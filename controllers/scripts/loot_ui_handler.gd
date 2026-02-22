@@ -5,6 +5,9 @@ extends Panel
 @export var title_label: Label
 @export var inventory_slot_prefab: PackedScene = preload("uid://q62nbm3h4dgb") 
 
+@onready var store_all_button: Button = $StoreAllButton
+@onready var take_all_button: Button = $TakeAllButton
+
 var current_container: LootContainerComponent
 var active_slots: Array[InventorySlot] = []
 
@@ -12,6 +15,10 @@ var active_slots: Array[InventorySlot] = []
 func _ready() -> void:
 	Global.open_loot_ui.connect(open_loot_panel)
 	Global.close_loot_ui.connect(close_loot_panel)
+	if take_all_button:
+		take_all_button.pressed.connect(_on_take_all_pressed)
+	if store_all_button:
+		store_all_button.pressed.connect(_on_store_all_pressed)
 	self.visible = false
 	self.modulate.a = 0.0
 
@@ -165,3 +172,75 @@ func _sync_loot_data() -> void:
 		else:
 			config.item = null
 			config.amount = 0
+
+# ==========================================
+# 智能一键收取逻辑
+# ==========================================
+func _on_take_all_pressed() -> void:
+	if not current_container: return
+	var main_inventory = get_parent()
+	if not main_inventory or not main_inventory.has_method("PickupItem"): return
+	
+	var sound_played = false
+	
+	for slot_ui in active_slots:
+		if slot_ui.SlotFilled:
+			var item = slot_ui.SlotData
+			var amount = slot_ui.StackCount
+			
+			var success = main_inventory.PickupItem(item, amount)
+			if success:
+				slot_ui.ClearSlot()
+				if not sound_played:
+					main_inventory._play_ui_sound("button_click")
+					sound_played = true
+	
+	_sync_loot_data()
+
+func _on_store_all_pressed() -> void:
+	if not current_container: return
+	var main_inventory = get_parent()
+	if not main_inventory: return
+	
+	var sound_played = false
+	
+	# 遍历玩家背包里的所有物品，尝试塞进箱子里
+	for p_slot in main_inventory.InventorySlots:
+		if p_slot.SlotFilled:
+			var item = p_slot.SlotData
+			var amount = p_slot.StackCount
+			var remaining_to_store = amount
+			
+			# 1. 优先找箱子里的同类物品堆叠
+			for l_slot in active_slots:
+				if remaining_to_store <= 0: break
+				if l_slot.SlotFilled and l_slot.SlotData == item:
+					var available = l_slot.GetAvailableSpace()
+					if available > 0:
+						var add_amount = min(available, remaining_to_store)
+						l_slot.AddStack(add_amount)
+						remaining_to_store -= add_amount
+						
+			# 2. 如果还有剩余，找箱子里的空格子放
+			for l_slot in active_slots:
+				if remaining_to_store <= 0: break
+				if not l_slot.SlotFilled:
+					var add_amount = min(item.MaxStackSize, remaining_to_store)
+					l_slot.FillSlot(item, add_amount)
+					remaining_to_store -= add_amount
+					
+			# 结算扣除：如果你存进去了东西，就在玩家包里扣除对应的数量
+			var stored_amount = amount - remaining_to_store
+			if stored_amount > 0:
+				p_slot.RemoveStack(stored_amount)
+				if p_slot.StackCount <= 0:
+					p_slot.ClearSlot()
+					
+				if not sound_played:
+					main_inventory._play_ui_sound("button_click")
+					sound_played = true
+					
+	_sync_loot_data()
+	# 如果当前玩家正选中某个被存进去的物品，清空显示
+	if main_inventory.current_selected_slot and not main_inventory.current_selected_slot.SlotFilled:
+		main_inventory.clear_info_display()

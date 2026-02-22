@@ -319,14 +319,18 @@ func spawn_dropped_item(item:ItemData, amount:int):
 	spawn_pos.y=max(spawn_pos.y, 0.1)
 	var player_parent=player.get_parent()
 	for i in amount:
-		var dropped_item=item_scene.instantiate() as Node3D
+		var dropped_item = item_scene.instantiate() as Node3D
 		if not dropped_item: return
-		var offset=Vector3.ZERO
+		var offset = Vector3.ZERO
 		if amount > 1:
 			offset.x = (i - float(amount-1) / 2) * 0.3
 			offset.z = (i % 2) * 0.2
+			
+		# 【核心修复】：在加入场景树之前，先在内存中设定好它的坐标轴
+		dropped_item.position = spawn_pos + offset
+		
+		# 然后再将其安全地添加到场景中！
 		player_parent.add_child(dropped_item)
-		dropped_item.global_position=spawn_pos + offset
 
 func PickupItem(item:ItemData, amount:int=1) -> bool:
 	if not CanPickupItem(item, amount): return false

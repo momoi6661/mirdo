@@ -160,6 +160,7 @@ mesh = SubResource("BoxMesh_xc4gq")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Box" unique_id=265354530]
 script = ExtResource("3_m48vv")
+container_size = 100
 initial_loot = Array[ExtResource("5_ecv8m")]([SubResource("Resource_ecv8m"), SubResource("Resource_ywvwd")])
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Box/StaticBody3D" unique_id=1033063653]
