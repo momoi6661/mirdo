@@ -4,6 +4,10 @@ class_name InventorySlot
 signal OnItemDropped(fromSlotId,toSlotId, amount)
 signal item_clicked(item_data)
 
+enum SlotOwner { PLAYER, LOOT_BOX }
+var slot_owner: SlotOwner = SlotOwner.PLAYER
+var parent_handler: Node 
+
 @export var IconSlot:TextureRect
 @export var CountLabel:Label
 @export var amount_selector:AmountSelectorPanel
@@ -129,7 +133,7 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 		
 		set_drag_preview(drag_preview)
 		
-		var drag_data={"Type":"Item","ID":InventorySlotId,"Amount":drag_amount}
+		var drag_data={"Type":"Item","ID":InventorySlotId,"Amount":drag_amount,"source_slot":self}
 		print("返回拖拽数据: ", drag_data)
 		print("=== 拖拽数据准备完成 ===
 ")
@@ -148,6 +152,16 @@ func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
 
 func _drop_data(at_position: Vector2, data: Variant) -> void:
 	var amount = data.get("Amount", 0)
+	var source_slot = data.get("source_slot")
+	
+	if source_slot and source_slot != self:
+		if source_slot.slot_owner != self.slot_owner:
+			if self.slot_owner == SlotOwner.PLAYER:
+				self.parent_handler.transfer_item_from_loot(source_slot, self, amount)
+			elif self.slot_owner == SlotOwner.LOOT_BOX:
+				self.parent_handler.transfer_item_from_player(source_slot, self, amount)
+			return
+			
 	OnItemDropped.emit(data["ID"],InventorySlotId, amount)
 
 func ClearSlot():

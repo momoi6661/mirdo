@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bvx5k2nah7n8p"]
+[gd_scene format=3 uid="uid://b380plj3gqjtn"]
 
 [ext_resource type="Script" uid="uid://dwpi1640ycbhf" path="res://scripts/Inventory/AmountSelectorPanel.gd" id="1_amount"]
 

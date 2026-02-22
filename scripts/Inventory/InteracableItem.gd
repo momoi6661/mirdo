@@ -75,3 +75,32 @@ func GainFocus():
 
 func LoseFocus():
 	remove_outline()
+
+# ==========================================
+# --- 接入全新交互系统的接口 ---
+# ==========================================
+
+func get_interaction_time() -> float:
+	return 0.5 
+
+func get_prompt_text() -> String:
+	if item_data:
+		return "交互: " + item_data.ItemName
+	return "交互"
+
+func interact(player: Node) -> void:
+	if item_data and player.has_method("add_to_inventory"):
+		if player.add_to_inventory(item_data):
+			queue_free()
+
+func short_interact(player: Node) -> void:
+	var pickup_handler = player.get_node_or_null("Components/PickupHandler")
+	if not pickup_handler:
+		pickup_handler = player.get("pickup_handler")
+		
+	if pickup_handler:
+		var target_body = self as Node
+		if target_body is RigidBody3D:
+			pickup_handler.pickup_specific_object(target_body)
+		elif get_parent() is RigidBody3D:
+			pickup_handler.pickup_specific_object(get_parent())

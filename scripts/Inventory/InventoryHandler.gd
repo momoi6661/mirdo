@@ -28,6 +28,7 @@ var desc_tween: Tween
 var empty_state_active: bool = true
 
 var inventory_visible: bool = false
+var main_panel_original_pos: Vector2
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
@@ -63,110 +64,53 @@ func _play_ui_sound(sound_type: String) -> void:
 		ui_sound_player.play()
 
 func play_open_animation():
-	if is_transitioning:
-		if panel_tween and panel_tween.is_valid():
-			panel_tween.kill()
-	is_transitioning = true
 	self.visible = true
-	
+	_play_ui_sound("menu_open")
+	if has_node("UIAnimationPlayer"):
+		var animator = $UIAnimationPlayer
+		if animator.has_animation("inv_open"):
+			animator.play("inv_open")
+
+func play_loot_open_animation():
+	self.visible = true
 	_play_ui_sound("menu_open")
 	
-	if PanelNode:
-		PanelNode.scale = Vector2(0.95, 0.95)
-		PanelNode.modulate.a = 0.0
+	var loot_panel = get_node_or_null("LootPanel")
+	if loot_panel:
+		loot_panel.visible = true
 		
-		panel_tween = create_tween().set_parallel(true)
-		panel_tween.tween_property(PanelNode, "scale", Vector2(1, 1), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		panel_tween.tween_property(PanelNode, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_SINE)
-		
-		await panel_tween.finished
-	is_transitioning = false
+	if has_node("UIAnimationPlayer"):
+		var animator = $UIAnimationPlayer
+		if animator.has_animation("loot_open"):
+			animator.play("loot_open")
 
 func play_close_animation():
-	if is_transitioning:
-		if panel_tween and panel_tween.is_valid():
-			panel_tween.kill()
-	is_transitioning = true
-	
 	_play_ui_sound("menu_close")
 	
-	if PanelNode:
-		panel_tween = create_tween().set_parallel(true)
-		panel_tween.tween_property(PanelNode, "scale", Vector2(0.95, 0.95), 0.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		panel_tween.tween_property(PanelNode, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_SINE)
+	if has_node("UIAnimationPlayer"):
+		var animator = $UIAnimationPlayer
 		
-		await panel_tween.finished
-		
-	self.visible = false
-	is_transitioning = false
-
-func _process(delta: float) -> void:
-	if empty_state_active and itemDescLabel:
-		var time = Time.get_ticks_msec() / 1000.0
-		if fmod(time, 1.0) < 0.5:
-			itemDescLabel.text = "> _"
+		var loot_panel = get_node_or_null("LootPanel")
+		if loot_panel and loot_panel.visible:
+			if animator.has_animation("loot_close"):
+				animator.play("loot_close")
+			else:
+				animator.play("close_all")
 		else:
-			itemDescLabel.text = "> "
-
-func _ready() -> void:
-	mouse_filter=Control.MOUSE_FILTER_STOP
+			if animator.has_animation("inv_close"):
+				animator.play("inv_close")
+			else:
+				if animator.has_animation("close_all"):
+					animator.play("close_all")
+				
+		await animator.animation_finished
 	
-	if not InventoryGrid:
-		push_error("InventoryGrid 未设置")
-		return
+	self.visible = false
+	var loot_panel = get_node_or_null("LootPanel")
+	if loot_panel:
+		loot_panel.visible = false
 		
-	# 如果场景里已经手动摆放了格子，就先收集它们
-	
-	ui_sound_player = AudioStreamPlayer.new()
-	ui_sound_player.bus = "UI"
-	add_child(ui_sound_player)
-	
-	# Make sure panel has center pivot for scaling
-	if PanelNode:
-		PanelNode.pivot_offset = PanelNode.size / 2.0
-
-	InventorySlots.clear()
-	var existing_slots = []
-	for child in InventoryGrid.get_children():
-		if child is Control and child.has_node("Button"):
-			var slot = child.get_node("Button") as InventorySlot
-			if slot:
-				existing_slots.append(slot)
-	
-	# 如果已经有格子了，就直接用现成的，不再重新实例化
-	if existing_slots.size() > 0:
-		for i in range(existing_slots.size()):
-			var slot = existing_slots[i]
-			slot.InventorySlotId = i
-			slot.amount_selector = AmountSelector
-			if not slot.OnItemDropped.is_connected(ItemDroppedOnSlot):
-				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
-			if not slot.item_clicked.is_connected(_on_slot_item_clicked):
-				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
-			if not slot.button_up.is_connected(_on_slot_button_up):
-				slot.button_up.connect(_on_slot_button_up.bind(slot))
-			InventorySlots.append(slot)
-	else:
-		# 如果场景里没有格子，且有预制体，则代码生成
-		if not InventorySlotPrefab:
-			push_error("InventorySlotPrefab 未设置且 Grid 为空")
-			return
-			
-		for i in ItemSlotsCount:
-			var slot_node=InventorySlotPrefab.instantiate()
-			InventoryGrid.add_child(slot_node)
-			var slot=slot_node.get_node("Button") as InventorySlot
-			if slot:
-				slot.InventorySlotId=i
-				slot.amount_selector=AmountSelector
-				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
-				
-				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
-				slot.button_up.connect(_on_slot_button_up.bind(slot))
-				
-				InventorySlots.append(slot)
-	
-	call_deferred("apply_slot_configs")
+	Global.close_loot_ui.emit()
 
 func _on_slot_item_clicked(item_data: ItemData, slot: Control):
 	if current_selected_slot and current_selected_slot != slot:
@@ -377,3 +321,7 @@ func load_inventory_data(data: Array) -> void:
 func clear_inventory() -> void:
 	for slot in InventorySlots:
 		slot.ClearSlot()
+
+func _record_original_pos():
+	if PanelNode:
+		main_panel_original_pos = PanelNode.position

@@ -14,8 +14,6 @@ extends CharacterBody3D
 @export var pickup_handler:PickupHandlerComponent
 @export var standing_collision:CollisionShape3D
 @export var inventory_handler:InventoryHandler
-@export var pickup_ray: RayCast3D
-@export var pickup_ui: PickupTextUI
 @export var unique_id: String = "player_001"
 
 var interact_hold_timer:float=0.0
@@ -53,112 +51,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		_rotation_input = -event.relative.x * MOUSE_SENSITIVITY
 		_tilt_input = -event.relative.y * MOUSE_SENSITIVITY
 
+var _drop_timer: float = 0.0
+var _is_holding_drop: bool = false
+
 func _input(event):
 	if event.is_action_pressed("sprint"):
-		_is_sprinting = !_is_sprinting
+		_is_sprinting = !_is_sprinting		
 	
-	if event.is_action_pressed("interact"):
-		is_interacting = true
-		interact_hold_timer = 0.0
-	
-	if event.is_action_released("interact"):
-		if pickup_ui:
-			pickup_ui.stop_picking_animation()
-		if is_interacting and interact_hold_timer > 0.0 and interact_hold_timer < long_press_time:
-			handle_short_press()
-		is_interacting = false
-		interact_hold_timer = 0.0
-	
+	# 处理长短按抛弃逻辑 (T 键)
 	if event.is_action_pressed("drop_item"):
-		if pickup_handler:
-			pickup_handler.release_object(true)
+		if pickup_handler and pickup_handler.is_holding_object():
+			_is_holding_drop = true
+			_drop_timer = 0.0
+	
+	if event.is_action_released("drop_item"):
+		if _is_holding_drop and pickup_handler:
+			if _drop_timer < 0.3:
+				pickup_handler.drop_object()  # 短按：轻轻放下
+			else:
+				pickup_handler.throw_object() # 长按：用力抛出
+		_is_holding_drop = false
+		_drop_timer = 0.0
 
 func _process(delta):
-	if not pickup_ray:
-		return
-	
-	if pickup_ui:
-		pickup_ray.force_raycast_update()
-		
-		if pickup_ray.is_colliding():
-			var collider = pickup_ray.get_collider()
-			if collider and collider is InteractableItem and collider.item_data:
-				pickup_ui.set_item_name(collider.item_data.ItemName)
-				if is_interacting:
-					pickup_ui.set_picking()
-					pickup_ui.show()
-					
-					# 只有在指着物品时才增加计时器
-					interact_hold_timer += delta
-					
-					# 当计时器达到阈值时拾取物品
-					if interact_hold_timer >= long_press_time:
-						handle_long_press()
-						interact_hold_timer = 0.0
-						if pickup_ui:
-							pickup_ui.stop_picking_animation()
-				else:
-					if inventory_handler and inventory_handler.is_inside_tree() and not inventory_handler.CanPickupItem(collider.item_data):
-						pickup_ui.set_pickup_text("背包已满")
-					else:
-						pickup_ui.set_pickup_text("长按 E 拾取")
-					pickup_ui.show()
-			else:
-				pickup_ui.hide()
-				# 如果不指着物品，重置计时器
-				if is_interacting:
-					interact_hold_timer = 0.0
-					if pickup_ui:
-						pickup_ui.stop_picking_animation()
-		else:
-			pickup_ui.hide()
-			# 如果不指着物品，重置计时器
-			if is_interacting:
-				interact_hold_timer = 0.0
-				if pickup_ui:
-					pickup_ui.stop_picking_animation()
+	# 只要按住 T 键，就累加时间
+	if _is_holding_drop:
+		_drop_timer += delta
 
-
-
-func handle_short_press():
-	if not pickup_ray:
-		return
-	
-	pickup_ray.force_raycast_update()
-	
-	if not pickup_ray.is_colliding():
-		return
-	
-	var collider = pickup_ray.get_collider()
-	
-	if not collider:
-		return
-	
-	if collider is InteractableItem and pickup_handler:
-		print("短按：将物品拿在手上")
-		pickup_handler.pickup_object(collider)
-func handle_long_press():
-	if not pickup_ray:
-		print("错误: pickup_ray 未设置")
-		return
-	
-	pickup_ray.force_raycast_update()
-	
-	if not pickup_ray.is_colliding():
-		return
-	
-	var collider = pickup_ray.get_collider()
-	
-	if not collider:
-		return
-	
-	if collider is InteractableItem and collider.item_data:
-		var item_data = collider.item_data
-		if add_to_inventory(item_data):
-			collider.queue_free()
-			print("添加物品到背包: ", item_data.ItemName)
-		else:
-			print("背包已满，无法添加: ", item_data.ItemName)
 
 func add_to_inventory(item: ItemData) -> bool:
 	if not inventory_handler:
@@ -283,10 +202,6 @@ func _ready():
 	if !pickup_handler:
 		if has_node("Components/PickupHandler"):
 			pickup_handler = $Components/PickupHandler
-	
-	if !pickup_ray:
-		if has_node("Marker3D/CameraOffset/Camera3D/PickUpRayCast"):
-			pickup_ray = $Marker3D/CameraOffset/Camera3D/PickUpRayCast
 
 # --- 存档系统自定义接口 ---
 

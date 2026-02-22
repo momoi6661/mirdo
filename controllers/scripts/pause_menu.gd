@@ -16,6 +16,7 @@ signal exit_requested
 @onready var ui_sound_player=%UISoundPlayer
 
 var is_transitioning: bool = false
+var pre_pause_mouse_mode: int = Input.MOUSE_MODE_CAPTURED
 
 var sound_library: Dictionary = {
 	"button_hover": "uid://bcmrth5ffkdj1",
@@ -47,6 +48,9 @@ func show_menu() -> void:
 	if is_transitioning or visible: return
 	is_transitioning = true
 	
+	# 记录打开 ESC 前的鼠标状态（比如是不是开着背包）
+	pre_pause_mouse_mode = Input.mouse_mode
+	
 	show()
 	if animation_player:
 		animation_player.play("fade_in")
@@ -76,7 +80,8 @@ func hide_menu() -> void:
 	
 	hide()
 	
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# 恢复到打开 ESC 前的鼠标状态！如果之前开着背包，它依然是 VISIBLE
+	Input.mouse_mode = pre_pause_mouse_mode
 	get_tree().paused = false
 	is_transitioning = false
 

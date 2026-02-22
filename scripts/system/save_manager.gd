@@ -6,8 +6,8 @@ func _ready() -> void:
 	if not DirAccess.dir_exists_absolute(SAVE_DIR):
 		DirAccess.make_dir_absolute(SAVE_DIR)
 	
-	if has_save("manual_save"):
-		load_game.call_deferred("manual_save")
+	#if has_save("manual_save"):
+		#load_game.call_deferred("manual_save")
 
 func has_save(slot_name: String = "manual_save") -> bool:
 	return FileAccess.file_exists(SAVE_DIR + slot_name + ".tres")

@@ -2,8 +2,10 @@
 
 [ext_resource type="PackedScene" uid="uid://btv0a42cgxt8g" path="res://levels/WE_test.tscn" id="1_db21n"]
 [ext_resource type="Material" uid="uid://cn1gsy15bkaff" path="res://materials/grid.tres" id="2_x5xie"]
+[ext_resource type="Script" uid="uid://dyi51kcv8f7jh" path="res://components/loot_container_component.gd" id="3_m48vv"]
 [ext_resource type="Texture2D" uid="uid://ivvpsi314b34" path="res://textures/grid.jpg" id="3_yfwkt"]
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="4_liofc"]
+[ext_resource type="Script" uid="uid://bwrwnqcuerqts" path="res://scripts/Inventory/SlotConfig.gd" id="5_ecv8m"]
 [ext_resource type="PackedScene" uid="uid://bvptujf8q5r05" path="res://models/benchs/bench.tscn" id="5_wtxts"]
 [ext_resource type="PackedScene" uid="uid://cajdj0uq7nrqh" path="res://models/benchs/bench_2.tscn" id="6_jrmpr"]
 [ext_resource type="PackedScene" uid="uid://em6ql0cp5lpm" path="res://models/benchs/bench_broken.tscn" id="7_3l7at"]
@@ -97,6 +99,21 @@ shader_parameter/uv2_offset = Vector3(0, 0, 0)
 material = SubResource("ShaderMaterial_0racc")
 size = Vector3(2, 2, 2)
 
+[sub_resource type="Resource" id="Resource_a4ax1"]
+script = ExtResource("5_ecv8m")
+slot_id = 0
+metadata/_custom_type_script = "uid://bwrwnqcuerqts"
+
+[sub_resource type="Resource" id="Resource_m48vv"]
+script = ExtResource("5_ecv8m")
+slot_id = 1
+metadata/_custom_type_script = "uid://bwrwnqcuerqts"
+
+[sub_resource type="Resource" id="Resource_ecv8m"]
+script = ExtResource("5_ecv8m")
+slot_id = 2
+metadata/_custom_type_script = "uid://bwrwnqcuerqts"
+
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_vp4dy"]
 data = PackedVector3Array(-1, 1, 1, 1, 1, 1, -1, -1, 1, 1, 1, 1, 1, -1, 1, -1, -1, 1, 1, 1, -1, -1, 1, -1, 1, -1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, 1, 1, 1, 1, 1, -1, 1, -1, 1, 1, 1, -1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, 1, -1, 1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, -1, -1, 1, 1, -1, 1, -1, -1, -1, 1, -1, 1, 1, -1, -1, -1, -1, -1)
 
@@ -143,6 +160,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 1, -5)
 mesh = SubResource("BoxMesh_xc4gq")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Box" unique_id=265354530]
+script = ExtResource("3_m48vv")
+slots = Array[ExtResource("5_ecv8m")]([SubResource("Resource_a4ax1"), SubResource("Resource_m48vv"), SubResource("Resource_ecv8m")])
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Box/StaticBody3D" unique_id=1033063653]
 shape = SubResource("ConcavePolygonShape3D_vp4dy")

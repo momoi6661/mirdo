@@ -14,9 +14,10 @@
 [ext_resource type="Script" path="res://controllers/scripts/player_ui.gd" id="11_ui"]
 [ext_resource type="Script" uid="uid://bk3fwfdlmkwao" path="res://controllers/compoents/step_handler_component.gd" id="12_step"]
 [ext_resource type="Script" uid="uid://76ijpxrm7y33" path="res://controllers/compoents/pickup_handler_component.gd" id="13_pickup"]
+[ext_resource type="Script" uid="uid://uhf2cghy364c" path="res://controllers/compoents/player_interaction_component.gd" id="13_yvtcv"]
 [ext_resource type="PackedScene" uid="uid://dgmyb0374yij2" path="res://controllers/ui/InventoryUI.tscn" id="15_3og01"]
-[ext_resource type="PackedScene" uid="uid://dg354npug7yv2" path="res://controllers/ui/PickupTextUI.tscn" id="16_progress"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="17_save_comp"]
+[ext_resource type="PackedScene" path="res://controllers/ui/FPSInteractionHUD.tscn" id="18_h7h5r"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -127,7 +128,7 @@ pickup_handler = NodePath("Components/PickupHandler")
 standing_collision = NodePath("CollisionShape3D")
 inventory_handler = NodePath("Control/InventoryUi")
 pickup_ray = NodePath("Marker3D/CameraOffset/Camera3D/PickUpRayCast")
-pickup_ui = NodePath("Control/PickupTextUI")
+pickup_ui = NodePath("")
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -175,14 +176,18 @@ MAX_STEP_HEIGHT = 0.2
 MAX_CROUCH_STEP_HEIGHT = 0.7
 camera_offset = NodePath("../../Marker3D/CameraOffset")
 
-[node name="PickupHandler" type="Node" parent="Components" unique_id=1410065402 node_paths=PackedStringArray("player", "pickup_ray", "pickup_holder", "arm_end")]
+[node name="PickupHandler" type="Node" parent="Components" unique_id=1410065402 node_paths=PackedStringArray("player", "pickup_holder", "arm_end")]
 script = ExtResource("13_pickup")
 player = NodePath("../..")
-pickup_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
 pickup_holder = NodePath("../../Marker3D/CameraOffset/PickUpArm")
 arm_end = NodePath("../../Marker3D/CameraOffset/PickUpArm/ArmEnd")
 throw_force = 8.0
 follow_speed = 15.0
+
+[node name="PlayerInteractionComponent" type="Node" parent="Components" unique_id=2034430049 node_paths=PackedStringArray("interaction_ray", "interaction_hud")]
+script = ExtResource("13_yvtcv")
+interaction_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
+interaction_hud = NodePath("../../Control/FPSInteractionHUD")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=3143502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
@@ -274,9 +279,6 @@ visible = false
 points = PackedVector2Array(-5, 0, -15, 0)
 width = 3.0
 
-[node name="PickupTextUI" parent="Control" unique_id=506145329 instance=ExtResource("16_progress")]
-layout_mode = 1
-
 [node name="InventoryUi" parent="Control" unique_id=1812563664 node_paths=PackedStringArray("player") instance=ExtResource("15_3og01")]
 layout_mode = 1
 player = NodePath("../..")
@@ -305,6 +307,9 @@ text = "State: Idle"
 [node name="SpeedLabel" type="Label" parent="Control/DebugPanel/MarginContainer/VBoxContainer" unique_id=-1294967294]
 layout_mode = 2
 text = "Speed: 0.0"
+
+[node name="FPSInteractionHUD" parent="Control" unique_id=1576126160 instance=ExtResource("18_h7h5r")]
+layout_mode = 1
 
 [connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
 [connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]

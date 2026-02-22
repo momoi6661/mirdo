@@ -15,7 +15,15 @@ func start_interaction(item) -> void:
 	_is_interacting = true
 	_current_interaction_time = 0.0
 	visible = true
-	label.text = "Collecting..."
+	
+	if item and item.has_method("get_prompt_text"):
+		label.text = item.get_prompt_text()
+	else:
+		label.text = "Interacting..."
+		
+	if item and item.has_method("get_interaction_time"):
+		_interaction_duration = item.get_interaction_time()
+		
 	progress_bar.value = 0.0
 
 func update_progress(delta_time: float) -> void:

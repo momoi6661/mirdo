@@ -1,0 +1,83 @@
+[gd_scene format=3 uid="uid://d1awi57j76xuy"]
+
+[ext_resource type="Script" uid="uid://c58lovit8bivh" path="res://controllers/scripts/loot_ui_handler.gd" id="1_loot_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.015, 0.015, 0.018, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.3, 0.05, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="LootPanel" type="Panel" unique_id=2137424645 node_paths=PackedStringArray("loot_grid", "title_label")]
+custom_minimum_size = Vector2(300, 500)
+anchors_preset = -1
+anchor_left = 0.42200002
+anchor_top = 0.26900002
+anchor_right = 0.578
+anchor_bottom = 0.731
+offset_left = -0.24005127
+offset_top = -0.52001953
+offset_right = 0.23999023
+offset_bottom = 0.52001953
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+script = ExtResource("1_loot_script")
+loot_grid = NodePath("MarginContainer/VBoxContainer/ScrollContainer/LootGrid")
+title_label = NodePath("Header")
+metadata/_edit_use_anchors_ = true
+
+[node name="DecorBar" type="ColorRect" parent="." unique_id=23280734]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = -8.0
+grow_vertical = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="Header" type="Label" parent="." unique_id=1981333762]
+layout_mode = 1
+offset_left = 20.0
+offset_top = 15.0
+offset_right = 200.0
+offset_bottom = 45.0
+theme_override_colors/font_color = Color(0.9, 0.3, 0.05, 1)
+theme_override_font_sizes/font_size = 20
+text = "LOOT_DATA //"
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1975766427]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 50.0
+offset_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=646980514]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBoxContainer" unique_id=835254052]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="LootGrid" type="GridContainer" parent="MarginContainer/VBoxContainer/ScrollContainer" unique_id=1014145492]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4
