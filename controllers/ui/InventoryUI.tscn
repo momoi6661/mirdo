@@ -480,3 +480,5 @@ autowrap_mode = 3
 
 [node name="UIAnimationPlayer" type="AnimationPlayer" parent="." unique_id=1331844662]
 libraries/ = SubResource("AnimationLibrary_ui")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=117270695]

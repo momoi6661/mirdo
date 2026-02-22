@@ -15,6 +15,7 @@ class_name InventoryHandler
 @export var itemIconDisplay: TextureRect
 
 @export var slot_configs: Array[SlotConfig] = []
+@onready var ui_sound_player: AudioStreamPlayer = $AudioStreamPlayer
 
 var InventorySlots:Array[InventorySlot]=[]
 const SLOT_SIZE:int=64
@@ -29,6 +30,57 @@ var empty_state_active: bool = true
 
 var inventory_visible: bool = false
 var main_panel_original_pos: Vector2
+
+func _ready() -> void:
+	mouse_filter=Control.MOUSE_FILTER_STOP
+	
+	if not ui_sound_player:
+		ui_sound_player = AudioStreamPlayer.new()
+		ui_sound_player.bus = "UI"
+		add_child(ui_sound_player)
+	
+	if not InventoryGrid:
+		push_error("InventoryGrid 未设置")
+		return
+		
+	InventorySlots.clear()
+	var existing_slots = []
+	for child in InventoryGrid.get_children():
+		if child is Control and child.has_node("Button"):
+			var slot = child.get_node("Button") as InventorySlot
+			if slot:
+				existing_slots.append(slot)
+	
+	if existing_slots.size() > 0:
+		for i in range(existing_slots.size()):
+			var slot = existing_slots[i]
+			slot.InventorySlotId = i
+			slot.amount_selector = AmountSelector
+			if not slot.OnItemDropped.is_connected(ItemDroppedOnSlot):
+				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
+			if not slot.item_clicked.is_connected(_on_slot_item_clicked):
+				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
+			if not slot.button_up.is_connected(_on_slot_button_up):
+				slot.button_up.connect(_on_slot_button_up.bind(slot))
+			InventorySlots.append(slot)
+	else:
+		if not InventorySlotPrefab:
+			push_error("InventorySlotPrefab 未设置且 Grid 为空")
+			return
+			
+		for i in ItemSlotsCount:
+			var slot_node=InventorySlotPrefab.instantiate()
+			InventoryGrid.add_child(slot_node)
+			var slot=slot_node.get_node("Button") as InventorySlot
+			if slot:
+				slot.InventorySlotId=i
+				slot.amount_selector=AmountSelector
+				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
+				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
+				slot.button_up.connect(_on_slot_button_up.bind(slot))
+				InventorySlots.append(slot)
+	
+	call_deferred("apply_slot_configs")
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
@@ -45,7 +97,7 @@ func toggle_inventory():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		play_close_animation()
 
-var ui_sound_player: AudioStreamPlayer
+
 var is_transitioning: bool = false
 var panel_tween: Tween
 
