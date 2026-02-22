@@ -1,0 +1,240 @@
+[gd_scene format=3 uid="uid://dlknl2ih32w1p"]
+
+[ext_resource type="Script" uid="uid://dsekwaboq524b" path="res://controllers/scripts/transition_screen.gd" id="1_script"]
+[ext_resource type="Shader" uid="uid://dobqp76dorgxj" path="res://controllers/ui/shaders/transition_fade.gdshader" id="2_shader"]
+
+[sub_resource type="Gradient" id="Gradient_bg"]
+offsets = PackedFloat32Array(0, 0.7108434, 1)
+colors = PackedColorArray(0.05, 0.02, 0.01, 1, 0.01, 0.01, 0.01, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bg"]
+gradient = SubResource("Gradient_bg")
+width = 512
+height = 512
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 1)
+
+[sub_resource type="Animation" id="Animation_fade_in"]
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Control:modulate:a")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [0.0, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Scanline:material:shader_parameter/fade")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [0.0, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_fade_out"]
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Control:modulate:a")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [1.0, 0.0]
+}
+
+[sub_resource type="Animation" id="Animation_idle"]
+loop_mode = 1
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Control/CenterContainer/VBox/StatusLabel:modulate:a")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5, 1),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [1.0, 0.4, 1.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Control/CenterContainer/VBox/LoadingBlocks/B1:modulate:a")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.2, 1.0, 0.2]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Control/CenterContainer/VBox/LoadingBlocks/B2:modulate:a")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0.1, 0.3, 0.5),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.2, 1.0, 0.2]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Control/CenterContainer/VBox/LoadingBlocks/B3:modulate:a")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0.2, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.2, 1.0, 0.2]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("Control/CenterContainer/VBox/LoadingBlocks/B4:modulate:a")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0.3, 0.5, 0.7),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.2, 1.0, 0.2]
+}
+tracks/5/type = "value"
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/path = NodePath("Control/CenterContainer/VBox/LoadingBlocks/B5:modulate:a")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [0.2, 1.0, 0.2]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_anim"]
+_data = {
+&"RESET": SubResource("Animation_fade_in"),
+&"fade_in": SubResource("Animation_fade_in"),
+&"fade_out": SubResource("Animation_fade_out"),
+&"idle_pulse": SubResource("Animation_idle")
+}
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_scanline"]
+shader = ExtResource("2_shader")
+shader_parameter/fade = 0.0
+shader_parameter/fade_color = Color(0.01, 0.01, 0.015, 1)
+
+[node name="TransitionUI" type="CanvasLayer" unique_id=2140570857]
+layer = 128
+script = ExtResource("1_script")
+
+[node name="Control" type="Control" parent="." unique_id=865843678]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BG" type="TextureRect" parent="Control" unique_id=745949863]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture2D_bg")
+
+[node name="CenterContainer" type="CenterContainer" parent="Control" unique_id=393350932]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Control/CenterContainer" unique_id=1086567503]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="StatusLabel" type="Label" parent="Control/CenterContainer/VBox" unique_id=1708052153]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.3, 0.05, 1)
+theme_override_font_sizes/font_size = 18
+text = "DATA_RESTORATION // IN_PROGRESS"
+horizontal_alignment = 1
+
+[node name="LoadingBlocks" type="HBoxContainer" parent="Control/CenterContainer/VBox" unique_id=947204630]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="B1" type="ColorRect" parent="Control/CenterContainer/VBox/LoadingBlocks" unique_id=816342514]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="B2" type="ColorRect" parent="Control/CenterContainer/VBox/LoadingBlocks" unique_id=639863872]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="B3" type="ColorRect" parent="Control/CenterContainer/VBox/LoadingBlocks" unique_id=1251939762]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="B4" type="ColorRect" parent="Control/CenterContainer/VBox/LoadingBlocks" unique_id=1856677375]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="B5" type="ColorRect" parent="Control/CenterContainer/VBox/LoadingBlocks" unique_id=1531821633]
+custom_minimum_size = Vector2(12, 12)
+layout_mode = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="Footer" type="Label" parent="Control/CenterContainer/VBox" unique_id=489646308]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.2)
+theme_override_font_sizes/font_size = 10
+text = "SECURE_BOOT_SEQUENCE // ANTIGRAVITY_OS"
+horizontal_alignment = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=413167101]
+unique_name_in_owner = true
+libraries/ = SubResource("AnimationLibrary_anim")
+
+[node name="Scanline" type="ColorRect" parent="." unique_id=1870874095]
+visible = false
+material = SubResource("ShaderMaterial_scanline")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2

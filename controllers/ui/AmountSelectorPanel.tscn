@@ -1,0 +1,89 @@
+[gd_scene format=3 uid="uid://bvx5k2nah7n8p"]
+
+[ext_resource type="Script" uid="uid://dwpi1640ycbhf" path="res://scripts/Inventory/AmountSelectorPanel.gd" id="1_amount"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sfha3"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1, 0.1, 0.1, 0.6)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(3.252, 2.925, 2.907, 0.412)
+border_blend = true
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+corner_detail = 5
+
+[node name="AmountSelectorPanel" type="Panel" unique_id=1188612260 node_paths=PackedStringArray("title_label", "slider", "value_label", "confirm_button", "cancel_button")]
+custom_minimum_size = Vector2(200, 120)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -59.0
+offset_right = 100.0
+offset_bottom = 62.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_sfha3")
+script = ExtResource("1_amount")
+title_label = NodePath("MarginContainer/VBoxContainer/Label")
+slider = NodePath("MarginContainer/VBoxContainer/HSlider")
+value_label = NodePath("MarginContainer/VBoxContainer/ValueLabel")
+confirm_button = NodePath("MarginContainer/VBoxContainer/HBoxContainer/ConfirmButton")
+cancel_button = NodePath("MarginContainer/VBoxContainer/HBoxContainer/CancelButton")
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1308639860]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer" unique_id=1910127219]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer" unique_id=351695334]
+layout_mode = 2
+text = "选择数量"
+horizontal_alignment = 1
+
+[node name="HSlider" type="HSlider" parent="MarginContainer/VBoxContainer" unique_id=899147959]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 10.0
+value = 1.0
+
+[node name="ValueLabel" type="Label" parent="MarginContainer/VBoxContainer" unique_id=1504789201]
+layout_mode = 2
+text = "1"
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer" unique_id=1775535138]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CancelButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=1511435745]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "取消"
+
+[node name="ConfirmButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer" unique_id=1816813221]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "确认"

@@ -1,0 +1,310 @@
+[gd_scene format=3 uid="uid://c3ffql15mo0aj"]
+
+[ext_resource type="Script" uid="uid://dgro2pfgmo45x" path="res://controllers/scripts/fps_controller.gd" id="1_pgc1p"]
+[ext_resource type="Script" uid="uid://d2ejy7drn3gte" path="res://controllers/InteractionHandler/InteracableRange.gd" id="2_5w0k0"]
+[ext_resource type="Material" uid="uid://b4gwd5h7ixvct" path="res://materials/player.tres" id="2_gldw4"]
+[ext_resource type="Script" uid="uid://rt7ge3fxa3au" path="res://controllers/scripts/reticle.gd" id="3_xc2pf"]
+[ext_resource type="Script" uid="uid://c8oo7xkq6vyod" path="res://scripts/state_machine.gd" id="4_t6fw5"]
+[ext_resource type="Script" uid="uid://xcj3xr8csxby" path="res://controllers/scripts/idle_state.gd" id="5_y677r"]
+[ext_resource type="Script" path="res://controllers/scripts/walk_state.gd" id="6_7k3r2"]
+[ext_resource type="Script" uid="uid://dtp4ku553up7q" path="res://controllers/scripts/crouch_state.gd" id="7_r5k8n"]
+[ext_resource type="Script" uid="uid://da4cwyrp7m1qs" path="res://controllers/scripts/jump_state.gd" id="8_t4l9x"]
+[ext_resource type="Script" uid="uid://cti1dgo70wxkw" path="res://controllers/scripts/fall_state.gd" id="9_m6n3p"]
+[ext_resource type="Script" uid="uid://cqvbbg6g50abi" path="res://controllers/scripts/sprint_state.gd" id="10_sprint"]
+[ext_resource type="Script" path="res://controllers/scripts/player_ui.gd" id="11_ui"]
+[ext_resource type="Script" uid="uid://bk3fwfdlmkwao" path="res://controllers/compoents/step_handler_component.gd" id="12_step"]
+[ext_resource type="Script" uid="uid://76ijpxrm7y33" path="res://controllers/compoents/pickup_handler_component.gd" id="13_pickup"]
+[ext_resource type="PackedScene" uid="uid://dgmyb0374yij2" path="res://controllers/ui/InventoryUI.tscn" id="15_3og01"]
+[ext_resource type="PackedScene" uid="uid://dg354npug7yv2" path="res://controllers/ui/PickupTextUI.tscn" id="16_progress"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="17_save_comp"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
+radius = 6.5739846
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_u6tj1"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_6tv51"]
+material = ExtResource("2_gldw4")
+
+[sub_resource type="Animation" id="Animation_ca8e7"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("CollisionShape3D:shape:height")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [2.0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("CollisionShape3D:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 1, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Marker3D:position")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 1.5, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_xc2pf"]
+resource_name = "crouch"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("CollisionShape3D:shape:height")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [2.0, 1.5]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("CollisionShape3D:position")
+tracks/1/interp = 2
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 1, 0), Vector3(0, 0.75, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Marker3D:position")
+tracks/2/interp = 2
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(0, 1.5, 0), Vector3(0, 1, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_t6fw5"]
+_data = {
+&"RESET": SubResource("Animation_ca8e7"),
+&"crouch": SubResource("Animation_xc2pf")
+}
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l8yvu"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ca8e7"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rk4xh"]
+bg_color = Color(0.16206557, 0.1620656, 0.16206548, 1)
+
+[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler", "pickup_ray", "pickup_ui")]
+wall_min_slide_angle = 0.7853982
+script = ExtResource("1_pgc1p")
+MOUSE_SENSITIVITY = 0.25
+CAMERA_CONTROLLER = NodePath("Marker3D/CameraOffset/Camera3D")
+step_handler = NodePath("Components/StepHandler")
+pickup_handler = NodePath("Components/PickupHandler")
+standing_collision = NodePath("CollisionShape3D")
+inventory_handler = NodePath("Control/InventoryUi")
+pickup_ray = NodePath("Marker3D/CameraOffset/Camera3D/PickUpRayCast")
+pickup_ui = NodePath("Control/PickupTextUI")
+
+[node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
+script = ExtResource("17_save_comp")
+unique_id = "player_001"
+
+[node name="Area3D" type="Area3D" parent="." unique_id=210373777]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("2_5w0k0")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=1151415474]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.08, 0)
+shape = SubResource("SphereShape3D_5w0k0")
+
+[node name="StateMachine" type="Node" parent="." unique_id=2058013970 node_paths=PackedStringArray("CURRENT_STATE")]
+script = ExtResource("4_t6fw5")
+CURRENT_STATE = NodePath("IdleState")
+metadata/_custom_type_script = "uid://c8oo7xkq6vyod"
+
+[node name="IdleState" type="Node" parent="StateMachine" unique_id=1751029337]
+script = ExtResource("5_y677r")
+
+[node name="WalkState" type="Node" parent="StateMachine" unique_id=-133222203]
+script = ExtResource("6_7k3r2")
+
+[node name="SprintState" type="Node" parent="StateMachine" unique_id=-616043845]
+script = ExtResource("10_sprint")
+
+[node name="CrouchState" type="Node" parent="StateMachine" unique_id=1088988864]
+script = ExtResource("7_r5k8n")
+
+[node name="JumpState" type="Node" parent="StateMachine" unique_id=1456789012]
+script = ExtResource("8_t4l9x")
+
+[node name="FallState" type="Node" parent="StateMachine" unique_id=-1727077173]
+script = ExtResource("9_m6n3p")
+
+[node name="Components" type="Node" parent="." unique_id=2041336431]
+
+[node name="StepHandler" type="Node" parent="Components" unique_id=388787947 node_paths=PackedStringArray("player", "collision_shape", "camera_offset")]
+script = ExtResource("12_step")
+player = NodePath("../..")
+collision_shape = NodePath("../../CollisionShape3D")
+MAX_STEP_HEIGHT = 0.2
+MAX_CROUCH_STEP_HEIGHT = 0.7
+camera_offset = NodePath("../../Marker3D/CameraOffset")
+
+[node name="PickupHandler" type="Node" parent="Components" unique_id=1410065402 node_paths=PackedStringArray("player", "pickup_ray", "pickup_holder", "arm_end")]
+script = ExtResource("13_pickup")
+player = NodePath("../..")
+pickup_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
+pickup_holder = NodePath("../../Marker3D/CameraOffset/PickUpArm")
+arm_end = NodePath("../../Marker3D/CameraOffset/PickUpArm/ArmEnd")
+throw_force = 8.0
+follow_speed = 15.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=3143502]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_u6tj1")
+
+[node name="PlaceholderMesh" type="MeshInstance3D" parent="CollisionShape3D" unique_id=239223935]
+layers = 2
+mesh = SubResource("CapsuleMesh_6tv51")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=784737969]
+libraries/ = SubResource("AnimationLibrary_t6fw5")
+
+[node name="Marker3D" type="Marker3D" parent="." unique_id=1226719117]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="CameraOffset" type="Node3D" parent="Marker3D" unique_id=2006593265]
+
+[node name="Camera3D" type="Camera3D" parent="Marker3D/CameraOffset" unique_id=2006032877]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+top_level = true
+cull_mask = 1
+
+[node name="ReflectionProbe" type="ReflectionProbe" parent="Marker3D/CameraOffset/Camera3D" unique_id=336024960]
+update_mode = 1
+enable_shadows = true
+
+[node name="PickUpRayCast" type="RayCast3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=1410065399]
+target_position = Vector3(0, 0, -3)
+collision_mask = 3
+debug_shape_custom_color = Color(0.6953205, 0.86600894, 0.26181218, 0.078431375)
+
+[node name="PickUpArm" type="SpringArm3D" parent="Marker3D/CameraOffset" unique_id=1410065400]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0.5)
+shape = SubResource("BoxShape3D_l8yvu")
+spring_length = -2.4
+margin = 0.05
+
+[node name="ArmEnd" type="Node3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=172098117]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.4)
+
+[node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("SphereShape3D_ca8e7")
+target_position = Vector3(0, 0.5, 0)
+debug_shape_custom_color = Color(1.4514787, 1.2296157, 0.6632813, 0.88235295)
+
+[node name="Control" type="Control" parent="." unique_id=501820937]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("11_ui")
+
+[node name="CenterContainer" type="CenterContainer" parent="Control" unique_id=1001677642]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 10.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_xc2pf")
+
+[node name="top" type="Line2D" parent="Control/CenterContainer" unique_id=1774930936]
+visible = false
+points = PackedVector2Array(0, -5, 0, -15)
+width = 3.0
+
+[node name="right" type="Line2D" parent="Control/CenterContainer" unique_id=1287895425]
+visible = false
+points = PackedVector2Array(5, 0, 15, 0)
+width = 3.0
+
+[node name="bottom" type="Line2D" parent="Control/CenterContainer" unique_id=373013553]
+visible = false
+points = PackedVector2Array(0, 5, 0, 15)
+width = 3.0
+
+[node name="left" type="Line2D" parent="Control/CenterContainer" unique_id=1416044383]
+visible = false
+points = PackedVector2Array(-5, 0, -15, 0)
+width = 3.0
+
+[node name="PickupTextUI" parent="Control" unique_id=506145329 instance=ExtResource("16_progress")]
+layout_mode = 1
+
+[node name="InventoryUi" parent="Control" unique_id=1812563664 node_paths=PackedStringArray("player") instance=ExtResource("15_3og01")]
+layout_mode = 1
+player = NodePath("../..")
+
+[node name="DebugPanel" type="PanelContainer" parent="Control" unique_id=-294967295]
+layout_mode = 1
+offset_right = 200.0
+offset_bottom = 75.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_rk4xh")
+
+[node name="MarginContainer" type="MarginContainer" parent="Control/DebugPanel" unique_id=-294967294]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/DebugPanel/MarginContainer" unique_id=-294967293]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Control/DebugPanel/MarginContainer/VBoxContainer" unique_id=-1294967295]
+layout_mode = 2
+theme_type_variation = &"HeaderSmall"
+text = "State: Idle"
+
+[node name="SpeedLabel" type="Label" parent="Control/DebugPanel/MarginContainer/VBoxContainer" unique_id=-1294967294]
+layout_mode = 2
+text = "Speed: 0.0"
+
+[connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
+[connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]

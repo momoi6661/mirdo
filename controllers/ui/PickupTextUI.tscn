@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://dg354npug7yv2"]
+
+[ext_resource type="Script" uid="uid://csg6xoa7q8fpe" path="res://controllers/scripts/pickup_text.gd" id="1_script"]
+
+[node name="PickupTextUI" type="Control" unique_id=575666743]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=2006277576]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -10.0
+offset_right = 100.0
+offset_bottom = 50.000183
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=1227023684]
+layout_mode = 2
+
+[node name="ItemName" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1020723664]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.5294118)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9372549)
+theme_override_font_sizes/font_size = 20
+horizontal_alignment = 1
+
+[node name="StatusText" type="Label" parent="CenterContainer/VBoxContainer" unique_id=690716592]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7607843)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9372549)
+theme_override_font_sizes/font_size = 16
+text = "长按 E 拾取"
+horizontal_alignment = 1

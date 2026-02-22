@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://casjryoyf0u0t"]
+
+[ext_resource type="Texture2D" uid="uid://qf7esmkw7t0m" path="res://resources/items/water-bottle.png" id="1_be2vl"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_q6k5x"]
+
+[resource]
+script = ExtResource("1_q6k5x")
+ItemName = "瓶装水"
+Description = "一瓶普通的纯净水。虽然包装简陋，但在荒野中这是维持生命的无价之宝"
+Icon = ExtResource("1_be2vl")
+ItemModelScenePath = "uid://c0s86a8rn2pbm"
+MaxStackSize = 5
+metadata/_custom_type_script = "uid://bdhapua5nkgw8"

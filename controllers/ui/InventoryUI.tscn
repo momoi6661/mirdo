@@ -1,0 +1,223 @@
+[gd_scene format=3 uid="uid://dgmyb0374yij2"]
+
+[ext_resource type="Script" uid="uid://blfjqtgy80yuf" path="res://scripts/Inventory/InventoryHandler.gd" id="1_kql8m"]
+[ext_resource type="PackedScene" uid="uid://bvx5k2nah7n8p" path="res://controllers/ui/AmountSelectorPanel.tscn" id="2_amount"]
+[ext_resource type="Script" uid="uid://bwrwnqcuerqts" path="res://scripts/Inventory/SlotConfig.gd" id="2_sdkd0"]
+[ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="3_hsp72"]
+
+[sub_resource type="Resource" id="Resource_sdkd0"]
+script = ExtResource("2_sdkd0")
+slot_id = 0
+item = ExtResource("3_hsp72")
+amount = 2
+metadata/_custom_type_script = "uid://bwrwnqcuerqts"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.015, 0.015, 0.018, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.3, 0.05, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_info"]
+bg_color = Color(0.05, 0.05, 0.06, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9, 0.3, 0.05, 0.4)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_sep"]
+color = Color(0.9, 0.3, 0.05, 0.3)
+grow_begin = -10.0
+grow_end = -10.0
+thickness = 2
+
+[node name="InventoryUi" type="Control" unique_id=1812563664 node_paths=PackedStringArray("InventoryGrid", "PanelNode", "AmountSelector", "itemNameLabel", "itemDescLabel", "itemIconDisplay")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_kql8m")
+InventoryGrid = NodePath("MainPanel/HBoxContainer/InventorySection/ScrollContainer/GridContainer")
+PanelNode = NodePath("MainPanel")
+AmountSelector = NodePath("AmountSelector")
+itemNameLabel = NodePath("MainPanel/HBoxContainer/InfoSection/VBoxContainer/NameLabel")
+itemDescLabel = NodePath("MainPanel/HBoxContainer/InfoSection/VBoxContainer/DescScroll/DescLabel")
+itemIconDisplay = NodePath("MainPanel/HBoxContainer/InfoSection/VBoxContainer/IconContainer/ItemIcon")
+slot_configs = Array[ExtResource("2_sdkd0")]([SubResource("Resource_sdkd0")])
+
+[node name="MainPanel" type="Panel" parent="." unique_id=2021192520]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -250.0
+offset_right = 400.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="DecorBar" type="ColorRect" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = -8.0
+grow_vertical = 2
+color = Color(0.9, 0.3, 0.05, 1)
+
+[node name="Header" type="Label" parent="MainPanel"]
+layout_mode = 1
+offset_left = 20.0
+offset_top = 15.0
+offset_right = 200.0
+offset_bottom = 45.0
+theme_override_colors/font_color = Color(0.9, 0.3, 0.05, 1)
+theme_override_font_sizes/font_size = 20
+text = "INVENTORY_SYS //"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 50.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="InventorySection" type="VBoxContainer" parent="MainPanel/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.8
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MainPanel/HBoxContainer/InventorySection"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="GridContainer" type="GridContainer" parent="MainPanel/HBoxContainer/InventorySection/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 6
+
+[node name="VSeparator" type="VSeparator" parent="MainPanel/HBoxContainer"]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_sep")
+
+[node name="InfoSection" type="Panel" parent="MainPanel/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.2
+theme_override_styles/panel = SubResource("StyleBoxFlat_info")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MainPanel/HBoxContainer/InfoSection"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = -15.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 15
+
+[node name="IconContainer" type="ColorRect" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+color = Color(0, 0, 0, 0.3)
+
+[node name="ItemIcon" type="TextureRect" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer/IconContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HSeparator" type="HSeparator" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_sep")
+
+[node name="NameLabel" type="Label" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 20
+text = "ITEM_DATA"
+horizontal_alignment = 1
+uppercase = true
+
+[node name="DescScroll" type="ScrollContainer" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="DescLabel" type="Label" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer/DescScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "> "
+autowrap_mode = 3
+
+[node name="HintSeparator" type="HSeparator" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_sep")
+
+[node name="HintBox" type="VBoxContainer" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="HintLabel1" type="Label" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer/HintBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.3, 0.05, 0.8)
+theme_override_font_sizes/font_size = 12
+text = "[SHIFT + L-CLICK]: 拿取一半"
+autowrap_mode = 3
+
+[node name="HintLabel2" type="Label" parent="MainPanel/HBoxContainer/InfoSection/VBoxContainer/HintBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.3, 0.05, 0.8)
+theme_override_font_sizes/font_size = 12
+text = "[CTRL + L-CLICK]: 拿取单个"
+autowrap_mode = 3
+
+[node name="AmountSelector" parent="." unique_id=730094974 instance=ExtResource("2_amount")]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -60.0
+offset_right = 100.0
+offset_bottom = 60.0

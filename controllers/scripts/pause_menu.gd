@@ -1,0 +1,141 @@
+extends CanvasLayer
+
+signal continue_requested
+signal save_requested
+signal options_requested
+signal main_menu_requested
+signal exit_requested
+
+@onready var continue_button = %ContinueButton
+@onready var save_button = %SaveGameButton
+@onready var options_button = %OptionsButton
+@onready var main_menu_button = %MainMenuButton
+@onready var exit_button = %ExitGameButton
+@onready var animation_player = %AnimationPlayer
+
+@onready var ui_sound_player=%UISoundPlayer
+
+var is_transitioning: bool = false
+
+var sound_library: Dictionary = {
+	"button_hover": "uid://bcmrth5ffkdj1",
+	"button_click": "uid://b0e7nekr1tt3k",
+	"menu_open": "uid://rub4iei5paoa",
+	"menu_close": "uid://dm15ase4xcwm8"
+}
+
+func _ready() -> void:
+	if continue_button and not continue_button.pressed.is_connected(_on_continue_pressed):
+		continue_button.pressed.connect(_on_continue_pressed)
+	if save_button and not save_button.pressed.is_connected(_on_save_pressed):
+		save_button.pressed.connect(_on_save_pressed)
+	if options_button and not options_button.pressed.is_connected(_on_options_pressed):
+		options_button.pressed.connect(_on_options_pressed)
+	if main_menu_button and not main_menu_button.pressed.is_connected(_on_main_menu_pressed):
+		main_menu_button.pressed.connect(_on_main_menu_pressed)
+	if exit_button and not exit_button.pressed.is_connected(_on_exit_pressed):
+		exit_button.pressed.connect(_on_exit_pressed)
+	
+	_connect_button_hover_sounds()
+	
+	if get_parent() == get_tree().root:
+		show_menu()
+	else:
+		hide()
+
+func show_menu() -> void:
+	if is_transitioning or visible: return
+	is_transitioning = true
+	
+	show()
+	if animation_player:
+		animation_player.play("fade_in")
+	
+	_play_ui_sound("menu_open")
+	
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().paused = true
+	
+	if animation_player and animation_player.is_playing():
+		await animation_player.animation_finished
+	
+	if visible and animation_player:
+		animation_player.play("idle_pulse") # 开启呼吸动画
+	
+	is_transitioning = false
+
+func hide_menu() -> void:
+	if is_transitioning or not visible: return
+	is_transitioning = true
+	
+	_play_ui_sound("menu_close")
+	
+	if animation_player:
+		animation_player.play("fade_out")
+		await animation_player.animation_finished
+	
+	hide()
+	
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	get_tree().paused = false
+	is_transitioning = false
+
+func _connect_button_hover_sounds() -> void:
+	var buttons = [continue_button, save_button, options_button, main_menu_button, exit_button]
+	for button in buttons:
+		if button and not button.mouse_entered.is_connected(_on_button_hover):
+			button.mouse_entered.connect(_on_button_hover)
+
+func _play_ui_sound(sound_type: String) -> void:
+	if not ui_sound_player or not sound_library.has(sound_type):
+		return
+	
+	ui_sound_player.stream = load(sound_library[sound_type])
+	if ui_sound_player.stream:
+		ui_sound_player.play()
+
+func _on_button_hover() -> void:
+	_play_ui_sound("button_hover")
+
+func _on_continue_pressed() -> void:
+	_play_ui_sound("button_click")
+	emit_signal("continue_requested")
+	hide_menu()
+
+func _on_save_pressed() -> void:
+	_play_ui_sound("button_click")
+	emit_signal("save_requested")
+	if has_node("/root/SaveManager"):
+		get_node("/root/SaveManager").save_game("manual_save")
+	elif Engine.has_singleton("SaveManager"):
+		# 兼容不同注册方式
+		var sm = Engine.get_singleton("SaveManager")
+		if sm.has_method("save_game"):
+			sm.save_game("manual_save")
+	else:
+		# 如果还没在项目设置里注册 Autoload，尝试直接推断
+		# 但最好的做法还是在 Autoload 里注册
+		print("SaveManager not found in Autoloads. Please register res://scripts/system/save_manager.gd as 'SaveManager'.")
+
+func _on_options_pressed() -> void:
+	_play_ui_sound("button_click")
+	emit_signal("options_requested")
+
+func _on_main_menu_pressed() -> void:
+	_play_ui_sound("button_click")
+	emit_signal("main_menu_requested")
+	hide_menu()
+
+func _on_exit_pressed() -> void:
+	_play_ui_sound("button_click")
+	emit_signal("exit_requested")
+	get_tree().quit()
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if visible:
+			emit_signal("continue_requested")
+			hide_menu()
+		else:
+			# 允许在测试时按 ESC 呼出菜单
+			show_menu()
