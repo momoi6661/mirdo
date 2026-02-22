@@ -12,6 +12,7 @@ var parent_handler: Node
 @export var CountLabel:Label
 @export var amount_selector:AmountSelectorPanel
 
+@export var is_selectable: bool = true # 新增属性：这个格子是否可以被选中高亮
 var InventorySlotId:int=-1
 var SlotFilled:bool=false
 
@@ -20,27 +21,21 @@ var StackCount:int=0
 var selected_amount:int=0
 
 func _ready():
+	focus_mode = Control.FOCUS_NONE
 	self.toggled.connect(_on_toggled)
 
 func _on_toggled(toggled_on: bool):
 	if toggled_on:
 		if SlotFilled:
-			item_clicked.emit(SlotData)
+			item_clicked.emit(SlotData, self)
 		else:
-			item_clicked.emit(null)
-	else:
-		# If toggled off by user click, we don't want it to stay off if it's the selected one, 
-		# but InventoryHandler handles exclusivity.
-		pass
+			item_clicked.emit(null, self)
 
 func _gui_input(event: InputEvent):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			# Right click manual trigger
-			if not self.button_pressed:
+			if is_selectable and not self.button_pressed:
 				self.button_pressed = true
-
-
 
 func FillSlot(data:ItemData, amount:int=1):
 	if data==null:
@@ -151,19 +146,32 @@ func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
 	return can_drop	
 
 func _drop_data(at_position: Vector2, data: Variant) -> void:
-	var amount = data.get("Amount", 0)
+	var amount = 1
+	if data.has("amount"):
+		amount = data.get("amount")
+	elif data.has("Amount"):
+		amount = data.get("Amount")
+		
 	var source_slot = data.get("source_slot")
-	
-	if source_slot and source_slot != self:
-		if source_slot.slot_owner != self.slot_owner:
-			if self.slot_owner == SlotOwner.PLAYER:
-				self.parent_handler.transfer_item_from_loot(source_slot, self, amount)
-			elif self.slot_owner == SlotOwner.LOOT_BOX:
-				self.parent_handler.transfer_item_from_player(source_slot, self, amount)
-			return
-			
-	OnItemDropped.emit(data["ID"],InventorySlotId, amount)
 
+	if not source_slot or source_slot == self:
+		return # 无效拖拽或拖到自己身上
+		
+	if source_slot.slot_owner != self.slot_owner:
+		# --- 跨界面板拖拽 ---
+		# 极其关键：self.slot_owner 代表的是【物品要放下的目标地点】
+		if self.slot_owner == SlotOwner.PLAYER: 
+			# 如果目标是玩家背包（意味着你正把东西从箱子拖到玩家包里）
+			if self.parent_handler and self.parent_handler.has_method("transfer_item_from_loot"):
+				self.parent_handler.transfer_item_from_loot(source_slot, self, amount)
+				
+		elif self.slot_owner == SlotOwner.LOOT_BOX: 
+			# 如果目标是箱子（意味着你正把东西从玩家拖到箱子里）
+			if self.parent_handler and self.parent_handler.has_method("transfer_item_from_player"):
+				self.parent_handler.transfer_item_from_player(source_slot, self, amount)
+	else:
+		# --- 面板内部拖拽 ---
+		OnItemDropped.emit(source_slot.InventorySlotId, self.InventorySlotId, amount)
 func ClearSlot():
 	SlotData=null
 	SlotFilled=false

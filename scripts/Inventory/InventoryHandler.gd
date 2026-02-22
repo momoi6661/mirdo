@@ -55,11 +55,13 @@ func _ready() -> void:
 		for i in range(existing_slots.size()):
 			var slot = existing_slots[i]
 			slot.InventorySlotId = i
+			slot.slot_owner = slot.SlotOwner.PLAYER # 标记为玩家格子
+			slot.parent_handler = self # 告诉格子它的主人是谁！
 			slot.amount_selector = AmountSelector
 			if not slot.OnItemDropped.is_connected(ItemDroppedOnSlot):
-				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
+				slot.OnItemDropped.connect(ItemDroppedOnSlot)
 			if not slot.item_clicked.is_connected(_on_slot_item_clicked):
-				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
+				slot.item_clicked.connect(_on_slot_item_clicked)
 			if not slot.button_up.is_connected(_on_slot_button_up):
 				slot.button_up.connect(_on_slot_button_up.bind(slot))
 			InventorySlots.append(slot)
@@ -74,9 +76,12 @@ func _ready() -> void:
 			var slot=slot_node.get_node("Button") as InventorySlot
 			if slot:
 				slot.InventorySlotId=i
+				slot.slot_owner = slot.SlotOwner.PLAYER
+				slot.parent_handler = self
+				slot.is_selectable = true
 				slot.amount_selector=AmountSelector
-				slot.OnItemDropped.connect(ItemDroppedOnSlot.bind())
-				slot.item_clicked.connect(_on_slot_item_clicked.bind(slot))
+				slot.OnItemDropped.connect(ItemDroppedOnSlot)
+				slot.item_clicked.connect(_on_slot_item_clicked)
 				slot.button_up.connect(_on_slot_button_up.bind(slot))
 				InventorySlots.append(slot)
 	
@@ -164,14 +169,15 @@ func play_close_animation():
 		
 	Global.close_loot_ui.emit()
 
-func _on_slot_item_clicked(item_data: ItemData, slot: Control):
+func _on_slot_item_clicked(item_data: ItemData, slot: InventorySlot):
+	# 核心大一统：不论是玩家格子还是箱子格子点亮，都必须熄灭上一个格子
 	if current_selected_slot and current_selected_slot != slot:
 		current_selected_slot.set_pressed_no_signal(false)
 	
 	current_selected_slot = slot
 	if slot:
 		slot.set_pressed_no_signal(true)
-		_play_ui_sound("button_click")
+		_play_ui_sound("button_click") # 触发点击音效！
 	
 	if item_data:
 		empty_state_active = false
@@ -180,8 +186,6 @@ func _on_slot_item_clicked(item_data: ItemData, slot: Control):
 		if itemIconDisplay:
 			itemIconDisplay.texture = item_data.Icon
 			itemIconDisplay.visible = true
-			# 全息影像显现动画 (过曝 -> 正常)
-			itemIconDisplay.modulate = Color(2.5, 1.5, 0.5, 0.0) # 起始高亮透明
 			var icon_tween = create_tween()
 			icon_tween.tween_property(itemIconDisplay, "modulate", Color(1, 1, 1, 1), 0.35).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 			
@@ -190,14 +194,14 @@ func _on_slot_item_clicked(item_data: ItemData, slot: Control):
 			itemDescLabel.text = target_text
 			itemDescLabel.visible_characters = 0
 			
-			# 终端打字机动画 (Typewriter effect)
 			if desc_tween and desc_tween.is_valid():
 				desc_tween.kill()
 			desc_tween = create_tween()
-			var duration = target_text.length() * 0.02 # 根据字数动态决定打字时间 (越长越久，平均每字0.02秒)
+			var duration = target_text.length() * 0.02
 			desc_tween.tween_property(itemDescLabel, "visible_characters", target_text.length(), duration).set_trans(Tween.TRANS_LINEAR)
 	else:
 		clear_info_display()
+
 func _on_slot_button_up(slot: Control):
 	if not slot.SlotFilled:
 		if current_selected_slot:
@@ -263,19 +267,29 @@ func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
 	return typeof(data)==TYPE_DICTIONARY and data.get("Type")=="Item"
 
 func _drop_data(at_position: Vector2, data: Variant) -> void:
-	var fromSlotId=data["ID"]
-	var slot=InventorySlots[fromSlotId]
-	var item=slot.SlotData
-	var drop_amount = data.get("Amount", 0)
-	var amount = drop_amount if drop_amount > 0 else slot.StackCount
+	var amount = 1
+	if data.has("amount"): amount = data.get("amount")
+	elif data.has("Amount"): amount = data.get("Amount")
 	
-	if drop_amount > 0 and drop_amount < slot.StackCount:
-		slot.RemoveStack(drop_amount)
+	var source_slot = data.get("source_slot")
+	if not source_slot: return
+	
+	var item = source_slot.SlotData
+	var move_amount = amount if amount > 0 else source_slot.StackCount
+	
+	if move_amount > 0 and move_amount < source_slot.StackCount:
+		source_slot.RemoveStack(move_amount)
 	else:
-		slot.ClearSlot()
-		if current_selected_slot == slot: clear_info_display()
+		source_slot.ClearSlot()
+		if current_selected_slot == source_slot: clear_info_display()
 	
-	spawn_dropped_item(item, amount)
+	# 如果是从箱子扔出来的，确保同步箱子数据
+	if source_slot.slot_owner != source_slot.SlotOwner.PLAYER:
+		var loot_panel = get_node_or_null("LootPanel")
+		if loot_panel and loot_panel.has_method("_sync_loot_data"):
+			loot_panel._sync_loot_data()
+			
+	spawn_dropped_item(item, move_amount)
 
 func spawn_dropped_item(item:ItemData, amount:int):
 	if not player or not is_instance_valid(player) or not player.is_inside_tree(): return
@@ -377,3 +391,40 @@ func clear_inventory() -> void:
 func _record_original_pos():
 	if PanelNode:
 		main_panel_original_pos = PanelNode.position
+
+# === 处理从箱子拖拽物品到玩家背包 ===
+func transfer_item_from_loot(source_loot_slot: InventorySlot, target_player_slot: InventorySlot, amount: int):
+	var item = source_loot_slot.SlotData
+	var is_partial_move = amount > 0 and amount < source_loot_slot.StackCount
+	var move_amount = amount if amount > 0 else source_loot_slot.StackCount
+	
+	if not target_player_slot.SlotFilled:
+		# 目标是空的，直接放
+		target_player_slot.FillSlot(item, move_amount)
+		source_loot_slot.RemoveStack(move_amount)
+		if source_loot_slot.StackCount <= 0:
+			source_loot_slot.ClearSlot()
+	else:
+		if target_player_slot.SlotData == item:
+			# 物品相同，尝试堆叠
+			var available = target_player_slot.GetAvailableSpace()
+			var actual_add = min(move_amount, available)
+			if actual_add > 0:
+				target_player_slot.AddStack(actual_add)
+				source_loot_slot.RemoveStack(actual_add)
+				if source_loot_slot.StackCount <= 0:
+					source_loot_slot.ClearSlot()
+		else:
+			# 物品不同，而且是全部拖拽，执行交换！
+			if not is_partial_move:
+				var temp_item = target_player_slot.SlotData
+				var temp_count = target_player_slot.StackCount
+				target_player_slot.ClearSlot()
+				target_player_slot.FillSlot(source_loot_slot.SlotData, source_loot_slot.StackCount)
+				source_loot_slot.ClearSlot()
+				source_loot_slot.FillSlot(temp_item, temp_count)
+			
+	# 通知箱子面板同步数据！
+	var loot_panel = get_node_or_null("LootPanel")
+	if loot_panel and loot_panel.has_method("_sync_loot_data"):
+		loot_panel._sync_loot_data()

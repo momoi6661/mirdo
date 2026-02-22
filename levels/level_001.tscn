@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://bwrwnqcuerqts" path="res://scripts/Inventory/SlotConfig.gd" id="5_ecv8m"]
 [ext_resource type="PackedScene" uid="uid://bvptujf8q5r05" path="res://models/benchs/bench.tscn" id="5_wtxts"]
 [ext_resource type="PackedScene" uid="uid://cajdj0uq7nrqh" path="res://models/benchs/bench_2.tscn" id="6_jrmpr"]
+[ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="6_m48vv"]
 [ext_resource type="PackedScene" uid="uid://em6ql0cp5lpm" path="res://models/benchs/bench_broken.tscn" id="7_3l7at"]
 [ext_resource type="PackedScene" uid="uid://bak8ltrhbmlv5" path="res://models/CSGStairMaker3D.tscn" id="8_jrmpr"]
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://models/water_bottle.tscn" id="9_3l7at"]
@@ -99,19 +100,17 @@ shader_parameter/uv2_offset = Vector3(0, 0, 0)
 material = SubResource("ShaderMaterial_0racc")
 size = Vector3(2, 2, 2)
 
-[sub_resource type="Resource" id="Resource_a4ax1"]
-script = ExtResource("5_ecv8m")
-slot_id = 0
-metadata/_custom_type_script = "uid://bwrwnqcuerqts"
-
-[sub_resource type="Resource" id="Resource_m48vv"]
-script = ExtResource("5_ecv8m")
-slot_id = 1
-metadata/_custom_type_script = "uid://bwrwnqcuerqts"
-
 [sub_resource type="Resource" id="Resource_ecv8m"]
 script = ExtResource("5_ecv8m")
-slot_id = 2
+slot_id = 0
+item = ExtResource("6_m48vv")
+metadata/_custom_type_script = "uid://bwrwnqcuerqts"
+
+[sub_resource type="Resource" id="Resource_ywvwd"]
+script = ExtResource("5_ecv8m")
+slot_id = 3
+item = ExtResource("6_m48vv")
+amount = 3
 metadata/_custom_type_script = "uid://bwrwnqcuerqts"
 
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_vp4dy"]
@@ -161,7 +160,7 @@ mesh = SubResource("BoxMesh_xc4gq")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Box" unique_id=265354530]
 script = ExtResource("3_m48vv")
-slots = Array[ExtResource("5_ecv8m")]([SubResource("Resource_a4ax1"), SubResource("Resource_m48vv"), SubResource("Resource_ecv8m")])
+initial_loot = Array[ExtResource("5_ecv8m")]([SubResource("Resource_ecv8m"), SubResource("Resource_ywvwd")])
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Box/StaticBody3D" unique_id=1033063653]
 shape = SubResource("ConcavePolygonShape3D_vp4dy")
