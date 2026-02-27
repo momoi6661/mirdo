@@ -34,7 +34,7 @@ func physics_process(delta: float):
 		return
 	if not player.is_on_floor():
 		player.velocity.y -= player.gravity * delta
-		if player.velocity.y < 0:
+		if player.velocity.y < -0.5:
 			transition.emit("FallState")
 	
 # 楼梯处理将在玩家控制器中统一处理

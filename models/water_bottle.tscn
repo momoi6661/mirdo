@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cbmhrtu2ovbw3" path="res://scripts/Inventory/InteracableItem.gd" id="1_ox4bg"]
 [ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="2_rvoh6"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_63etl"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_bottle"]
 height = 0.43829077
@@ -141,6 +142,10 @@ script = ExtResource("1_ox4bg")
 item_data = ExtResource("2_rvoh6")
 highlight_meshes = [NodePath("GLTF_SceneRootNode/Cylinder_001_2/Object_6"), NodePath("GLTF_SceneRootNode/Cylinder_002_3/Object_8"), NodePath("GLTF_SceneRootNode/Cylinder_1/Object_4")]
 outline_width = 0.1
+
+[node name="SaveComponent" type="Node" parent="." unique_id=1701586429]
+script = ExtResource("3_63etl")
+metadata/_custom_type_script = "uid://nqd2tq1l4j5f"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=101001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2181591, 0)

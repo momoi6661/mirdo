@@ -33,3 +33,37 @@ func get_prompt_text() -> String:
 
 func interact(player: Node) -> void:
 	Global.open_loot_ui.emit(self)
+
+# ==========================================
+# 存档系统接口
+# ==========================================
+
+# 1. 保存数据
+func get_container_save_data() -> Array:
+	var slots_data = []
+	for slot in runtime_slots:
+		if slot.item != null:
+			slots_data.append({
+				"slot_id": slot.slot_id,
+				"item_path": slot.item.resource_path, 
+				"amount": slot.amount
+			})
+	return slots_data
+
+# 2. 读取数据
+func load_container_save_data(saved_slots: Array) -> void:
+	# 先清空当前所有格子
+	for slot in runtime_slots:
+		slot.item = null
+		slot.amount = 0
+		
+	# 重新填入读取的数据
+	for data in saved_slots:
+		var slot_id = data.get("slot_id", 0)
+		var item_path = data.get("item_path", "")
+		var amount = data.get("amount", 0)
+		
+		if slot_id >= 0 and slot_id < container_size and item_path != "":
+			if ResourceLoader.exists(item_path):
+				runtime_slots[slot_id].item = load(item_path)
+				runtime_slots[slot_id].amount = amount

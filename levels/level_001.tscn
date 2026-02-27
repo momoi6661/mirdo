@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://cajdj0uq7nrqh" path="res://models/benchs/bench_2.tscn" id="6_jrmpr"]
 [ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="6_m48vv"]
 [ext_resource type="PackedScene" uid="uid://em6ql0cp5lpm" path="res://models/benchs/bench_broken.tscn" id="7_3l7at"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="7_ecv8m"]
 [ext_resource type="PackedScene" uid="uid://bak8ltrhbmlv5" path="res://models/CSGStairMaker3D.tscn" id="8_jrmpr"]
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://models/water_bottle.tscn" id="9_3l7at"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="10_n3164"]
@@ -174,6 +175,10 @@ mesh = SubResource("BoxMesh_xc4gq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Box/Box/StaticBody3D" unique_id=1839686194]
 shape = SubResource("ConcavePolygonShape3D_vp4dy")
+
+[node name="SaveComponent" type="Node" parent="Box" unique_id=1924319362]
+script = ExtResource("7_ecv8m")
+metadata/_custom_type_script = "uid://nqd2tq1l4j5f"
 
 [node name="Ramp" type="MeshInstance3D" parent="." unique_id=1272296189]
 transform = Transform3D(-4.37114e-08, 0, -1, 0, 1, 0, 1, 0, -4.37114e-08, 5, 0, 0)

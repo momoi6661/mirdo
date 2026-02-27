@@ -15,6 +15,9 @@ signal exit_requested
 
 @onready var ui_sound_player=%UISoundPlayer
 
+# 临时调试用的加载按钮（如果 UI 节点中不存在则为 null，不会报错）
+@onready var debug_load_button = get_node_or_null("%DebugLoadButton")
+
 var is_transitioning: bool = false
 var pre_pause_mouse_mode: int = Input.MOUSE_MODE_CAPTURED
 
@@ -36,6 +39,10 @@ func _ready() -> void:
 		main_menu_button.pressed.connect(_on_main_menu_pressed)
 	if exit_button and not exit_button.pressed.is_connected(_on_exit_pressed):
 		exit_button.pressed.connect(_on_exit_pressed)
+		
+	# 临时调试加载按钮连接
+	if debug_load_button and not debug_load_button.pressed.is_connected(_on_debug_load_pressed):
+		debug_load_button.pressed.connect(_on_debug_load_pressed)
 	
 	_connect_button_hover_sounds()
 	
@@ -87,6 +94,9 @@ func hide_menu() -> void:
 
 func _connect_button_hover_sounds() -> void:
 	var buttons = [continue_button, save_button, options_button, main_menu_button, exit_button]
+	if debug_load_button:
+		buttons.append(debug_load_button)
+		
 	for button in buttons:
 		if button and not button.mouse_entered.is_connected(_on_button_hover):
 			button.mouse_entered.connect(_on_button_hover)
@@ -112,15 +122,17 @@ func _on_save_pressed() -> void:
 	emit_signal("save_requested")
 	if has_node("/root/SaveManager"):
 		get_node("/root/SaveManager").save_game("manual_save")
-	elif Engine.has_singleton("SaveManager"):
-		# 兼容不同注册方式
-		var sm = Engine.get_singleton("SaveManager")
-		if sm.has_method("save_game"):
-			sm.save_game("manual_save")
+
+func _on_debug_load_pressed() -> void:
+	_play_ui_sound("button_click")
+	
+	# 如果你在 UI 层面有动画或菜单隐藏逻辑，先关闭暂停菜单，恢复时间
+	hide_menu()
+	
+	if has_node("/root/SaveManager"):
+		get_node("/root/SaveManager").auto_load_game("manual_save")
 	else:
-		# 如果还没在项目设置里注册 Autoload，尝试直接推断
-		# 但最好的做法还是在 Autoload 里注册
-		print("SaveManager not found in Autoloads. Please register res://scripts/system/save_manager.gd as 'SaveManager'.")
+		print("[PauseMenu] 找不到 SaveManager！")
 
 func _on_options_pressed() -> void:
 	_play_ui_sound("button_click")

@@ -7,3 +7,5 @@ class_name SaveGame
 
 @export var player_data: Dictionary = {}
 @export var world_objects_data: Array[Dictionary] = []
+# 新增：记录在这个存档中，已经被永久销毁（拾取、击杀）的物体唯一ID
+@export var destroyed_objects: Array[String] = []

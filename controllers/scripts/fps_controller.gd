@@ -31,6 +31,7 @@ var _mouse_input : bool = false
 var _rotation_input : float
 var _tilt_input : float
 var _time:float=0
+var _bob_time:float=0.0 # 新增：专门用于记录晃动时间
 var _head_bob_intensity:float=0
 var _head_bob_target:float=0
 var _was_on_floor:bool=true
@@ -101,11 +102,19 @@ func _update_camera(delta):
 	
 	_head_bob_intensity = lerpf(_head_bob_intensity, _head_bob_target, 10.0 * delta)
 	
-	var head_bob=Vector3.ZERO
-	if _head_bob_intensity>0.01 and is_on_floor():
-		var speed_ratio = _speed / SPEED_DEFAULT
-		head_bob.y=sin(_time*8*speed_ratio)*_head_bob_intensity*0.03
-		head_bob.x=sin(_time*4*speed_ratio)*_head_bob_intensity*0.01
+	# === 优化后的视角晃动逻辑 ===
+	var head_bob = Vector3.ZERO
+	# 获取玩家实际的水平移动速度
+	var horizontal_vel = Vector2(velocity.x, velocity.z).length()
+	var speed_ratio = clamp(horizontal_vel / SPEED_DEFAULT, 0.0, 2.0)
+	
+	# 只有在实际移动时，才推进晃动的时间
+	if is_on_floor() and horizontal_vel > 0.1:
+		_bob_time += delta * speed_ratio * 1.2
+		# Y轴使用 sin，X轴使用 cos，形成更自然的 "∞" 字形晃动
+		head_bob.y = sin(_bob_time * 8) * _head_bob_intensity * 0.04
+		head_bob.x = cos(_bob_time * 4) * _head_bob_intensity * 0.02
+	# ===========================
 	
 	if not is_on_floor():
 		var jump_progress=clamp(velocity.y/JUMP_VELOCITY, -1.0, 1.0)
@@ -206,12 +215,17 @@ func _ready():
 # --- 存档系统自定义接口 ---
 
 func _get_custom_save_data() -> Dictionary:
-	return {
+	var data = {
 		"mouse_rotation": _mouse_rotation,
 		"state": $StateMachine.CURRENT_STATE.name,
 		"is_crouching": is_crouching,
 		"is_sprinting": _is_sprinting
 	}
+	
+	if inventory_handler:
+		data["inventory"] = inventory_handler.get_inventory_data()
+		
+	return data
 
 func _load_custom_save_data(data: Dictionary) -> void:
 	# 1. 物理脱离：防止加载瞬间产生位移冲突
@@ -228,6 +242,10 @@ func _load_custom_save_data(data: Dictionary) -> void:
 	is_crouching = data.is_crouching
 	_is_sprinting = data.is_sprinting
 	velocity = Vector3.ZERO
+	
+	# 恢复背包数据
+	if data.has("inventory") and inventory_handler:
+		inventory_handler.load_inventory_data(data["inventory"])
 	
 	var sm = $StateMachine
 	sm.is_locked = true

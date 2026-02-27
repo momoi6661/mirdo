@@ -324,6 +324,21 @@ theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
 text = "继续任务"
 alignment = 0
 
+[node name="DebugLoadButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1096618873]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
+text = "加载进度"
+alignment = 0
+
 [node name="SaveGameButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1549748530]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)

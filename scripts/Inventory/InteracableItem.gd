@@ -91,6 +91,14 @@ func get_prompt_text() -> String:
 func interact(player: Node) -> void:
 	if item_data and player.has_method("add_to_inventory"):
 		if player.add_to_inventory(item_data):
+			var save_comp = get_node_or_null("SaveComponent")
+			if not save_comp:
+				for child in get_children():
+					if child is SaveComponent:
+						save_comp = child
+						break
+			if save_comp and save_comp.has_method("mark_destroyed"):
+				save_comp.mark_destroyed()
 			queue_free()
 
 func short_interact(player: Node) -> void:
