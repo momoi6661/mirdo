@@ -118,7 +118,7 @@ _data = {
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rk4xh"]
 bg_color = Color(0.16206557, 0.1620656, 0.16206548, 1)
 
-[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler", "pickup_ray", "pickup_ui")]
+[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler")]
 wall_min_slide_angle = 0.7853982
 script = ExtResource("1_pgc1p")
 MOUSE_SENSITIVITY = 0.25
@@ -127,8 +127,6 @@ step_handler = NodePath("Components/StepHandler")
 pickup_handler = NodePath("Components/PickupHandler")
 standing_collision = NodePath("CollisionShape3D")
 inventory_handler = NodePath("Control/InventoryUi")
-pickup_ray = NodePath("Marker3D/CameraOffset/Camera3D/PickUpRayCast")
-pickup_ui = NodePath("")
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -281,6 +279,7 @@ width = 3.0
 
 [node name="InventoryUi" parent="Control" unique_id=1812563664 node_paths=PackedStringArray("player") instance=ExtResource("15_3og01")]
 layout_mode = 1
+ItemSlotsCount = 14
 player = NodePath("../..")
 
 [node name="DebugPanel" type="PanelContainer" parent="Control" unique_id=-294967295]
