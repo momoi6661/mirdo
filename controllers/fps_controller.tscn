@@ -23,9 +23,11 @@
 radius = 6.5739846
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_u6tj1"]
+radius = 0.25
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_6tv51"]
 material = ExtResource("2_gldw4")
+radius = 0.25
 
 [sub_resource type="Animation" id="Animation_ca8e7"]
 length = 0.001
@@ -208,23 +210,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 top_level = true
 cull_mask = 1
 
-[node name="ReflectionProbe" type="ReflectionProbe" parent="Marker3D/CameraOffset/Camera3D" unique_id=336024960]
-update_mode = 1
-enable_shadows = true
-
 [node name="PickUpRayCast" type="RayCast3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=1410065399]
 target_position = Vector3(0, 0, -3)
 collision_mask = 3
 debug_shape_custom_color = Color(0.6953205, 0.86600894, 0.26181218, 0.078431375)
 
 [node name="PickUpArm" type="SpringArm3D" parent="Marker3D/CameraOffset" unique_id=1410065400]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0.3)
 shape = SubResource("BoxShape3D_l8yvu")
 spring_length = -2.4
 margin = 0.05
 
 [node name="ArmEnd" type="Node3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=172098117]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2)
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)

@@ -56,8 +56,8 @@ func setup_stair_rays():
 			elif collision_shape.shape is BoxShape3D:
 				player_radius = collision_shape.shape.size.x / 2.0
 		
-		stairs_ahead_ray.position = Vector3(0, 0.5, -player_radius)  # 射线起点位置
-		stairs_ahead_ray.target_position = Vector3(0, -0.5, 0)  # 从起点向下0.5米
+		stairs_ahead_ray.position = Vector3(0, 0.25, -player_radius)  # 射线起点位置
+		stairs_ahead_ray.target_position = Vector3(0, -0.25, 0)  # 从起点向下0.5米
 		stairs_ahead_ray.enabled = true
 		# 同样使用和玩家相同的碰撞掩码
 		# 这样射线就能准确检测玩家可以站立或碰撞的表面
@@ -128,7 +128,7 @@ func check_snap_to_stairs():
 		# PhysicsTestMotionResult3D用于存储物理测试的结果，包括碰撞点、法线、移动距离等信息
 		var result = PhysicsTestMotionResult3D.new()
 		# 测试玩家是否可以向下移动MAX_STEP_HEIGHT的距离
-		if body_test_motion_own(player.global_transform, Vector3(0, -MAX_STEP_HEIGHT, 0), result):
+		if body_test_motion_own(player.global_transform, Vector3(0, -MAX_STEP_HEIGHT * 2, 0), result):
 			# 保存相机位置，用于平滑过渡
 			save_camera_pos()
 			# 将玩家向下移动到碰撞点
