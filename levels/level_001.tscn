@@ -238,5 +238,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3382298, 0, 3.452651)
 [node name="reze" parent="." unique_id=1930910840 instance=ExtResource("15_ywvwd")]
 transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0.08723974, 0.0016237523, -1.4320016)
 
-[node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("4_liofc")]
+[node name="PlayerController" parent="." unique_id=1610761508 groups=["Player"] instance=ExtResource("4_liofc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13005686, -2.3841858e-07, 0.46384174)
