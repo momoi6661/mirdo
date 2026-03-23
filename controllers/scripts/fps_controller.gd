@@ -165,29 +165,37 @@ func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target:
 			step_handler.handle_after_move_slide(delta)
 	
 func handle_rigid_body_collisions():
-	for i in get_slide_collision_count():
-		var collision = get_slide_collision(i)
-		var collider = collision.get_collider()
-		
-		if collider is RigidBody3D:
-			push_rigid_body(collider, collision)
-
-func push_rigid_body(rigid_body: RigidBody3D, collision: KinematicCollision3D):
-	var collision_point = collision.get_position()
-	var collision_normal = collision.get_normal()
-	
-	var horizontal_velocity = Vector3(velocity.x, 0, velocity.z)
-	
-	if horizontal_velocity.length() < 0.01:
+	if not has_node("KickArea"):
 		return
 	
-	var push_direction = horizontal_velocity.normalized()
+	var kick_area = $KickArea
+	var bodies = kick_area.get_overlapping_bodies()
 	
-	var impulse_magnitude = horizontal_velocity.length() * 0.3
-	var impulse_vector = push_direction * impulse_magnitude
-	
-	var local_impulse_point = rigid_body.to_local(collision_point)
-	rigid_body.apply_impulse(impulse_vector, local_impulse_point)
+	var horizontal_velocity = Vector3(velocity.x, 0, velocity.z)
+	var speed = horizontal_velocity.length()
+	if speed < 0.1:
+		return
+		
+	var delta = get_physics_process_delta_time()
+		
+	for body in bodies:
+		if body is RigidBody3D:
+			# 混合玩家移动方向和物体相对方向
+			var to_body = (body.global_position - global_position)
+			to_body.y = 0.0
+			to_body = to_body.normalized()
+			
+			var move_dir = horizontal_velocity.normalized()
+			
+			# 将两个方向混合：60%向前推，40%往旁边挤开
+			var push_direction = (move_dir * 0.6 + to_body * 0.4).normalized()
+			
+			# 修复：在物理帧连续执行时，必须根据 delta 缩小冲量，同时乘上物体质量，实现真实推力
+			var force_magnitude = speed * body.mass * 8.0 * delta
+			body.apply_central_impulse(push_direction * force_magnitude)
+
+func push_rigid_body(rigid_body: RigidBody3D, collision: KinematicCollision3D):
+	pass # 保留空函数防止有其他地方调用
 	
 func _ready():
 	_speed=SPEED_DEFAULT

@@ -15,7 +15,6 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Basic Setup"
-run/main_scene="res://levels/level_001.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -100,6 +99,7 @@ pause={
 
 [physics]
 
+common/physics_ticks_per_second=120
 common/physics_jitter_fix=0.0
 3d/physics_engine="Jolt Physics"
 jolt_physics_3d/simulation/generate_all_kinematic_contacts=true

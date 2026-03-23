@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://models/water_bottle.tscn" id="9_3l7at"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="10_n3164"]
 [ext_resource type="PackedScene" uid="uid://cci46x1ougi1v" path="res://models/reze.tscn" id="15_ywvwd"]
+[ext_resource type="PackedScene" uid="uid://b47msdpisqaeo" path="res://3DModel/xiaokong/xiaokong.glb" id="16_5d8v6"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_gd0ev"]
 material = ExtResource("2_x5xie")
@@ -148,13 +149,14 @@ data = PackedVector3Array(-4, 1, 1, 4, -1, 1, -4, -1, 1, -4, 1, -1, -4, -1, -1, 
 [node name="WorldEnvironment" parent="." unique_id=813723417 instance=ExtResource("1_db21n")]
 
 [node name="Floor" type="MeshInstance3D" parent="." unique_id=1659943637]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.111, -0.25, -0.347)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1092262, -0.25282592, -0.34624434)
 mesh = SubResource("BoxMesh_gd0ev")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Floor" unique_id=563600559]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floor/StaticBody3D" unique_id=259931559]
 shape = SubResource("ConcavePolygonShape3D_oahyi")
+debug_color = Color(0.22678164, 0.58383584, 0.70953846, 0.41960785)
 
 [node name="Box" type="MeshInstance3D" parent="." unique_id=1112525461]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 1, -5)
@@ -214,6 +216,7 @@ mesh = SubResource("BoxMesh_gd0ev")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Floor2/StaticBody3D" unique_id=1145435940]
 shape = SubResource("ConcavePolygonShape3D_oahyi")
+debug_color = Color(0.22678164, 0.58383584, 0.70953846, 0.41960785)
 
 [node name="water_bottle" parent="." unique_id=2119110613 instance=ExtResource("9_3l7at")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.0996755, 9.536743e-07, 1.4494996)
@@ -240,3 +243,6 @@ transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0.08723974, 0.001623
 
 [node name="PlayerController" parent="." unique_id=1610761508 groups=["Player"] instance=ExtResource("4_liofc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13005686, -2.3841858e-07, 0.46384174)
+
+[node name="xiaokong" parent="." unique_id=1546594088 instance=ExtResource("16_5d8v6")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.643902, 0.03258055, -2.5545125)

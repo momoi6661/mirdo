@@ -121,7 +121,12 @@ radius = 0.01
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rk4xh"]
 bg_color = Color(0.16206557, 0.1620656, 0.16206548, 1)
 
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_kick"]
+height = 1.0449219
+radius = 0.25976563
+
 [node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler")]
+collision_layer = 4
 wall_min_slide_angle = 0.7853982
 script = ExtResource("1_pgc1p")
 MOUSE_SENSITIVITY = 0.25
@@ -307,6 +312,14 @@ text = "Speed: 0.0"
 
 [node name="FPSInteractionHUD" parent="Control" unique_id=1576126160 instance=ExtResource("18_h7h5r")]
 layout_mode = 1
+
+[node name="KickArea" type="Area3D" parent="." unique_id=1376236608]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="KickArea" unique_id=1086482585]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52246094, 0)
+shape = SubResource("CylinderShape3D_kick")
 
 [connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
 [connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]
