@@ -13,7 +13,7 @@ dest_files=["res://.godot/imported/xiaokong.glb-6e773626664222b575f68844ab0944c6
 
 [params]
 
-nodes/root_type=""
+nodes/root_type="CharacterBody3D"
 nodes/root_name=""
 nodes/root_script=null
 nodes/apply_root_scale=true

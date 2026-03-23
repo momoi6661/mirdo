@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://c1fjt301y1523"]
+
+[ext_resource type="PackedScene" uid="uid://b47msdpisqaeo" path="res://3DModel/xiaokong/xiaokong.glb" id="1_2x0fh"]
+[ext_resource type="AnimationLibrary" uid="uid://dv1b3psop5jb" path="res://resources/animate/basic.res" id="2_7ytl7"]
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_7ytl7"]
+
+[node name="xiaokong" unique_id=907349756 instance=ExtResource("1_2x0fh")]
+
+[node name="UpperChest" parent="根/GeneralSkeleton" parent_id_path=PackedInt32Array(702012437) index="0" unique_id=1263885111]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0007098939, 0.99073863, 0.0044296533)
+
+[node name="AnimationPlayer" parent="." index="1" unique_id=154705161]
+libraries/ = ExtResource("2_7ytl7")
+
+[node name="AnimationTree" type="AnimationTree" parent="." index="2" unique_id=995566560]
+tree_root = SubResource("AnimationNodeStateMachine_7ytl7")
+advance_expression_base_node = NodePath("..")
+anim_player = NodePath("../AnimationPlayer")
