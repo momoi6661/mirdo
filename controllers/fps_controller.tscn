@@ -123,7 +123,7 @@ bg_color = Color(0.16206557, 0.1620656, 0.16206548, 1)
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_kick"]
 height = 1.0449219
-radius = 0.25976563
+radius = 0.37548828
 
 [node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler")]
 collision_layer = 4
