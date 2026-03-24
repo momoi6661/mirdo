@@ -18,6 +18,7 @@ const ACTIONS_BY_STATE := {
 	&"LayUp": [],
 	&"Laying": LAYING_ACTIONS,
 	&"SitDown": SIT_DOWN_ACTIONS,
+	&"SittingIdle": SIT_DOWN_ACTIONS,
 	&"SitToStand": SIT_TO_STAND_ACTIONS,
 }
 const ACTION_CONSUMPTION_STATES := {
@@ -95,6 +96,10 @@ func trigger_action(action_name: StringName) -> bool:
 	var allowed_actions: Array = ACTIONS_BY_STATE.get(current_state, [])
 	if not allowed_actions.has(action_name):
 		return false
+
+	var requested_state: StringName = ACTION_CONSUMPTION_STATES.get(action_name, &"")
+	if requested_state == current_state:
+		return true
 
 	queued_action = String(action_name)
 	return true

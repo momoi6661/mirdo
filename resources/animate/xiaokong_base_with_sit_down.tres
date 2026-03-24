@@ -1,5 +1,7 @@
 [gd_resource type="AnimationLibrary" format=3 uid="uid://ba4ddeixdmwwj"]
 
+[ext_resource type="Animation" path="res://resources/animate/actions/sitting_idle.res" id="1_pwp12"]
+
 [sub_resource type="Animation" id="Animation_slcq6"]
 resource_name = "Greating_reremap"
 length = 2.8666666
@@ -15666,5 +15668,6 @@ _data = {
 &"Sit Down_reremap": SubResource("Animation_fd0t7"),
 &"Sit To Stand_reremap": SubResource("Animation_ks23v"),
 &"Standing Greeting_remap": SubResource("Animation_qcs7s"),
+&"sitting_idle": ExtResource("1_pwp12"),
 &"walk_treak_remap": SubResource("Animation_au4dj")
 }
