@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c1fjt301y1523"]
 
 [ext_resource type="PackedScene" uid="uid://b47msdpisqaeo" path="res://3DModel/xiaokong/xiaokong.glb" id="1_2x0fh"]
-[ext_resource type="AnimationLibrary" path="res://resources/animate/xiaokong_base_with_sit_down.tres" id="2_7ytl7"]
+[ext_resource type="AnimationLibrary" uid="uid://ba4ddeixdmwwj" path="res://resources/animate/xiaokong_base_with_sit_down.tres" id="2_7ytl7"]
 [ext_resource type="Script" uid="uid://b3baudx0fy7ip" path="res://scripts/xiaokong/xiaokong_animation_state_machine.gd" id="3_g1v7j"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_greeting"]
@@ -128,7 +128,7 @@ advance_mode = 2
 advance_expression = "move_speed <= move_enter_threshold and ((queued_action == '' and turn_amount >= turn_enter_threshold) or queued_action == 'turn_right')"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_greeting_idle"]
-xfade_time = 0.20
+xfade_time = 0.2
 switch_mode = 2
 advance_mode = 2
 advance_expression = "move_speed <= move_enter_threshold"
@@ -140,7 +140,7 @@ advance_mode = 2
 advance_expression = "move_speed > move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_standing_greeting_idle"]
-xfade_time = 0.20
+xfade_time = 0.2
 switch_mode = 2
 advance_mode = 2
 advance_expression = "move_speed <= move_enter_threshold"
@@ -152,7 +152,7 @@ advance_mode = 2
 advance_expression = "move_speed > move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_salute_idle"]
-xfade_time = 0.20
+xfade_time = 0.2
 switch_mode = 2
 advance_mode = 2
 advance_expression = "move_speed <= move_enter_threshold"
@@ -164,7 +164,7 @@ advance_mode = 2
 advance_expression = "move_speed > move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_kiss_idle"]
-xfade_time = 0.20
+xfade_time = 0.2
 switch_mode = 2
 advance_mode = 2
 advance_expression = "move_speed <= move_enter_threshold"
@@ -188,12 +188,12 @@ advance_mode = 2
 advance_expression = "queued_action == 'laydown'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laydown_laying"]
-xfade_time = 0.20
+xfade_time = 0.5
 switch_mode = 2
 advance_mode = 2
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laying_lay_up"]
-xfade_time = 0.20
+xfade_time = 0.5
 advance_mode = 2
 advance_expression = "queued_action == 'stand_up'"
 
@@ -267,7 +267,7 @@ states/Start/position = Vector2(53.333332, -39.77777)
 states/Walk/node = SubResource("AnimationNodeAnimation_walk")
 states/Walk/position = Vector2(500, 60)
 transitions = ["Start", "Idle", SubResource("AnimationNodeStateMachineTransition_start_idle"), "Idle", "Walk", SubResource("AnimationNodeStateMachineTransition_idle_walk"), "Walk", "Idle", SubResource("AnimationNodeStateMachineTransition_walk_idle"), "Idle", "Greeting", SubResource("AnimationNodeStateMachineTransition_idle_greeting"), "Walk", "Greeting", SubResource("AnimationNodeStateMachineTransition_walk_greeting"), "Idle", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_idle_standing_greeting"), "Walk", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_walk_standing_greeting"), "Idle", "Salute", SubResource("AnimationNodeStateMachineTransition_idle_salute"), "Walk", "Salute", SubResource("AnimationNodeStateMachineTransition_walk_salute"), "Idle", "Kiss", SubResource("AnimationNodeStateMachineTransition_idle_kiss"), "Walk", "Kiss", SubResource("AnimationNodeStateMachineTransition_walk_kiss"), "Idle", "SitDown", SubResource("AnimationNodeStateMachineTransition_idle_sit_down"), "Walk", "SitDown", SubResource("AnimationNodeStateMachineTransition_walk_sit_down"), "Idle", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_idle_left_turn"), "Walk", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_walk_left_turn"), "Idle", "RightTurn", SubResource("AnimationNodeStateMachineTransition_idle_right_turn"), "Walk", "RightTurn", SubResource("AnimationNodeStateMachineTransition_walk_right_turn"), "Greeting", "Idle", SubResource("AnimationNodeStateMachineTransition_greeting_idle"), "Greeting", "Walk", SubResource("AnimationNodeStateMachineTransition_greeting_walk"), "StandingGreeting", "Idle", SubResource("AnimationNodeStateMachineTransition_standing_greeting_idle"), "StandingGreeting", "Walk", SubResource("AnimationNodeStateMachineTransition_standing_greeting_walk"), "Salute", "Idle", SubResource("AnimationNodeStateMachineTransition_salute_idle"), "Salute", "Walk", SubResource("AnimationNodeStateMachineTransition_salute_walk"), "Kiss", "Idle", SubResource("AnimationNodeStateMachineTransition_kiss_idle"), "Kiss", "Walk", SubResource("AnimationNodeStateMachineTransition_kiss_walk"), "SitDown", "SitToStand", SubResource("AnimationNodeStateMachineTransition_sit_down_sit_to_stand"), "SitDown", "LayDown", SubResource("AnimationNodeStateMachineTransition_sit_down_laydown"), "LayDown", "Laying", SubResource("AnimationNodeStateMachineTransition_laydown_laying"), "Laying", "LayUp", SubResource("AnimationNodeStateMachineTransition_laying_lay_up"), "LayUp", "SitToStand", SubResource("AnimationNodeStateMachineTransition_lay_up_sit_to_stand"), "SitToStand", "Idle", SubResource("AnimationNodeStateMachineTransition_sit_to_stand_idle"), "SitToStand", "Walk", SubResource("AnimationNodeStateMachineTransition_sit_to_stand_walk"), "LeftTurn", "Idle", SubResource("AnimationNodeStateMachineTransition_left_turn_idle"), "LeftTurn", "Walk", SubResource("AnimationNodeStateMachineTransition_left_turn_walk"), "RightTurn", "Idle", SubResource("AnimationNodeStateMachineTransition_right_turn_idle"), "RightTurn", "Walk", SubResource("AnimationNodeStateMachineTransition_right_turn_walk")]
-graph_offset = Vector2(-320, -60.60929)
+graph_offset = Vector2(-320, -72.93609)
 
 [node name="xiaokong" unique_id=907349756 instance=ExtResource("1_2x0fh")]
 script = ExtResource("3_g1v7j")
@@ -275,7 +275,7 @@ script = ExtResource("3_g1v7j")
 [node name="GeneralSkeleton" parent="根" parent_id_path=PackedInt32Array(649474779) index="0" unique_id=1090658932]
 bones/0/position = Vector3(-2.2374727e-05, -3.2065367e-05, -1.5543122e-15)
 bones/0/rotation = Quaternion(-9.213282e-05, 6.428882e-05, -5.935844e-09, 1)
-bones/1/position = Vector3(-0.0009357086, 0.3515574, -0.009693952)
+bones/1/position = Vector3(-0.0009357086, 0.3515574, -0.3183273)
 bones/1/rotation = Quaternion(-0.7048239, 0.007967912, 0.0036200904, 0.7093283)
 bones/2/rotation = Quaternion(0.18406357, 0.12653218, 0.9705526, -0.09021072)
 bones/3/rotation = Quaternion(0.008472644, 0.95995265, -0.27992332, -0.007885319)
@@ -472,7 +472,7 @@ bones/286/position = Vector3(-0.014405991, 0.83684415, -0.44635624)
 bones/286/rotation = Quaternion(-0.7081592, -0.03821332, 0.060938347, 0.7023794)
 
 [node name="UpperChest" parent="根/GeneralSkeleton" index="0" unique_id=39284811]
-transform = Transform3D(0.9943683, -0.038054578, -0.0989123, 0.099472106, 0.013105335, 0.994954, -0.036566272, -0.99918973, 0.016816929, -0.0068700667, 0.33944237, -0.26581597)
+transform = Transform3D(0.9943683, -0.038054578, -0.0989123, 0.099472106, 0.013105335, 0.994954, -0.036566272, -0.99918973, 0.016816929, -0.0069097495, 0.3393855, -0.57444936)
 
 [node name="制服_AppliedMods" parent="根/GeneralSkeleton" index="19" unique_id=1124496510]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0008107722, -0.0019191206, 0.00039288402)
