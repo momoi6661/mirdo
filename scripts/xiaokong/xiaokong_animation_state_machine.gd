@@ -2,20 +2,30 @@ extends Node3D
 
 # AnimationTree owns the whole state machine in xiaokong.tscn.
 # This script only updates parameters and sends one pending target state.
-# pending_action should use the exact AnimationTree state name.
+# For posture changes, pending_action should use the final target state name.
+# The AnimationTree then routes through transition states like SitDown/LayDown.
 
 const IDLE_STATE := &"Idle"
+const WALK_STATE := &"Walk"
+const STANDING_GREETING_STATE := &"StandingGreeting"
+const SALUTE_STATE := &"Salute"
+const KISS_STATE := &"Kiss"
 const LEFT_TURN_STATE := &"LeftTurn"
 const RIGHT_TURN_STATE := &"RightTurn"
+const SIT_DOWN_STATE := &"SitDown"
+const SITTING_IDLE_STATE := &"SittingIdle"
+const SIT_TO_STAND_STATE := &"SitToStand"
+const LAY_DOWN_STATE := &"LayDown"
+const LAY_UP_STATE := &"LayUp"
+const LAYING_STATE := &"Laying"
 
-const ACTION_STATES := {
+const REQUEST_STATES := {
+	&"Idle": true,
 	&"StandingGreeting": true,
 	&"Salute": true,
 	&"Kiss": true,
-	&"SitDown": true,
-	&"SitToStand": true,
-	&"LayDown": true,
-	&"LayUp": true,
+	&"SittingIdle": true,
+	&"Laying": true,
 	&"LeftTurn": true,
 	&"RightTurn": true,
 }
@@ -78,11 +88,15 @@ func clear_pending_action() -> void:
 	pending_action = ""
 
 func trigger_action(state_name: StringName) -> bool:
-	if not ACTION_STATES.has(state_name):
+	if not REQUEST_STATES.has(state_name):
 		return false
 
-	if state_name == _get_current_state():
+	var current_state := _get_current_state()
+	if _is_request_satisfied(current_state, state_name):
 		return true
+
+	if not _can_request_state(current_state, state_name):
+		return false
 
 	pending_action = String(state_name)
 	return true
@@ -112,8 +126,28 @@ func _consume_pending_action(current_state: StringName) -> void:
 	if pending_action.is_empty():
 		return
 
-	if StringName(pending_action) == current_state:
+	if _is_request_satisfied(current_state, StringName(pending_action)):
 		pending_action = ""
 
 func _is_turn_state(state: StringName) -> bool:
 	return state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE
+
+func _is_request_satisfied(current_state: StringName, requested_state: StringName) -> bool:
+	if requested_state == IDLE_STATE:
+		return current_state == IDLE_STATE or current_state == WALK_STATE
+
+	return current_state == requested_state
+
+func _can_request_state(current_state: StringName, requested_state: StringName) -> bool:
+	match requested_state:
+		IDLE_STATE:
+			return current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == SIT_TO_STAND_STATE or current_state == LAY_DOWN_STATE or current_state == LAYING_STATE or current_state == LAY_UP_STATE
+		SITTING_IDLE_STATE:
+			return _is_standing_branch_state(current_state) or current_state == SIT_DOWN_STATE
+		LAYING_STATE:
+			return _is_standing_branch_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == LAY_DOWN_STATE
+		_:
+			return _is_standing_branch_state(current_state)
+
+func _is_standing_branch_state(state: StringName) -> bool:
+	return state == IDLE_STATE or state == WALK_STATE or state == STANDING_GREETING_STATE or state == SALUTE_STATE or state == KISS_STATE or state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE

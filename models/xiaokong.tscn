@@ -98,14 +98,14 @@ advance_expression = "pending_action == 'Kiss'"
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_sit_down"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'SitDown' and move_speed <= move_enter_threshold"
+advance_expression = "(pending_action == 'SittingIdle' or pending_action == 'Laying') and move_speed <= move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_sit_down"]
 xfade_time = 0.24
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'SitDown'"
+advance_expression = "pending_action == 'SittingIdle' or pending_action == 'Laying'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_left_turn"]
 xfade_time = 0.18
@@ -150,7 +150,7 @@ xfade_time = 0.24
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'SitDown'"
+advance_expression = "pending_action == 'SittingIdle' or pending_action == 'Laying'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_left_turn"]
 xfade_time = 0.18
@@ -224,12 +224,12 @@ advance_mode = 2
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_sit_down_sit_to_stand"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'SitToStand'"
+advance_expression = "pending_action == 'Idle'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_sit_down_laydown"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'LayDown'"
+advance_expression = "pending_action == 'Laying'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laydown_laying"]
 xfade_time = 0.5
@@ -240,7 +240,7 @@ advance_mode = 2
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laying_lay_up"]
 xfade_time = 0.5
 advance_mode = 2
-advance_expression = "pending_action == 'LayUp'"
+advance_expression = "pending_action == 'Idle'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_lay_up_sit_to_stand"]
 xfade_time = 0.24
