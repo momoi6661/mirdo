@@ -8,6 +8,7 @@ extends Node3D
 const IDLE_STATE := &"Idle"
 const WALK_STATE := &"Walk"
 const STANDING_GREETING_STATE := &"StandingGreeting"
+const DRINKING_STATE := &"Drinking"
 const SALUTE_STATE := &"Salute"
 const KISS_STATE := &"Kiss"
 const LEFT_TURN_STATE := &"LeftTurn"
@@ -22,6 +23,7 @@ const LAYING_STATE := &"Laying"
 const REQUEST_STATES := {
 	&"Idle": true,
 	&"StandingGreeting": true,
+	&"Drinking": true,
 	&"Salute": true,
 	&"Kiss": true,
 	&"SittingIdle": true,
@@ -141,7 +143,7 @@ func _is_request_satisfied(current_state: StringName, requested_state: StringNam
 func _can_request_state(current_state: StringName, requested_state: StringName) -> bool:
 	match requested_state:
 		IDLE_STATE:
-			return current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == SIT_TO_STAND_STATE or current_state == LAY_DOWN_STATE or current_state == LAYING_STATE or current_state == LAY_UP_STATE
+			return current_state != IDLE_STATE and current_state != WALK_STATE
 		SITTING_IDLE_STATE:
 			return _is_standing_branch_state(current_state) or current_state == SIT_DOWN_STATE
 		LAYING_STATE:
@@ -150,4 +152,4 @@ func _can_request_state(current_state: StringName, requested_state: StringName) 
 			return _is_standing_branch_state(current_state)
 
 func _is_standing_branch_state(state: StringName) -> bool:
-	return state == IDLE_STATE or state == WALK_STATE or state == STANDING_GREETING_STATE or state == SALUTE_STATE or state == KISS_STATE or state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE
+	return state == IDLE_STATE or state == WALK_STATE or state == STANDING_GREETING_STATE or state == DRINKING_STATE or state == SALUTE_STATE or state == KISS_STATE or state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE

@@ -1,6 +1,11 @@
-[gd_resource type="AnimationLibrary" format=3 uid="uid://ba4ddeixdmwwj"]
+[gd_resource type="AnimationLibrary" format=3 uid="uid://c1nps20qj2ouk"]
 
-[ext_resource type="Animation" uid="uid://dno4d2wcqqb0g" path="res://resources/animate/actions/sitting_idle.res" id="1_pwp12"]
+[ext_resource type="Animation" uid="uid://dno4d2wcqqb0g" path="res://resources/animate/actions/sitting_idle.res" id="1_7lvh2"]
+[ext_resource type="Animation" uid="uid://c2kan5so0lbk2" path="res://resources/animate/actions/Drinking.tres" id="1_ltqtg"]
+
+[sub_resource type="Animation" id="Animation_2rlpq"]
+resource_name = "Drinking_fixed"
+length = 8.8667
 
 [sub_resource type="Animation" id="Animation_pwp12"]
 resource_name = "Idle_remap"
@@ -14274,6 +14279,8 @@ tracks/198/keys = PackedFloat32Array(0, 1, -0.21418673, 0.67388725, 0.21418673, 
 
 [resource]
 _data = {
+&"Drinking": ExtResource("1_ltqtg"),
+&"Drinking_fixed": SubResource("Animation_2rlpq"),
 &"Idle_remap": SubResource("Animation_pwp12"),
 &"Kiss_reremap": SubResource("Animation_6bqpd"),
 &"Laydown": SubResource("Animation_0qbec"),
@@ -14284,6 +14291,6 @@ _data = {
 &"Sit Down_reremap": SubResource("Animation_fd0t7"),
 &"Sit To Stand_reremap": SubResource("Animation_ks23v"),
 &"Standing Greeting_remap": SubResource("Animation_qcs7s"),
-&"sitting_idle": ExtResource("1_pwp12"),
+&"sitting_idle": ExtResource("1_7lvh2"),
 &"walk_treak_remap": SubResource("Animation_au4dj")
 }
