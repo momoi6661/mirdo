@@ -62,109 +62,109 @@ advance_expression = "pending_action == '' and move_speed <= move_exit_threshold
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_standing_greeting"]
 xfade_time = 0.22
 advance_mode = 2
-advance_expression = "pending_action == 'standing_greet' and move_speed <= move_enter_threshold"
+advance_expression = "pending_action == 'StandingGreeting' and move_speed <= move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_standing_greeting"]
 xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'standing_greet'"
+advance_expression = "pending_action == 'StandingGreeting'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_salute"]
 xfade_time = 0.22
 advance_mode = 2
-advance_expression = "pending_action == 'salute' and move_speed <= move_enter_threshold"
+advance_expression = "pending_action == 'Salute' and move_speed <= move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_salute"]
 xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'salute'"
+advance_expression = "pending_action == 'Salute'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_kiss"]
 xfade_time = 0.22
 advance_mode = 2
-advance_expression = "pending_action == 'kiss' and move_speed <= move_enter_threshold"
+advance_expression = "pending_action == 'Kiss' and move_speed <= move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_kiss"]
 xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'kiss'"
+advance_expression = "pending_action == 'Kiss'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_sit_down"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'sit_down' and move_speed <= move_enter_threshold"
+advance_expression = "pending_action == 'SitDown' and move_speed <= move_enter_threshold"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_sit_down"]
 xfade_time = 0.24
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'sit_down'"
+advance_expression = "pending_action == 'SitDown'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_left_turn"]
 xfade_time = 0.18
 advance_mode = 2
-advance_expression = "move_speed <= move_enter_threshold and ((pending_action == '' and turn_amount <= -turn_enter_threshold) or pending_action == 'turn_left')"
+advance_expression = "move_speed <= move_enter_threshold and ((pending_action == '' and turn_amount <= -turn_enter_threshold) or pending_action == 'LeftTurn')"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_left_turn"]
 xfade_time = 0.18
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "(pending_action == '' and move_speed <= move_enter_threshold and turn_amount <= -turn_enter_threshold) or pending_action == 'turn_left'"
+advance_expression = "(pending_action == '' and move_speed <= move_enter_threshold and turn_amount <= -turn_enter_threshold) or pending_action == 'LeftTurn'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_idle_right_turn"]
 xfade_time = 0.18
 advance_mode = 2
-advance_expression = "move_speed <= move_enter_threshold and ((pending_action == '' and turn_amount >= turn_enter_threshold) or pending_action == 'turn_right')"
+advance_expression = "move_speed <= move_enter_threshold and ((pending_action == '' and turn_amount >= turn_enter_threshold) or pending_action == 'RightTurn')"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_walk_right_turn"]
 xfade_time = 0.18
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "(pending_action == '' and move_speed <= move_enter_threshold and turn_amount >= turn_enter_threshold) or pending_action == 'turn_right'"
+advance_expression = "(pending_action == '' and move_speed <= move_enter_threshold and turn_amount >= turn_enter_threshold) or pending_action == 'RightTurn'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_salute"]
 xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'salute'"
+advance_expression = "pending_action == 'Salute'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_kiss"]
 xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'kiss'"
+advance_expression = "pending_action == 'Kiss'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_sit_down"]
 xfade_time = 0.24
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'sit_down'"
+advance_expression = "pending_action == 'SitDown'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_left_turn"]
 xfade_time = 0.18
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'turn_left'"
+advance_expression = "pending_action == 'LeftTurn'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_action_right_turn"]
 xfade_time = 0.18
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'turn_right'"
+advance_expression = "pending_action == 'RightTurn'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_standing_greeting_idle"]
 xfade_time = 0.2
@@ -185,7 +185,7 @@ xfade_time = 0.22
 break_loop_at_end = true
 switch_mode = 2
 advance_mode = 2
-advance_expression = "pending_action == 'standing_greet'"
+advance_expression = "pending_action == 'StandingGreeting'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_salute_idle"]
 xfade_time = 0.2
@@ -224,12 +224,12 @@ advance_mode = 2
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_sit_down_sit_to_stand"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'sit_to_stand' or pending_action == 'stand_up'"
+advance_expression = "pending_action == 'SitToStand'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_sit_down_laydown"]
 xfade_time = 0.24
 advance_mode = 2
-advance_expression = "pending_action == 'laydown'"
+advance_expression = "pending_action == 'LayDown'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laydown_laying"]
 xfade_time = 0.5
@@ -240,7 +240,7 @@ advance_mode = 2
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_laying_lay_up"]
 xfade_time = 0.5
 advance_mode = 2
-advance_expression = "pending_action == 'stand_up'"
+advance_expression = "pending_action == 'LayUp'"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_lay_up_sit_to_stand"]
 xfade_time = 0.24
