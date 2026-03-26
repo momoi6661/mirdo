@@ -19,6 +19,21 @@ const SIT_TO_STAND_STATE := &"SitToStand"
 const LAY_DOWN_STATE := &"LayDown"
 const LAY_UP_STATE := &"LayUp"
 const LAYING_STATE := &"Laying"
+const HAIR_CENTER_BONE := "\u5934\u90e8"
+const HAIR_SPRING_STIFFNESS := 2.4
+const HAIR_SPRING_DRAG := 0.24
+const HAIR_SPRING_GRAVITY := 0.03
+const HAIR_SPRING_RADIUS := 0.015
+const HAIR_SPRING_CHAINS := [
+	{"root": "Hair.201", "end": "Hair.203"},
+	{"root": "Hair.101", "end": "Hair.103"},
+	{"root": "Hair.301", "end": "Hair.304"},
+	{"root": "Hair.401", "end": "Hair.404"},
+	{"root": "Hair.501", "end": "Hair.506"},
+	{"root": "Hair.507", "end": "Hair.504"},
+	{"root": "Hair.601.r", "end": "Hair.602.r"},
+	{"root": "Hair.601.l", "end": "Hair.602.l"},
+]
 
 const REQUEST_STATES := {
 	&"Idle": true,
@@ -38,6 +53,7 @@ const REQUEST_STATES := {
 @export var auto_activate_tree: bool = true
 
 @onready var animation_tree: AnimationTree = $AnimationTree
+@onready var general_skeleton: Skeleton3D = %GeneralSkeleton
 
 const DRINKING_STANDING_BLEND_PATH := "parameters/Drinking/StandingBlend/blend_amount"
 const DRINKING_SITTING_BLEND_PATH := "parameters/Drinking/SittingBlend/blend_amount"
@@ -55,6 +71,8 @@ var _playback: AnimationNodeStateMachinePlayback
 var _last_state: StringName = &""
 
 func _ready() -> void:
+	_setup_hair_spring_bones()
+
 	if animation_tree == null:
 		push_warning("xiaokong animation setup is missing AnimationTree.")
 		return
@@ -68,6 +86,42 @@ func _ready() -> void:
 		_last_state = IDLE_STATE
 
 	set_process(true)
+
+func _setup_hair_spring_bones() -> void:
+	if general_skeleton == null:
+		push_warning("xiaokong is missing GeneralSkeleton for spring hair setup.")
+		return
+
+	var legacy_hair_physics := general_skeleton.get_node_or_null("HairPhysicsSimulator") as PhysicalBoneSimulator3D
+	if legacy_hair_physics != null:
+		legacy_hair_physics.active = false
+
+	var hair_spring := general_skeleton.get_node_or_null("HairSpringBoneSimulator") as SpringBoneSimulator3D
+	if hair_spring == null:
+		push_warning("xiaokong is missing HairSpringBoneSimulator.")
+		return
+
+	hair_spring.active = true
+	hair_spring.mutable_bone_axes = true
+	hair_spring.external_force = Vector3.ZERO
+	hair_spring.clear_settings()
+	hair_spring.setting_count = HAIR_SPRING_CHAINS.size()
+
+	for index in range(HAIR_SPRING_CHAINS.size()):
+		var chain: Dictionary = HAIR_SPRING_CHAINS[index]
+		hair_spring.set_root_bone_name(index, String(chain["root"]))
+		hair_spring.set_end_bone_name(index, String(chain["end"]))
+		hair_spring.set_center_from(index, SpringBoneSimulator3D.CENTER_FROM_BONE)
+		hair_spring.set_center_bone_name(index, HAIR_CENTER_BONE)
+		hair_spring.set_rotation_axis(index, SkeletonModifier3D.ROTATION_AXIS_ALL)
+		hair_spring.set_drag(index, HAIR_SPRING_DRAG)
+		hair_spring.set_stiffness(index, HAIR_SPRING_STIFFNESS)
+		hair_spring.set_gravity(index, HAIR_SPRING_GRAVITY)
+		hair_spring.set_gravity_direction(index, Vector3.DOWN)
+		hair_spring.set_radius(index, HAIR_SPRING_RADIUS)
+		hair_spring.set_enable_all_child_collisions(index, true)
+
+	hair_spring.reset()
 
 func _setup_drinking_blend_tree() -> void:
 	animation_tree.set(DRINKING_STANDING_BLEND_PATH, 1.0)
