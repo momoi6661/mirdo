@@ -39,10 +39,15 @@ const REQUEST_STATES := {
 
 @onready var animation_tree: AnimationTree = $AnimationTree
 
+const DRINKING_STANDING_BLEND_PATH := "parameters/Drinking/StandingBlend/blend_amount"
+const DRINKING_SITTING_BLEND_PATH := "parameters/Drinking/SittingBlend/blend_amount"
+const DRINKING_CONTEXT_BLEND_PATH := "parameters/Drinking/ContextBlend/blend_amount"
+
 # These three properties are read directly by AnimationTree advance expressions.
 var move_speed: float = 0.0
 var turn_amount: float = 0.0
 var pending_action: String = ""
+var drinking_return_state: String = "Idle"
 
 var _motion_velocity: Vector3 = Vector3.ZERO
 var _use_velocity_input := true
@@ -56,12 +61,18 @@ func _ready() -> void:
 
 	animation_tree.active = auto_activate_tree
 	_playback = animation_tree.get("parameters/playback") as AnimationNodeStateMachinePlayback
+	_setup_drinking_blend_tree()
 
 	if _playback != null:
 		_playback.start(IDLE_STATE)
 		_last_state = IDLE_STATE
 
 	set_process(true)
+
+func _setup_drinking_blend_tree() -> void:
+	animation_tree.set(DRINKING_STANDING_BLEND_PATH, 1.0)
+	animation_tree.set(DRINKING_SITTING_BLEND_PATH, 1.0)
+	animation_tree.set(DRINKING_CONTEXT_BLEND_PATH, 0.0)
 
 func _process(_delta: float) -> void:
 	_update_move_speed()
@@ -99,6 +110,9 @@ func trigger_action(state_name: StringName) -> bool:
 
 	if not _can_request_state(current_state, state_name):
 		return false
+
+	if state_name == DRINKING_STATE:
+		_update_drinking_return_state(current_state)
 
 	pending_action = String(state_name)
 	return true
@@ -144,12 +158,25 @@ func _can_request_state(current_state: StringName, requested_state: StringName) 
 	match requested_state:
 		IDLE_STATE:
 			return current_state != IDLE_STATE and current_state != WALK_STATE
+		DRINKING_STATE:
+			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE
 		SITTING_IDLE_STATE:
-			return _is_standing_branch_state(current_state) or current_state == SIT_DOWN_STATE
+			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE
 		LAYING_STATE:
-			return _is_standing_branch_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == LAY_DOWN_STATE
+			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == LAY_DOWN_STATE
 		_:
-			return _is_standing_branch_state(current_state)
+			return _is_standing_context_state(current_state)
 
-func _is_standing_branch_state(state: StringName) -> bool:
+func _update_drinking_return_state(current_state: StringName) -> void:
+	if current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE:
+		drinking_return_state = String(SITTING_IDLE_STATE)
+		animation_tree.set(DRINKING_CONTEXT_BLEND_PATH, 1.0)
+	else:
+		drinking_return_state = String(IDLE_STATE)
+		animation_tree.set(DRINKING_CONTEXT_BLEND_PATH, 0.0)
+
+func _is_standing_context_state(state: StringName) -> bool:
+	if state == DRINKING_STATE:
+		return drinking_return_state != String(SITTING_IDLE_STATE)
+
 	return state == IDLE_STATE or state == WALK_STATE or state == STANDING_GREETING_STATE or state == DRINKING_STATE or state == SALUTE_STATE or state == KISS_STATE or state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE
