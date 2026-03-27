@@ -101,20 +101,24 @@ func clear_pending_action() -> void:
 	pending_action = ""
 
 func trigger_action(state_name: StringName) -> bool:
-	if not REQUEST_STATES.has(state_name):
+	var current_state := _get_current_state()
+	var requested_state := state_name
+	if state_name == IDLE_STATE:
+		requested_state = _resolve_idle_request_target(current_state)
+
+	if not REQUEST_STATES.has(requested_state):
 		return false
 
-	var current_state := _get_current_state()
-	if _is_request_satisfied(current_state, state_name):
+	if _is_request_satisfied(current_state, requested_state):
 		return true
 
-	if not _can_request_state(current_state, state_name):
+	if not _can_request_state(current_state, requested_state):
 		return false
 
-	if state_name == DRINKING_STATE:
+	if requested_state == DRINKING_STATE:
 		_update_drinking_return_state(current_state)
 
-	pending_action = String(state_name)
+	pending_action = String(requested_state)
 	return true
 
 func _update_move_speed() -> void:
@@ -161,11 +165,17 @@ func _can_request_state(current_state: StringName, requested_state: StringName) 
 		DRINKING_STATE:
 			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE
 		SITTING_IDLE_STATE:
-			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE
+			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE or _is_laying_context_state(current_state)
 		LAYING_STATE:
 			return _is_standing_context_state(current_state) or current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE or current_state == LAY_DOWN_STATE
 		_:
 			return _is_standing_context_state(current_state)
+
+func _resolve_idle_request_target(current_state: StringName) -> StringName:
+	if _is_laying_context_state(current_state):
+		return SITTING_IDLE_STATE
+
+	return IDLE_STATE
 
 func _update_drinking_return_state(current_state: StringName) -> void:
 	if current_state == SIT_DOWN_STATE or current_state == SITTING_IDLE_STATE:
@@ -180,3 +190,6 @@ func _is_standing_context_state(state: StringName) -> bool:
 		return drinking_return_state != String(SITTING_IDLE_STATE)
 
 	return state == IDLE_STATE or state == WALK_STATE or state == STANDING_GREETING_STATE or state == DRINKING_STATE or state == SALUTE_STATE or state == KISS_STATE or state == LEFT_TURN_STATE or state == RIGHT_TURN_STATE
+
+func _is_laying_context_state(state: StringName) -> bool:
+	return state == LAY_DOWN_STATE or state == LAYING_STATE or state == LAY_UP_STATE
