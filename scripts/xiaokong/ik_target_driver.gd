@@ -5,6 +5,7 @@ const EPSILON := 0.00001
 
 @export var elbow_pole_distance_scale: float = 0.9
 @export var knee_pole_distance_scale: float = 1.0
+@export var look_at_follow_bone_name: StringName = &"头部"
 @export var auto_manage_influence: bool = true
 @export var manage_head_look_at: bool = true
 @export var position_offset_threshold: float = 0.002
@@ -17,6 +18,7 @@ const EPSILON := 0.00001
 @onready var right_hand_rot_auto: Node3D = %RightHandRotAuto
 @onready var left_foot_auto: Node3D = %LeftFootAuto
 @onready var right_foot_auto: Node3D = %RightFootAuto
+@onready var look_at_auto: Node3D = %LookAtAuto
 @onready var left_elbow_pole_auto: Node3D = %LeftElbowPoleAuto
 @onready var right_elbow_pole_auto: Node3D = %RightElbowPoleAuto
 @onready var left_knee_pole_auto: Node3D = %LeftKneePoleAuto
@@ -52,6 +54,7 @@ var left_foot_bone: int = -1
 var right_upper_leg_bone: int = -1
 var right_lower_leg_bone: int = -1
 var right_foot_bone: int = -1
+var look_at_follow_bone: int = -1
 
 var left_hand_target_base: Transform3D
 var right_hand_target_base: Transform3D
@@ -94,6 +97,14 @@ func _cache_bones() -> void:
 	right_lower_leg_bone = skeleton.find_bone("RightLowerLeg")
 	right_foot_bone = skeleton.find_bone("RightFoot")
 
+	look_at_follow_bone = skeleton.find_bone(String(look_at_follow_bone_name))
+	if look_at_follow_bone == -1:
+		look_at_follow_bone = skeleton.find_bone("头部")
+	if look_at_follow_bone == -1:
+		look_at_follow_bone = skeleton.find_bone("Head")
+	if look_at_follow_bone == -1:
+		push_warning("IKTargetDriver could not find a LookAt follow bone.")
+
 func _on_skeleton_pose_updated() -> void:
 	_set_auto_from_bone(left_hand_auto, left_hand_bone)
 	_set_auto_from_bone(right_hand_auto, right_hand_bone)
@@ -101,6 +112,7 @@ func _on_skeleton_pose_updated() -> void:
 	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
 	_set_auto_from_bone(left_foot_auto, left_foot_bone)
 	_set_auto_from_bone(right_foot_auto, right_foot_bone)
+	_set_auto_from_bone(look_at_auto, look_at_follow_bone)
 
 	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
 	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
