@@ -17,6 +17,10 @@
 [ext_resource type="PackedScene" uid="uid://cci46x1ougi1v" path="res://models/reze.tscn" id="15_ywvwd"]
 [ext_resource type="PackedScene" uid="uid://c1fjt301y1523" path="res://models/xiaokong.tscn" id="16_5d8v6"]
 
+[sub_resource type="NavigationMesh" id="NavigationMesh_level_001"]
+vertices = PackedVector3Array(-31, 0, -11, 11, 0, -11, 11, 0, 11, -31, 0, 11)
+polygons = [PackedInt32Array(0, 1, 2, 3)]
+
 [sub_resource type="BoxMesh" id="BoxMesh_gd0ev"]
 material = ExtResource("2_x5xie")
 size = Vector3(20, 0.5, 20)
@@ -148,6 +152,9 @@ data = PackedVector3Array(-4, 1, 1, 4, -1, 1, -4, -1, 1, -4, 1, -1, -4, -1, -1, 
 
 [node name="WorldEnvironment" parent="." unique_id=813723417 instance=ExtResource("1_db21n")]
 
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1920223747]
+navigation_mesh = SubResource("NavigationMesh_level_001")
+
 [node name="Floor" type="MeshInstance3D" parent="." unique_id=1659943637]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1092262, -0.25282592, -0.34624434)
 mesh = SubResource("BoxMesh_gd0ev")
@@ -245,4 +252,4 @@ transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0.08723974, 0.001623
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13005686, -2.3841858e-07, 0.46384174)
 
 [node name="xiaokong" parent="." unique_id=907349756 instance=ExtResource("16_5d8v6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6176229, 0.03256569, 2.9590344)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5508841, 0.03256581, 1.8682122)
