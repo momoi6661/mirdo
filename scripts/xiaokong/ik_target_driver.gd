@@ -6,6 +6,7 @@ const EPSILON := 0.00001
 @export var elbow_pole_distance_scale: float = 0.9
 @export var knee_pole_distance_scale: float = 1.0
 @export var look_at_follow_bone_name: StringName = &"头部"
+@export var look_at_auto_forward_offset: float = 0.08
 @export var auto_manage_influence: bool = true
 @export var manage_head_look_at: bool = true
 @export var position_offset_threshold: float = 0.002
@@ -112,7 +113,7 @@ func _on_skeleton_pose_updated() -> void:
 	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
 	_set_auto_from_bone(left_foot_auto, left_foot_bone)
 	_set_auto_from_bone(right_foot_auto, right_foot_bone)
-	_set_auto_from_bone(look_at_auto, look_at_follow_bone)
+	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, look_at_auto_forward_offset)
 
 	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
 	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
@@ -127,6 +128,15 @@ func _set_auto_from_bone(target: Node3D, bone_idx: int) -> void:
 		return
 
 	target.global_transform = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
+
+func _set_auto_from_bone_with_forward_offset(target: Node3D, bone_idx: int, forward_offset: float) -> void:
+	if target == null or bone_idx == -1:
+		return
+
+	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
+	var forward: Vector3 = -bone_global.basis.z.normalized()
+	bone_global.origin += forward * forward_offset
+	target.global_transform = bone_global
 
 func _update_pole_auto(target: Node3D, root_bone_idx: int, middle_bone_idx: int, end_bone_idx: int, fallback_direction: Vector3, distance_scale: float) -> void:
 	if target == null or root_bone_idx == -1 or middle_bone_idx == -1 or end_bone_idx == -1:
