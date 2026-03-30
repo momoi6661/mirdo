@@ -12,29 +12,29 @@ const EPSILON := 0.00001
 @export var position_offset_threshold: float = 0.002
 @export var rotation_offset_threshold_degrees: float = 1.0
 
-@onready var skeleton: Skeleton3D = %GeneralSkeleton
-@onready var left_hand_auto: Node3D = %LeftHandAuto
-@onready var right_hand_auto: Node3D = %RightHandAuto
-@onready var left_hand_rot_auto: Node3D = %LeftHandRotAuto
-@onready var right_hand_rot_auto: Node3D = %RightHandRotAuto
-@onready var left_foot_auto: Node3D = %LeftFootAuto
-@onready var right_foot_auto: Node3D = %RightFootAuto
-@onready var look_at_auto: Node3D = %LookAtAuto
-@onready var left_elbow_pole_auto: Node3D = %LeftElbowPoleAuto
-@onready var right_elbow_pole_auto: Node3D = %RightElbowPoleAuto
-@onready var left_knee_pole_auto: Node3D = %LeftKneePoleAuto
-@onready var right_knee_pole_auto: Node3D = %RightKneePoleAuto
-@onready var left_hand_target: Marker3D = $LeftHandAuto/LeftHandTarget
-@onready var right_hand_target: Marker3D = $RightHandAuto/RightHandTarget
-@onready var left_hand_rot_target: Marker3D = $LeftHandRotAuto/LeftHandRotTarget
-@onready var right_hand_rot_target: Marker3D = $RightHandRotAuto/RightHandRotTarget
-@onready var left_foot_target: Marker3D = $LeftFootAuto/LeftFootTarget
-@onready var right_foot_target: Marker3D = $RightFootAuto/RightFootTarget
-@onready var left_elbow_pole_target: Marker3D = $LeftElbowPoleAuto/LeftElbowPoleTarget
-@onready var right_elbow_pole_target: Marker3D = $RightElbowPoleAuto/RightElbowPoleTarget
-@onready var left_knee_pole_target: Marker3D = $LeftKneePoleAuto/LeftKneePoleTarget
-@onready var right_knee_pole_target: Marker3D = $RightKneePoleAuto/RightKneePoleTarget
-@onready var mark_look_at_target: Marker3D = %mark3d
+@onready var skeleton: Skeleton3D = get_parent().get_node_or_null("GeneralSkeleton") as Skeleton3D
+@onready var left_hand_auto: Node3D = get_node_or_null("LeftHandAuto") as Node3D
+@onready var right_hand_auto: Node3D = get_node_or_null("RightHandAuto") as Node3D
+@onready var left_hand_rot_auto: Node3D = get_node_or_null("LeftHandRotAuto") as Node3D
+@onready var right_hand_rot_auto: Node3D = get_node_or_null("RightHandRotAuto") as Node3D
+@onready var left_foot_auto: Node3D = get_node_or_null("LeftFootAuto") as Node3D
+@onready var right_foot_auto: Node3D = get_node_or_null("RightFootAuto") as Node3D
+@onready var look_at_auto: Node3D = get_node_or_null("LookAtAuto") as Node3D
+@onready var left_elbow_pole_auto: Node3D = get_node_or_null("LeftElbowPoleAuto") as Node3D
+@onready var right_elbow_pole_auto: Node3D = get_node_or_null("RightElbowPoleAuto") as Node3D
+@onready var left_knee_pole_auto: Node3D = get_node_or_null("LeftKneePoleAuto") as Node3D
+@onready var right_knee_pole_auto: Node3D = get_node_or_null("RightKneePoleAuto") as Node3D
+@onready var left_hand_target: Marker3D = get_node_or_null("LeftHandAuto/LeftHandTarget") as Marker3D
+@onready var right_hand_target: Marker3D = get_node_or_null("RightHandAuto/RightHandTarget") as Marker3D
+@onready var left_hand_rot_target: Marker3D = get_node_or_null("LeftHandRotAuto/LeftHandRotTarget") as Marker3D
+@onready var right_hand_rot_target: Marker3D = get_node_or_null("RightHandRotAuto/RightHandRotTarget") as Marker3D
+@onready var left_foot_target: Marker3D = get_node_or_null("LeftFootAuto/LeftFootTarget") as Marker3D
+@onready var right_foot_target: Marker3D = get_node_or_null("RightFootAuto/RightFootTarget") as Marker3D
+@onready var left_elbow_pole_target: Marker3D = get_node_or_null("LeftElbowPoleAuto/LeftElbowPoleTarget") as Marker3D
+@onready var right_elbow_pole_target: Marker3D = get_node_or_null("RightElbowPoleAuto/RightElbowPoleTarget") as Marker3D
+@onready var left_knee_pole_target: Marker3D = get_node_or_null("LeftKneePoleAuto/LeftKneePoleTarget") as Marker3D
+@onready var right_knee_pole_target: Marker3D = get_node_or_null("RightKneePoleAuto/RightKneePoleTarget") as Marker3D
+@onready var mark_look_at_target: Marker3D = get_node_or_null("LookAtAuto/mark3d") as Marker3D
 @onready var head_look_at: LookAtModifier3D = get_parent().get_node_or_null("GeneralSkeleton/HeadLookAt") as LookAtModifier3D
 @onready var left_arm_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/LeftArmIK") as TwoBoneIK3D
 @onready var right_arm_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/RightArmIK") as TwoBoneIK3D
@@ -78,6 +78,14 @@ func _ready() -> void:
 	_cache_base_target_transforms()
 	if not skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
 		skeleton.pose_updated.connect(_on_skeleton_pose_updated)
+	_on_skeleton_pose_updated()
+	set_process(Engine.is_editor_hint())
+
+func _process(_delta: float) -> void:
+	if not Engine.is_editor_hint():
+		return
+	if skeleton == null:
+		return
 	_on_skeleton_pose_updated()
 
 func _exit_tree() -> void:
@@ -171,18 +179,22 @@ func _update_pole_auto(target: Node3D, root_bone_idx: int, middle_bone_idx: int,
 	target.global_transform = Transform3D(auto_basis, middle_position + pole_direction * pole_distance)
 
 func _cache_base_target_transforms() -> void:
-	left_hand_target_base = left_hand_target.transform
-	right_hand_target_base = right_hand_target.transform
-	left_hand_rot_target_base = left_hand_rot_target.transform
-	right_hand_rot_target_base = right_hand_rot_target.transform
-	left_foot_target_base = left_foot_target.transform
-	right_foot_target_base = right_foot_target.transform
-	left_elbow_pole_target_base = left_elbow_pole_target.transform
-	right_elbow_pole_target_base = right_elbow_pole_target.transform
-	left_knee_pole_target_base = left_knee_pole_target.transform
-	right_knee_pole_target_base = right_knee_pole_target.transform
-	if mark_look_at_target != null:
-		mark_look_at_target_base = mark_look_at_target.transform
+	left_hand_target_base = _safe_local_transform(left_hand_target)
+	right_hand_target_base = _safe_local_transform(right_hand_target)
+	left_hand_rot_target_base = _safe_local_transform(left_hand_rot_target)
+	right_hand_rot_target_base = _safe_local_transform(right_hand_rot_target)
+	left_foot_target_base = _safe_local_transform(left_foot_target)
+	right_foot_target_base = _safe_local_transform(right_foot_target)
+	left_elbow_pole_target_base = _safe_local_transform(left_elbow_pole_target)
+	right_elbow_pole_target_base = _safe_local_transform(right_elbow_pole_target)
+	left_knee_pole_target_base = _safe_local_transform(left_knee_pole_target)
+	right_knee_pole_target_base = _safe_local_transform(right_knee_pole_target)
+	mark_look_at_target_base = _safe_local_transform(mark_look_at_target)
+
+func _safe_local_transform(node: Node3D) -> Transform3D:
+	if node == null:
+		return Transform3D.IDENTITY
+	return node.transform
 
 func _update_modifier_influence() -> void:
 	var left_arm_active: bool = _has_position_offset(left_hand_target, left_hand_target_base) or _has_position_offset(left_elbow_pole_target, left_elbow_pole_target_base)
