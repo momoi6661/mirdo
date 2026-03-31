@@ -20,6 +20,7 @@ var is_crouch_adjusted: bool = false
 var stairs_below_ray: RayCast3D
 var stairs_ahead_ray: RayCast3D
 @export var camera_offset: Node3D
+@export_flags_3d_physics var step_detection_mask: int = 1
 
 func _ready():
 	# 获取相机偏移节点，用于相机平滑
@@ -36,7 +37,7 @@ func setup_stair_rays():
 		stairs_below_ray.enabled = true
 		# 重要：使用和玩家相同的碰撞掩码！
 		# 原因：射线应该只检测玩家能碰撞的物体
-		stairs_below_ray.collision_mask = player.collision_mask
+		stairs_below_ray.collision_mask = _get_step_detection_mask()
 		player.add_child(stairs_below_ray)
 	
 	# 创建向前检测楼梯的射线
@@ -61,8 +62,15 @@ func setup_stair_rays():
 		stairs_ahead_ray.enabled = true
 		# 同样使用和玩家相同的碰撞掩码
 		# 这样射线就能准确检测玩家可以站立或碰撞的表面
-		stairs_ahead_ray.collision_mask = player.collision_mask
+		stairs_ahead_ray.collision_mask = _get_step_detection_mask()
 		player.add_child(stairs_ahead_ray)
+
+func _get_step_detection_mask() -> int:
+	if step_detection_mask > 0:
+		return step_detection_mask
+	if player:
+		return player.collision_mask
+	return 1
 
 # 主函数：处理上楼梯逻辑，在move_and_slide之前调用
 # 返回true表示正在上楼梯，应该跳过move_and_slide
