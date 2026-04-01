@@ -4,6 +4,7 @@
 [ext_resource type="Animation" uid="uid://b00ek16jrdljr" path="res://resources/animate/actions/Idle.res" id="1_irdeu"]
 [ext_resource type="Animation" uid="uid://b3toowos074re" path="res://resources/animate/actions/Kiss_mixamo.res" id="2_7j6lw"]
 [ext_resource type="Animation" uid="uid://cao5sk6aawo3o" path="res://resources/animate/actions/salute_mixamo.res" id="3_7j6lw"]
+[ext_resource type="Animation" uid="uid://bp36ptmp5d2ue" path="res://resources/animate/actions/Walk_mixamo.res" id="3_16xdh"]
 
 [sub_resource type="Animation" id="Animation_f5oi3"]
 resource_name = "mixamo_com"
@@ -14595,6 +14596,7 @@ _data = {
 &"Sit Down_reremap": SubResource("Animation_fd0t7"),
 &"Sit To Stand_reremap": SubResource("Animation_ks23v"),
 &"Standing Greeting_remap": SubResource("Animation_qcs7s"),
+&"Walk_mixamo": ExtResource("3_16xdh"),
 &"salute_mixamo": ExtResource("3_7j6lw"),
 &"sitting_idle": ExtResource("1_7lvh2"),
 &"walk_treak_remap": SubResource("Animation_au4dj")

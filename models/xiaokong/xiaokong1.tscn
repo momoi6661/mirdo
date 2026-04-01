@@ -91,7 +91,7 @@ animation = &"sitting_idle"
 animation = &"Standing Greeting_remap"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_walk"]
-animation = &"walk_treak_remap"
+animation = &"Walk_mixamo"
 
 [sub_resource type="AnimationNodeStateMachineTransition" id="AnimationNodeStateMachineTransition_start_idle"]
 advance_mode = 2
@@ -368,7 +368,7 @@ states/Drinking/node = SubResource("AnimationNodeBlendTree_drinking")
 states/Drinking/position = Vector2(211.33337, -80.666664)
 states/End/position = Vector2(980, 68.22222)
 states/Idle/node = SubResource("AnimationNodeAnimation_idle")
-states/Idle/position = Vector2(297.3333, 67.703705)
+states/Idle/position = Vector2(303.3333, 105.703705)
 states/Kiss/node = SubResource("AnimationNodeAnimation_kiss")
 states/Kiss/position = Vector2(196.66667, 277.55554)
 states/LayDown/node = SubResource("AnimationNodeAnimation_laydown")
@@ -384,9 +384,9 @@ states/RightTurn/position = Vector2(720, 160)
 states/Salute/node = SubResource("AnimationNodeAnimation_salute")
 states/Salute/position = Vector2(632.8889, -38.518517)
 states/SitDown/node = SubResource("AnimationNodeAnimation_sit_down")
-states/SitDown/position = Vector2(126.888885, 180.0494)
+states/SitDown/position = Vector2(132.88889, 218.0494)
 states/SitToStand/node = SubResource("AnimationNodeAnimation_sit_to_stand")
-states/SitToStand/position = Vector2(6, 61.11111)
+states/SitToStand/position = Vector2(12, 99.111115)
 states/SittingIdle/node = SubResource("AnimationNodeAnimation_j65ll")
 states/SittingIdle/position = Vector2(20, 300)
 states/StandingGreeting/node = SubResource("AnimationNodeAnimation_standing_greeting")
@@ -395,7 +395,7 @@ states/Start/position = Vector2(53.333332, -39.77777)
 states/Walk/node = SubResource("AnimationNodeAnimation_walk")
 states/Walk/position = Vector2(560.6667, 50.44445)
 transitions = ["Start", "Idle", SubResource("AnimationNodeStateMachineTransition_start_idle"), "Idle", "Walk", SubResource("AnimationNodeStateMachineTransition_idle_walk"), "Walk", "Idle", SubResource("AnimationNodeStateMachineTransition_walk_idle"), "Idle", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_idle_standing_greeting"), "Walk", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_walk_standing_greeting"), "Idle", "Drinking", SubResource("AnimationNodeStateMachineTransition_idle_drinking"), "Idle", "Salute", SubResource("AnimationNodeStateMachineTransition_idle_salute"), "Walk", "Salute", SubResource("AnimationNodeStateMachineTransition_walk_salute"), "Idle", "Kiss", SubResource("AnimationNodeStateMachineTransition_idle_kiss"), "Walk", "Kiss", SubResource("AnimationNodeStateMachineTransition_walk_kiss"), "Idle", "SitDown", SubResource("AnimationNodeStateMachineTransition_idle_sit_down"), "Walk", "SitDown", SubResource("AnimationNodeStateMachineTransition_walk_sit_down"), "Idle", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_idle_left_turn"), "Walk", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_walk_left_turn"), "Idle", "RightTurn", SubResource("AnimationNodeStateMachineTransition_idle_right_turn"), "Walk", "RightTurn", SubResource("AnimationNodeStateMachineTransition_walk_right_turn"), "StandingGreeting", "Drinking", SubResource("AnimationNodeStateMachineTransition_action_drinking"), "StandingGreeting", "Salute", SubResource("AnimationNodeStateMachineTransition_action_salute"), "StandingGreeting", "Kiss", SubResource("AnimationNodeStateMachineTransition_action_kiss"), "StandingGreeting", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "StandingGreeting", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_action_left_turn"), "StandingGreeting", "RightTurn", SubResource("AnimationNodeStateMachineTransition_action_right_turn"), "StandingGreeting", "Idle", SubResource("AnimationNodeStateMachineTransition_standing_greeting_idle"), "StandingGreeting", "Walk", SubResource("AnimationNodeStateMachineTransition_standing_greeting_walk"), "Drinking", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_action_standing_greeting"), "Drinking", "Salute", SubResource("AnimationNodeStateMachineTransition_action_salute"), "Drinking", "Kiss", SubResource("AnimationNodeStateMachineTransition_action_kiss"), "Drinking", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "Drinking", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_action_left_turn"), "Drinking", "RightTurn", SubResource("AnimationNodeStateMachineTransition_action_right_turn"), "Drinking", "Idle", SubResource("AnimationNodeStateMachineTransition_drinking_idle"), "Drinking", "Walk", SubResource("AnimationNodeStateMachineTransition_drinking_walk"), "Drinking", "SittingIdle", SubResource("AnimationNodeStateMachineTransition_drinking_sitting_idle"), "Salute", "Drinking", SubResource("AnimationNodeStateMachineTransition_action_drinking"), "Salute", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_action_standing_greeting"), "Salute", "Kiss", SubResource("AnimationNodeStateMachineTransition_action_kiss"), "Salute", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "Salute", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_action_left_turn"), "Salute", "RightTurn", SubResource("AnimationNodeStateMachineTransition_action_right_turn"), "Salute", "Idle", SubResource("AnimationNodeStateMachineTransition_salute_idle"), "Salute", "Walk", SubResource("AnimationNodeStateMachineTransition_salute_walk"), "Kiss", "Drinking", SubResource("AnimationNodeStateMachineTransition_action_drinking"), "Kiss", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_action_standing_greeting"), "Kiss", "Salute", SubResource("AnimationNodeStateMachineTransition_action_salute"), "Kiss", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "Kiss", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_action_left_turn"), "Kiss", "RightTurn", SubResource("AnimationNodeStateMachineTransition_action_right_turn"), "Kiss", "Idle", SubResource("AnimationNodeStateMachineTransition_kiss_idle"), "Kiss", "Walk", SubResource("AnimationNodeStateMachineTransition_kiss_walk"), "SitDown", "SittingIdle", SubResource("AnimationNodeStateMachineTransition_f5oi3"), "SittingIdle", "Drinking", SubResource("AnimationNodeStateMachineTransition_sitting_idle_drinking"), "SittingIdle", "SitToStand", SubResource("AnimationNodeStateMachineTransition_sit_down_sit_to_stand"), "SittingIdle", "LayDown", SubResource("AnimationNodeStateMachineTransition_sit_down_laydown"), "LayDown", "Laying", SubResource("AnimationNodeStateMachineTransition_laydown_laying"), "Laying", "LayUp", SubResource("AnimationNodeStateMachineTransition_laying_lay_up"), "LayUp", "SittingIdle", SubResource("AnimationNodeStateMachineTransition_lay_up_sitting_idle"), "SitToStand", "Idle", SubResource("AnimationNodeStateMachineTransition_sit_to_stand_idle"), "SitToStand", "Walk", SubResource("AnimationNodeStateMachineTransition_sit_to_stand_walk"), "LeftTurn", "Drinking", SubResource("AnimationNodeStateMachineTransition_action_drinking"), "LeftTurn", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_action_standing_greeting"), "LeftTurn", "Salute", SubResource("AnimationNodeStateMachineTransition_action_salute"), "LeftTurn", "Kiss", SubResource("AnimationNodeStateMachineTransition_action_kiss"), "LeftTurn", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "LeftTurn", "RightTurn", SubResource("AnimationNodeStateMachineTransition_action_right_turn"), "LeftTurn", "Idle", SubResource("AnimationNodeStateMachineTransition_left_turn_idle"), "RightTurn", "Drinking", SubResource("AnimationNodeStateMachineTransition_action_drinking"), "RightTurn", "StandingGreeting", SubResource("AnimationNodeStateMachineTransition_action_standing_greeting"), "RightTurn", "Salute", SubResource("AnimationNodeStateMachineTransition_action_salute"), "RightTurn", "Kiss", SubResource("AnimationNodeStateMachineTransition_action_kiss"), "RightTurn", "SitDown", SubResource("AnimationNodeStateMachineTransition_action_sit_down"), "RightTurn", "LeftTurn", SubResource("AnimationNodeStateMachineTransition_action_left_turn"), "RightTurn", "Idle", SubResource("AnimationNodeStateMachineTransition_right_turn_idle")]
-graph_offset = Vector2(-164.31789, 118.41653)
+graph_offset = Vector2(-164.31789, -70.90191)
 
 [node name="Xiaokong1" type="Node3D" unique_id=1699226533]
 
@@ -403,62 +403,62 @@ graph_offset = Vector2(-164.31789, 118.41653)
 script = ExtResource("2_76vli")
 
 [node name="GeneralSkeleton" parent="xiaokong/根" parent_id_path=PackedInt32Array(1100334418, 956639029) index="0" unique_id=79627121]
-bones/1/position = Vector3(0.0007640007, 0.7333189, 0.011251835)
-bones/1/rotation = Quaternion(-0.0002274136, 0.019103896, -0.005815287, 0.99980056)
-bones/2/rotation = Quaternion(0.09609572, 0.05465544, 0.99378407, -0.0131026395)
-bones/3/rotation = Quaternion(0.0034874282, 0.99700445, -0.0719265, -0.0282218)
-bones/4/rotation = Quaternion(0.037274618, 0.6937156, -0.71827793, 0.038027976)
-bones/5/rotation = Quaternion(-2.259905e-08, 1, 3.734231e-05, -3.7259484e-09)
-bones/10/rotation = Quaternion(0.0060525867, 0.03595634, 0.9992801, -0.010481935)
-bones/11/rotation = Quaternion(0.001532294, 0.99792844, -0.044682715, -0.046259988)
-bones/12/rotation = Quaternion(0.014322832, 0.70052266, -0.7131915, 0.020512994)
-bones/13/rotation = Quaternion(1.1642743e-09, 1, 4.7415495e-05, -6.984652e-10)
-bones/18/rotation = Quaternion(-0.0010913606, 0.00495529, -0.0068529597, 0.99996364)
-bones/19/rotation = Quaternion(-0.0021728054, 0.009272046, -0.0027548447, 0.99995095)
-bones/20/rotation = Quaternion(-0.0020088628, 0.012459226, 0.015448198, 0.99980104)
-bones/21/rotation = Quaternion(0.07360401, 0.0025775386, 0.03341793, 0.99672425)
-bones/22/rotation = Quaternion(-0.05893013, -0.024561446, -0.04694114, 0.9968554)
-bones/230/rotation = Quaternion(0.54274255, -0.47068602, -0.5283497, -0.45247298)
-bones/231/rotation = Quaternion(-0.19760302, 0.7623321, -0.53349257, 0.3085266)
-bones/232/rotation = Quaternion(0.06318201, 0.7042785, -0.06318192, 0.7042783)
-bones/233/rotation = Quaternion(-0.012795827, -0.47345918, -0.026958099, 0.88031024)
-bones/234/rotation = Quaternion(-0.2667698, -0.6974913, -0.044768702, 0.6635779)
-bones/235/rotation = Quaternion(0.10618065, -0.09167298, -0.031730894, 0.98960346)
-bones/236/rotation = Quaternion(0.13468948, 0.032136668, -0.08012769, 0.9871199)
-bones/237/rotation = Quaternion(0.304005, 0.027487166, 0.025380129, 0.9519355)
-bones/238/rotation = Quaternion(0.26012522, 0.001825809, 0.024622137, 0.96525913)
-bones/239/rotation = Quaternion(0.0018386242, 0.0014345049, -0.018807141, 0.9998205)
-bones/240/rotation = Quaternion(0.26720148, 0.016434398, 0.045607943, 0.96242046)
-bones/241/rotation = Quaternion(0.20805484, -0.0014346835, 0.023640806, 0.97783035)
-bones/242/rotation = Quaternion(0.00071629876, 0.0003327876, -0.016110374, 0.99986994)
-bones/243/rotation = Quaternion(0.20959152, 0.006754606, 0.075229846, 0.97486734)
-bones/244/rotation = Quaternion(0.2071695, 0.001596391, 0.027804669, 0.9779086)
-bones/245/rotation = Quaternion(0.0020774303, 4.6446912e-05, 0.0012429951, 0.99999714)
-bones/246/rotation = Quaternion(0.14435759, 0.002468943, 0.08115438, 0.986189)
-bones/247/rotation = Quaternion(0.14107054, 0.0008174925, 0.021111397, 0.98977417)
-bones/248/rotation = Quaternion(-0.006085514, 0.0005551576, -0.01127982, 0.99991775)
-bones/253/rotation = Quaternion(0.50568974, 0.5169841, 0.57135177, -0.38802403)
-bones/254/rotation = Quaternion(0.12501481, 0.7747362, -0.56709903, -0.25010765)
-bones/255/rotation = Quaternion(0.054166272, -0.70502913, 0.054166146, 0.70502913)
-bones/256/rotation = Quaternion(-0.020918673, 0.49484247, -0.03328755, 0.8680929)
-bones/257/rotation = Quaternion(-0.28478697, 0.7155752, 0.13184543, 0.6240716)
-bones/258/rotation = Quaternion(0.17763278, 0.061224498, 0.019808741, 0.9819908)
-bones/259/rotation = Quaternion(0.17791207, -0.015805736, -0.0036623478, 0.98391265)
-bones/260/rotation = Quaternion(0.23763753, -0.026507214, 0.0096538365, 0.97094417)
-bones/261/rotation = Quaternion(0.1916589, -0.0013462008, -0.01772228, 0.9813008)
-bones/262/rotation = Quaternion(-0.0070839226, -6.151199e-05, -0.0067786723, 0.999952)
-bones/263/rotation = Quaternion(0.24084629, -0.016057879, -0.03424254, 0.9698261)
-bones/264/rotation = Quaternion(0.18032907, 0.0012458266, -0.020896347, 0.98338366)
-bones/265/rotation = Quaternion(0.019246055, 0.00055705005, -0.0018357334, 0.9998129)
-bones/266/rotation = Quaternion(0.18355486, -0.008176759, -0.05858171, 0.98122835)
-bones/267/rotation = Quaternion(0.17999569, -0.0013474375, -0.025118172, 0.98334575)
-bones/268/rotation = Quaternion(-0.024326101, 2.810359e-05, 1.6823411e-05, 0.9997041)
-bones/269/rotation = Quaternion(0.16854243, -0.0060856193, -0.066645265, 0.98342)
-bones/270/rotation = Quaternion(0.16183703, -0.00096157193, -0.023191124, 0.98654455)
-bones/271/rotation = Quaternion(-0.032832284, -0.00010648371, 0.0051732217, 0.9994476)
+bones/1/position = Vector3(0.001430304, 0.68678975, 0.039492443)
+bones/1/rotation = Quaternion(-0.02127566, -0.0094737, 0.024243968, 0.9994348)
+bones/2/rotation = Quaternion(-0.062091358, 0.2406574, 0.9684318, 0.019200727)
+bones/3/rotation = Quaternion(0.042028304, 0.9840141, -0.1677092, 0.04270399)
+bones/4/rotation = Quaternion(0.019587753, 0.7689836, -0.63852745, -0.023736645)
+bones/5/rotation = Quaternion(-8.299305e-09, 1, 1.9158757e-05, -8.251687e-09)
+bones/10/rotation = Quaternion(-0.07760653, -0.066013776, 0.99453753, 0.02268564)
+bones/11/rotation = Quaternion(0.004553922, 0.9463318, -0.3210204, 0.03716786)
+bones/12/rotation = Quaternion(-0.08009975, 0.7992916, -0.58887804, 0.0891047)
+bones/13/rotation = Quaternion(-0.0011856714, 0.9037539, 0.42804044, -0.0030174202)
+bones/18/rotation = Quaternion(0.0018858921, 0.027904361, -0.002697728, 0.9996052)
+bones/19/rotation = Quaternion(-0.0009517184, 0.021648033, 0.0011084793, 0.99976456)
+bones/20/rotation = Quaternion(-0.00091732724, 0.021653956, 0.0008378087, 0.9997648)
+bones/21/rotation = Quaternion(-0.013942948, -0.0064939666, -0.016694393, 0.9997423)
+bones/22/rotation = Quaternion(-0.09887712, -0.04415425, -0.034636196, 0.9935161)
+bones/230/rotation = Quaternion(0.54712135, -0.44133967, -0.5459561, -0.4558614)
+bones/231/rotation = Quaternion(-0.16442887, 0.8507551, -0.43005797, 0.25343475)
+bones/232/rotation = Quaternion(0.1757741, 0.68491125, -0.1757738, 0.6849114)
+bones/233/rotation = Quaternion(-0.11805013, -0.49181068, -0.10413776, 0.8563538)
+bones/234/rotation = Quaternion(-0.109207965, -0.76571494, -0.03882999, 0.63265043)
+bones/235/rotation = Quaternion(0.097966075, -0.044818297, -0.037990123, 0.993454)
+bones/236/rotation = Quaternion(0.010185913, -0.0065478245, 0.01188186, 0.9998562)
+bones/237/rotation = Quaternion(0.06827269, -1.4901159e-08, 0.008320152, 0.9976321)
+bones/238/rotation = Quaternion(0.11352068, -2.9802315e-08, 0.013834622, 0.9934393)
+bones/239/rotation = Quaternion(0.056853786, -2.9802315e-08, 0.0069286507, 0.9983585)
+bones/240/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/241/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/242/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/243/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/244/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/245/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/246/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/247/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/248/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/253/rotation = Quaternion(0.45914695, 0.49052247, 0.6236482, -0.3995432)
+bones/254/rotation = Quaternion(0.027700407, 0.8515415, -0.5125816, -0.10663078)
+bones/255/rotation = Quaternion(0.062432267, -0.7043451, 0.06243217, 0.70434535)
+bones/256/rotation = Quaternion(-0.12857147, 0.6351593, -0.0027426558, 0.7616)
+bones/257/rotation = Quaternion(-0.18772061, 0.7634871, 0.05159752, 0.61578095)
+bones/258/rotation = Quaternion(0.10704529, 0.060297854, 0.04630271, 0.9913433)
+bones/259/rotation = Quaternion(0.0324094, 0.02354455, -0.0041072965, 0.9991889)
+bones/260/rotation = Quaternion(0.09673421, 0.0036348258, -0.047397174, 0.9941745)
+bones/261/rotation = Quaternion(0.082210034, 0.0027944744, 0.0258784, 0.99627507)
+bones/262/rotation = Quaternion(0.03894091, -7.450581e-08, -0.004699499, 0.99923056)
+bones/263/rotation = Quaternion(0.101226985, -2.8312206e-07, -0.01221633, 0.9947884)
+bones/264/rotation = Quaternion(0.07782163, -7.4505806e-08, -0.009391665, 0.9969231)
+bones/265/rotation = Quaternion(0.038940966, -5.9604645e-08, -0.0046994686, 0.9992305)
+bones/266/rotation = Quaternion(0.10108815, -1.788139e-07, -0.012199579, 0.99480265)
+bones/267/rotation = Quaternion(0.0779607, -2.0861626e-07, -0.009408504, 0.9969121)
+bones/268/rotation = Quaternion(0.038940955, -4.470349e-08, -0.0046994095, 0.99923056)
+bones/269/rotation = Quaternion(0.101226985, -2.8312206e-07, -0.01221633, 0.9947884)
+bones/270/rotation = Quaternion(0.07782163, -7.4505806e-08, -0.009391665, 0.9969231)
+bones/271/rotation = Quaternion(0.038940966, -5.9604645e-08, -0.0046994686, 0.9992305)
 
 [node name="UpperChest" parent="xiaokong/根/GeneralSkeleton" index="0" unique_id=1405971952]
-transform = Transform3D(0.9957895, -0.00064924563, 0.09166721, -0.00023937793, 0.99995303, 0.009682622, -0.09166921, -0.009663796, 0.9957426, 0.005214737, 0.98900986, -0.0060598934)
+transform = Transform3D(0.9914246, -0.046807997, 0.122010164, 0.041194998, 0.99799126, 0.048129134, -0.124017894, -0.042690206, 0.9913612, -0.011611092, 0.9414369, 0.012727441)
 
 [node name="HeadLookAt" type="LookAtModifier3D" parent="xiaokong/根/GeneralSkeleton" index="28" unique_id=2093252016]
 influence = 0.0
@@ -473,60 +473,50 @@ secondary_damp_threshold = 1.0
 
 [node name="HairSpringBoneSimulator" type="SpringBoneSimulator3D" parent="xiaokong/根/GeneralSkeleton" index="29" unique_id=1919084872]
 setting_count = 7
-settings/0/root_bone_name = "Hair.201"
-settings/0/root_bone = 204
+settings/0/root_bone_name = "Hair.202"
+settings/0/root_bone = 205
 settings/0/end_bone_name = "Hair.203"
 settings/0/end_bone = 206
 settings/0/extend_end_bone = false
 settings/0/center_from = 0
 settings/0/individual_config = true
-settings/0/joint_count = 3
+settings/0/joint_count = 2
 settings/0/joints/0/rotation_axis = 3
 settings/0/joints/0/radius = 0.015
 settings/0/joints/0/stiffness = 4.0
-settings/0/joints/0/drag = 0.02
+settings/0/joints/0/drag = 0.34
 settings/0/joints/0/gravity = 0.0
 settings/0/joints/0/gravity_direction = Vector3(0, -1, 0)
 settings/0/joints/1/rotation_axis = 3
 settings/0/joints/1/radius = 0.015
 settings/0/joints/1/stiffness = 4.0
-settings/0/joints/1/drag = 1.0
+settings/0/joints/1/drag = 0.72
 settings/0/joints/1/gravity = 0.0
 settings/0/joints/1/gravity_direction = Vector3(0, -1, 0)
-settings/0/joints/2/rotation_axis = 3
-settings/0/joints/2/radius = 0.015
-settings/0/joints/2/stiffness = 0.7
-settings/0/joints/2/drag = 0.55
-settings/0/joints/2/gravity = 0.0
-settings/0/joints/2/gravity_direction = Vector3(0, -1, 0)
 settings/0/enable_all_child_collisions = true
 settings/0/exclude_collision_count = 0
-settings/1/root_bone_name = "Hair.101"
-settings/1/root_bone = 207
+settings/1/root_bone_name = "Hair.102"
+settings/1/root_bone = 208
 settings/1/end_bone_name = "Hair.103"
 settings/1/end_bone = 209
-settings/1/extend_end_bone = false
+settings/1/extend_end_bone = true
+settings/1/end_bone/direction = 6
+settings/1/end_bone/length = 0.034
 settings/1/center_from = 0
 settings/1/individual_config = true
-settings/1/joint_count = 3
+settings/1/joint_count = 2
 settings/1/joints/0/rotation_axis = 3
 settings/1/joints/0/radius = 0.005
 settings/1/joints/0/stiffness = 4.0
-settings/1/joints/0/drag = 0.15
+settings/1/joints/0/drag = 0.33
 settings/1/joints/0/gravity = 0.05
 settings/1/joints/0/gravity_direction = Vector3(0, -1, 0)
 settings/1/joints/1/rotation_axis = 3
 settings/1/joints/1/radius = 0.005
-settings/1/joints/1/stiffness = 1.73
+settings/1/joints/1/stiffness = 2.98
 settings/1/joints/1/drag = 0.79
 settings/1/joints/1/gravity = 0.07
 settings/1/joints/1/gravity_direction = Vector3(0, -1, 0)
-settings/1/joints/2/rotation_axis = 3
-settings/1/joints/2/radius = 0.017
-settings/1/joints/2/stiffness = 1.2
-settings/1/joints/2/drag = 0.72
-settings/1/joints/2/gravity = 0.0
-settings/1/joints/2/gravity_direction = Vector3(0, -1, 0)
 settings/1/enable_all_child_collisions = true
 settings/1/exclude_collision_count = 0
 settings/2/root_bone_name = "Hair.303"
@@ -589,7 +579,7 @@ settings/4/joints/0/gravity = 0.26
 settings/4/joints/0/gravity_direction = Vector3(0, -1, 0)
 settings/4/joints/1/rotation_axis = 0
 settings/4/joints/1/radius = 0.042
-settings/4/joints/1/stiffness = 0.39
+settings/4/joints/1/stiffness = 2.58
 settings/4/joints/1/drag = 0.6
 settings/4/joints/1/gravity = 0.37
 settings/4/joints/1/gravity_direction = Vector3(0, -1, 0)
@@ -675,23 +665,23 @@ settings/6/enable_all_child_collisions = true
 settings/6/exclude_collision_count = 0
 
 [node name="HairCollisionHead" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=153979417]
-transform = Transform3D(0.99822325, 0.031714637, 0.0504433, -0.03072076, 0.99932057, -0.020357624, -0.05105468, 0.018771805, 0.9985194, 0.0010894949, 1.2139435, 0.0027693287)
+transform = Transform3D(0.9989728, 0.03966099, 0.021922551, -0.044134893, 0.96125484, 0.27210528, -0.01028119, -0.27279332, 0.9620177, -0.014695136, 1.194384, 0.017476877)
 bone_name = "Head"
 bone = 22
-position_offset = Vector3(0, 0.05, 0)
+position_offset = Vector3(0, 0.065, 0.04)
 rotation_offset = Quaternion(0, 0, 0, 1)
-radius = 0.106
+radius = 0.103
 
 [node name="HairCollisionBackHead" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=2021898485]
-transform = Transform3D(0.99822325, 0.031714637, 0.0504433, -0.03072076, 0.99932057, -0.020357624, -0.05105468, 0.018771805, 0.9985194, 0.0026752262, 1.2639096, 0.003707919)
+transform = Transform3D(0.9989728, 0.03966099, 0.021922551, -0.044134893, 0.96125484, 0.27210528, -0.01028119, -0.27279332, 0.9620177, -0.014622355, 1.2117015, -0.04979195)
 bone_name = "Head"
 bone = 22
-position_offset = Vector3(0, 0.1, 0)
+position_offset = Vector3(0, 0.1, -0.02)
 rotation_offset = Quaternion(0, 0, 0, 1)
-radius = 0.098
+radius = 0.116
 
 [node name="HairCollisionNeck" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1852006944]
-transform = Transform3D(0.9934886, -0.05313361, 0.10078315, 0.06675225, 0.9883232, -0.13697146, -0.092328556, 0.1428071, 0.9854347, 0.0024585123, 1.0693316, -0.03553904)
+transform = Transform3D(0.9939834, -0.016865265, 0.10822565, 0.008683494, 0.99709815, 0.07562974, -0.1091871, -0.07423493, 0.9912453, -0.018962406, 1.0204897, -0.019285487)
 bone_name = "Neck"
 bone = 21
 position_offset = Vector3(0, 0, 0)
@@ -699,7 +689,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.062
 
 [node name="HairCollisionUpperChest" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1588552779]
-transform = Transform3D(0.9957895, -0.00064924563, 0.09166721, -0.00023937793, 0.99995303, 0.009682622, -0.09166921, -0.009663796, 0.9957426, 0.005214737, 0.98900986, -0.0060598934)
+transform = Transform3D(0.9914246, -0.046807997, 0.122010164, 0.041194998, 0.99799126, 0.048129134, -0.124017894, -0.042690206, 0.9913612, -0.011611092, 0.9414369, 0.012727441)
 bone_name = "UpperChest"
 bone = 20
 position_offset = Vector3(0, 0, 0)
@@ -707,7 +697,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.102
 
 [node name="HairCollisionLeftShoulder" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1549538525]
-transform = Transform3D(-0.096945554, 0.98048115, 0.1710511, 0.08899167, -0.16263309, 0.98266524, 0.99130327, 0.11048714, -0.07148819, 0.022732243, 1.0514128, -0.047320325)
+transform = Transform3D(-0.13693598, 0.97987854, 0.14521307, -0.012054022, -0.14823145, 0.98887926, 0.99050653, 0.13366267, 0.032109655, 0.0017360626, 1.003101, -0.03112246)
 bone_name = "LeftShoulder"
 bone = 253
 position_offset = Vector3(0, 0, 0)
@@ -715,7 +705,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.075
 
 [node name="HairCollisionRightShoulder" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=571216069]
-transform = Transform3D(-0.09298813, -0.98422027, -0.15054516, -0.042470273, -0.14714177, 0.98820317, -0.994761, 0.098284855, -0.028117593, -0.019610476, 1.0513928, -0.043416586)
+transform = Transform3D(-0.108498365, -0.9652286, -0.23782815, -0.03273163, -0.23564206, 0.97128856, -0.9935575, 0.11316771, -0.0060267365, -0.040419478, 1.0013193, -0.025842203)
 bone_name = "RightShoulder"
 bone = 230
 position_offset = Vector3(0, 0, 0)
@@ -723,7 +713,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.075
 
 [node name="HairCollisionLeftUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=2133770549]
-transform = Transform3D(0.591882, 0.16690767, -0.78855413, 0.088769406, -0.98587215, -0.14204282, -0.80112153, 0.014073215, -0.5983362, 0.101970054, 0.9424965, -0.038877174)
+transform = Transform3D(0.3092002, 0.34435326, -0.88646275, 0.14006451, -0.9384647, -0.31569874, -0.9406257, -0.026547793, -0.33840504, 0.09867914, 0.89984506, -0.025258452)
 bone_name = "LeftUpperArm"
 bone = 254
 position_offset = Vector3(0, 0.1, 0)
@@ -732,7 +722,7 @@ radius = 0.055
 height = 0.307
 
 [node name="HairCollisionRightUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=760356393]
-transform = Transform3D(0.7276218, -0.20889896, 0.65339726, -0.13266104, -0.9773737, -0.1647472, 0.67302865, 0.03319323, -0.7388711, -0.10326965, 0.9442255, -0.033818852)
+transform = Transform3D(0.63806784, -0.355441, 0.68303114, -0.1374231, -0.92540294, -0.3531916, 0.7576175, 0.131496, -0.6393154, -0.1375174, 0.8937049, -0.0054659303)
 bone_name = "RightUpperArm"
 bone = 231
 position_offset = Vector3(0, 0.1, 0)
@@ -741,7 +731,7 @@ radius = 0.055
 height = 0.307
 
 [node name="HairCollisionLeftLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1191290864]
-transform = Transform3D(-0.7885542, 0.07453578, -0.61043173, -0.14204264, -0.98786205, 0.06286927, -0.5983362, 0.13628328, 0.78956985, 0.13254106, 0.73908746, -0.03969544)
+transform = Transform3D(-0.8864626, 0.28459737, -0.36494985, -0.31569856, -0.9484697, 0.02719072, -0.33840534, 0.13931774, 0.93062973, 0.1641768, 0.70534134, -0.030968059)
 bone_name = "LeftLowerArm"
 bone = 255
 position_offset = Vector3(0, 0.1, 0)
@@ -750,7 +740,7 @@ radius = 0.05
 height = 0.3
 
 [node name="HairCollisionRightLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=777146507]
-transform = Transform3D(-0.65339756, -0.07605328, 0.7531851, 0.16474709, -0.9853796, 0.04342082, 0.73887086, 0.15245602, 0.656374, -0.14112423, 0.7425011, -0.029857228)
+transform = Transform3D(-0.6830311, -0.0042463467, 0.73037726, 0.35319126, -0.8772136, 0.32519588, 0.6393157, 0.48008162, 0.6006636, -0.18225099, 0.7073731, 0.040965077)
 bone_name = "RightLowerArm"
 bone = 232
 position_offset = Vector3(0, 0.1, 0)
@@ -759,7 +749,7 @@ radius = 0.05
 height = 0.3
 
 [node name="HairCollisionLeftUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1801933938]
-transform = Transform3D(-0.9732346, 0.029025214, 0.22797388, -0.0040742517, -0.9940156, 0.10916301, 0.22977804, 0.105312385, 0.96752846, 0.07319634, 0.63315773, 0.019386405)
+transform = Transform3D(-0.98797333, -0.03378842, -0.15088694, -0.0466103, -0.86536145, 0.4989758, -0.14743136, 0.50000775, 0.8533793, 0.067524314, 0.6037141, 0.09099768)
 bone_name = "LeftUpperLeg"
 bone = 2
 position_offset = Vector3(0, 0.1, 0)
@@ -768,7 +758,7 @@ radius = 0.07
 height = 0.4
 
 [node name="HairCollisionRightUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=225241545]
-transform = Transform3D(-0.9986571, 0.012520453, 0.050271332, -0.008875606, -0.99735916, 0.07208285, 0.051041085, 0.07153986, 0.996131, -0.06749305, 0.6343429, 0.021342302)
+transform = Transform3D(-0.9852262, 0.01545139, -0.17055981, 0.0006618351, -0.99557066, -0.094014004, -0.17125697, -0.09273793, 0.98085207, -0.06650813, 0.5837951, 0.029253818)
 bone_name = "RightUpperLeg"
 bone = 10
 position_offset = Vector3(0, 0.1, 0)
@@ -777,7 +767,7 @@ radius = 0.07
 height = 0.4
 
 [node name="HairCollisionLeftLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1695819245]
-transform = Transform3D(0.98469496, -0.006833883, -0.17415248, -0.0007918491, -0.99939615, 0.034739837, -0.17428471, -0.03407021, -0.98410565, 0.06711638, 0.26061347, 0.017833553)
+transform = Transform3D(0.99337685, -0.07837832, 0.084017806, -0.06187506, -0.9810474, -0.18362302, 0.09681749, 0.17720821, -0.97939956, 0.041297313, 0.2662567, 0.21429837)
 bone_name = "LeftLowerLeg"
 bone = 3
 position_offset = Vector3(0, 0.1, 0.055)
@@ -786,7 +776,7 @@ radius = 0.06
 height = 0.3
 
 [node name="HairCollisionHipsCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=633993786]
-transform = Transform3D(0.99920243, 0.011619565, 0.03820282, -0.011636944, 0.9999323, 0.00023254722, -0.03819753, -0.00067692576, 0.99926996, 0.0007640007, 0.7333189, 0.011251835)
+transform = Transform3D(0.99864495, -0.048057407, -0.019968303, 0.048863642, 0.99791914, 0.042067904, 0.017905077, -0.042986628, 0.9989152, 0.001430304, 0.68678975, 0.039492443)
 bone_name = "Hips"
 bone = 1
 position_offset = Vector3(0, 0, 0)
@@ -795,7 +785,7 @@ radius = 0.125
 height = 0.26
 
 [node name="HairCollisionRightLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1249655268]
-transform = Transform3D(0.9991029, 0.009054419, 0.041370843, 0.008309705, -0.999801, 0.018137574, 0.041526835, -0.017777547, -0.99897933, -0.04910912, 0.25912765, 0.009086117)
+transform = Transform3D(0.99472475, 0.083835274, 0.059115216, 0.021405147, -0.733223, 0.6796512, 0.100323364, -0.67480046, -0.7311497, -0.044546343, 0.26784313, -0.07784558)
 bone_name = "RightLowerLeg"
 bone = 11
 position_offset = Vector3(0, 0.1, 0.055)
@@ -804,7 +794,7 @@ radius = 0.051
 height = 0.3
 
 [node name="HairCollisionLeftHandSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=864611243]
-transform = Transform3D(0.11712289, 0.087337784, -0.98926973, -0.048546523, -0.9944313, -0.09354091, -0.9919301, 0.058981527, -0.11223072, 0.12184978, 0.65806985, -0.016239401)
+transform = Transform3D(0.13394819, 0.48900697, -0.8619339, 0.07161465, -0.8722745, -0.483744, -0.98839694, 0.0030696243, -0.15185957, 0.17512178, 0.62583387, -0.002912674)
 bone_name = "LeftHand"
 bone = 256
 position_offset = Vector3(0, 0, 0)
@@ -812,7 +802,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.055
 
 [node name="HairCollisionRightHandSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1190236901]
-transform = Transform3D(0.27153727, -0.11258854, 0.95581985, 0.1617014, -0.97367895, -0.16062976, 0.94874656, 0.19817427, -0.24618444, -0.12830037, 0.6611386, -0.008719761)
+transform = Transform3D(0.29564252, -0.27802834, 0.9139454, 0.51118827, -0.7621716, -0.39721662, 0.8070204, 0.5846321, -0.08320552, -0.16378224, 0.6393993, 0.088605106)
 bone_name = "RightHand"
 bone = 233
 position_offset = Vector3(0, 0, 0)
@@ -820,7 +810,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.055
 
 [node name="HairCollisionLeftFootSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=520947939]
-transform = Transform3D(-0.96057695, 0.27801418, 6.0880557e-06, 5.8119185e-06, -1.8328428e-06, 1.0000001, 0.27801415, 0.9605769, 8.568168e-08, 0.05323568, 0.06996563, -0.0006649345)
+transform = Transform3D(-0.995267, -0.09717871, 0.000371838, 0.0003549091, 0.00019176304, 1, -0.097178765, 0.995267, -0.00015617907, 0.017257888, 0.0766902, 0.23348388)
 bone_name = "LeftFoot"
 bone = 4
 position_offset = Vector3(0, 0, 0)
@@ -828,7 +818,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.07
 
 [node name="HairCollisionRightFootSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=79951855]
-transform = Transform3D(-0.9999697, 0.0078078546, -4.043104e-07, -4.984322e-07, -1.1695549e-05, 1, 0.0078078583, 0.9999697, 1.1820346e-05, -0.036114644, 0.068265796, -0.007856838)
+transform = Transform3D(-0.9885411, -0.054858632, 0.14062993, 0.11734935, -0.8652839, 0.4873529, 0.09494932, 0.4982713, 0.86180633, -0.017048936, 0.13736458, -0.21606068)
 bone_name = "RightFoot"
 bone = 12
 position_offset = Vector3(0, 0, 0)
@@ -836,7 +826,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.07
 
 [node name="HairCollisionLeftKneeSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=749394287]
-transform = Transform3D(0.98469496, -0.006833883, -0.17415248, -0.0007918491, -0.99939615, 0.034739837, -0.17428471, -0.03407021, -0.98410565, 0.077378154, 0.3586424, 0.07536639)
+transform = Transform3D(0.99337685, -0.07837832, 0.084017806, -0.06187506, -0.9810474, -0.18362302, 0.09681749, 0.17720821, -0.97939956, 0.044514168, 0.37446073, 0.25044453)
 bone_name = "LeftLowerLeg"
 bone = 3
 position_offset = Vector3(0, 0, 0)
@@ -844,7 +834,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.07
 
 [node name="HairCollisionRightKneeSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1072400378]
-transform = Transform3D(0.9991029, 0.009054419, 0.041370843, 0.008309705, -0.999801, 0.018137574, 0.041526835, -0.017777547, -0.99897933, -0.05228996, 0.3581102, 0.06580773)
+transform = Transform3D(0.99472475, 0.083835274, 0.059115216, 0.021405147, -0.733223, 0.6796512, 0.100323364, -0.67480046, -0.7311497, -0.056181204, 0.30378464, 0.029847683)
 bone_name = "RightLowerLeg"
 bone = 11
 position_offset = Vector3(0, 0, 0)
@@ -852,7 +842,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.07
 
 [node name="HairCollisionLeftElbowSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1002967061]
-transform = Transform3D(-0.7885542, 0.07453578, -0.61043173, -0.14204264, -0.98786205, 0.06286927, -0.5983362, 0.13628328, 0.78956985, 0.1250875, 0.83787364, -0.053323757)
+transform = Transform3D(-0.8864626, 0.28459737, -0.36494985, -0.31569856, -0.9484697, 0.02719072, -0.33840534, 0.13931774, 0.93062973, 0.1357171, 0.80018836, -0.044899825)
 bone_name = "LeftLowerArm"
 bone = 255
 position_offset = Vector3(0, 0, 0)
@@ -860,7 +850,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.055
 
 [node name="HairCollisionRightElbowSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=675157654]
-transform = Transform3D(-0.65339756, -0.07605328, 0.7531851, 0.16474709, -0.9853796, 0.04342082, 0.73887086, 0.15245602, 0.656374, -0.1335189, 0.84103906, -0.04510284)
+transform = Transform3D(-0.6830311, -0.0042463467, 0.73037726, 0.35319126, -0.8772136, 0.32519588, 0.6393157, 0.48008162, 0.6006636, -0.18182635, 0.79509443, -0.007043087)
 bone_name = "RightLowerArm"
 bone = 232
 position_offset = Vector3(0, 0, 0)
@@ -868,14 +858,14 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.055
 
 [node name="HairCollisionPelvisSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=283904835]
-transform = Transform3D(0.99920243, 0.011619565, 0.03820282, -0.011636944, 0.9999323, 0.00023254722, -0.03819753, -0.00067692576, 0.99926996, 0.0007640007, 0.7333189, 0.011251835)
+transform = Transform3D(0.99864495, -0.048057407, -0.019968303, 0.048863642, 0.99791914, 0.042067904, 0.017905077, -0.042986628, 0.9989152, 0.001430304, 0.68678975, 0.039492443)
 bone_name = "Hips"
 bone = 1
 position_offset = Vector3(0, 0, 0)
 rotation_offset = Quaternion(0, 0, 0, 1)
 
 [node name="HairCollisionLeftHipSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1557133880]
-transform = Transform3D(-0.9732346, 0.029025214, 0.22797388, -0.0040742517, -0.9940156, 0.10916301, 0.22977804, 0.105312385, 0.96752846, 0.070293814, 0.7325593, 0.008855168)
+transform = Transform3D(-0.98797333, -0.03378842, -0.15088694, -0.0466103, -0.86536145, 0.4989758, -0.14743136, 0.50000775, 0.8533793, 0.07090316, 0.6902503, 0.040996894)
 bone_name = "LeftUpperLeg"
 bone = 2
 position_offset = Vector3(0, 0, 0)
@@ -883,7 +873,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.08
 
 [node name="HairCollisionRightHipSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=950347362]
-transform = Transform3D(-0.9986571, 0.012520453, 0.050271332, -0.008875606, -0.99735916, 0.07208285, 0.051041085, 0.07153986, 0.996131, -0.0687451, 0.7340788, 0.014188316)
+transform = Transform3D(-0.9852262, 0.01545139, -0.17055981, 0.0006618351, -0.99557066, -0.094014004, -0.17125697, -0.09273793, 0.98085207, -0.06805327, 0.6833521, 0.03852761)
 bone_name = "RightUpperLeg"
 bone = 10
 position_offset = Vector3(0, 0, 0)
@@ -891,7 +881,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.08
 
 [node name="HairCollisionSpineSphere" type="SpringBoneCollisionSphere3D" parent="xiaokong/根/GeneralSkeleton/HairSpringBoneSimulator" unique_id=1295402900]
-transform = Transform3D(0.9985221, 0.02521615, 0.048142686, -0.02535289, 0.99967605, 0.0022316184, -0.04807082, -0.003448876, 0.99883795, 0.0019412067, 0.8192735, 0.016174389)
+transform = Transform3D(0.9984436, -0.042637523, 0.035952296, 0.04116251, 0.9983185, 0.04081484, -0.037632085, -0.039271433, 0.99851966, -0.0025816339, 0.7727598, 0.040773496)
 bone_name = "Spine"
 bone = 18
 position_offset = Vector3(0, 0, 0.005)
