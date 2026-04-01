@@ -235,19 +235,40 @@ func _find_xiaokong_candidate() -> Node:
 
 	if scene_root.has_node("xiaokong"):
 		var by_name := scene_root.get_node("xiaokong")
-		if _is_supported_target(by_name):
-			return by_name
+		var resolved_by_name := _resolve_supported_target(by_name)
+		if resolved_by_name != null:
+			return resolved_by_name
 
 	for child in scene_root.get_children():
-		if _is_supported_target(child):
-			return child
+		var resolved_child := _resolve_supported_target(child)
+		if resolved_child != null:
+			return resolved_child
 
 	return null
 
 func _find_by_group() -> Node:
 	for candidate in get_tree().get_nodes_in_group(target_group_name):
-		if candidate is Node and _is_supported_target(candidate):
-			return candidate
+		if candidate is Node:
+			var resolved := _resolve_supported_target(candidate)
+			if resolved != null:
+				return resolved
+	return null
+
+func _resolve_supported_target(root_node: Node) -> Node:
+	if root_node == null:
+		return null
+
+	if _is_supported_target(root_node):
+		return root_node
+
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var resolved_child := _resolve_supported_target(child_node)
+		if resolved_child != null:
+			return resolved_child
+
 	return null
 
 func _is_supported_target(node: Node) -> bool:

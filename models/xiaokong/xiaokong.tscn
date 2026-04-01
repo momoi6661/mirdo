@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://jmqcyhndixre"]
+
+[ext_resource type="PackedScene" uid="uid://c45hvbaa5mxbd" path="res://3DModel/xiaokong/xiaokong2.glb" id="1_rsab7"]
+
+[node name="xiaokong" unique_id=1100334418 instance=ExtResource("1_rsab7")]
+
+[node name="UpperChest" parent="根/GeneralSkeleton" parent_id_path=PackedInt32Array(911180148) index="0" unique_id=1231184242]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0007098939, 0.99073863, 0.0044296533)

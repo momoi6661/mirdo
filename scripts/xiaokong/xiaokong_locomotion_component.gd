@@ -11,6 +11,8 @@ class_name XiaokongLocomotionComponent
 @export var use_negative_z_forward: bool = false
 @export var apply_turn_state_rotation: bool = true
 @export var turn_state_degrees_per_second: float = 220.0
+@export var turn_state_total_degrees: float = 90.0
+@export var turn_state_acceleration_deg_per_sec2: float = 540.0
 @export var stop_speed_deadzone: float = 0.06
 
 var _desired_velocity: Vector3 = Vector3.ZERO
@@ -22,6 +24,7 @@ var _nav_turn_elapsed := 0.0
 var _nav_turn_duration := 0.0
 var _nav_turn_action: StringName = &""
 var _nav_turn_started_anim := false
+var _turn_state_current_speed_rad := 0.0
 
 @onready var _body: CharacterBody3D = get_parent() as CharacterBody3D
 @onready var _animation: Node = get_node_or_null(animation_controller_path)
@@ -223,7 +226,9 @@ func _advance_navigation_turn(delta: float) -> void:
 	var previous_t := clampf(_nav_turn_elapsed / _nav_turn_duration, 0.0, 1.0)
 	_nav_turn_elapsed = minf(_nav_turn_elapsed + delta, _nav_turn_duration)
 	var current_t := clampf(_nav_turn_elapsed / _nav_turn_duration, 0.0, 1.0)
-	var delta_t := current_t - previous_t
+	var previous_progress := _turn_progress_curve(previous_t)
+	var current_progress := _turn_progress_curve(current_t)
+	var delta_t := current_progress - previous_progress
 	if delta_t > 0.0:
 		_body.rotate_y(_nav_turn_total_angle * delta_t)
 
@@ -259,19 +264,53 @@ func _cancel_navigation_turn(notify_navigation: bool) -> void:
 
 func _apply_turn_state_rotation(delta: float) -> void:
 	if not apply_turn_state_rotation:
+		_turn_state_current_speed_rad = 0.0
 		return
 	if _navigation != null and _navigation.is_active():
+		_turn_state_current_speed_rad = 0.0
 		return
 
 	var left_turn_sign := 1.0 if use_negative_z_forward else -1.0
 	var right_turn_sign := -left_turn_sign
 	var state := _get_animation_state_name()
+	var turn_speed_deg_per_sec := _get_turn_state_degrees_per_second(state)
+	var target_sign := 0.0
 	if state == &"LeftTurn":
-		_body.rotate_y(deg_to_rad(turn_state_degrees_per_second) * left_turn_sign * delta)
+		target_sign = left_turn_sign
+	elif state == &"RightTurn":
+		target_sign = right_turn_sign
+
+	var target_speed_rad := 0.0
+	if target_sign != 0.0 and turn_speed_deg_per_sec > 0.0:
+		target_speed_rad = deg_to_rad(turn_speed_deg_per_sec) * target_sign
+
+	var accel_rad := deg_to_rad(maxf(turn_state_acceleration_deg_per_sec2, 1.0))
+	_turn_state_current_speed_rad = move_toward(_turn_state_current_speed_rad, target_speed_rad, accel_rad * delta)
+	if absf(_turn_state_current_speed_rad) > 0.0001:
+		_body.rotate_y(_turn_state_current_speed_rad * delta)
+
+	if state == &"LeftTurn":
 		_set_animation_turn(left_turn_sign)
 	elif state == &"RightTurn":
-		_body.rotate_y(deg_to_rad(turn_state_degrees_per_second) * right_turn_sign * delta)
 		_set_animation_turn(right_turn_sign)
+
+func _get_turn_state_degrees_per_second(state: StringName) -> float:
+	if state != &"LeftTurn" and state != &"RightTurn":
+		return 0.0
+
+	if turn_state_total_degrees <= 0.001:
+		return maxf(turn_state_degrees_per_second, 0.0)
+
+	var duration := _get_navigation_turn_duration(state)
+	if duration <= 0.001:
+		return maxf(turn_state_degrees_per_second, 0.0)
+
+	return turn_state_total_degrees / duration
+
+func _turn_progress_curve(t: float) -> float:
+	var x := clampf(t, 0.0, 1.0)
+	# Smoothstep: softer acceleration/deceleration to keep spring bones stable while turning.
+	return x * x * (3.0 - 2.0 * x)
 
 func _get_animation_state_name() -> StringName:
 	if _animation != null and _animation.has_method("get_current_state_name"):
