@@ -58,6 +58,8 @@ const REQUIRED_TREE_STATES: Array[StringName] = [
 @export var walk_min_playback_scale: float = 0.75
 @export var walk_max_playback_scale: float = 1.25
 @export var walk_playback_lerp_rate: float = 12.0
+@export var ik_idle_offset_states: PackedStringArray = PackedStringArray(["Idle"])
+@export var ik_idle_offset_blend_speed: float = 8.0
 
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var animation_tree: AnimationTree = $AnimationTree
@@ -82,6 +84,8 @@ var _motion_velocity: Vector3 = Vector3.ZERO
 var _use_velocity_input := true
 var _playback: AnimationNodeStateMachinePlayback
 var _last_state: StringName = &""
+var _ik_target_driver: Node
+var _ik_idle_offset_weight: float = 0.0
 
 func _ready() -> void:
 	if animation_tree == null:
@@ -97,6 +101,8 @@ func _ready() -> void:
 		_playback.start(TargetState.IDLE)
 		_last_state = TargetState.IDLE
 
+	_resolve_ik_target_driver()
+	_update_ik_idle_offset(0.0)
 	set_process(true)
 
 func _setup_drinking_blend_tree() -> void:
@@ -113,12 +119,12 @@ func _process(delta: float) -> void:
 		return
 
 	var current_state := _playback.get_current_node()
-	if current_state == _last_state:
-		return
+	if current_state != _last_state:
+		if _is_turn_state(current_state):
+			turn_amount = 0.0
+		_last_state = current_state
 
-	if _is_turn_state(current_state):
-		turn_amount = 0.0
-	_last_state = current_state
+	_update_ik_idle_offset(delta)
 
 func set_motion_velocity(value: Vector3) -> void:
 	_motion_velocity = value
@@ -275,6 +281,38 @@ func _get_current_state() -> StringName:
 
 func _is_turn_state(state: StringName) -> bool:
 	return state == TargetState.LEFT_TURN or state == TargetState.RIGHT_TURN
+
+func _update_ik_idle_offset(delta: float) -> void:
+	var current_state := _get_current_state()
+	var target_weight := 1.0 if ik_idle_offset_states.has(String(current_state)) else 0.0
+	var blend_step := maxf(ik_idle_offset_blend_speed, 0.0) * delta
+	if blend_step > 0.0:
+		_ik_idle_offset_weight = move_toward(_ik_idle_offset_weight, target_weight, blend_step)
+	else:
+		_ik_idle_offset_weight = target_weight
+
+	_resolve_ik_target_driver()
+	if _ik_target_driver == null or not is_instance_valid(_ik_target_driver):
+		return
+	if _ik_target_driver.has_method("set_idle_arm_offset_weight"):
+		_ik_target_driver.call("set_idle_arm_offset_weight", _ik_idle_offset_weight)
+
+func _resolve_ik_target_driver() -> void:
+	if _ik_target_driver != null and is_instance_valid(_ik_target_driver):
+		return
+	_ik_target_driver = _find_node_with_method(self, &"set_idle_arm_offset_weight")
+
+func _find_node_with_method(root: Node, method_name: StringName) -> Node:
+	for child in root.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		if child_node.has_method(method_name):
+			return child_node
+		var nested := _find_node_with_method(child_node, method_name)
+		if nested != null:
+			return nested
+	return null
 
 func _is_request_satisfied(current_state: StringName, requested_state: StringName) -> bool:
 	if requested_state == TargetState.IDLE:

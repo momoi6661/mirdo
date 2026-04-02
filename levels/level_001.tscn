@@ -252,4 +252,4 @@ transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0.08723974, 0.001623
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7233847, -2.3841858e-07, 0.46384174)
 
 [node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("16_5d8v6")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.23138, 0.03256569, -1.7795691)
+transform = Transform3D(1.1, 0, 0, 0, 1.1, 0, 0, 0, 1.1, 2.23138, 0.03256569, -1.7795691)

@@ -11,6 +11,11 @@ const EPSILON := 0.00001
 @export var manage_head_look_at: bool = true
 @export var position_offset_threshold: float = 0.002
 @export var rotation_offset_threshold_degrees: float = 1.0
+@export var idle_arm_offset_blend_speed: float = 8.0
+@export var idle_left_hand_offset: Vector3 = Vector3(-0.02, 0.0, 0.0)
+@export var idle_right_hand_offset: Vector3 = Vector3(0.02, 0.0, 0.0)
+@export var idle_left_elbow_pole_offset: Vector3 = Vector3(0.0, 0.0, -0.01)
+@export var idle_right_elbow_pole_offset: Vector3 = Vector3(0.0, 0.0, -0.01)
 
 @onready var skeleton: Skeleton3D = get_parent().get_node_or_null("GeneralSkeleton") as Skeleton3D
 @onready var left_hand_auto: Node3D = get_node_or_null("LeftHandAuto") as Node3D
@@ -68,6 +73,9 @@ var right_elbow_pole_target_base: Transform3D
 var left_knee_pole_target_base: Transform3D
 var right_knee_pole_target_base: Transform3D
 var mark_look_at_target_base: Transform3D
+var _idle_arm_offset_target_weight: float = 0.0
+var _idle_arm_offset_weight: float = 0.0
+var _idle_arm_offset_dirty: bool = true
 
 func _ready() -> void:
 	if skeleton == null:
@@ -79,14 +87,17 @@ func _ready() -> void:
 	if not skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
 		skeleton.pose_updated.connect(_on_skeleton_pose_updated)
 	_on_skeleton_pose_updated()
-	set_process(Engine.is_editor_hint())
+	_apply_idle_arm_offsets(0.0)
+	set_process(true)
 
-func _process(_delta: float) -> void:
-	if not Engine.is_editor_hint():
-		return
+func _process(delta: float) -> void:
 	if skeleton == null:
 		return
-	_on_skeleton_pose_updated()
+	if Engine.is_editor_hint():
+		_on_skeleton_pose_updated()
+
+	if _idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON:
+		_apply_idle_arm_offsets(delta)
 
 func _exit_tree() -> void:
 	if skeleton != null and skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
@@ -195,6 +206,61 @@ func _safe_local_transform(node: Node3D) -> Transform3D:
 	if node == null:
 		return Transform3D.IDENTITY
 	return node.transform
+
+func reset_arm_targets_to_base() -> void:
+	_idle_arm_offset_target_weight = 0.0
+	_idle_arm_offset_weight = 0.0
+	_idle_arm_offset_dirty = false
+	_restore_local_transform(left_hand_target, left_hand_target_base)
+	_restore_local_transform(right_hand_target, right_hand_target_base)
+	_restore_local_transform(left_elbow_pole_target, left_elbow_pole_target_base)
+	_restore_local_transform(right_elbow_pole_target, right_elbow_pole_target_base)
+	_restore_local_transform(left_hand_rot_target, left_hand_rot_target_base)
+	_restore_local_transform(right_hand_rot_target, right_hand_rot_target_base)
+
+	if auto_manage_influence:
+		_update_modifier_influence()
+
+func set_idle_arm_offset_weight(weight: float) -> void:
+	_idle_arm_offset_target_weight = clampf(weight, 0.0, 1.0)
+	_idle_arm_offset_dirty = true
+	if not is_inside_tree():
+		return
+	if idle_arm_offset_blend_speed <= EPSILON:
+		_idle_arm_offset_weight = _idle_arm_offset_target_weight
+		_apply_arm_target_offsets(_idle_arm_offset_weight)
+
+func _apply_idle_arm_offsets(delta: float) -> void:
+	var blend_step := maxf(idle_arm_offset_blend_speed, 0.0) * maxf(delta, 0.0)
+	if blend_step > 0.0:
+		_idle_arm_offset_weight = move_toward(_idle_arm_offset_weight, _idle_arm_offset_target_weight, blend_step)
+	else:
+		_idle_arm_offset_weight = _idle_arm_offset_target_weight
+
+	_apply_arm_target_offsets(_idle_arm_offset_weight)
+	if is_zero_approx(_idle_arm_offset_weight) and is_zero_approx(_idle_arm_offset_target_weight):
+		_idle_arm_offset_dirty = false
+
+func _apply_arm_target_offsets(weight: float) -> void:
+	_set_position_offset(left_hand_target, left_hand_target_base, idle_left_hand_offset, weight)
+	_set_position_offset(right_hand_target, right_hand_target_base, idle_right_hand_offset, weight)
+	_set_position_offset(left_elbow_pole_target, left_elbow_pole_target_base, idle_left_elbow_pole_offset, weight)
+	_set_position_offset(right_elbow_pole_target, right_elbow_pole_target_base, idle_right_elbow_pole_offset, weight)
+
+	if auto_manage_influence:
+		_update_modifier_influence()
+
+func _set_position_offset(node: Node3D, base_transform: Transform3D, offset: Vector3, weight: float) -> void:
+	if node == null:
+		return
+	var target_transform := base_transform
+	target_transform.origin += offset * weight
+	node.transform = target_transform
+
+func _restore_local_transform(node: Node3D, base_transform: Transform3D) -> void:
+	if node == null:
+		return
+	node.transform = base_transform
 
 func _update_modifier_influence() -> void:
 	var left_arm_active: bool = _has_position_offset(left_hand_target, left_hand_target_base) or _has_position_offset(left_elbow_pole_target, left_elbow_pole_target_base)
