@@ -2,6 +2,12 @@
 
 [ext_resource type="Texture2D" uid="uid://qf7esmkw7t0m" path="res://resources/items/water-bottle.png" id="1_be2vl"]
 [ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_q6k5x"]
+[ext_resource type="Script" path="res://scripts/xiaokong/resources/xiaokong_stat_modifier.gd" id="2_stat_mod"]
+
+[sub_resource type="Resource" id="Resource_water_effect"]
+script = ExtResource("2_stat_mod")
+thirst_delta = 30
+mood_delta = 4
 
 [resource]
 script = ExtResource("1_q6k5x")
@@ -10,4 +16,5 @@ Description = "一瓶普通的纯净水。虽然包装简陋，但在荒野中�
 Icon = ExtResource("1_be2vl")
 ItemModelScenePath = "uid://c0s86a8rn2pbm"
 MaxStackSize = 5
+consumable_effect = SubResource("Resource_water_effect")
 metadata/_custom_type_script = "uid://bdhapua5nkgw8"

@@ -4,6 +4,8 @@ extends Control
 @onready var dialogue_box = $VBoxContainer/DialogueBox
 @onready var input_edit = $VBoxContainer/HBoxContainer/InputEdit
 @onready var send_button = $VBoxContainer/HBoxContainer/SendButton
+@export var action_router_path: NodePath
+@onready var action_router: Node = get_node_or_null(action_router_path)
 
 var ai_manager: AIManager
 
@@ -67,6 +69,9 @@ func _on_ai_response_completed(final_data: Dictionary):
 		print("小雅当前的表情是: ", final_data["emotion"])
 	if final_data.has("action"):
 		print("小雅决定去: ", final_data["action"])
+	if action_router != null and action_router.has_method("apply_ai_response"):
+		var route_summary = action_router.call("apply_ai_response", final_data)
+		print("动作路由执行结果: ", route_summary)
 	print("===============================")
 
 # 3. 接收网络错误
