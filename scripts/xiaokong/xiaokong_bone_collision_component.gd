@@ -44,10 +44,14 @@ func _physics_process(_delta: float) -> void:
 func _setup_collision() -> void:
 	_character_body = get_node_or_null(character_body_path) as CharacterBody3D
 	if _character_body == null:
+		_character_body = _find_parent_character_body()
+	if _character_body == null:
 		push_warning("Bone collision setup could not find CharacterBody3D at %s." % String(character_body_path))
 		return
 
 	_skeleton = get_node_or_null(skeleton_path) as Skeleton3D
+	if _skeleton == null:
+		_skeleton = _find_first_skeleton(_character_body)
 	if _skeleton == null:
 		push_warning("Bone collision setup could not find Skeleton3D at %s." % String(skeleton_path))
 		return
@@ -125,3 +129,25 @@ func _sync_hitboxes() -> void:
 		valid_bindings.append(binding)
 
 	_bindings = valid_bindings
+
+func _find_parent_character_body() -> CharacterBody3D:
+	var current: Node = self
+	while current != null:
+		if current is CharacterBody3D:
+			return current as CharacterBody3D
+		current = current.get_parent()
+	return null
+
+func _find_first_skeleton(root_node: Node) -> Skeleton3D:
+	if root_node == null:
+		return null
+	if root_node is Skeleton3D:
+		return root_node as Skeleton3D
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_first_skeleton(child_node)
+		if nested != null:
+			return nested
+	return null

@@ -3,6 +3,10 @@ class_name XiaokongControlComponent
 
 @export var camera_path: NodePath = NodePath("../../Marker3D/CameraOffset/Camera3D")
 @export var panel_path: NodePath = NodePath("../../Control/XiaokongControlPanel")
+@export var subtitle_root_path: NodePath = NodePath("../../Control")
+@export var subtitle_overlay_name: StringName = &"XiaokongSubtitleOverlay"
+@export var subtitle_speaker_name: String = "Xiaokong"
+@export var prefer_world_subtitle: bool = true
 @export var default_target_path: NodePath = NodePath("../../../xiaokong")
 @export var target_group_name: StringName = &"Xiaokong"
 @export var ground_collision_mask: int = 1
@@ -18,12 +22,18 @@ var _preview_position: Vector3 = Vector3.ZERO
 
 @onready var _camera: Camera3D = get_node_or_null(camera_path) as Camera3D
 @onready var _panel: Node = get_node_or_null(panel_path)
+@onready var _subtitle_root: Control = get_node_or_null(subtitle_root_path) as Control
 @onready var _player: CharacterBody3D = get_parent().get_parent() as CharacterBody3D
 
 var _preview_marker: MeshInstance3D
+var _dialogue_component: XiaokongAIDialogueComponent
+var _world_subtitle_component: Node
+var _subtitle_overlay: XiaokongSubtitleOverlay
+var _dialogue_stream_text: String = ""
 
 func _ready() -> void:
 	_ensure_preview_marker()
+	_ensure_subtitle_overlay()
 	_set_preview_visible(false)
 
 	call_deferred("_deferred_init_ui")
@@ -97,6 +107,8 @@ func bind_target_by_path(path_text: String) -> bool:
 		return false
 
 	_target = found_target
+	_bind_dialogue_component_from_target()
+	_bind_world_subtitle_component_from_target()
 	_set_status("Bound target: %s" % String(_target.get_path()))
 	_sync_target_path_to_panel()
 	return true
@@ -157,6 +169,33 @@ func get_bound_target_path() -> String:
 		return ""
 	return String(_target.get_path())
 
+func send_dialogue_text(text: String) -> bool:
+	var trimmed := text.strip_edges()
+	if trimmed.is_empty():
+		_set_status("Dialogue text is empty.")
+		return false
+
+	if _target == null and not _deferred_bind_target():
+		_set_status("No Xiaokong target bound.")
+		return false
+
+	_bind_dialogue_component_from_target()
+	if _dialogue_component == null:
+		_set_status("Dialogue component not found on target.")
+		return false
+
+	var result = _dialogue_component.send_player_text(trimmed)
+	if bool(result.get("ok", false)):
+		_dialogue_stream_text = ""
+		_begin_subtitle_stream(subtitle_speaker_name)
+		if _panel != null and _panel.has_method("set_dialogue_reply"):
+			_panel.call("set_dialogue_reply", "(thinking...)")
+		_set_status("Dialogue request sent.")
+		return true
+
+	_set_status("Dialogue request failed: %s" % String(result.get("error", "unknown_error")))
+	return false
+
 func _set_panel_open(opened: bool) -> void:
 	_panel_open = opened
 
@@ -184,6 +223,8 @@ func _deferred_bind_target() -> bool:
 	var by_group := _find_by_group()
 	if by_group != null:
 		_target = by_group
+		_bind_dialogue_component_from_target()
+		_bind_world_subtitle_component_from_target()
 		_set_status("Auto-bound Xiaokong by group: %s" % String(target_group_name))
 		_sync_target_path_to_panel()
 		return true
@@ -301,6 +342,53 @@ func _set_preview_visible(visible_value: bool) -> void:
 	if _preview_marker != null:
 		_preview_marker.visible = visible_value
 
+func _ensure_subtitle_overlay() -> void:
+	if _subtitle_overlay != null and is_instance_valid(_subtitle_overlay):
+		return
+
+	var root_control := _subtitle_root
+	if root_control == null:
+		root_control = get_node_or_null(subtitle_root_path) as Control
+	if root_control == null:
+		return
+
+	var existing := root_control.get_node_or_null(NodePath(String(subtitle_overlay_name))) as XiaokongSubtitleOverlay
+	if existing != null:
+		_subtitle_overlay = existing
+		return
+
+	var overlay := XiaokongSubtitleOverlay.new()
+	overlay.name = String(subtitle_overlay_name)
+	root_control.add_child(overlay)
+	_subtitle_overlay = overlay
+
+func _begin_subtitle_stream(speaker: String) -> void:
+	var target := _resolve_subtitle_target()
+	if target != null and target.has_method("begin_stream"):
+		target.call("begin_stream", speaker)
+
+func _push_subtitle_chunk(chunk: String) -> void:
+	var target := _resolve_subtitle_target()
+	if target != null and target.has_method("push_chunk"):
+		target.call("push_chunk", chunk)
+
+func _finish_subtitle_stream(final_text: String) -> void:
+	var target := _resolve_subtitle_target()
+	if target != null and target.has_method("finish_stream"):
+		target.call("finish_stream", final_text)
+
+func _show_subtitle_once(text: String, speaker: String) -> void:
+	var target := _resolve_subtitle_target()
+	if target != null and target.has_method("show_once"):
+		target.call("show_once", text, speaker)
+
+func _resolve_subtitle_target() -> Node:
+	_bind_world_subtitle_component_from_target()
+	if prefer_world_subtitle and _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
+		return _world_subtitle_component
+	_ensure_subtitle_overlay()
+	return _subtitle_overlay
+
 func _sync_target_path_to_panel() -> void:
 	if _panel != null and _panel.has_method("refresh_target_path"):
 		_panel.call("refresh_target_path", get_bound_target_path())
@@ -312,3 +400,100 @@ func _sync_pick_mode_to_panel() -> void:
 func _set_status(text: String) -> void:
 	if _panel != null and _panel.has_method("set_status"):
 		_panel.call("set_status", text)
+
+func _bind_dialogue_component_from_target() -> void:
+	if _target == null:
+		_dialogue_component = null
+		return
+
+	var found: XiaokongAIDialogueComponent = null
+	if _target is Node and (_target as Node).has_node("AIDialogueComponent"):
+		found = (_target as Node).get_node("AIDialogueComponent") as XiaokongAIDialogueComponent
+	if found == null:
+		found = _find_dialogue_component_recursive(_target)
+
+	if found == _dialogue_component:
+		return
+
+	if _dialogue_component != null:
+		var chunk_cb := Callable(self, "_on_dialogue_chunk")
+		if _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
+			_dialogue_component.dialogue_chunk_received.disconnect(chunk_cb)
+		var done_cb := Callable(self, "_on_dialogue_completed")
+		if _dialogue_component.dialogue_completed.is_connected(done_cb):
+			_dialogue_component.dialogue_completed.disconnect(done_cb)
+		var err_cb := Callable(self, "_on_dialogue_failed")
+		if _dialogue_component.dialogue_failed.is_connected(err_cb):
+			_dialogue_component.dialogue_failed.disconnect(err_cb)
+
+	_dialogue_component = found
+	if _dialogue_component == null:
+		return
+
+	var chunk_cb := Callable(self, "_on_dialogue_chunk")
+	if not _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
+		_dialogue_component.dialogue_chunk_received.connect(chunk_cb)
+	var done_cb := Callable(self, "_on_dialogue_completed")
+	if not _dialogue_component.dialogue_completed.is_connected(done_cb):
+		_dialogue_component.dialogue_completed.connect(done_cb)
+	var err_cb := Callable(self, "_on_dialogue_failed")
+	if not _dialogue_component.dialogue_failed.is_connected(err_cb):
+		_dialogue_component.dialogue_failed.connect(err_cb)
+
+func _bind_world_subtitle_component_from_target() -> void:
+	if _target == null:
+		_world_subtitle_component = null
+		return
+	_world_subtitle_component = _find_world_subtitle_component_recursive(_target)
+
+func _find_world_subtitle_component_recursive(root_node: Node) -> Node:
+	if root_node == null:
+		return null
+	if root_node.has_method("begin_stream") and root_node.has_method("push_chunk") and root_node.has_method("finish_stream") and root_node.has_method("show_once"):
+		var script_ref: Script = root_node.get_script() as Script
+		if script_ref != null and String(script_ref.resource_path).ends_with("xiaokong_world_subtitle_component.gd"):
+			return root_node
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_world_subtitle_component_recursive(child_node)
+		if nested != null:
+			return nested
+	return null
+
+func _find_dialogue_component_recursive(root_node: Node) -> XiaokongAIDialogueComponent:
+	if root_node == null:
+		return null
+	if root_node is XiaokongAIDialogueComponent:
+		return root_node as XiaokongAIDialogueComponent
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_dialogue_component_recursive(child_node)
+		if nested != null:
+			return nested
+	return null
+
+func _on_dialogue_chunk(chunk: String) -> void:
+	_dialogue_stream_text += chunk
+	_push_subtitle_chunk(chunk)
+	if _panel != null and _panel.has_method("set_dialogue_reply"):
+		_panel.call("set_dialogue_reply", _dialogue_stream_text)
+	_set_status("Dialogue streaming...")
+
+func _on_dialogue_completed(report: Dictionary) -> void:
+	var reply := String(report.get("dialogue", "")).strip_edges()
+	_dialogue_stream_text = ""
+	_finish_subtitle_stream(reply)
+	if _panel != null and _panel.has_method("set_dialogue_reply"):
+		_panel.call("set_dialogue_reply", reply)
+	_set_status("Dialogue completed.")
+
+func _on_dialogue_failed(error_text: String) -> void:
+	_dialogue_stream_text = ""
+	_show_subtitle_once("[error] %s" % error_text, "System")
+	if _panel != null and _panel.has_method("set_dialogue_reply"):
+		_panel.call("set_dialogue_reply", "[error] %s" % error_text)
+	_set_status("Dialogue failed: %s" % error_text)

@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name XiaokongAIActionRouterComponent
 
 signal ai_response_applied(summary: Dictionary)
@@ -141,7 +141,7 @@ func _normalize_action(action_value: Variant) -> StringName:
 
 func _normalize_stat_change(raw_delta: Dictionary) -> Dictionary:
 	var delta = {}
-	var supported = PackedStringArray(["hunger", "thirst", "mood", "favor", "ai_hunger", "ai_mood"])
+	var supported = PackedStringArray(["hunger", "thirst", "mood", "favor", "ai_hunger", "ai_thirst", "ai_mood", "ai_favor"])
 	for key in supported:
 		if raw_delta.has(key):
 			delta[key] = float(raw_delta[key])
@@ -157,5 +157,3 @@ func _find_state_component() -> XiaokongStateComponent:
 		if state != null:
 			return state
 	return null
-
-

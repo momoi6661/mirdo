@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" path="res://controllers/ui/FPSInteractionHUD.tscn" id="18_h7h5r"]
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
+[ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -343,6 +344,15 @@ offset_right = 200.0
 offset_bottom = 75.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_rk4xh")
 
+[node name="XiaokongStatusPanel" parent="Control" unique_id=1020198871 instance=ExtResource("21_xk_status")]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -332.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 214.0
+
 [node name="MarginContainer" type="MarginContainer" parent="Control/DebugPanel" unique_id=-294967294]
 layout_mode = 2
 theme_override_constants/margin_left = 10
@@ -368,7 +378,7 @@ layout_mode = 1
 offset_left = 20.0
 offset_top = 88.0
 offset_right = 460.0
-offset_bottom = 430.0
+offset_bottom = 500.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_xk_panel")
 script = ExtResource("20_xk_panel")
 
@@ -506,6 +516,35 @@ theme_override_styles/normal = SubResource("StyleBoxEmpty_xk_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_xk_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_xk_btn_hover")
 text = "Stop"
+
+[node name="DialogueRow" type="HBoxContainer" parent="Control/XiaokongControlPanel/Margin/VBox" unique_id=374457661]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="DialogueInput" type="LineEdit" parent="Control/XiaokongControlPanel/Margin/VBox/DialogueRow" unique_id=384457661]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_placeholder_color = Color(1, 1, 1, 0.35)
+theme_override_styles/normal = SubResource("StyleBoxFlat_xk_field")
+theme_override_styles/focus = SubResource("StyleBoxFlat_xk_field")
+placeholder_text = "Say something to Xiaokong..."
+
+[node name="SendDialogueButton" type="Button" parent="Control/XiaokongControlPanel/Margin/VBox/DialogueRow" unique_id=394457661]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = SubResource("StyleBoxEmpty_xk_btn_normal")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_xk_btn_pressed")
+theme_override_styles/hover = SubResource("StyleBoxFlat_xk_btn_hover")
+text = "Send"
+
+[node name="DialogueReplyLabel" type="Label" parent="Control/XiaokongControlPanel/Margin/VBox" unique_id=404457661]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 0.92)
+text = "AI: (waiting)"
+autowrap_mode = 2
 
 [node name="HintLabel" type="Label" parent="Control/XiaokongControlPanel/Margin/VBox" unique_id=354457661]
 layout_mode = 2

@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_63etl"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_bottle"]
-height = 0.43829077
+height = 0.46504146
 radius = 0.075683594
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j1abk"]
@@ -148,12 +148,12 @@ script = ExtResource("3_63etl")
 metadata/_custom_type_script = "uid://nqd2tq1l4j5f"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=101001]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2181591, 0)
+transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 0, 0.16091613, 0)
 shape = SubResource("CylinderShape3D_bottle")
 debug_color = Color(0.9552199, 1.92523e-06, 0.54689574, 0.41960785)
 
 [node name="GLTF_SceneRootNode" type="Node3D" parent="." unique_id=1490003160]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0)
+transform = Transform3D(0.07, 0, 0, 0, 0.07, 0, 0, 0, 0.07, 0, 0, 0)
 
 [node name="Cylinder_1" type="Node3D" parent="GLTF_SceneRootNode" unique_id=539057994]
 transform = Transform3D(0.69017655, 0, 0, 0, 0.69017655, 0, 0, 0, 0.69017655, 0, 0.69216686, 0.010938303)

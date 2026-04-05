@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name XiaokongStateComponent
 
 signal stats_changed(snapshot: Dictionary, applied_delta: Dictionary, reason: String)
@@ -138,8 +138,12 @@ func _extract_delta(delta: Dictionary, key: String) -> float:
 	# Keep compatibility with old payload keys.
 	if key == "hunger" and delta.has("ai_hunger"):
 		return float(delta["ai_hunger"])
+	if key == "thirst" and delta.has("ai_thirst"):
+		return float(delta["ai_thirst"])
 	if key == "mood" and delta.has("ai_mood"):
 		return float(delta["ai_mood"])
+	if key == "favor" and delta.has("ai_favor"):
+		return float(delta["ai_favor"])
 
 	return 0.0
 
@@ -156,4 +160,3 @@ func _refresh_critical_cache(emit_changes: bool) -> void:
 		_critical_cache[key] = now_critical
 		if emit_changes and previous != now_critical:
 			critical_state_changed.emit(stat_name, now_critical, get_stat(stat_name))
-

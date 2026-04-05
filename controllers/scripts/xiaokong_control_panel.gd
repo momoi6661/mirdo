@@ -23,6 +23,9 @@ const ACTIONS: PackedStringArray = [
 @onready var play_action_button: Button = $Margin/VBox/ActionRow/PlayActionButton
 @onready var pick_nav_button: CheckButton = $Margin/VBox/PickRow/PickNavButton
 @onready var stop_nav_button: Button = $Margin/VBox/PickRow/StopNavButton
+@onready var dialogue_input: LineEdit = $Margin/VBox/DialogueRow/DialogueInput
+@onready var send_dialogue_button: Button = $Margin/VBox/DialogueRow/SendDialogueButton
+@onready var dialogue_reply_label: Label = $Margin/VBox/DialogueReplyLabel
 @onready var status_label: Label = $Margin/VBox/StatusLabel
 
 var _controller: Node
@@ -67,6 +70,8 @@ func _bind_signals() -> void:
 	play_action_button.pressed.connect(_on_play_action_pressed)
 	pick_nav_button.toggled.connect(_on_pick_nav_toggled)
 	stop_nav_button.pressed.connect(_on_stop_nav_pressed)
+	send_dialogue_button.pressed.connect(_on_send_dialogue_pressed)
+	dialogue_input.text_submitted.connect(_on_dialogue_submitted)
 
 func _on_bind_target_pressed() -> void:
 	if _controller == null:
@@ -101,3 +106,23 @@ func _on_stop_nav_pressed() -> void:
 		return
 	if _controller.has_method("stop_navigation"):
 		_controller.call("stop_navigation")
+
+func _on_dialogue_submitted(_new_text: String) -> void:
+	_on_send_dialogue_pressed()
+
+func _on_send_dialogue_pressed() -> void:
+	if _controller == null:
+		return
+
+	var text := dialogue_input.text.strip_edges()
+	if text.is_empty():
+		return
+
+	if _controller.has_method("send_dialogue_text"):
+		_controller.call("send_dialogue_text", text)
+		dialogue_input.text = ""
+
+func set_dialogue_reply(text: String) -> void:
+	if dialogue_reply_label != null:
+		var trimmed = text.strip_edges()
+		dialogue_reply_label.text = "AI: %s" % (trimmed if not trimmed.is_empty() else "(empty)")

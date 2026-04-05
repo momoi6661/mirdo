@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name XiaokongItemConsumerComponent
 
 signal item_consumed(item_name: String, applied_delta: Dictionary, suggested_action: StringName)
@@ -89,4 +89,3 @@ func _find_state_component() -> XiaokongStateComponent:
 			return state
 
 	return null
-

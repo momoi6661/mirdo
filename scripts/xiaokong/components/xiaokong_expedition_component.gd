@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name XiaokongExpeditionComponent
 
 signal expedition_requested(payload: Dictionary)
@@ -299,4 +299,3 @@ func _find_state_component() -> XiaokongStateComponent:
 		if state_component != null:
 			return state_component
 	return null
-

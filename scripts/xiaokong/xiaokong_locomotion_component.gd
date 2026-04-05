@@ -14,6 +14,11 @@ class_name XiaokongLocomotionComponent
 @export var turn_state_total_degrees: float = 90.0
 @export var turn_state_acceleration_deg_per_sec2: float = 540.0
 @export var stop_speed_deadzone: float = 0.06
+@export var use_root_motion_for_pose_transitions: bool = true
+@export var root_motion_states: PackedStringArray = PackedStringArray(["SitDown", "LayDown", "SitToStand", "LayUp"])
+@export var root_motion_translation_scale: float = 1.0
+@export var root_motion_rotation_scale: float = 1.0
+@export var root_motion_max_speed: float = 2.2
 
 var _desired_velocity: Vector3 = Vector3.ZERO
 var _desired_turn_amount: float = 0.0
@@ -26,7 +31,7 @@ var _nav_turn_action: StringName = &""
 var _nav_turn_started_anim := false
 var _turn_state_current_speed_rad := 0.0
 
-@onready var _body: CharacterBody3D = get_parent() as CharacterBody3D
+@onready var _body: CharacterBody3D = _resolve_body()
 @onready var _animation: Node = get_node_or_null(animation_controller_path)
 @onready var _navigation: XiaokongNavigationComponent = get_node_or_null(navigation_component_path) as XiaokongNavigationComponent
 
@@ -66,6 +71,11 @@ func _physics_process(delta: float) -> void:
 		_body.move_and_slide()
 		_advance_navigation_turn(delta)
 		_push_animation_motion(Vector3.ZERO)
+		_was_navigation_active = navigation_active
+		return
+
+	if _should_apply_root_motion(navigation_active):
+		_apply_root_motion_transition(delta)
 		_was_navigation_active = navigation_active
 		return
 
@@ -312,6 +322,46 @@ func _turn_progress_curve(t: float) -> float:
 	# Smoothstep: softer acceleration/deceleration to keep spring bones stable while turning.
 	return x * x * (3.0 - 2.0 * x)
 
+func _should_apply_root_motion(navigation_active: bool) -> bool:
+	if not use_root_motion_for_pose_transitions:
+		return false
+	if navigation_active:
+		return false
+	if _animation == null or not _animation.has_method("consume_root_motion_delta"):
+		return false
+
+	var state := _get_animation_state_name()
+	if state == &"":
+		return false
+	return root_motion_states.has(String(state))
+
+func _apply_root_motion_transition(delta: float) -> void:
+	var delta_value: Variant = _animation.call("consume_root_motion_delta")
+	var root_delta: Dictionary = delta_value if delta_value is Dictionary else {}
+
+	var local_position: Vector3 = root_delta.get("position", Vector3.ZERO) as Vector3
+	local_position *= root_motion_translation_scale
+	local_position.y = 0.0
+
+	var world_motion := _body.global_transform.basis * local_position
+	var motion_velocity := Vector3.ZERO
+	if delta > 0.0001:
+		motion_velocity = world_motion / delta
+	if root_motion_max_speed > 0.0 and motion_velocity.length() > root_motion_max_speed:
+		motion_velocity = motion_velocity.normalized() * root_motion_max_speed
+
+	_body.velocity.x = motion_velocity.x
+	_body.velocity.z = motion_velocity.z
+	_body.move_and_slide()
+
+	var local_rotation: Quaternion = root_delta.get("rotation", Quaternion.IDENTITY) as Quaternion
+	var yaw_delta := local_rotation.get_euler().y * root_motion_rotation_scale
+	if absf(yaw_delta) > 0.0001:
+		_body.rotate_y(yaw_delta)
+
+	_set_animation_turn(0.0)
+	_push_animation_motion(Vector3(_body.velocity.x, 0.0, _body.velocity.z))
+
 func _get_animation_state_name() -> StringName:
 	if _animation != null and _animation.has_method("get_current_state_name"):
 		return _animation.call("get_current_state_name") as StringName
@@ -320,3 +370,11 @@ func _get_animation_state_name() -> StringName:
 func _is_turn_state_active() -> bool:
 	var state := _get_animation_state_name()
 	return state == &"LeftTurn" or state == &"RightTurn"
+
+func _resolve_body() -> CharacterBody3D:
+	var current: Node = self
+	while current != null:
+		if current is CharacterBody3D:
+			return current as CharacterBody3D
+		current = current.get_parent()
+	return null

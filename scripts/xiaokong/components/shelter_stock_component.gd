@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name ShelterStockComponent
 
 signal stock_changed(snapshot: Dictionary, applied_delta: Dictionary, reason: String)
@@ -98,5 +98,3 @@ func _invert_delta(raw_delta: Dictionary) -> Dictionary:
 func _clamp_non_negative() -> void:
 	for key in _stock.keys():
 		_stock[key] = maxi(0, int(_stock[key]))
-
-

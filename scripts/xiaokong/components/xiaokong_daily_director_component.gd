@@ -1,4 +1,4 @@
-﻿extends Node
+extends Node
 class_name XiaokongDailyDirectorComponent
 
 signal day_started(day_index: int, active_events: Array)
@@ -249,5 +249,3 @@ func _find_state_component() -> XiaokongStateComponent:
 			return state
 
 	return null
-
-

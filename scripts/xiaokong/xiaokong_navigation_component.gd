@@ -27,7 +27,7 @@ var _turn_request_action: StringName = &""
 var _turn_request_angle := 0.0
 var _turn_request_cooldown := 0.0
 
-@onready var _body: CharacterBody3D = get_parent() as CharacterBody3D
+@onready var _body: CharacterBody3D = _resolve_body()
 @onready var _agent: NavigationAgent3D = get_node_or_null(navigation_agent_path) as NavigationAgent3D
 
 func _ready() -> void:
@@ -206,3 +206,11 @@ func _get_body_forward() -> Vector3:
 	if forward.length_squared() <= 0.0001:
 		return Vector3.ZERO
 	return forward.normalized()
+
+func _resolve_body() -> CharacterBody3D:
+	var current: Node = self
+	while current != null:
+		if current is CharacterBody3D:
+			return current as CharacterBody3D
+		current = current.get_parent()
+	return null

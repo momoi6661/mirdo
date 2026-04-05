@@ -6,6 +6,8 @@ extends Control
 @onready var send_button = $VBoxContainer/HBoxContainer/SendButton
 @export var action_router_path: NodePath
 @onready var action_router: Node = get_node_or_null(action_router_path)
+@export var state_component_path: NodePath
+@onready var state_component: Node = get_node_or_null(state_component_path)
 
 var ai_manager: AIManager
 
@@ -23,7 +25,7 @@ func _ready():
 	ai_manager.on_ai_response_completed.connect(_on_ai_response_completed)
 	ai_manager.on_ai_request_error.connect(_on_ai_request_error)
 
-func _on_send_submitted(new_text: String):
+func _on_send_submitted(_new_text: String):
 	_on_send_pressed()
 
 func _on_send_pressed():
@@ -39,8 +41,21 @@ func _on_send_pressed():
 	status_label.text = "状态: AI 正在思考..."
 	dialogue_box.text += "\n\n[机器人]: " + text + "\n[小雅]: "
 	
-	# 模拟发送数据给后端 (第1天, 早上8点, 饱食度50, 心情50)
-	ai_manager.send_interaction_stream(1, 480, 50, 50, text)
+	# 模拟发送数据给后端 (第1天, 早上8点, 饱食50, 饮水50, 心情50, 好感20)
+	var hunger = 50
+	var thirst = 50
+	var mood = 50
+	var favor = 20
+	if state_component != null and state_component.has_method("build_ai_stats"):
+		var stats_value: Variant = state_component.call("build_ai_stats")
+		if stats_value is Dictionary:
+			var stats = stats_value as Dictionary
+			hunger = int(stats.get("hunger", hunger))
+			thirst = int(stats.get("thirst", thirst))
+			mood = int(stats.get("mood", mood))
+			favor = int(stats.get("favor", favor))
+
+	ai_manager.send_interaction_stream(1, 480, hunger, thirst, mood, favor, text)
 
 # ==========================================
 # 接收 AI 信号的回调函数

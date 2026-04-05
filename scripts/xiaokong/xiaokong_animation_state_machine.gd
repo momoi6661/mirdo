@@ -60,10 +60,11 @@ const REQUIRED_TREE_STATES: Array[StringName] = [
 @export var walk_playback_lerp_rate: float = 12.0
 @export var ik_idle_offset_states: PackedStringArray = PackedStringArray(["Idle"])
 @export var ik_idle_offset_blend_speed: float = 8.0
+@export var auto_navigation_path: NodePath = NodePath("AutoNavigation")
 
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var animation_tree: AnimationTree = $AnimationTree
-@onready var auto_navigation: XiaokongNavigationComponent = get_node_or_null("AutoNavigation") as XiaokongNavigationComponent
+@onready var auto_navigation: XiaokongNavigationComponent = _resolve_auto_navigation()
 
 const DRINKING_STANDING_BLEND_PATH := "parameters/Drinking/StandingBlend/blend_amount"
 const DRINKING_SITTING_BLEND_PATH := "parameters/Drinking/SittingBlend/blend_amount"
@@ -145,6 +146,13 @@ func trigger_action(state_name: StringName) -> bool:
 	if not REQUEST_STATES.has(state_name):
 		return false
 
+	# Manual actions should preempt navigation motion, otherwise move_speed can
+	# keep the state machine in walk-related transitions and block action entry.
+	if state_name != TargetState.IDLE and auto_navigation != null and auto_navigation.is_active():
+		auto_navigation.stop_navigation()
+		set_motion_velocity(Vector3.ZERO)
+		set_turn_amount(0.0)
+
 	_requested_action = state_name
 	return true
 
@@ -171,6 +179,15 @@ func is_ready_for_navigation_motion() -> bool:
 
 func get_current_state_name() -> StringName:
 	return _get_current_state()
+
+func consume_root_motion_delta() -> Dictionary:
+	if animation_tree == null or not animation_tree.active:
+		return {}
+
+	return {
+		"position": animation_tree.get_root_motion_position(),
+		"rotation": animation_tree.get_root_motion_rotation(),
+	}
 
 func get_turn_animation_duration(state_name: StringName) -> float:
 	if animation_player == null:
@@ -257,6 +274,10 @@ func _step_to_laying(_current_state: StringName) -> StringName:
 	return TargetState.LAYING
 
 func _step_to_drinking(current_state: StringName) -> StringName:
+	# SitDown has no direct transition to Drinking in the tree.
+	# Queue sitting idle first, then transition into Drinking.
+	if current_state == SIT_DOWN_STATE:
+		return TargetState.SITTING_IDLE
 	if _is_laying_context_state(current_state):
 		return TargetState.SITTING_IDLE
 	return TargetState.DRINKING
@@ -301,6 +322,36 @@ func _resolve_ik_target_driver() -> void:
 	if _ik_target_driver != null and is_instance_valid(_ik_target_driver):
 		return
 	_ik_target_driver = _find_node_with_method(self, &"set_idle_arm_offset_weight")
+
+func _resolve_auto_navigation() -> XiaokongNavigationComponent:
+	if auto_navigation_path != NodePath():
+		var by_export := get_node_or_null(auto_navigation_path) as XiaokongNavigationComponent
+		if by_export != null:
+			return by_export
+
+	var by_components := get_node_or_null("Components/AutoNavigation") as XiaokongNavigationComponent
+	if by_components != null:
+		return by_components
+
+	var legacy := get_node_or_null("AutoNavigation") as XiaokongNavigationComponent
+	if legacy != null:
+		return legacy
+
+	return _find_navigation_component_recursive(self)
+
+func _find_navigation_component_recursive(root_node: Node) -> XiaokongNavigationComponent:
+	if root_node == null:
+		return null
+	if root_node is XiaokongNavigationComponent:
+		return root_node as XiaokongNavigationComponent
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_navigation_component_recursive(child_node)
+		if nested != null:
+			return nested
+	return null
 
 func _find_node_with_method(root: Node, method_name: StringName) -> Node:
 	for child in root.get_children():

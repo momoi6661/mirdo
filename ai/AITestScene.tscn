@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://c8y8c8y8c8y8c"]
 
-[ext_resource type="Script" path="res://AITestUI.gd" id="1_testui"]
+[ext_resource type="Script" path="res://ai/AITestUI.gd" id="1_testui"]
 
 [node name="AITestScene" type="Control"]
 layout_mode = 3
