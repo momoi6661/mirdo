@@ -23,12 +23,19 @@ var stairs_ahead_ray: RayCast3D
 @export_flags_3d_physics var step_detection_mask: int = 1
 
 func _ready():
-	# 获取相机偏移节点，用于相机平滑
-	#camera_offset = player.get_node("Marker3D/CameraOffset")
-	# 延迟一帧执行射线设置，确保玩家节点已完全初始化
+	if player == null:
+		player = get_parent().get_parent() as PlayerController
+	if collision_shape == null and player != null:
+		collision_shape = player.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if camera_offset == null and player != null:
+		camera_offset = player.get_node_or_null("Marker3D/CameraOffset") as Node3D
 	call_deferred("setup_stair_rays")
 
 func setup_stair_rays():
+	if player == null:
+		push_warning("StepHandlerComponent: player is null, skipping stair ray setup.")
+		return
+
 	# 创建向下检测楼梯的射线
 	if !stairs_below_ray:
 		stairs_below_ray = RayCast3D.new()
@@ -38,7 +45,8 @@ func setup_stair_rays():
 		# 重要：使用和玩家相同的碰撞掩码！
 		# 原因：射线应该只检测玩家能碰撞的物体
 		stairs_below_ray.collision_mask = _get_step_detection_mask()
-		player.add_child(stairs_below_ray)
+		if stairs_below_ray.get_parent() == null:
+			player.add_child(stairs_below_ray)
 	
 	# 创建向前检测楼梯的射线
 	if !stairs_ahead_ray:
@@ -63,7 +71,8 @@ func setup_stair_rays():
 		# 同样使用和玩家相同的碰撞掩码
 		# 这样射线就能准确检测玩家可以站立或碰撞的表面
 		stairs_ahead_ray.collision_mask = _get_step_detection_mask()
-		player.add_child(stairs_ahead_ray)
+		if stairs_ahead_ray.get_parent() == null:
+			player.add_child(stairs_ahead_ray)
 
 func _get_step_detection_mask() -> int:
 	if step_detection_mask > 0:
@@ -79,6 +88,9 @@ func _get_step_detection_mask() -> int:
 # 如果返回true，fps_controller会跳过move_and_slide()
 # 因为我们已经手动移动玩家到台阶上了，不需要再move_and_slide
 func handle_step_climbing(delta: float = 0.0) -> bool:
+	if player == null or stairs_ahead_ray == null or stairs_below_ray == null:
+		return false
+
 	# 根据蹲伏状态调整射线位置
 	adjust_rays_for_crouch()
 	
@@ -96,6 +108,9 @@ func handle_step_climbing(delta: float = 0.0) -> bool:
 
 # 主函数：处理下楼梯逻辑，在move_and_slide之后调用
 func handle_after_move_slide(delta: float):
+	if player == null or stairs_below_ray == null:
+		return
+
 	# 检查是否需要吸附到楼梯
 	check_snap_to_stairs()
 	# 执行相机平滑

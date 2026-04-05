@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://components/world_subtitle_component.gd" id="1_world_subtitle_script"]
+[ext_resource type="PackedScene" path="res://scenes/components/world_subtitle_letter.tscn" id="2_world_subtitle_letter_scene"]
+
+[node name="WorldSubtitleComponent" type="Node3D" unique_id=1729303174]
+script = ExtResource("1_world_subtitle_script")
+letter_scene = ExtResource("2_world_subtitle_letter_scene")
+
+[node name="Letters" type="Node3D" parent="." unique_id=303419575]

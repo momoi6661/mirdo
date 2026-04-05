@@ -3,7 +3,7 @@ extends CenterContainer
 @export var spread_base:float=5
 @export var spread_factor:float=0.5
 @export var lerp_speed:float=0.1
-@onready var player_controller: PlayerController = $'../..'
+@onready var player_controller: CharacterBody3D = $"../.." as CharacterBody3D
 
 
 var _current_spread:float=0

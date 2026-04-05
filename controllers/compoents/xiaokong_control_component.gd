@@ -196,6 +196,57 @@ func send_dialogue_text(text: String) -> bool:
 	_set_status("Dialogue request failed: %s" % String(result.get("error", "unknown_error")))
 	return false
 
+func enqueue_subtitle_text(text: String, speaker: String = "") -> bool:
+	var trimmed := text.strip_edges()
+	if trimmed.is_empty():
+		_set_status("Subtitle text is empty.")
+		return false
+
+	if _target == null and not _deferred_bind_target():
+		_set_status("No Xiaokong target bound.")
+		return false
+
+	var subtitle_target := _resolve_subtitle_target()
+	if subtitle_target == null:
+		_set_status("Subtitle target not found.")
+		return false
+
+	var target_speaker := subtitle_speaker_name if speaker.strip_edges().is_empty() else speaker.strip_edges()
+	if subtitle_target.has_method("enqueue_text"):
+		var count := int(subtitle_target.call("enqueue_text", trimmed, target_speaker))
+		_set_status("Subtitle queued (%d pending)." % count)
+		return true
+
+	if subtitle_target.has_method("show_once"):
+		subtitle_target.call("show_once", trimmed, target_speaker)
+		_set_status("Subtitle shown immediately (no queue support).")
+		return true
+
+	_set_status("Subtitle target has no supported API.")
+	return false
+
+func clear_subtitle_queue(stop_current: bool = true) -> void:
+	if _target == null and not _deferred_bind_target():
+		_set_status("No Xiaokong target bound.")
+		return
+
+	var subtitle_target := _resolve_subtitle_target()
+	if subtitle_target == null:
+		_set_status("Subtitle target not found.")
+		return
+
+	if subtitle_target.has_method("clear_queue"):
+		subtitle_target.call("clear_queue", stop_current)
+		_set_status("Subtitle queue cleared.")
+		return
+
+	if stop_current and subtitle_target.has_method("cancel_now"):
+		subtitle_target.call("cancel_now")
+		_set_status("Current subtitle stopped.")
+		return
+
+	_set_status("Subtitle target has no queue API.")
+
 func _set_panel_open(opened: bool) -> void:
 	_panel_open = opened
 
@@ -450,9 +501,7 @@ func _find_world_subtitle_component_recursive(root_node: Node) -> Node:
 	if root_node == null:
 		return null
 	if root_node.has_method("begin_stream") and root_node.has_method("push_chunk") and root_node.has_method("finish_stream") and root_node.has_method("show_once"):
-		var script_ref: Script = root_node.get_script() as Script
-		if script_ref != null and String(script_ref.resource_path).ends_with("xiaokong_world_subtitle_component.gd"):
-			return root_node
+		return root_node
 	for child in root_node.get_children():
 		var child_node := child as Node
 		if child_node == null:

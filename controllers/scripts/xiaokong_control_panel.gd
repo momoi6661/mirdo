@@ -25,6 +25,9 @@ const ACTIONS: PackedStringArray = [
 @onready var stop_nav_button: Button = $Margin/VBox/PickRow/StopNavButton
 @onready var dialogue_input: LineEdit = $Margin/VBox/DialogueRow/DialogueInput
 @onready var send_dialogue_button: Button = $Margin/VBox/DialogueRow/SendDialogueButton
+@onready var subtitle_queue_input: LineEdit = get_node_or_null("Margin/VBox/SubtitleQueueRow/SubtitleQueueInput") as LineEdit
+@onready var queue_subtitle_button: Button = get_node_or_null("Margin/VBox/SubtitleQueueRow/QueueSubtitleButton") as Button
+@onready var clear_subtitle_queue_button: Button = get_node_or_null("Margin/VBox/SubtitleQueueRow/ClearSubtitleQueueButton") as Button
 @onready var dialogue_reply_label: Label = $Margin/VBox/DialogueReplyLabel
 @onready var status_label: Label = $Margin/VBox/StatusLabel
 
@@ -32,6 +35,7 @@ var _controller: Node
 
 func _ready() -> void:
 	_populate_actions()
+	_ensure_subtitle_queue_controls()
 	_bind_signals()
 	if target_path_input != null:
 		target_path_input.editable = false
@@ -39,6 +43,48 @@ func _ready() -> void:
 		target_label.text = "Target (auto)"
 	if bind_target_button != null:
 		bind_target_button.visible = false
+
+func _ensure_subtitle_queue_controls() -> void:
+	if subtitle_queue_input != null and queue_subtitle_button != null and clear_subtitle_queue_button != null:
+		return
+
+	var vbox := get_node_or_null("Margin/VBox") as VBoxContainer
+	if vbox == null:
+		return
+
+	var row := get_node_or_null("Margin/VBox/SubtitleQueueRow") as HBoxContainer
+	if row == null:
+		row = HBoxContainer.new()
+		row.name = "SubtitleQueueRow"
+		row.add_theme_constant_override("separation", 6)
+		vbox.add_child(row)
+		if dialogue_reply_label != null:
+			vbox.move_child(row, dialogue_reply_label.get_index())
+
+	if subtitle_queue_input == null:
+		subtitle_queue_input = get_node_or_null("Margin/VBox/SubtitleQueueRow/SubtitleQueueInput") as LineEdit
+	if subtitle_queue_input == null:
+		subtitle_queue_input = LineEdit.new()
+		subtitle_queue_input.name = "SubtitleQueueInput"
+		subtitle_queue_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		subtitle_queue_input.placeholder_text = "Queue world subtitle text..."
+		row.add_child(subtitle_queue_input)
+
+	if queue_subtitle_button == null:
+		queue_subtitle_button = get_node_or_null("Margin/VBox/SubtitleQueueRow/QueueSubtitleButton") as Button
+	if queue_subtitle_button == null:
+		queue_subtitle_button = Button.new()
+		queue_subtitle_button.name = "QueueSubtitleButton"
+		queue_subtitle_button.text = "Queue"
+		row.add_child(queue_subtitle_button)
+
+	if clear_subtitle_queue_button == null:
+		clear_subtitle_queue_button = get_node_or_null("Margin/VBox/SubtitleQueueRow/ClearSubtitleQueueButton") as Button
+	if clear_subtitle_queue_button == null:
+		clear_subtitle_queue_button = Button.new()
+		clear_subtitle_queue_button.name = "ClearSubtitleQueueButton"
+		clear_subtitle_queue_button.text = "Clear"
+		row.add_child(clear_subtitle_queue_button)
 
 func setup(controller: Node) -> void:
 	_controller = controller
@@ -65,13 +111,26 @@ func _populate_actions() -> void:
 	action_option.select(0)
 
 func _bind_signals() -> void:
-	bind_target_button.pressed.connect(_on_bind_target_pressed)
-	go_position_button.pressed.connect(_on_go_position_pressed)
-	play_action_button.pressed.connect(_on_play_action_pressed)
-	pick_nav_button.toggled.connect(_on_pick_nav_toggled)
-	stop_nav_button.pressed.connect(_on_stop_nav_pressed)
-	send_dialogue_button.pressed.connect(_on_send_dialogue_pressed)
-	dialogue_input.text_submitted.connect(_on_dialogue_submitted)
+	if bind_target_button != null:
+		bind_target_button.pressed.connect(_on_bind_target_pressed)
+	if go_position_button != null:
+		go_position_button.pressed.connect(_on_go_position_pressed)
+	if play_action_button != null:
+		play_action_button.pressed.connect(_on_play_action_pressed)
+	if pick_nav_button != null:
+		pick_nav_button.toggled.connect(_on_pick_nav_toggled)
+	if stop_nav_button != null:
+		stop_nav_button.pressed.connect(_on_stop_nav_pressed)
+	if send_dialogue_button != null:
+		send_dialogue_button.pressed.connect(_on_send_dialogue_pressed)
+	if dialogue_input != null:
+		dialogue_input.text_submitted.connect(_on_dialogue_submitted)
+	if queue_subtitle_button != null and not queue_subtitle_button.pressed.is_connected(_on_queue_subtitle_pressed):
+		queue_subtitle_button.pressed.connect(_on_queue_subtitle_pressed)
+	if clear_subtitle_queue_button != null and not clear_subtitle_queue_button.pressed.is_connected(_on_clear_subtitle_queue_pressed):
+		clear_subtitle_queue_button.pressed.connect(_on_clear_subtitle_queue_pressed)
+	if subtitle_queue_input != null and not subtitle_queue_input.text_submitted.is_connected(_on_subtitle_queue_submitted):
+		subtitle_queue_input.text_submitted.connect(_on_subtitle_queue_submitted)
 
 func _on_bind_target_pressed() -> void:
 	if _controller == null:
@@ -121,6 +180,29 @@ func _on_send_dialogue_pressed() -> void:
 	if _controller.has_method("send_dialogue_text"):
 		_controller.call("send_dialogue_text", text)
 		dialogue_input.text = ""
+
+func _on_subtitle_queue_submitted(_new_text: String) -> void:
+	_on_queue_subtitle_pressed()
+
+func _on_queue_subtitle_pressed() -> void:
+	if _controller == null:
+		return
+	if subtitle_queue_input == null:
+		return
+
+	var text := subtitle_queue_input.text.strip_edges()
+	if text.is_empty():
+		return
+
+	if _controller.has_method("enqueue_subtitle_text"):
+		_controller.call("enqueue_subtitle_text", text)
+		subtitle_queue_input.text = ""
+
+func _on_clear_subtitle_queue_pressed() -> void:
+	if _controller == null:
+		return
+	if _controller.has_method("clear_subtitle_queue"):
+		_controller.call("clear_subtitle_queue", true)
 
 func set_dialogue_reply(text: String) -> void:
 	if dialogue_reply_label != null:

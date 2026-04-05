@@ -1,6 +1,6 @@
 extends Control
 
-@onready var player_controller: CharacterBody3D = $'..'
+@onready var player_controller: Node = $".."
 @onready var speed_label: Label = $DebugPanel/MarginContainer/VBoxContainer/SpeedLabel
 @onready var status_label: Label = $DebugPanel/MarginContainer/VBoxContainer/StatusLabel
 @onready var inventory_ui: Control = $InventoryUi
@@ -24,6 +24,13 @@ func _process(delta: float) -> void:
 		if state_machine and state_machine.CURRENT_STATE:
 			status_label.text = "State: " + state_machine.CURRENT_STATE.name
 		
-		var velocity = player_controller.velocity
+		var body := player_controller as CharacterBody3D
+		if body == null:
+			return
+		var velocity = body.velocity
 		var horizontal_speed = sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
-		speed_label.text = "Speed: %.1f / %.1f" % [horizontal_speed, player_controller._speed]
+		var move_speed: float = horizontal_speed
+		var typed_controller := player_controller as PlayerController
+		if typed_controller != null:
+			move_speed = typed_controller._speed
+		speed_label.text = "Speed: %.1f / %.1f" % [horizontal_speed, move_speed]

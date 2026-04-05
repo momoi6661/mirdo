@@ -37,20 +37,20 @@ func _on_child_transition(new_state_name:StringName):
 
 func change_state(new_state_name: StringName):
 	if is_locked: 
-		print("[StateMachine] 锁定中，拦截切换请求: ", new_state_name)
+		#print("[StateMachine] 锁定中，拦截切换请求: ", new_state_name)
 		return
 	
 	# 拦截错误的 FallState 请求：如果玩家实际在地上，忽略来自其它状态的掉落请求
 	if new_state_name == "FallState":
 		var parent = get_parent()
 		if parent and parent.has_method("is_on_floor") and parent.is_on_floor():
-			print("[StateMachine] 拦截虚假的 FallState 请求（玩家当前在地面）")
+			#print("[StateMachine] 拦截虚假的 FallState 请求（玩家当前在地面）")
 			return
 	
 	var new_state=states.get(new_state_name)
 	if new_state!=null and new_state != CURRENT_STATE:
 		var old_name = CURRENT_STATE.name if CURRENT_STATE else "None"
-		print("[StateMachine] 状态切换: ", old_name, " -> ", new_state_name)
+		#print("[StateMachine] 状态切换: ", old_name, " -> ", new_state_name)
 		
 		if CURRENT_STATE:
 			CURRENT_STATE.exit()

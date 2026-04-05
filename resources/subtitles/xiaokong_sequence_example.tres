@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WorldSubtitleSequence" format=3 uid="uid://b8q7w5y2if8to"]
+
+[ext_resource type="Script" uid="uid://dyvdfmntpulpa" path="res://components/world_subtitle_sequence.gd" id="1_seq"]
+[ext_resource type="Script" uid="uid://bafk4a4s5j0ds" path="res://components/world_subtitle_entry.gd" id="2_entry"]
+
+[sub_resource type="Resource" id="WorldSubtitleEntry_1"]
+script = ExtResource("2_entry")
+speaker = "Xiaokong"
+text = "Hello, this is an example subtitle line."
+wait_time = 0.3
+
+[sub_resource type="Resource" id="WorldSubtitleEntry_2"]
+script = ExtResource("2_entry")
+speaker = "Xiaokong"
+text = "Edit this resource to define your own sequence."
+
+[resource]
+script = ExtResource("1_seq")
+entries = Array[ExtResource("2_entry")]([SubResource("WorldSubtitleEntry_1"), SubResource("WorldSubtitleEntry_2")])
