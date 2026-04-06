@@ -1,0 +1,20 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[ext_resource type="Animation" path="res://resources/animate/facial/face_angry.tres" id="1_angry"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_blink_random.tres" id="1_blink"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_neutral.tres" id="1_neutral"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_sad.tres" id="1_sad"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_smile.tres" id="1_smile"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_surprised.tres" id="1_surpr"]
+[ext_resource type="Animation" path="res://resources/animate/facial/face_talk_loop.tres" id="1_talk"]
+
+[resource]
+_data = {
+&"face_angry": ExtResource("1_angry"),
+&"face_blink_random": ExtResource("1_blink"),
+&"face_neutral": ExtResource("1_neutral"),
+&"face_sad": ExtResource("1_sad"),
+&"face_smile": ExtResource("1_smile"),
+&"face_surprised": ExtResource("1_surpr"),
+&"face_talk_loop": ExtResource("1_talk")
+}
