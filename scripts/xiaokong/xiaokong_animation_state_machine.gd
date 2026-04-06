@@ -68,6 +68,7 @@ const REQUIRED_TREE_STATES: Array[StringName] = [
 @export var face_blink_animation: StringName = &"face_blink_random"
 @export var face_talk_animation: StringName = &"face_talk_loop"
 @export var face_talk_blend_duration: float = 0.12
+@export_range(0.0, 1.0, 0.01) var face_expression_transition_duration: float = 0.16
 
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var animation_tree: AnimationTree = $AnimationTree
@@ -103,6 +104,13 @@ const FACE_EXPRESSION_STATES := {
 	&"face_angry": &"Angry",
 	&"face_surprised": &"Surprised",
 }
+const FACE_EXPRESSION_STATE_ORDER: Array[StringName] = [
+	&"Neutral",
+	&"Smile",
+	&"Sad",
+	&"Angry",
+	&"Surprised",
+]
 
 # Read directly by AnimationTree advance expressions.
 var move_speed: float = 0.0
@@ -171,6 +179,7 @@ func _setup_face_animation() -> void:
 	if face_expression_sm == null or _face_talk_node == null or _face_blink_node == null:
 		push_warning("FaceAnimationTree missing required nodes: ExpressionSM/Talk/Blink.")
 		return
+	_ensure_face_expression_transitions(face_expression_sm)
 	_face_expression_playback = face_animation_tree.get(FACE_EXPR_PLAYBACK_PATH) as AnimationNodeStateMachinePlayback
 	if _face_expression_playback == null:
 		push_warning("FaceAnimationTree is missing state machine playback at %s." % FACE_EXPR_PLAYBACK_PATH)
@@ -220,13 +229,50 @@ func _has_face_animation(animation_name: StringName) -> bool:
 func _is_face_tree_ready() -> bool:
 	return face_animation_tree != null and _face_expression_playback != null and _face_talk_node != null and _face_blink_node != null
 
+func _find_face_expression_transition(
+	face_expression_sm: AnimationNodeStateMachine,
+	from_state: StringName,
+	to_state: StringName
+) -> AnimationNodeStateMachineTransition:
+	for index in range(face_expression_sm.get_transition_count()):
+		if face_expression_sm.get_transition_from(index) == from_state and face_expression_sm.get_transition_to(index) == to_state:
+			return face_expression_sm.get_transition(index)
+	return null
+
+func _configure_face_expression_transition(transition: AnimationNodeStateMachineTransition) -> void:
+	if transition == null:
+		return
+	transition.switch_mode = AnimationNodeStateMachineTransition.SWITCH_MODE_IMMEDIATE
+	transition.advance_mode = AnimationNodeStateMachineTransition.ADVANCE_MODE_ENABLED
+	transition.reset = true
+	transition.priority = 1
+	transition.xfade_time = maxf(face_expression_transition_duration, 0.0)
+
+func _ensure_face_expression_transitions(face_expression_sm: AnimationNodeStateMachine) -> void:
+	for from_index in range(FACE_EXPRESSION_STATE_ORDER.size()):
+		var from_state: StringName = FACE_EXPRESSION_STATE_ORDER[from_index]
+		if not face_expression_sm.has_node(from_state):
+			continue
+		for to_index in range(FACE_EXPRESSION_STATE_ORDER.size()):
+			var to_state: StringName = FACE_EXPRESSION_STATE_ORDER[to_index]
+			if from_state == to_state or not face_expression_sm.has_node(to_state):
+				continue
+			var transition: AnimationNodeStateMachineTransition = _find_face_expression_transition(face_expression_sm, from_state, to_state)
+			if transition == null:
+				transition = AnimationNodeStateMachineTransition.new()
+				face_expression_sm.add_transition(from_state, to_state, transition)
+			_configure_face_expression_transition(transition)
+
 func _start_face_expression_state(expression_name: StringName) -> void:
 	if _face_expression_playback == null:
 		return
 	var state_name := FACE_EXPRESSION_STATES.get(expression_name, &"") as StringName
 	if state_name == &"":
 		return
-	_face_expression_playback.start(state_name)
+	if not _face_expression_playback.is_playing() or _face_expression_playback.get_current_node() == &"":
+		_face_expression_playback.start(state_name)
+		return
+	_face_expression_playback.travel(state_name)
 
 func _set_face_tree_param(path: String, value: float) -> void:
 	if face_animation_tree == null:
@@ -299,6 +345,8 @@ func set_face_expression(expression_name: StringName) -> bool:
 	if not _is_face_expression_animation(expression_name):
 		push_warning("Unknown face expression animation: %s" % String(expression_name))
 		return false
+	if expression_name == _current_face_expression:
+		return true
 
 	_current_face_expression = expression_name
 	_start_face_expression_state(_current_face_expression)
