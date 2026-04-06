@@ -146,9 +146,12 @@ func trigger_action(state_name: StringName) -> bool:
 	if not REQUEST_STATES.has(state_name):
 		return false
 
+	var is_navigation_turn := state_name == TargetState.LEFT_TURN or state_name == TargetState.RIGHT_TURN
 	# Manual actions should preempt navigation motion, otherwise move_speed can
 	# keep the state machine in walk-related transitions and block action entry.
-	if state_name != TargetState.IDLE and auto_navigation != null and auto_navigation.is_active():
+	# Navigation-generated turn actions must keep navigation alive, otherwise
+	# locomotion falls back to turn-state rotation (default 90 degrees).
+	if state_name != TargetState.IDLE and not is_navigation_turn and auto_navigation != null and auto_navigation.is_active():
 		auto_navigation.stop_navigation()
 		set_motion_velocity(Vector3.ZERO)
 		set_turn_amount(0.0)

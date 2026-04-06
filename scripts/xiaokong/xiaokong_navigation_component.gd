@@ -143,19 +143,17 @@ func _set_target_position(world_position: Vector3) -> void:
 	_agent.target_position = world_position
 
 func _compute_signed_turn_angle(desired_direction: Vector3) -> float:
-	if desired_direction.length_squared() <= 0.0001:
+	if _body == null or desired_direction.length_squared() <= 0.0001:
 		return 0.0
 
 	var desired_forward := desired_direction.normalized()
-	var desired_yaw := atan2(desired_forward.x, desired_forward.z)
-	if use_negative_z_forward:
-		desired_yaw = wrapf(desired_yaw + PI, -PI, PI)
-
-	if _body == null:
+	var current_forward := _get_body_forward()
+	if current_forward.length_squared() <= 0.0001:
 		return 0.0
 
-	var current_yaw := _body.global_rotation.y
-	return wrapf(desired_yaw - current_yaw, -PI, PI)
+	var cross_y := current_forward.cross(desired_forward).y
+	var dot := clampf(current_forward.dot(desired_forward), -1.0, 1.0)
+	return atan2(cross_y, dot)
 
 func _emit_idle_motion() -> void:
 	motion_command.emit(Vector3.ZERO, 0.0)
@@ -165,7 +163,9 @@ func _stabilize_signed_angle(angle: float) -> float:
 	if abs_angle <= 0.001:
 		return 0.0
 
-	var near_pi := deg_to_rad(170.0)
+	# Keep stabilization window narrow so 170~178 degree turns still pick
+	# the geometrically correct side instead of sticking to previous sign.
+	var near_pi := deg_to_rad(178.5)
 	if abs_angle < near_pi:
 		_last_turn_sign = signf(angle)
 		return angle
@@ -179,7 +179,8 @@ func _create_turn_request(signed_angle: float) -> void:
 		return
 	if absf(signed_angle) <= 0.001:
 		return
-	_turn_request_action = &"RightTurn" if signed_angle > 0.0 else &"LeftTurn"
+	var is_right_turn := _is_right_turn_from_signed_angle(signed_angle)
+	_turn_request_action = &"RightTurn" if is_right_turn else &"LeftTurn"
 	_turn_request_angle = signed_angle
 	_turn_request_pending = true
 
@@ -200,12 +201,19 @@ func complete_turn_request() -> void:
 	_turn_request_cooldown = turn_request_cooldown_sec
 
 func _get_body_forward() -> Vector3:
+	if _body == null:
+		return Vector3.ZERO
 	var basis := _body.global_transform.basis
 	var forward := -basis.z if use_negative_z_forward else basis.z
 	forward.y = 0.0
 	if forward.length_squared() <= 0.0001:
 		return Vector3.ZERO
 	return forward.normalized()
+
+func _is_right_turn_from_signed_angle(signed_angle: float) -> bool:
+	if use_negative_z_forward:
+		return signed_angle < 0.0
+	return signed_angle > 0.0
 
 func _resolve_body() -> CharacterBody3D:
 	var current: Node = self

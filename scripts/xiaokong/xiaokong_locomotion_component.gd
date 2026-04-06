@@ -168,12 +168,13 @@ func _compute_signed_turn_angle(target_forward: Vector3) -> float:
 		return 0.0
 
 	var desired := target_forward.normalized()
-	var desired_yaw := atan2(desired.x, desired.z)
-	if use_negative_z_forward:
-		desired_yaw = wrapf(desired_yaw + PI, -PI, PI)
+	var current_forward := _get_body_forward()
+	if current_forward.length_squared() <= 0.0001:
+		return 0.0
 
-	var current_yaw := _body.global_rotation.y
-	return wrapf(desired_yaw - current_yaw, -PI, PI)
+	var cross_y := current_forward.cross(desired).y
+	var dot := clampf(current_forward.dot(desired), -1.0, 1.0)
+	return atan2(cross_y, dot)
 
 func _is_navigation_animation_ready() -> bool:
 	if _animation == null:
