@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://ck03ounfwn3c2"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_53kpf"]
+load_path = "res://.godot/imported/axe.png-7a4a43ff600420bbcb565ba4f0c3a19b.s3tc.ctex"
+
+[resource]
+resource_name = "axe"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_53kpf")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

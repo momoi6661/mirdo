@@ -6,8 +6,9 @@ signal on_ai_response_completed(final_data: Dictionary)
 signal on_ai_request_error(error_msg: String)
 
 @export var server_host: String = "127.0.0.1"
-@export_range(1, 65535, 1) var server_port: int = 8000
+@export_range(1, 65535, 1) var server_port: int = 18080
 @export var endpoint_path: String = "/chat_stream"
+@export var debug_subtitle_endpoint_path: String = "/debug/subtitle_test_stream"
 @export var use_https: bool = false
 @export var request_timeout_sec: float = 20.0
 @export var debug_log: bool = false
@@ -51,14 +52,39 @@ func send_interaction_stream(
 	}
 	return send_chat_payload(request_data, {"type": "interaction"})
 
-func send_chat_payload(payload: Dictionary, context: Dictionary = {}) -> bool:
+func send_subtitle_test_stream(test_text: String = "Subtitle debug test", session_id: String = "fps_subtitle_test") -> bool:
+	var clean_session_id := session_id.strip_edges()
+	if clean_session_id.is_empty():
+		clean_session_id = "fps_subtitle_test"
+
+	var payload := {
+		"day": 1,
+		"time": 540,
+		"time_min": 540,
+		"session_id": clean_session_id,
+		"npc_stats": {
+			"hunger": 50,
+			"thirst": 50,
+			"mood": 50,
+			"favor": 20,
+		},
+		"player_text": test_text.strip_edges(),
+		"given_item": "",
+		"context": {
+			"source": "fps_subtitle_debug",
+		},
+	}
+	return send_chat_payload(payload, {"type": "subtitle_test"}, debug_subtitle_endpoint_path)
+
+func send_chat_payload(payload: Dictionary, context: Dictionary = {}, endpoint_override: String = "") -> bool:
 	_ensure_http_request()
 
 	if is_requesting:
 		_emit_error("request_in_progress")
 		return false
 
-	var trimmed_endpoint := endpoint_path.strip_edges()
+	var resolved_endpoint := endpoint_path if endpoint_override.strip_edges().is_empty() else endpoint_override
+	var trimmed_endpoint := resolved_endpoint.strip_edges()
 	if trimmed_endpoint.is_empty():
 		_emit_error("endpoint_path_empty")
 		return false

@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://d3tw3q78ogkvn"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_1bq0j"]
+load_path = "res://.godot/imported/bed.png-10b073ac9a69f4202d0eb902992ab9e7.s3tc.ctex"
+
+[resource]
+resource_name = "bed"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_1bq0j")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://7a4w50w1oa1l"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_dg6dy"]
+load_path = "res://.godot/imported/nightstand.png-c17796df49ceea8dd0ad62963a16118c.s3tc.ctex"
+
+[resource]
+resource_name = "nightstand"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_dg6dy")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

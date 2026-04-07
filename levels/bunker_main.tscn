@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://bnwp1q6cqbw13"]
+
+[ext_resource type="PackedScene" uid="uid://btv0a42cgxt8g" path="res://levels/WE_test.tscn" id="1_we"]
+[ext_resource type="PackedScene" uid="uid://1n3nbac2kdrj" path="res://3DModel/bunker_scene.blend" id="2_bunker"]
+[ext_resource type="PackedScene" uid="uid://b6svd2wt3lxks" path="res://models/xiaokong/xiaokong1.tscn" id="3_g4wa5"]
+[ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_player"]
+
+[node name="BunkerMain" type="Node3D" unique_id=1724491302]
+
+[node name="WorldEnvironment" parent="." unique_id=1360160829 instance=ExtResource("1_we")]
+
+[node name="BunkerScene" parent="." unique_id=601083373 instance=ExtResource("2_bunker")]
+
+[node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("3_g4wa5")]
+transform = Transform3D(1.25, 0, 0, 0, 1.25, 0, 0, 0, 1.25, 0.24577987, 0.03420347, -0.22391012)
+
+[node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.74727213, 0, 0.8848088)

@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cokwndxyxvg4i"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_uu0ii"]
+load_path = "res://.godot/imported/sink.png-5e52d93ec8e9deeec5473a52f84fb5eb.s3tc.ctex"
+
+[resource]
+resource_name = "sink"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_uu0ii")
+roughness = 0.5

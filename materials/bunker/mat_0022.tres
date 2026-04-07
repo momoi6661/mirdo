@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dlhb4uwj87ky3"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_5pubt"]
+load_path = "res://.godot/imported/ceramic.png-303ee583c2d21e24b696d41355c260f1.s3tc.ctex"
+
+[resource]
+resource_name = "ceramic"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_5pubt")
+roughness = 0.5

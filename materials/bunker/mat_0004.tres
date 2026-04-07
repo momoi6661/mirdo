@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cw72jo3550kne"]
+
+[resource]
+resource_name = "wood_1"
+cull_mode = 2
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

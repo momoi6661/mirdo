@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://b78ukc7utckgv"]
+
+[ext_resource type="Texture2D" uid="uid://bdgpfydbfep64" path="res://3DModel/workshop/gas_cylinder/gas_cylinder.png" id="1_ibfsx"]
+
+[resource]
+resource_name = "gas_cylinder"
+cull_mode = 2
+albedo_texture = ExtResource("1_ibfsx")
+roughness = 0.5

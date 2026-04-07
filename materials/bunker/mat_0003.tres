@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bsxihcn0vb6rc"]
+
+[resource]
+resource_name = "white_plastic"
+cull_mode = 2
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

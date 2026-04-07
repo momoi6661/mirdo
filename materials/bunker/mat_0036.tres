@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bqe5tvqxkb2ko"]
+
+[resource]
+resource_name = "light.001"
+cull_mode = 2
+albedo_color = Color(0, 0, 0, 1)
+metallic = 1.0
+emission_enabled = true
+emission = Color(1, 1, 1, 1)
+emission_energy_multiplier = 200.0
+metadata/extras = {
+"blenderkit": {}
+}

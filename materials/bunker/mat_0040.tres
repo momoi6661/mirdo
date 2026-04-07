@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://c1lmgnmc5fpab"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_0cy0l"]
+load_path = "res://.godot/imported/double_stand.png-e9b0bad3c2e2198613d27ee399d142f1.s3tc.ctex"
+
+[resource]
+resource_name = "pale_wood"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_0cy0l")
+roughness = 0.5

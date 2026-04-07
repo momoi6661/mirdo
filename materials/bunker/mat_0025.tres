@@ -1,0 +1,12 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://0gdq4wdvwn6i"]
+
+[ext_resource type="Texture2D" uid="uid://certdauxpcrfg" path="res://3DModel/workshop/workbench/workbench.png" id="1_1hgj7"]
+
+[resource]
+resource_name = "workbench"
+cull_mode = 2
+albedo_texture = ExtResource("1_1hgj7")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

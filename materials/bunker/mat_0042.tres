@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://c12bxr718sqth"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_cf02k"]
+load_path = "res://.godot/imported/stand.png-25894ff4456f83cf042daa4eeb035700.s3tc.ctex"
+
+[resource]
+resource_name = "stand"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_cf02k")
+roughness = 0.5

@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://7ea8cn4v4rjv"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_cgq21"]
+load_path = "res://.godot/imported/grey_metal.png-fadd3bf0d36887d6b2c17097a38b10f9.s3tc.ctex"
+
+[resource]
+resource_name = "grey_metal"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_cgq21")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

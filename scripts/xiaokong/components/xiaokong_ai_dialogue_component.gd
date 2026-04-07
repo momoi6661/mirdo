@@ -14,6 +14,8 @@ signal dialogue_failed(error_text: String)
 @export var use_local_fallback_on_error: bool = true
 @export var fallback_reply_text: String = "Signal lost. Let's stay inside for now."
 @export_range(-20.0, 20.0, 0.5) var fallback_mood_delta: float = 1.0
+@export var session_id: String = "default_session"
+@export var save_slot_name: String = "manual_save"
 
 var _ai_manager: AIManager
 var _state_component: XiaokongStateComponent
@@ -54,6 +56,57 @@ func send_player_text(player_text: String, given_item: String = "") -> Dictionar
 		"payload": payload,
 	}
 
+func send_subtitle_test(test_text: String = "Subtitle debug test") -> Dictionary:
+	_refresh_refs()
+	_bind_ai_signals()
+
+	var text := test_text.strip_edges()
+	if text.is_empty():
+		text = "Subtitle debug test"
+	if _ai_manager == null:
+		return {"ok": false, "error": "ai_manager_not_found"}
+	if _request_in_flight or _ai_manager.is_requesting:
+		return {"ok": false, "error": "ai_busy"}
+
+	var clean_session_id := session_id.strip_edges()
+	if clean_session_id.is_empty():
+		clean_session_id = "default_session"
+	session_id = clean_session_id
+
+	var payload := {
+		"day": 1,
+		"time": 540,
+		"time_min": 540,
+		"session_id": clean_session_id,
+		"npc_stats": {
+			"hunger": 50,
+			"thirst": 50,
+			"mood": 50,
+			"favor": 20,
+		},
+		"player_text": text,
+		"given_item": "",
+		"context": {
+			"session_id": clean_session_id,
+			"save_slot": save_slot_name.strip_edges(),
+			"debug_subtitle_test": true,
+		},
+	}
+
+	_last_payload = payload.duplicate(true)
+	dialogue_requested.emit(payload.duplicate(true))
+	_request_in_flight = true
+	var sent := _ai_manager.send_subtitle_test_stream(text, clean_session_id)
+	if not sent:
+		_request_in_flight = false
+		return {"ok": false, "error": "request_send_failed"}
+
+	return {
+		"ok": true,
+		"payload": payload,
+		"debug": true,
+	}
+
 func _build_dialogue_payload(player_text: String, given_item: String) -> Dictionary:
 	var day_index := 1
 	var time_minutes := 0
@@ -70,10 +123,16 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 	if _state_component != null:
 		stats = _state_component.build_ai_stats()
 
+	var clean_session_id := session_id.strip_edges()
+	if clean_session_id.is_empty():
+		clean_session_id = "default_session"
+	session_id = clean_session_id
+
 	return {
 		"day": day_index,
 		"time": time_minutes,
 		"time_min": time_minutes,
+		"session_id": clean_session_id,
 		"npc_stats": stats.duplicate(true),
 		"ai_hunger": int(stats.get("hunger", 50)),
 		"ai_thirst": int(stats.get("thirst", 50)),
@@ -81,6 +140,10 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 		"ai_favor": int(stats.get("favor", 20)),
 		"player_text": player_text,
 		"given_item": given_item.strip_edges(),
+		"context": {
+			"session_id": clean_session_id,
+			"save_slot": save_slot_name.strip_edges(),
+		},
 	}
 
 func _bind_ai_signals() -> void:
@@ -109,6 +172,10 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		return
 
 	_request_in_flight = false
+	var backend_session_id := String(final_data.get("session_id", "")).strip_edges()
+	if not backend_session_id.is_empty():
+		session_id = backend_session_id
+
 	var route_summary := {}
 	if auto_apply_ai_response and _action_router != null:
 		route_summary = _action_router.apply_ai_response(final_data)
@@ -150,6 +217,18 @@ func _on_ai_error(error_text: String) -> void:
 		return
 
 	dialogue_failed.emit(error_text)
+
+func _get_custom_save_data() -> Dictionary:
+	return {
+		"session_id": session_id,
+		"save_slot_name": save_slot_name,
+	}
+
+func _load_custom_save_data(data: Dictionary) -> void:
+	if data.has("session_id"):
+		session_id = String(data["session_id"]).strip_edges()
+	if data.has("save_slot_name"):
+		save_slot_name = String(data["save_slot_name"]).strip_edges()
 
 func _extract_dialogue(data: Dictionary) -> String:
 	for key in ["dialogue", "reply", "text", "message", "summary"]:

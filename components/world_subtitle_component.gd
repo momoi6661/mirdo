@@ -4,6 +4,7 @@ class_name WorldSubtitleComponent
 signal line_finished
 signal sequence_finished
 signal queue_count_changed(count: int)
+signal face_talk_requested(enabled: bool)
 
 @export var letter_scene: PackedScene
 @export var anchor_marker_path: NodePath
@@ -13,6 +14,9 @@ signal queue_count_changed(count: int)
 @export var rotate_whole_subtitle_to_camera: bool = true
 @export var y_only_rotation: bool = true
 @export_range(-180.0, 180.0, 1.0) var yaw_offset_degrees: float = 180.0
+@export var auto_face_talk_with_subtitle: bool = true
+@export var apply_face_talk_directly: bool = false
+@export var talk_controller_path: NodePath
 @export var default_speaker: String = ""
 @export var show_speaker_prefix: bool = false
 @export_range(0.01, 1.0, 0.01) var spawn_interval: float = 0.06
@@ -60,6 +64,9 @@ var _cleanup_left: float = 0.0
 var _line_done_emitted: bool = true
 var _sequence_running: bool = false
 var _line_queue: Array[Dictionary] = []
+var _talk_controller: Node
+var _talk_state_initialized: bool = false
+var _talk_state_active: bool = false
 
 func _ready() -> void:
 	_letters_root = get_node_or_null(letters_root_path) as Node3D
@@ -70,6 +77,9 @@ func _ready() -> void:
 		push_warning("WorldSubtitleComponent requires a letter scene.")
 		return
 	_anchor = _resolve_anchor()
+	if apply_face_talk_directly:
+		_talk_controller = _resolve_talk_controller()
+	_update_face_talk_state()
 	set_process(true)
 
 func play_text(text: String, speaker: String = "") -> void:
@@ -102,6 +112,7 @@ func begin_stream(speaker: String = "") -> void:
 	_streaming = true
 	_playing = true
 	_hold_left = show_time
+	_update_face_talk_state()
 
 func push_chunk(chunk: String) -> void:
 	if chunk.is_empty():
@@ -110,6 +121,7 @@ func push_chunk(chunk: String) -> void:
 		begin_stream("")
 	_target_text += chunk
 	_hold_left = show_time
+	_update_face_talk_state()
 
 func finish_stream(final_text: String = "") -> void:
 	var cleaned := final_text.strip_edges()
@@ -120,6 +132,8 @@ func finish_stream(final_text: String = "") -> void:
 	_hold_left = show_time
 	if _effective_text().is_empty():
 		cancel_now()
+		return
+	_update_face_talk_state()
 
 func show_once(text: String, speaker: String = "") -> void:
 	begin_stream(speaker)
@@ -128,6 +142,8 @@ func show_once(text: String, speaker: String = "") -> void:
 	_hold_left = show_time
 	if _effective_text().is_empty():
 		cancel_now()
+		return
+	_update_face_talk_state()
 
 func cancel_now() -> void:
 	_playing = false
@@ -139,6 +155,7 @@ func cancel_now() -> void:
 	_hold_left = 0.0
 	_cleanup_left = 0.0
 	_clear_letters()
+	_update_face_talk_state()
 	_emit_line_finished_once()
 
 func play_sequence(sequence: WorldSubtitleSequence) -> void:
@@ -203,6 +220,7 @@ func _process(delta: float) -> void:
 		_queue_out_all()
 		_playing = false
 		_cleanup_left = queue_clear_delay
+		_update_face_talk_state()
 
 func _spawn_character(char_text: String) -> void:
 	if char_text == "\n":
@@ -362,6 +380,45 @@ func _resolve_anchor() -> Marker3D:
 	if by_dialogue_anchor != null:
 		return by_dialogue_anchor
 	return _find_marker_by_name(scene_root, "mark3d")
+
+func _resolve_talk_controller() -> Node:
+	if talk_controller_path != NodePath():
+		var by_path := get_node_or_null(talk_controller_path)
+		if by_path != null and by_path.has_method("set_face_talk_enabled"):
+			return by_path
+
+	var cursor: Node = self
+	while cursor != null:
+		if cursor.has_method("set_face_talk_enabled"):
+			return cursor
+		cursor = cursor.get_parent()
+	return null
+
+func _should_face_talk() -> bool:
+	if not auto_face_talk_with_subtitle:
+		return false
+	var has_text := not _effective_text().strip_edges().is_empty()
+	return has_text and (_playing or _streaming)
+
+func _update_face_talk_state() -> void:
+	if not auto_face_talk_with_subtitle:
+		return
+
+	var next_state := _should_face_talk()
+	if _talk_state_initialized and _talk_state_active == next_state:
+		return
+
+	_talk_state_initialized = true
+	_talk_state_active = next_state
+	face_talk_requested.emit(next_state)
+
+	if not apply_face_talk_directly:
+		return
+	if _talk_controller == null or not is_instance_valid(_talk_controller) or not _talk_controller.has_method("set_face_talk_enabled"):
+		_talk_controller = _resolve_talk_controller()
+		if _talk_controller == null:
+			return
+	_talk_controller.call("set_face_talk_enabled", next_state)
 
 func _find_marker_by_name(root_node: Node, marker_name: String) -> Marker3D:
 	if root_node == null:

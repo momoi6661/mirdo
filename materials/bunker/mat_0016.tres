@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dierwq0he5obp"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_rb26w"]
+load_path = "res://.godot/imported/metal.jpg-f551d5313a30dab8fa8afee60ccd8b24.s3tc.ctex"
+
+[resource]
+resource_name = "bunker_door"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_rb26w")
+roughness = 0.5

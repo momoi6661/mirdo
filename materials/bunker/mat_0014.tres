@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bgs5hscne6nmv"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_qw7s8"]
+load_path = "res://.godot/imported/blue_tiles.png-cc3dc44f02bf381ec9b9ff065dd06c40.s3tc.ctex"
+
+[resource]
+resource_name = "Blue_tiles"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_qw7s8")
+roughness = 0.5

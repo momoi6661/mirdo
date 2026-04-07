@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bq6amresby4mx"]
+
+[ext_resource type="Texture2D" uid="uid://bpb615piexn1x" path="res://3DModel/workshop/fuse_box/fuse_box.png" id="1_bpr81"]
+
+[resource]
+resource_name = "fuse_box"
+cull_mode = 2
+albedo_texture = ExtResource("1_bpr81")
+roughness = 0.5

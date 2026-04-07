@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://c3ecrvlpaodt4"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_4xtuv"]
+load_path = "res://.godot/imported/wall_cabinet.png-29a4c11244cc0719d5a12249ac6a7d67.s3tc.ctex"
+
+[resource]
+resource_name = "wall_cabinet"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_4xtuv")
+roughness = 0.5

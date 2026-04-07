@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://y32wl8lwgesi"]
+
+[ext_resource type="Texture2D" uid="uid://cbr8e0gl1dbbd" path="res://3DModel/workshop/rack/light_green.png" id="1_vkrkq"]
+
+[resource]
+resource_name = "rack"
+cull_mode = 2
+albedo_texture = ExtResource("1_vkrkq")
+roughness = 0.5

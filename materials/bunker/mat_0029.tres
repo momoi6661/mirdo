@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://do2es2a8sfm7e"]
+
+[ext_resource type="Texture2D" uid="uid://dfipmh7j8o6gw" path="res://3DModel/workshop/box/box.png" id="1_8eatt"]
+
+[resource]
+resource_name = "box"
+cull_mode = 2
+albedo_texture = ExtResource("1_8eatt")
+roughness = 0.5

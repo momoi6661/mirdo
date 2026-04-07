@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://bo2bbvxls8fv8"]
+
+[ext_resource type="PackedScene" uid="uid://btv0a42cgxt8g" path="res://levels/WE_test.tscn" id="1_we"]
+[ext_resource type="PackedScene" uid="uid://1n3nbac2kdrj" path="res://3DModel/bunker_scene.blend" id="2_bunker"]
+
+[node name="BunkerInstance" type="Node3D" unique_id=521220815]
+
+[node name="WorldEnvironment" parent="." unique_id=1325050260 instance=ExtResource("1_we")]
+
+[node name="BunkerScene" parent="." unique_id=1633041010 instance=ExtResource("2_bunker")]
+
+[editable path="BunkerScene"]

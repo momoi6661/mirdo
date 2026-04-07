@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://c12frwwrmv2xw"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_plh0i"]
+load_path = "res://.godot/imported/fire_extinguisher.png-fe9db601a935c515a24bea24be58cfe4.s3tc.ctex"
+
+[resource]
+resource_name = "fire_extinguisher"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_plh0i")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bwr16cedyn0vx"]
+
+[resource]
+resource_name = "door"
+cull_mode = 2
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

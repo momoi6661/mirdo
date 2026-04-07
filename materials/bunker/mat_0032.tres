@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://deftu2tyk3hw4"]
+
+[ext_resource type="Texture2D" uid="uid://boj1l66k0j0q3" path="res://3DModel/workshop/drawing/drawing_2.jpg" id="1_c4pom"]
+
+[resource]
+resource_name = "drawing_2"
+cull_mode = 2
+albedo_texture = ExtResource("1_c4pom")
+roughness = 0.5

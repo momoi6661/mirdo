@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bbsgvvyqmdkxx"]
+
+[ext_resource type="Texture2D" uid="uid://yela85o15fg7" path="res://3DModel/workshop/radiator/white_metal.png" id="1_al3mn"]
+
+[resource]
+resource_name = "radiator.001"
+cull_mode = 2
+albedo_texture = ExtResource("1_al3mn")
+roughness = 0.5

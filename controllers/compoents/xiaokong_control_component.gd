@@ -175,6 +175,10 @@ func send_dialogue_text(text: String) -> bool:
 		_set_status("Dialogue text is empty.")
 		return false
 
+	if trimmed.begins_with("/debug"):
+		var debug_text := trimmed.substr(6).strip_edges()
+		return send_debug_subtitle_test(debug_text)
+
 	if _target == null and not _deferred_bind_target():
 		_set_status("No Xiaokong target bound.")
 		return false
@@ -194,6 +198,37 @@ func send_dialogue_text(text: String) -> bool:
 		return true
 
 	_set_status("Dialogue request failed: %s" % String(result.get("error", "unknown_error")))
+	return false
+
+func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
+	var trimmed := text.strip_edges()
+	if trimmed.is_empty():
+		trimmed = "Subtitle debug test"
+
+	if _target == null and not _deferred_bind_target():
+		_set_status("No Xiaokong target bound.")
+		return false
+
+	_bind_dialogue_component_from_target()
+	if _dialogue_component == null:
+		_set_status("Dialogue component not found on target.")
+		return false
+
+	var result: Dictionary = {}
+	if _dialogue_component.has_method("send_subtitle_test"):
+		result = _dialogue_component.send_subtitle_test(trimmed)
+	else:
+		result = _dialogue_component.send_player_text(trimmed)
+
+	if bool(result.get("ok", false)):
+		_dialogue_stream_text = ""
+		_begin_subtitle_stream(subtitle_speaker_name)
+		if _panel != null and _panel.has_method("set_dialogue_reply"):
+			_panel.call("set_dialogue_reply", "(debug subtitle test...)")
+		_set_status("Debug subtitle test sent.")
+		return true
+
+	_set_status("Debug subtitle test failed: %s" % String(result.get("error", "unknown_error")))
 	return false
 
 func enqueue_subtitle_text(text: String, speaker: String = "") -> bool:

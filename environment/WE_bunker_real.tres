@@ -1,0 +1,56 @@
+[gd_resource type="Environment" format=3 uid="uid://d1jkw8urchsuj"]
+
+[ext_resource type="Texture2D" uid="uid://b1jvh1ehiaebt" path="res://textures/industrial_sunset_puresky_4k.hdr" id="1_kbote"]
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_v85bn"]
+panorama = ExtResource("1_kbote")
+
+[sub_resource type="Sky" id="Sky_pkdhh"]
+sky_material = SubResource("PanoramaSkyMaterial_v85bn")
+
+[resource]
+background_mode = 1
+background_color = Color(0.05, 0.06, 0.075, 1)
+background_intensity = 14000.0
+sky = SubResource("Sky_pkdhh")
+ambient_light_source = 2
+ambient_light_color = Color(0.26, 0.28, 0.31, 1)
+ambient_light_energy = 0.62
+reflected_light_source = 1
+tonemap_mode = 4
+tonemap_exposure = 1.16
+tonemap_white = 7.2
+ssao_enabled = true
+ssao_radius = 1.5
+ssao_intensity = 1.45
+ssil_enabled = true
+ssil_radius = 3.0
+ssil_intensity = 0.7
+sdfgi_enabled = true
+glow_enabled = true
+glow_levels/2 = 0.9
+glow_levels/3 = 0.45
+glow_levels/4 = 0.12
+glow_intensity = 0.06
+glow_strength = 0.55
+glow_bloom = 0.015
+fog_enabled = true
+fog_light_color = Color(0.62, 0.68, 0.76, 1)
+fog_light_energy = 0.62
+fog_sun_scatter = 0.08
+fog_density = 0.0013
+fog_aerial_perspective = 0.2
+fog_depth_begin = 5.0
+fog_depth_end = 56.0
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.0021
+volumetric_fog_albedo = Color(0.72, 0.78, 0.86, 1)
+volumetric_fog_anisotropy = 0.32
+volumetric_fog_length = 42.0
+volumetric_fog_detail_spread = 1.4
+volumetric_fog_ambient_inject = 0.45
+volumetric_fog_sky_affect = 0.55
+adjustment_enabled = true
+adjustment_brightness = 1.02
+adjustment_contrast = 1.03
+adjustment_saturation = 0.88

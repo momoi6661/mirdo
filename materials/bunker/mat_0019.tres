@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bxuwidiqvxq3p"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_kfe58"]
+load_path = "res://.godot/imported/metal_bat.png-01cbfbea5d3c85c51c6664f6b877aa54.s3tc.ctex"
+
+[resource]
+resource_name = "metal_bat"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_kfe58")
+roughness = 0.5
+metadata/extras = {
+"blenderkit": {}
+}

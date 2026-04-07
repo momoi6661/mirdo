@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cw7a2a5rx62s3"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_88gy8"]
+load_path = "res://.godot/imported/table_bench.png-076992c657b1d44d8d22ad5d6fa100a7.s3tc.ctex"
+
+[resource]
+resource_name = "table_bench"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_88gy8")
+roughness = 0.5

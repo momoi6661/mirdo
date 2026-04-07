@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://bndh8aatsv223"]
+
+[ext_resource type="Texture2D" uid="uid://d208en6nhhe05" path="res://3DModel/workshop/toolbox/toolbox.png" id="1_gqy44"]
+
+[resource]
+resource_name = "toolbox"
+cull_mode = 2
+albedo_texture = ExtResource("1_gqy44")
+roughness = 0.5
