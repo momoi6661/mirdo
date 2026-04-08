@@ -56,6 +56,8 @@ func disconnect_client() -> void:
 
 
 func poll(delta: float) -> void:
+	if _tcp == null:
+		return
 	_tcp.poll()
 	var status = _tcp.get_status()
 
@@ -95,7 +97,25 @@ func is_broker_connected() -> bool:
 
 
 func _try_connect() -> void:
-	_tcp.connect_to_host(_host, _port)
+	if _tcp == null:
+		return
+
+	_tcp.poll()
+	var status := _tcp.get_status()
+	if status == StreamPeerTCP.STATUS_CONNECTING or status == StreamPeerTCP.STATUS_CONNECTED:
+		return
+
+	if status != StreamPeerTCP.STATUS_NONE:
+		_tcp.disconnect_from_host()
+		_tcp.poll()
+		if _tcp.get_status() != StreamPeerTCP.STATUS_NONE:
+			return
+
+	var err := _tcp.connect_to_host(_host, _port)
+	if err == ERR_ALREADY_IN_USE:
+		return
+	if err != OK:
+		_reconnect_delay = min(_reconnect_delay * 2.0, _max_reconnect_delay)
 
 
 func _handle_disconnect() -> void:

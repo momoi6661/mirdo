@@ -1,0 +1,82 @@
+[gd_scene format=3 uid="uid://bm46b3p170ueq"]
+
+[ext_resource type="Script" uid="uid://4iqd5mcp1nut" path="res://ai/AIEditorRequestTool.gd" id="1_tool"]
+
+[node name="AIEditorRequestTool" type="Node" unique_id=1417425313]
+script = ExtResource("1_tool")
+player_text = "你好吗"
+last_request_json = "{
+	\"day\": 1,
+	\"time\": 540,
+	\"time_min\": 540,
+	\"session_id\": \"editor_session\",
+	\"npc_stats\": {
+		\"hunger\": 50,
+		\"thirst\": 50,
+		\"mood\": 50,
+		\"favor\": 20
+	},
+	\"player_text\": \"你好吗\",
+	\"given_item\": \"\",
+	\"context\": {
+		\"debug_transparent\": true,
+		\"request_source\": \"godot_editor_tool\",
+		\"source\": \"godot_editor_tool\"
+	},
+	\"max_context_turns\": 8
+}"
+last_response_json = "{
+	\"dialogue\": \"我在。今天也一起把避难所照看好。\",
+	\"emotion\": \"neutral\",
+	\"action\": \"Idle\",
+	\"stat_change\": {
+		\"hunger\": 0.0,
+		\"thirst\": 0.0,
+		\"mood\": 1.0,
+		\"favor\": 0.0
+	},
+	\"memory_tags\": [
+		\"local_fallback\",
+		\"model_error\"
+	],
+	\"session_id\": \"editor_session\",
+	\"turn_id\": 89.0,
+	\"used_skills\": [],
+	\"_debug\": {
+		\"request_echo\": {
+			\"day\": 1.0,
+			\"time\": 540.0,
+			\"time_min\": 540.0,
+			\"npc_stats\": {
+				\"hunger\": 50.0,
+				\"thirst\": 50.0,
+				\"mood\": 50.0,
+				\"favor\": 20.0
+			},
+			\"session_id\": \"editor_session\",
+			\"max_context_turns\": 8.0,
+			\"ai_hunger\": null,
+			\"ai_thirst\": null,
+			\"ai_mood\": null,
+			\"ai_favor\": null,
+			\"player_text\": \"你好吗\",
+			\"given_item\": \"\",
+			\"context\": {
+				\"debug_transparent\": true,
+				\"request_source\": \"godot_editor_tool\",
+				\"source\": \"godot_editor_tool\"
+			}
+		},
+		\"response_source\": \"local_fallback_model_error\",
+		\"model_error\": \"empty_model_content\",
+		\"chat_model\": \"gpt-5.2\",
+		\"retrieved_sources\": [
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\seed.md\",
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\survival_mechanics.md\",
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\xiaokong_persona.md\"
+		],
+		\"skill_calls\": [],
+		\"memory_summary_preview\": \"\"
+	}
+}"
+last_status = "chat_ok_200"

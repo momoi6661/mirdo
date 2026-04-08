@@ -7,6 +7,8 @@ class_name XiaokongControlComponent
 @export var subtitle_overlay_name: StringName = &"XiaokongSubtitleOverlay"
 @export var subtitle_speaker_name: String = "Xiaokong"
 @export var prefer_world_subtitle: bool = true
+@export_range(1, 24, 1) var local_stream_chunk_chars: int = 6
+@export_range(0.01, 0.3, 0.01) var local_stream_chunk_delay_sec: float = 0.04
 @export var default_target_path: NodePath = NodePath("../../../xiaokong")
 @export var target_group_name: StringName = &"Xiaokong"
 @export var ground_collision_mask: int = 1
@@ -30,6 +32,9 @@ var _dialogue_component: XiaokongAIDialogueComponent
 var _world_subtitle_component: Node
 var _subtitle_overlay: XiaokongSubtitleOverlay
 var _dialogue_stream_text: String = ""
+var _local_stream_token: int = 0
+var _last_request_payload: Dictionary = {}
+var _last_response_payload: Dictionary = {}
 
 func _ready() -> void:
 	_ensure_preview_marker()
@@ -190,6 +195,9 @@ func send_dialogue_text(text: String) -> bool:
 
 	var result = _dialogue_component.send_player_text(trimmed)
 	if bool(result.get("ok", false)):
+		_last_request_payload = result.get("payload", {}).duplicate(true) if result.get("payload", {}) is Dictionary else {}
+		if _panel != null and _panel.has_method("set_request_payload"):
+			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
 		_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
@@ -221,6 +229,9 @@ func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
 		result = _dialogue_component.send_player_text(trimmed)
 
 	if bool(result.get("ok", false)):
+		_last_request_payload = result.get("payload", {}).duplicate(true) if result.get("payload", {}) is Dictionary else {}
+		if _panel != null and _panel.has_method("set_request_payload"):
+			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
 		_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
@@ -281,6 +292,32 @@ func clear_subtitle_queue(stop_current: bool = true) -> void:
 		return
 
 	_set_status("Subtitle target has no queue API.")
+
+func probe_model_status() -> bool:
+	if _target == null and not _deferred_bind_target():
+		_set_status("No Xiaokong target bound.")
+		return false
+
+	_bind_dialogue_component_from_target()
+	if _dialogue_component == null:
+		_set_status("Dialogue component not found on target.")
+		return false
+	if not _dialogue_component.has_method("probe_model_once"):
+		_set_status("probe_model_once() is unavailable.")
+		return false
+
+	if _panel != null and _panel.has_method("set_probe_status"):
+		_panel.call("set_probe_status", "requesting...")
+
+	var ok := bool(_dialogue_component.probe_model_once())
+	if ok:
+		_set_status("Model probe sent.")
+		return true
+
+	if _panel != null and _panel.has_method("set_probe_status"):
+		_panel.call("set_probe_status", "send_failed")
+	_set_status("Model probe send failed.")
+	return false
 
 func _set_panel_open(opened: bool) -> void:
 	_panel_open = opened
@@ -471,8 +508,21 @@ func _show_subtitle_once(text: String, speaker: String) -> void:
 func _resolve_subtitle_target() -> Node:
 	_bind_world_subtitle_component_from_target()
 	if prefer_world_subtitle and _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
-		return _world_subtitle_component
+		var runtime_ready := true
+		if _world_subtitle_component.has_method("is_runtime_ready"):
+			runtime_ready = bool(_world_subtitle_component.call("is_runtime_ready"))
+		if runtime_ready:
+			return _world_subtitle_component
+
+		var reason := "world_subtitle_not_ready"
+		if _world_subtitle_component.has_method("get_runtime_block_reason"):
+			reason = String(_world_subtitle_component.call("get_runtime_block_reason"))
+		_set_status("3D subtitle unavailable, fallback to overlay (%s)." % reason)
 	_ensure_subtitle_overlay()
+	if _subtitle_overlay != null and is_instance_valid(_subtitle_overlay):
+		return _subtitle_overlay
+	if _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
+		return _world_subtitle_component
 	return _subtitle_overlay
 
 func _sync_target_path_to_panel() -> void:
@@ -511,6 +561,12 @@ func _bind_dialogue_component_from_target() -> void:
 		var err_cb := Callable(self, "_on_dialogue_failed")
 		if _dialogue_component.dialogue_failed.is_connected(err_cb):
 			_dialogue_component.dialogue_failed.disconnect(err_cb)
+		var probe_done_cb := Callable(self, "_on_model_probe_completed")
+		if _dialogue_component.model_probe_completed.is_connected(probe_done_cb):
+			_dialogue_component.model_probe_completed.disconnect(probe_done_cb)
+		var probe_err_cb := Callable(self, "_on_model_probe_failed")
+		if _dialogue_component.model_probe_failed.is_connected(probe_err_cb):
+			_dialogue_component.model_probe_failed.disconnect(probe_err_cb)
 
 	_dialogue_component = found
 	if _dialogue_component == null:
@@ -525,6 +581,12 @@ func _bind_dialogue_component_from_target() -> void:
 	var err_cb := Callable(self, "_on_dialogue_failed")
 	if not _dialogue_component.dialogue_failed.is_connected(err_cb):
 		_dialogue_component.dialogue_failed.connect(err_cb)
+	var probe_done_cb := Callable(self, "_on_model_probe_completed")
+	if not _dialogue_component.model_probe_completed.is_connected(probe_done_cb):
+		_dialogue_component.model_probe_completed.connect(probe_done_cb)
+	var probe_err_cb := Callable(self, "_on_model_probe_failed")
+	if not _dialogue_component.model_probe_failed.is_connected(probe_err_cb):
+		_dialogue_component.model_probe_failed.connect(probe_err_cb)
 
 func _bind_world_subtitle_component_from_target() -> void:
 	if _target == null:
@@ -561,6 +623,7 @@ func _find_dialogue_component_recursive(root_node: Node) -> XiaokongAIDialogueCo
 	return null
 
 func _on_dialogue_chunk(chunk: String) -> void:
+	_cancel_local_stream()
 	_dialogue_stream_text += chunk
 	_push_subtitle_chunk(chunk)
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
@@ -568,16 +631,90 @@ func _on_dialogue_chunk(chunk: String) -> void:
 	_set_status("Dialogue streaming...")
 
 func _on_dialogue_completed(report: Dictionary) -> void:
+	var had_stream_chunk := not _dialogue_stream_text.is_empty()
 	var reply := String(report.get("dialogue", "")).strip_edges()
-	_dialogue_stream_text = ""
-	_finish_subtitle_stream(reply)
+	if reply.is_empty():
+		var ai_data_value: Variant = report.get("ai_data", {})
+		if ai_data_value is Dictionary:
+			var ai_data := ai_data_value as Dictionary
+			for key in ["dialogue", "reply", "text", "message", "summary"]:
+				var value := String(ai_data.get(key, "")).strip_edges()
+				if not value.is_empty():
+					reply = value
+					break
+	if reply.is_empty():
+		reply = "……"
+	_last_response_payload = report.duplicate(true)
+	if _panel != null and _panel.has_method("set_response_payload"):
+		_panel.call("set_response_payload", _last_response_payload)
+
+	if had_stream_chunk:
+		_dialogue_stream_text = ""
+		_finish_subtitle_stream(reply)
+	else:
+		_start_local_stream_from_full_text(reply)
+
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
 		_panel.call("set_dialogue_reply", reply)
 	_set_status("Dialogue completed.")
 
 func _on_dialogue_failed(error_text: String) -> void:
+	_cancel_local_stream()
 	_dialogue_stream_text = ""
+	_last_response_payload = {"ok": false, "error": error_text}
+	if _panel != null and _panel.has_method("set_response_payload"):
+		_panel.call("set_response_payload", _last_response_payload)
 	_show_subtitle_once("[error] %s" % error_text, "System")
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
 		_panel.call("set_dialogue_reply", "[error] %s" % error_text)
 	_set_status("Dialogue failed: %s" % error_text)
+
+func _on_model_probe_completed(response: Dictionary) -> void:
+	_last_response_payload = response.duplicate(true)
+	if _panel != null and _panel.has_method("set_response_payload"):
+		_panel.call("set_response_payload", _last_response_payload)
+
+	var status := String(response.get("status", "unknown")).strip_edges()
+	var ok := bool(response.get("ok", false))
+	if _panel != null and _panel.has_method("set_probe_status"):
+		_panel.call("set_probe_status", "%s (ok=%s)" % [status, str(ok)])
+	_set_status("Model probe: %s (ok=%s)." % [status, str(ok)])
+
+func _on_model_probe_failed(error_text: String) -> void:
+	_last_response_payload = {"ok": false, "error": error_text}
+	if _panel != null and _panel.has_method("set_response_payload"):
+		_panel.call("set_response_payload", _last_response_payload)
+	if _panel != null and _panel.has_method("set_probe_status"):
+		_panel.call("set_probe_status", "error: %s" % error_text)
+	_set_status("Model probe failed: %s" % error_text)
+
+func _start_local_stream_from_full_text(text: String) -> void:
+	_cancel_local_stream()
+	_local_stream_token += 1
+	var token := _local_stream_token
+	_dialogue_stream_text = ""
+	_begin_subtitle_stream(subtitle_speaker_name)
+	call_deferred("_run_local_stream_async", text, token)
+
+func _run_local_stream_async(text: String, token: int) -> void:
+	var safe_text := text.strip_edges()
+	if safe_text.is_empty():
+		return
+	var step := maxi(1, local_stream_chunk_chars)
+	var delay_sec := maxf(0.01, local_stream_chunk_delay_sec)
+	for i in range(0, safe_text.length(), step):
+		if token != _local_stream_token:
+			return
+		var chunk := safe_text.substr(i, step)
+		_dialogue_stream_text += chunk
+		_push_subtitle_chunk(chunk)
+		if _panel != null and _panel.has_method("set_dialogue_reply"):
+			_panel.call("set_dialogue_reply", _dialogue_stream_text)
+		await get_tree().create_timer(delay_sec).timeout
+	if token != _local_stream_token:
+		return
+	_dialogue_stream_text = ""
+	_finish_subtitle_stream(safe_text)
+
+func _cancel_local_stream() -> void:
+	_local_stream_token += 1

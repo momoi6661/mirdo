@@ -82,6 +82,16 @@ func _ready() -> void:
 	_update_face_talk_state()
 	set_process(true)
 
+func is_runtime_ready() -> bool:
+	return _letters_root != null and letter_scene != null
+
+func get_runtime_block_reason() -> String:
+	if _letters_root == null:
+		return "missing_letters_root:%s" % String(letters_root_path)
+	if letter_scene == null:
+		return "missing_letter_scene"
+	return ""
+
 func play_text(text: String, speaker: String = "") -> void:
 	show_once(text, speaker)
 

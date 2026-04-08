@@ -56,6 +56,11 @@ var _drop_timer: float = 0.0
 var _is_holding_drop: bool = false
 
 func _input(event):
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ALT:
+		_toggle_mouse_capture_mode()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("sprint"):
 		_is_sprinting = !_is_sprinting		
 	
@@ -73,6 +78,12 @@ func _input(event):
 				pickup_handler.throw_object() # 长按：用力抛出
 		_is_holding_drop = false
 		_drop_timer = 0.0
+
+func _toggle_mouse_capture_mode() -> void:
+	if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _process(delta):
 	# 只要按住 T 键，就累加时间

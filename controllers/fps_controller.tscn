@@ -247,6 +247,7 @@ interaction_hud = NodePath("../../Control/FPSInteractionHUD")
 
 [node name="XiaokongControlComponent" type="Node" parent="Components" unique_id=1029384756]
 script = ExtResource("19_xk_ctrl")
+default_target_path = NodePath("../../../Xiaokong1/xiaokong")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=3143502]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
