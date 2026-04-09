@@ -319,5 +319,11 @@ func set_probe_status(text: String) -> void:
 	if probe_status_label != null:
 		probe_status_label.text = "Probe: %s" % text
 
+func focus_dialogue_input() -> void:
+	if dialogue_input == null:
+		return
+	dialogue_input.grab_focus()
+	dialogue_input.caret_column = dialogue_input.text.length()
+
 func _pretty_json(value: Variant) -> String:
 	return JSON.stringify(value, "\t", false)

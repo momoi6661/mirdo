@@ -22,6 +22,8 @@ func _init_states():
 
 func _process(delta: float) -> void:
 	if is_locked or not CURRENT_STATE: return
+	if _is_ui_text_input_focused():
+		return
 	CURRENT_STATE.update(delta)
 
 func _physics_process(delta: float):
@@ -58,3 +60,18 @@ func change_state(new_state_name: StringName):
 		CURRENT_STATE=new_state
 	elif new_state == null:
 		push_warning("StateMachine: State " + new_state_name + " not found.")
+
+func _is_ui_text_input_focused() -> bool:
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var focus_owner := viewport.gui_get_focus_owner()
+	if focus_owner == null:
+		return false
+	if focus_owner is LineEdit:
+		return true
+	if focus_owner is TextEdit:
+		return true
+	if focus_owner is CodeEdit:
+		return true
+	return false

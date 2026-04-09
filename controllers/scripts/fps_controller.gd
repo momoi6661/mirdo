@@ -47,6 +47,8 @@ var _camera_rotation : Vector3
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_ui_text_input_focused():
+		return
 	_mouse_input = event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
 	if _mouse_input:
 		_rotation_input = -event.relative.x * MOUSE_SENSITIVITY
@@ -56,6 +58,12 @@ var _drop_timer: float = 0.0
 var _is_holding_drop: bool = false
 
 func _input(event):
+	if is_ui_text_input_focused():
+		if event.is_action_released("drop_item"):
+			_is_holding_drop = false
+			_drop_timer = 0.0
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ALT:
 		_toggle_mouse_capture_mode()
 		get_viewport().set_input_as_handled()
@@ -143,9 +151,34 @@ func _update_camera(delta):
 	_tilt_input = 0.0
 
 func get_input_direction():
+	if is_ui_text_input_focused():
+		return Vector3.ZERO
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	return direction
+
+func is_ui_text_input_focused() -> bool:
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var focus_owner := viewport.gui_get_focus_owner()
+	if focus_owner == null:
+		return false
+	var control := focus_owner as Control
+	if control == null:
+		return false
+	return _is_text_input_control(control)
+
+func _is_text_input_control(control: Control) -> bool:
+	if control == null:
+		return false
+	if control is LineEdit:
+		return true
+	if control is TextEdit:
+		return true
+	if control is CodeEdit:
+		return true
+	return false
 	
 func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target: float, delta: float, direction: Vector3 = Vector3.ZERO):
 	if direction == Vector3.ZERO:

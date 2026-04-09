@@ -1,16 +1,23 @@
 extends Node
 class_name XiaokongControlComponent
 
+signal subtitle_stream_begin_requested(speaker: String)
+signal subtitle_stream_chunk_requested(chunk: String)
+signal subtitle_stream_done_requested(final_text: String)
+
 @export var camera_path: NodePath = NodePath("../../Marker3D/CameraOffset/Camera3D")
 @export var panel_path: NodePath = NodePath("../../Control/XiaokongControlPanel")
 @export var subtitle_root_path: NodePath = NodePath("../../Control")
 @export var subtitle_overlay_name: StringName = &"XiaokongSubtitleOverlay"
 @export var subtitle_speaker_name: String = "Xiaokong"
+@export var error_subtitle_text: String = "发生了一些错误，请稍后再试。"
+@export var error_subtitle_speaker: String = "系统"
 @export var prefer_world_subtitle: bool = true
 @export_range(1, 24, 1) var local_stream_chunk_chars: int = 6
 @export_range(0.01, 0.3, 0.01) var local_stream_chunk_delay_sec: float = 0.04
 @export var default_target_path: NodePath = NodePath("../../../xiaokong")
 @export var target_group_name: StringName = &"Xiaokong"
+@export_range(0.2, 10.0, 0.1) var auto_rebind_interval_sec: float = 1.5
 @export var ground_collision_mask: int = 1
 @export var ray_length: float = 200.0
 @export var marker_height: float = 0.03
@@ -32,9 +39,12 @@ var _dialogue_component: XiaokongAIDialogueComponent
 var _world_subtitle_component: Node
 var _subtitle_overlay: XiaokongSubtitleOverlay
 var _dialogue_stream_text: String = ""
+var _subtitle_stream_finished_early: bool = false
 var _local_stream_token: int = 0
 var _last_request_payload: Dictionary = {}
 var _last_response_payload: Dictionary = {}
+var _auto_rebind_elapsed: float = 0.0
+var _subtitle_signal_target: Node
 
 func _ready() -> void:
 	_ensure_preview_marker()
@@ -48,7 +58,15 @@ func _ready() -> void:
 	set_process(true)
 	set_process_unhandled_input(true)
 
+func _exit_tree() -> void:
+	_disconnect_subtitle_signal_target()
+
 func _process(_delta: float) -> void:
+	_auto_rebind_elapsed += _delta
+	if _auto_rebind_elapsed >= auto_rebind_interval_sec:
+		_auto_rebind_elapsed = 0.0
+		_refresh_target_binding_if_needed()
+
 	if not _pick_navigation_enabled:
 		return
 
@@ -58,6 +76,18 @@ func _process(_delta: float) -> void:
 		_cancel_preview()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_ui_text_input_focused():
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if _try_release_ui_text_focus_by_click(event.position):
+				get_viewport().set_input_as_handled()
+			return
+		if event is InputEventKey:
+			if event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+				_clear_ui_text_focus()
+				_set_panel_open(false)
+			get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
 		_set_panel_open(not _panel_open)
 		get_viewport().set_input_as_handled()
@@ -199,6 +229,7 @@ func send_dialogue_text(text: String) -> bool:
 		if _panel != null and _panel.has_method("set_request_payload"):
 			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
+		_subtitle_stream_finished_early = false
 		_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
 			_panel.call("set_dialogue_reply", "(thinking...)")
@@ -233,6 +264,7 @@ func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
 		if _panel != null and _panel.has_method("set_request_payload"):
 			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
+		_subtitle_stream_finished_early = false
 		_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
 			_panel.call("set_dialogue_reply", "(debug subtitle test...)")
@@ -327,8 +359,11 @@ func _set_panel_open(opened: bool) -> void:
 
 	if _panel_open:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if _panel.has_method("focus_dialogue_input"):
+			_panel.call_deferred("focus_dialogue_input")
 		_set_status("Xiaokong panel opened.")
 	else:
+		_clear_ui_text_focus()
 		if not _pick_navigation_enabled:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		_set_status("Xiaokong panel closed.")
@@ -352,6 +387,26 @@ func _deferred_bind_target() -> bool:
 		_sync_target_path_to_panel()
 		return true
 	return bind_target_by_path(String(default_target_path))
+
+func _refresh_target_binding_if_needed() -> void:
+	if _target == null or not is_instance_valid(_target):
+		var candidate := _find_by_group()
+		if candidate == null:
+			var fallback_path := String(default_target_path).strip_edges()
+			if not fallback_path.is_empty():
+				var by_path := get_node_or_null(NodePath(fallback_path))
+				if by_path != null:
+					candidate = _resolve_supported_target(by_path)
+		if candidate == null:
+			return
+		_target = candidate
+		_set_status("Auto-bound Xiaokong runtime target: %s" % String(_target.get_path()))
+		_sync_target_path_to_panel()
+
+	if _dialogue_component == null or not is_instance_valid(_dialogue_component):
+		_bind_dialogue_component_from_target()
+	if _world_subtitle_component == null or not is_instance_valid(_world_subtitle_component):
+		_bind_world_subtitle_component_from_target()
 
 func _update_preview_from_screen(screen_pos: Vector2) -> bool:
 	if _camera == null:
@@ -487,17 +542,33 @@ func _ensure_subtitle_overlay() -> void:
 
 func _begin_subtitle_stream(speaker: String) -> void:
 	var target := _resolve_subtitle_target()
-	if target != null and target.has_method("begin_stream"):
+	if target == null:
+		return
+	if target.has_method("clear_queue"):
+		target.call("clear_queue", true)
+	elif target.has_method("cancel_now"):
+		target.call("cancel_now")
+	if subtitle_stream_begin_requested.get_connections().size() > 0:
+		subtitle_stream_begin_requested.emit(speaker)
+	elif target.has_method("begin_stream"):
 		target.call("begin_stream", speaker)
 
 func _push_subtitle_chunk(chunk: String) -> void:
 	var target := _resolve_subtitle_target()
-	if target != null and target.has_method("push_chunk"):
+	if target == null:
+		return
+	if subtitle_stream_chunk_requested.get_connections().size() > 0:
+		subtitle_stream_chunk_requested.emit(chunk)
+	elif target.has_method("push_chunk"):
 		target.call("push_chunk", chunk)
 
 func _finish_subtitle_stream(final_text: String) -> void:
 	var target := _resolve_subtitle_target()
-	if target != null and target.has_method("finish_stream"):
+	if target == null:
+		return
+	if subtitle_stream_done_requested.get_connections().size() > 0:
+		subtitle_stream_done_requested.emit(final_text)
+	elif target.has_method("finish_stream"):
 		target.call("finish_stream", final_text)
 
 func _show_subtitle_once(text: String, speaker: String) -> void:
@@ -505,14 +576,30 @@ func _show_subtitle_once(text: String, speaker: String) -> void:
 	if target != null and target.has_method("show_once"):
 		target.call("show_once", text, speaker)
 
+func _clear_subtitle_immediately() -> void:
+	var target := _resolve_subtitle_target()
+	if target == null:
+		return
+	if target.has_method("clear_queue"):
+		target.call("clear_queue", true)
+		return
+	if target.has_method("cancel_now"):
+		target.call("cancel_now")
+		return
+	if target.has_method("finish_stream"):
+		target.call("finish_stream", "")
+
 func _resolve_subtitle_target() -> Node:
 	_bind_world_subtitle_component_from_target()
+	var resolved: Node = null
 	if prefer_world_subtitle and _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
 		var runtime_ready := true
 		if _world_subtitle_component.has_method("is_runtime_ready"):
 			runtime_ready = bool(_world_subtitle_component.call("is_runtime_ready"))
 		if runtime_ready:
-			return _world_subtitle_component
+			resolved = _world_subtitle_component
+			_rebind_subtitle_signal_target(resolved)
+			return resolved
 
 		var reason := "world_subtitle_not_ready"
 		if _world_subtitle_component.has_method("get_runtime_block_reason"):
@@ -520,10 +607,54 @@ func _resolve_subtitle_target() -> Node:
 		_set_status("3D subtitle unavailable, fallback to overlay (%s)." % reason)
 	_ensure_subtitle_overlay()
 	if _subtitle_overlay != null and is_instance_valid(_subtitle_overlay):
-		return _subtitle_overlay
-	if _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
-		return _world_subtitle_component
-	return _subtitle_overlay
+		resolved = _subtitle_overlay
+	elif _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
+		resolved = _world_subtitle_component
+	else:
+		resolved = _subtitle_overlay
+	_rebind_subtitle_signal_target(resolved)
+	return resolved
+
+func _rebind_subtitle_signal_target(target: Node) -> void:
+	if target == _subtitle_signal_target and target != null and is_instance_valid(target):
+		return
+	_disconnect_subtitle_signal_target()
+	_subtitle_signal_target = target
+	if _subtitle_signal_target == null or not is_instance_valid(_subtitle_signal_target):
+		return
+
+	var begin_cb := Callable(_subtitle_signal_target, "begin_stream")
+	if _subtitle_signal_target.has_method("begin_stream") and not subtitle_stream_begin_requested.is_connected(begin_cb):
+		subtitle_stream_begin_requested.connect(begin_cb)
+
+	var chunk_cb := Callable(_subtitle_signal_target, "push_chunk")
+	if _subtitle_signal_target.has_method("push_chunk") and not subtitle_stream_chunk_requested.is_connected(chunk_cb):
+		subtitle_stream_chunk_requested.connect(chunk_cb)
+
+	var done_cb := Callable(_subtitle_signal_target, "finish_stream")
+	if _subtitle_signal_target.has_method("finish_stream") and not subtitle_stream_done_requested.is_connected(done_cb):
+		subtitle_stream_done_requested.connect(done_cb)
+
+func _disconnect_subtitle_signal_target() -> void:
+	if _subtitle_signal_target == null:
+		return
+	if not is_instance_valid(_subtitle_signal_target):
+		_subtitle_signal_target = null
+		return
+
+	var begin_cb := Callable(_subtitle_signal_target, "begin_stream")
+	if subtitle_stream_begin_requested.is_connected(begin_cb):
+		subtitle_stream_begin_requested.disconnect(begin_cb)
+
+	var chunk_cb := Callable(_subtitle_signal_target, "push_chunk")
+	if subtitle_stream_chunk_requested.is_connected(chunk_cb):
+		subtitle_stream_chunk_requested.disconnect(chunk_cb)
+
+	var done_cb := Callable(_subtitle_signal_target, "finish_stream")
+	if subtitle_stream_done_requested.is_connected(done_cb):
+		subtitle_stream_done_requested.disconnect(done_cb)
+
+	_subtitle_signal_target = null
 
 func _sync_target_path_to_panel() -> void:
 	if _panel != null and _panel.has_method("refresh_target_path"):
@@ -555,6 +686,9 @@ func _bind_dialogue_component_from_target() -> void:
 		var chunk_cb := Callable(self, "_on_dialogue_chunk")
 		if _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
 			_dialogue_component.dialogue_chunk_received.disconnect(chunk_cb)
+		var stream_done_cb := Callable(self, "_on_dialogue_stream_finished")
+		if _dialogue_component.dialogue_stream_finished.is_connected(stream_done_cb):
+			_dialogue_component.dialogue_stream_finished.disconnect(stream_done_cb)
 		var done_cb := Callable(self, "_on_dialogue_completed")
 		if _dialogue_component.dialogue_completed.is_connected(done_cb):
 			_dialogue_component.dialogue_completed.disconnect(done_cb)
@@ -575,6 +709,9 @@ func _bind_dialogue_component_from_target() -> void:
 	var chunk_cb := Callable(self, "_on_dialogue_chunk")
 	if not _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
 		_dialogue_component.dialogue_chunk_received.connect(chunk_cb)
+	var stream_done_cb := Callable(self, "_on_dialogue_stream_finished")
+	if not _dialogue_component.dialogue_stream_finished.is_connected(stream_done_cb):
+		_dialogue_component.dialogue_stream_finished.connect(stream_done_cb)
 	var done_cb := Callable(self, "_on_dialogue_completed")
 	if not _dialogue_component.dialogue_completed.is_connected(done_cb):
 		_dialogue_component.dialogue_completed.connect(done_cb)
@@ -630,6 +767,20 @@ func _on_dialogue_chunk(chunk: String) -> void:
 		_panel.call("set_dialogue_reply", _dialogue_stream_text)
 	_set_status("Dialogue streaming...")
 
+func _on_dialogue_stream_finished(dialogue_text: String) -> void:
+	if _subtitle_stream_finished_early:
+		return
+	if _dialogue_stream_text.strip_edges().is_empty():
+		return
+	var final_text := dialogue_text.strip_edges()
+	if final_text.is_empty():
+		final_text = _dialogue_stream_text.strip_edges()
+	if final_text.is_empty():
+		return
+	_subtitle_stream_finished_early = true
+	_finish_subtitle_stream(final_text)
+	_set_status("Dialogue text completed, waiting action...")
+
 func _on_dialogue_completed(report: Dictionary) -> void:
 	var had_stream_chunk := not _dialogue_stream_text.is_empty()
 	var reply := String(report.get("dialogue", "")).strip_edges()
@@ -650,7 +801,9 @@ func _on_dialogue_completed(report: Dictionary) -> void:
 
 	if had_stream_chunk:
 		_dialogue_stream_text = ""
-		_finish_subtitle_stream(reply)
+		if not _subtitle_stream_finished_early:
+			_finish_subtitle_stream(reply)
+		_subtitle_stream_finished_early = false
 	else:
 		_start_local_stream_from_full_text(reply)
 
@@ -661,13 +814,23 @@ func _on_dialogue_completed(report: Dictionary) -> void:
 func _on_dialogue_failed(error_text: String) -> void:
 	_cancel_local_stream()
 	_dialogue_stream_text = ""
+	_subtitle_stream_finished_early = false
+	_clear_subtitle_immediately()
+	var safe_error_text := error_subtitle_text.strip_edges()
+	if safe_error_text.is_empty():
+		safe_error_text = "发生了一些错误，请稍后再试。"
+	var safe_error_speaker := error_subtitle_speaker.strip_edges()
+	if safe_error_speaker.is_empty():
+		safe_error_speaker = "系统"
+	_show_subtitle_once(safe_error_text, safe_error_speaker)
+
 	_last_response_payload = {"ok": false, "error": error_text}
 	if _panel != null and _panel.has_method("set_response_payload"):
 		_panel.call("set_response_payload", _last_response_payload)
-	_show_subtitle_once("[error] %s" % error_text, "System")
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
-		_panel.call("set_dialogue_reply", "[error] %s" % error_text)
-	_set_status("Dialogue failed: %s" % error_text)
+		_panel.call("set_dialogue_reply", safe_error_text)
+	_set_status("Dialogue failed.")
+	push_warning("Dialogue failed: %s" % error_text)
 
 func _on_model_probe_completed(response: Dictionary) -> void:
 	_last_response_payload = response.duplicate(true)
@@ -718,3 +881,50 @@ func _run_local_stream_async(text: String, token: int) -> void:
 
 func _cancel_local_stream() -> void:
 	_local_stream_token += 1
+
+func _is_ui_text_input_focused() -> bool:
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var focus_owner := viewport.gui_get_focus_owner()
+	var control := focus_owner as Control
+	if control == null:
+		return false
+	return _is_text_input_control(control)
+
+func _is_text_input_control(control: Control) -> bool:
+	if control == null:
+		return false
+	if control is LineEdit:
+		return true
+	if control is TextEdit:
+		return true
+	if control is CodeEdit:
+		return true
+	return false
+
+func _clear_ui_text_focus() -> void:
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var focus_owner := viewport.gui_get_focus_owner()
+	var control := focus_owner as Control
+	if control == null:
+		return
+	if _is_text_input_control(control):
+		control.release_focus()
+
+func _try_release_ui_text_focus_by_click(screen_pos: Vector2) -> bool:
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var focus_owner := viewport.gui_get_focus_owner()
+	var control := focus_owner as Control
+	if control == null:
+		return false
+	if not _is_text_input_control(control):
+		return false
+	if control.get_global_rect().has_point(screen_pos):
+		return false
+	control.release_focus()
+	return true

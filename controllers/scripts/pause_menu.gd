@@ -149,6 +149,8 @@ func _on_exit_pressed() -> void:
 	get_tree().quit()
 
 func _input(event: InputEvent) -> void:
+	if _is_ui_text_input_focused():
+		return
 	if event.is_action_pressed("ui_cancel"):
 		if visible:
 			emit_signal("continue_requested")
@@ -156,3 +158,18 @@ func _input(event: InputEvent) -> void:
 		else:
 			# 允许在测试时按 ESC 呼出菜单
 			show_menu()
+
+func _is_ui_text_input_focused() -> bool:
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	var focus_owner := viewport.gui_get_focus_owner()
+	if focus_owner == null:
+		return false
+	if focus_owner is LineEdit:
+		return true
+	if focus_owner is TextEdit:
+		return true
+	if focus_owner is CodeEdit:
+		return true
+	return false

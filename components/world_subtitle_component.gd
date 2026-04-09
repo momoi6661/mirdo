@@ -19,11 +19,23 @@ signal face_talk_requested(enabled: bool)
 @export var talk_controller_path: NodePath
 @export var default_speaker: String = ""
 @export var show_speaker_prefix: bool = false
-@export_range(0.01, 1.0, 0.01) var spawn_interval: float = 0.06
+@export_range(0.005, 1.0, 0.005) var spawn_interval: float = 0.05
+@export_range(1, 24, 1) var max_chars_per_frame: int = 1
+@export var instant_reveal_on_stream_chunk: bool = false
 @export_range(0.1, 8.0, 0.1) var show_time: float = 2.2
 @export var letter_size: Vector2 = Vector2(0.15, 0.15)
 @export_range(1, 100, 1) var line_letter_max: int = 18
 @export_range(0.1, 3.0, 0.05) var letter_spacing: float = 1.0
+@export_range(0.8, 3.0, 0.05) var line_spacing: float = 1.15
+@export var auto_page_long_text: bool = true
+@export_range(8, 200, 1) var max_chars_per_page: int = 34
+@export var prefer_sentence_break_split: bool = true
+@export var typing_sfx_enabled: bool = true
+@export var typing_sfx_stream: AudioStream = preload("res://Audio/pausemenu/click2.ogg")
+@export_range(-40.0, 12.0, 0.5) var typing_sfx_volume_db: float = -14.0
+@export_range(0.01, 0.3, 0.005) var typing_sfx_min_interval_sec: float = 0.04
+@export_range(0.8, 1.4, 0.01) var typing_sfx_pitch_min: float = 0.96
+@export_range(0.8, 1.6, 0.01) var typing_sfx_pitch_max: float = 1.06
 @export_range(-1.0, 3.0, 0.01) var vertical_offset: float = 0.0
 @export_range(0.2, 4.0, 0.1) var queue_clear_delay: float = 2.1
 @export var sequence_resource: WorldSubtitleSequence
@@ -67,6 +79,8 @@ var _line_queue: Array[Dictionary] = []
 var _talk_controller: Node
 var _talk_state_initialized: bool = false
 var _talk_state_active: bool = false
+var _typing_sfx_player: AudioStreamPlayer
+var _typing_sfx_elapsed: float = 999.0
 
 func _ready() -> void:
 	_letters_root = get_node_or_null(letters_root_path) as Node3D
@@ -79,6 +93,7 @@ func _ready() -> void:
 	_anchor = _resolve_anchor()
 	if apply_face_talk_directly:
 		_talk_controller = _resolve_talk_controller()
+	_ensure_typing_sfx_player()
 	_update_face_talk_state()
 	set_process(true)
 
@@ -99,10 +114,13 @@ func enqueue_text(text: String, speaker: String = "") -> int:
 	var cleaned := text.strip_edges()
 	if cleaned.is_empty():
 		return _line_queue.size()
-	_line_queue.append({
-		"text": cleaned,
-		"speaker": speaker.strip_edges(),
-	})
+	var speaker_text := speaker.strip_edges()
+	var pages := _split_text_to_pages(cleaned)
+	for page in pages:
+		_line_queue.append({
+			"text": page,
+			"speaker": speaker_text,
+		})
 	_emit_queue_count()
 	_try_start_next_queued_line()
 	return _line_queue.size()
@@ -131,12 +149,16 @@ func push_chunk(chunk: String) -> void:
 		begin_stream("")
 	_target_text += chunk
 	_hold_left = show_time
+	if instant_reveal_on_stream_chunk:
+		_render_all_available_text_now()
 	_update_face_talk_state()
 
 func finish_stream(final_text: String = "") -> void:
 	var cleaned := final_text.strip_edges()
+	var source_text := _target_text
 	if not cleaned.is_empty():
-		_target_text = cleaned
+		source_text = cleaned
+	_apply_text_with_auto_paging(source_text, true)
 	_streaming = false
 	_playing = true
 	_hold_left = show_time
@@ -147,7 +169,7 @@ func finish_stream(final_text: String = "") -> void:
 
 func show_once(text: String, speaker: String = "") -> void:
 	begin_stream(speaker)
-	_target_text = text
+	_apply_text_with_auto_paging(text, true)
 	_streaming = false
 	_hold_left = show_time
 	if _effective_text().is_empty():
@@ -196,6 +218,7 @@ func _play_sequence_async(sequence: WorldSubtitleSequence) -> void:
 func _process(delta: float) -> void:
 	if _letters_root == null:
 		return
+	_typing_sfx_elapsed += delta
 
 	_sync_to_anchor()
 	_sync_rotation_to_camera()
@@ -203,7 +226,11 @@ func _process(delta: float) -> void:
 	if _cleanup_left > 0.0:
 		_cleanup_left = maxf(0.0, _cleanup_left - delta)
 		_purge_dead_letters()
+		_update_face_talk_state()
 		if _cleanup_left <= 0.0:
+			_target_text = ""
+			_speaker_text = ""
+			_update_face_talk_state()
 			_emit_line_finished_once()
 		return
 
@@ -215,16 +242,21 @@ func _process(delta: float) -> void:
 	var full_length := full_text.length()
 	if _displayed_count < full_length:
 		_spawn_timer += delta
-		while _spawn_timer >= spawn_interval and _displayed_count < full_length:
+		var safe_max_chars_per_frame := 1 if _streaming else maxi(1, max_chars_per_frame)
+		var spawned_this_frame := 0
+		while _spawn_timer >= spawn_interval and _displayed_count < full_length and spawned_this_frame < safe_max_chars_per_frame:
 			_spawn_timer -= spawn_interval
 			var next_char := full_text.substr(_displayed_count, 1)
 			_spawn_character(next_char)
 			_displayed_count += 1
+			spawned_this_frame += 1
+		_update_face_talk_state()
 		return
 
 	if _streaming:
 		return
 
+	_update_face_talk_state()
 	_hold_left = maxf(0.0, _hold_left - delta)
 	if _hold_left <= 0.0:
 		_queue_out_all()
@@ -252,6 +284,7 @@ func _spawn_character(char_text: String) -> void:
 		"id": letter_node.get_instance_id(),
 		"render_index": _active_letters.size(),
 	})
+	_play_typing_sfx(char_text)
 	_relayout_letters()
 
 func _queue_out_all() -> void:
@@ -319,6 +352,125 @@ func _reset_line_state() -> void:
 	_cleanup_left = 0.0
 	_hold_left = show_time
 	_line_done_emitted = false
+	_typing_sfx_elapsed = typing_sfx_min_interval_sec
+
+func _render_all_available_text_now() -> void:
+	var full_text := _effective_text()
+	var full_length := full_text.length()
+	while _displayed_count < full_length:
+		var next_char := full_text.substr(_displayed_count, 1)
+		_spawn_character(next_char)
+		_displayed_count += 1
+	_spawn_timer = 0.0
+
+func _apply_text_with_auto_paging(source_text: String, queue_after_current: bool) -> void:
+	var pages := _split_text_to_pages(source_text)
+	if pages.is_empty():
+		_target_text = ""
+		return
+	_target_text = pages[0]
+	if pages.size() <= 1:
+		return
+	var speaker_text := _speaker_text
+	var start_idx := pages.size() - 1
+	while start_idx >= 1:
+		_line_queue.insert(0, {
+			"text": pages[start_idx],
+			"speaker": speaker_text,
+		})
+		start_idx -= 1
+	if queue_after_current:
+		_emit_queue_count()
+
+func _split_text_to_pages(text: String) -> Array[String]:
+	var cleaned := text.strip_edges()
+	if cleaned.is_empty():
+		return []
+	if not auto_page_long_text:
+		return [cleaned]
+
+	var normalized := cleaned.replace("\r\n", "\n").replace("\r", "\n")
+	var limit := maxi(8, max_chars_per_page)
+	if normalized.length() <= limit:
+		return [normalized]
+
+	var pages: Array[String] = []
+	var current := ""
+	var current_len := 0
+	var hard_cap := limit + maxi(6, int(float(limit) * 0.25))
+
+	for i in range(normalized.length()):
+		var ch := normalized.substr(i, 1)
+		if ch == "\n":
+			var line_page := current.strip_edges()
+			if not line_page.is_empty():
+				pages.append(line_page)
+			current = ""
+			current_len = 0
+			continue
+
+		current += ch
+		current_len += 1
+
+		var end_of_text := (i + 1) >= normalized.length()
+		var next_is_newline := false
+		if not end_of_text:
+			next_is_newline = normalized.substr(i + 1, 1) == "\n"
+		var can_sentence_break := _is_sentence_break_char(ch) or next_is_newline or end_of_text
+		var reach_soft_limit := current_len >= limit
+		var reach_hard_limit := current_len >= hard_cap
+
+		if reach_hard_limit or (reach_soft_limit and ((not prefer_sentence_break_split) or can_sentence_break)):
+			var page := current.strip_edges()
+			if not page.is_empty():
+				pages.append(page)
+			current = ""
+			current_len = 0
+
+	var tail := current.strip_edges()
+	if not tail.is_empty():
+		pages.append(tail)
+
+	if pages.is_empty():
+		pages.append(cleaned)
+	return pages
+
+func _is_sentence_break_char(ch: String) -> bool:
+	return ch in [".", "!", "?", ";", ",", "。", "！", "？", "；", "，", "、", "："]
+
+func _ensure_typing_sfx_player() -> void:
+	var existing := get_node_or_null("TypingSFXPlayer") as AudioStreamPlayer
+	if existing != null:
+		_typing_sfx_player = existing
+	else:
+		_typing_sfx_player = AudioStreamPlayer.new()
+		_typing_sfx_player.name = "TypingSFXPlayer"
+		add_child(_typing_sfx_player)
+	_typing_sfx_player.autoplay = false
+	_typing_sfx_player.bus = "Master"
+	_typing_sfx_player.volume_db = typing_sfx_volume_db
+
+func _play_typing_sfx(char_text: String) -> void:
+	if not typing_sfx_enabled:
+		return
+	if char_text.strip_edges().is_empty():
+		return
+	if typing_sfx_stream == null:
+		return
+	if _typing_sfx_elapsed < typing_sfx_min_interval_sec:
+		return
+	if _typing_sfx_player == null or not is_instance_valid(_typing_sfx_player):
+		_ensure_typing_sfx_player()
+	if _typing_sfx_player == null:
+		return
+	_typing_sfx_player.stream = typing_sfx_stream
+	_typing_sfx_player.volume_db = typing_sfx_volume_db
+	var pitch_min := minf(typing_sfx_pitch_min, typing_sfx_pitch_max)
+	var pitch_max := maxf(typing_sfx_pitch_min, typing_sfx_pitch_max)
+	_typing_sfx_player.pitch_scale = randf_range(pitch_min, pitch_max)
+	_typing_sfx_player.play()
+	_typing_sfx_elapsed = 0.0
+
 
 func _emit_line_finished_once() -> void:
 	if _line_done_emitted:
@@ -366,16 +518,18 @@ func _dialog_size(letter_count: int) -> Vector2:
 		return Vector2.ZERO
 	var width_count := mini(letter_count, line_letter_max)
 	var rows := floori(float(letter_count - 1) / float(line_letter_max)) + 1
+	var line_height := letter_size.y * line_spacing
 	return Vector2(
 		float(width_count) * letter_size.x * letter_spacing,
-		float(rows) * letter_size.y * letter_spacing
+		float(rows) * line_height
 	)
 
 func _index_to_position(index: int, size: Vector2) -> Vector3:
 	var col := index % line_letter_max
 	var row := floori(float(index) / float(line_letter_max))
+	var line_height := letter_size.y * line_spacing
 	var x := (float(col) + 0.5) * letter_size.x * letter_spacing - size.x * 0.5
-	var y := -((float(row) + 0.5) * letter_size.y * letter_spacing) + size.y * 0.5
+	var y := -((float(row) + 0.5) * line_height) + size.y * 0.5
 	return Vector3(x, y, 0.0)
 
 func _resolve_anchor() -> Marker3D:
@@ -407,8 +561,15 @@ func _resolve_talk_controller() -> Node:
 func _should_face_talk() -> bool:
 	if not auto_face_talk_with_subtitle:
 		return false
-	var has_text := not _effective_text().strip_edges().is_empty()
-	return has_text and (_playing or _streaming)
+	var effective := _effective_text().strip_edges()
+	if effective.is_empty():
+		return false
+	if _streaming:
+		return true
+	var full_length := effective.length()
+	if _playing and _displayed_count < full_length:
+		return true
+	return false
 
 func _update_face_talk_state() -> void:
 	if not auto_face_talk_with_subtitle:

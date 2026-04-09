@@ -2,10 +2,14 @@ extends Node
 class_name AIManager
 
 signal on_ai_stream_chunk_received(chunk: String)
+signal on_ai_action_hint_received(action_hint: Dictionary)
+signal on_ai_stream_dialogue_finished(dialogue_text: String)
 signal on_ai_response_completed(final_data: Dictionary)
 signal on_ai_request_error(error_msg: String)
 signal on_session_history_received(session_id: String, response: Dictionary)
 signal on_session_history_error(session_id: String, error_msg: String)
+signal on_session_events_pull_received(session_id: String, response: Dictionary)
+signal on_session_events_pull_error(session_id: String, error_msg: String)
 signal on_session_event_received(session_id: String, event: Dictionary)
 signal on_session_event_error(session_id: String, error_msg: String)
 signal on_session_event_stream_state_changed(session_id: String, connected: bool)
@@ -22,10 +26,11 @@ signal on_model_probe_error(error_msg: String)
 @export var session_event_stream_endpoint_template: String = "/session/{session_id}/events/stream"
 @export var endpoint_path: String = "/chat_stream" # deprecated: kept for old scenes
 @export var use_https: bool = false
-@export var request_timeout_sec: float = 20.0
-@export var enable_true_sse_stream: bool = false
+@export var request_timeout_sec: float = 45.0
+@export_range(10.0, 600.0, 1.0) var stream_idle_timeout_sec: float = 120.0
+@export var enable_true_sse_stream: bool = true
 @export var session_event_stream_enabled: bool = false
-@export_range(0.005, 0.2, 0.005) var stream_poll_interval_sec: float = 0.02
+@export_range(0.005, 0.2, 0.005) var stream_poll_interval_sec: float = 0.005
 @export_range(0.5, 60.0, 0.5) var session_event_keepalive_timeout_sec: float = 30.0
 @export_range(0.2, 10.0, 0.1) var session_event_reconnect_delay_sec: float = 1.5
 @export var debug_log: bool = false
@@ -35,11 +40,14 @@ var is_requesting: bool = false
 
 var _http_request: HTTPRequest
 var _history_request: HTTPRequest
+var _events_pull_request: HTTPRequest
 var _probe_request: HTTPRequest
 var _last_request_payload: Dictionary = {}
 var _last_request_context: Dictionary = {}
 var _history_requesting: bool = false
 var _history_request_session_id: String = ""
+var _events_pull_requesting: bool = false
+var _events_pull_session_id: String = ""
 var _probe_requesting: bool = false
 var _stream_client: HTTPClient
 var _stream_active: bool = false
@@ -54,7 +62,11 @@ var _stream_chunks: Array[String] = []
 var _stream_last_event: Dictionary = {}
 var _stream_full_json_so_far: String = ""
 var _stream_done: bool = false
+var _stream_action_hint_emitted: bool = false
+var _stream_dialogue_finished_emitted: bool = false
+var _stream_dialogue_text_so_far: String = ""
 var _stream_elapsed_sec: float = 0.0
+var _stream_last_io_sec: float = 0.0
 var _stream_poll_elapsed: float = 0.0
 var _event_client: HTTPClient
 var _event_stream_active: bool = false
@@ -72,6 +84,7 @@ var _event_last_turn_id: int = 0
 func _ready() -> void:
 	_ensure_http_request()
 	_ensure_history_request()
+	_ensure_events_pull_request()
 	_ensure_probe_request()
 	set_process(true)
 
@@ -83,9 +96,11 @@ func _process_chat_stream(delta: float) -> void:
 	if not _stream_active:
 		return
 	_stream_elapsed_sec += delta
-	if request_timeout_sec > 0.0 and _stream_elapsed_sec >= request_timeout_sec:
+	_stream_last_io_sec += delta
+	if stream_idle_timeout_sec > 0.0 and _stream_last_io_sec >= stream_idle_timeout_sec:
+		_log("stream_idle_timeout elapsed=%.2f last_io=%.2f idle_limit=%.2f" % [_stream_elapsed_sec, _stream_last_io_sec, stream_idle_timeout_sec])
 		_stop_stream_client()
-		_emit_error("stream_timeout")
+		_emit_error("stream_idle_timeout")
 		return
 	_stream_poll_elapsed += delta
 	if _stream_poll_elapsed < stream_poll_interval_sec:
@@ -194,6 +209,32 @@ func request_session_history(session_id: String, limit: int = 20) -> bool:
 	_history_requesting = true
 	_history_request_session_id = clean_session_id
 	_log("history_request_start session_id=%s limit=%d" % [clean_session_id, safe_limit])
+	return true
+
+# 标准入口：仅拉取新事件，对应后端 GET /session/{session_id}/events/pull
+func request_session_events_pull(session_id: String, after_turn_id: int = 0, limit: int = 20) -> bool:
+	_ensure_events_pull_request()
+	if _events_pull_requesting:
+		return false
+
+	var clean_session_id := session_id.strip_edges()
+	if clean_session_id.is_empty():
+		clean_session_id = "default_session"
+	var safe_after := maxi(0, int(after_turn_id))
+	var safe_limit := maxi(1, mini(int(limit), 200))
+	var path := "/session/%s/events/pull?after_turn_id=%d&limit=%d" % [clean_session_id.uri_encode(), safe_after, safe_limit]
+	var url := _build_url(path)
+	var headers := PackedStringArray(["Accept: application/json"])
+
+	var err := _events_pull_request.request(url, headers, HTTPClient.METHOD_GET, "")
+	if err != OK:
+		on_session_events_pull_error.emit(clean_session_id, "request_failed_%d" % err)
+		_log("events_pull_request_failed session_id=%s err=%d" % [clean_session_id, err])
+		return false
+
+	_events_pull_requesting = true
+	_events_pull_session_id = clean_session_id
+	_log("events_pull_request_start session_id=%s after_turn_id=%d limit=%d" % [clean_session_id, safe_after, safe_limit])
 	return true
 
 # 标准入口：模型可用性探测，对应后端 GET /model/probe
@@ -445,7 +486,11 @@ func _send_stream_request(payload: Dictionary, context: Dictionary = {}, endpoin
 	_stream_last_event = {}
 	_stream_full_json_so_far = ""
 	_stream_done = false
+	_stream_action_hint_emitted = false
+	_stream_dialogue_finished_emitted = false
+	_stream_dialogue_text_so_far = ""
 	_stream_elapsed_sec = 0.0
+	_stream_last_io_sec = 0.0
 	_stream_poll_elapsed = 0.0
 	is_requesting = true
 	_last_request_payload = payload.duplicate(true)
@@ -487,6 +532,7 @@ func _poll_stream_client() -> void:
 		HTTPClient.STATUS_BODY:
 			if _stream_response_code == 0:
 				_stream_response_code = _stream_client.get_response_code()
+				_stream_last_io_sec = 0.0
 				_log("stream_response_header code=%d" % _stream_response_code)
 			_read_stream_body_chunks()
 			if _stream_done:
@@ -692,6 +738,7 @@ func _read_stream_body_chunks() -> void:
 		var text_part := chunk.get_string_from_utf8()
 		if text_part.is_empty():
 			continue
+		_stream_last_io_sec = 0.0
 		_stream_raw_body += text_part
 		_stream_sse_buffer += text_part
 		_consume_sse_buffer(false)
@@ -742,14 +789,36 @@ func _consume_sse_event(raw_event: String) -> void:
 	var chunk_text := String(event_data.get("dialogue_chunk", ""))
 	if not chunk_text.is_empty():
 		_stream_chunks.append(chunk_text)
+		_stream_dialogue_text_so_far += chunk_text
 		on_ai_stream_chunk_received.emit(chunk_text)
 
 	var full_json_candidate := String(event_data.get("full_json_so_far", ""))
 	if not full_json_candidate.is_empty():
 		_stream_full_json_so_far = full_json_candidate
 
+	var event_name := String(event_data.get("event", "")).strip_edges().to_lower()
+	if event_name == "action_hint":
+		var hint_value: Variant = event_data.get("action_hint", {})
+		if hint_value is Dictionary:
+			_stream_action_hint_emitted = true
+			on_ai_action_hint_received.emit((hint_value as Dictionary).duplicate(true))
+	if event_name == "dialogue_done" or bool(event_data.get("dialogue_done", false)):
+		var dialogue_text := String(event_data.get("dialogue", "")).strip_edges()
+		if dialogue_text.is_empty():
+			dialogue_text = _stream_dialogue_text_so_far.strip_edges()
+		_emit_stream_dialogue_finished_once(dialogue_text)
+
 	if bool(event_data.get("is_done", false)):
 		_stream_done = true
+
+func _emit_stream_dialogue_finished_once(dialogue_text: String) -> void:
+	if _stream_dialogue_finished_emitted:
+		return
+	var text := dialogue_text.strip_edges()
+	if text.is_empty():
+		return
+	_stream_dialogue_finished_emitted = true
+	on_ai_stream_dialogue_finished.emit(text)
 
 func _finalize_stream_request() -> void:
 	_consume_sse_buffer(true)
@@ -757,6 +826,8 @@ func _finalize_stream_request() -> void:
 	var response_code := _stream_response_code
 	var raw_body := _stream_raw_body
 	var emitted_chunks_count := _stream_chunks.size()
+	var stream_dialogue_finished_emitted := _stream_dialogue_finished_emitted
+	var stream_dialogue_snapshot := _stream_dialogue_text_so_far
 
 	var final_data: Dictionary = {}
 	if not _stream_full_json_so_far.is_empty():
@@ -787,6 +858,12 @@ func _finalize_stream_request() -> void:
 		_emit_error("empty_or_invalid_ai_response")
 		return
 
+	var backend_error := _extract_backend_error(final_data)
+	if not backend_error.is_empty():
+		_log("backend_error %s" % backend_error)
+		_emit_error(backend_error)
+		return
+
 	if emitted_chunks_count <= 0:
 		for chunk_value in fallback_chunks:
 			var chunk_text := String(chunk_value)
@@ -799,6 +876,13 @@ func _finalize_stream_request() -> void:
 		if not one_shot_text.is_empty():
 			on_ai_stream_chunk_received.emit(one_shot_text)
 			emitted_chunks_count = 1
+
+	if not stream_dialogue_finished_emitted:
+		var dialogue_done_fallback := _extract_dialogue_text(final_data).strip_edges()
+		if dialogue_done_fallback.is_empty():
+			dialogue_done_fallback = stream_dialogue_snapshot.strip_edges()
+		if not dialogue_done_fallback.is_empty():
+			on_ai_stream_dialogue_finished.emit(dialogue_done_fallback)
 
 	_log("stream_request_ok chunks=%d final_keys=%s" % [emitted_chunks_count, str(final_data.keys())])
 	if debug_log:
@@ -822,13 +906,25 @@ func _stop_stream_client() -> void:
 	_stream_last_event = {}
 	_stream_full_json_so_far = ""
 	_stream_done = false
+	_stream_action_hint_emitted = false
+	_stream_dialogue_finished_emitted = false
+	_stream_dialogue_text_so_far = ""
 	_stream_elapsed_sec = 0.0
+	_stream_last_io_sec = 0.0
 	_stream_poll_elapsed = 0.0
 
 func cancel_request() -> void:
 	_stop_stream_client()
 	if _http_request != null:
 		_http_request.cancel_request()
+	if _history_request != null:
+		_history_request.cancel_request()
+	_history_requesting = false
+	_history_request_session_id = ""
+	if _events_pull_request != null:
+		_events_pull_request.cancel_request()
+	_events_pull_requesting = false
+	_events_pull_session_id = ""
 	if _probe_request != null:
 		_probe_request.cancel_request()
 	_probe_requesting = false
@@ -853,6 +949,16 @@ func _ensure_history_request() -> void:
 	add_child(_history_request)
 	if not _history_request.request_completed.is_connected(_on_history_request_completed):
 		_history_request.request_completed.connect(_on_history_request_completed)
+
+func _ensure_events_pull_request() -> void:
+	if _events_pull_request != null and is_instance_valid(_events_pull_request):
+		return
+
+	_events_pull_request = HTTPRequest.new()
+	_events_pull_request.name = "AIEventsPullRequest"
+	add_child(_events_pull_request)
+	if not _events_pull_request.request_completed.is_connected(_on_events_pull_request_completed):
+		_events_pull_request.request_completed.connect(_on_events_pull_request_completed)
 
 func _ensure_probe_request() -> void:
 	if _probe_request != null and is_instance_valid(_probe_request):
@@ -881,17 +987,23 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 		return
 
 	var parsed = _parse_response(body_text)
-	var chunks: Array = parsed.get("chunks", [])
-	for chunk_value in chunks:
-		var chunk_text := String(chunk_value)
-		if not chunk_text.is_empty():
-			on_ai_stream_chunk_received.emit(chunk_text)
-
 	var final_data: Dictionary = parsed.get("final", {})
 	if final_data.is_empty():
 		_log("parse_error reason=empty_or_invalid_ai_response raw_len=%d" % body_text.length())
 		_emit_error("empty_or_invalid_ai_response")
 		return
+
+	var backend_error := _extract_backend_error(final_data)
+	if not backend_error.is_empty():
+		_log("backend_error %s" % backend_error)
+		_emit_error(backend_error)
+		return
+
+	var chunks: Array = parsed.get("chunks", [])
+	for chunk_value in chunks:
+		var chunk_text := String(chunk_value)
+		if not chunk_text.is_empty():
+			on_ai_stream_chunk_received.emit(chunk_text)
 
 	if chunks.is_empty():
 		var one_shot_text := _extract_dialogue_text(final_data)
@@ -925,6 +1037,28 @@ func _on_history_request_completed(result: int, response_code: int, _headers: Pa
 		return
 
 	on_session_history_received.emit(target_session_id, parser.data)
+
+func _on_events_pull_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var target_session_id := _events_pull_session_id
+	_events_pull_requesting = false
+	_events_pull_session_id = ""
+	_log("events_pull_request_completed result=%d code=%d body_bytes=%d" % [result, response_code, body.size()])
+
+	if result != HTTPRequest.RESULT_SUCCESS:
+		on_session_events_pull_error.emit(target_session_id, "network_error_%d" % result)
+		return
+
+	var body_text := body.get_string_from_utf8()
+	if response_code < 200 or response_code >= 300:
+		on_session_events_pull_error.emit(target_session_id, "http_%d" % response_code)
+		return
+
+	var parser := JSON.new()
+	if parser.parse(body_text) != OK or parser.data is not Dictionary:
+		on_session_events_pull_error.emit(target_session_id, "invalid_events_pull_json")
+		return
+
+	on_session_events_pull_received.emit(target_session_id, parser.data)
 
 func _on_probe_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_probe_requesting = false
@@ -1014,6 +1148,21 @@ func _extract_dialogue_text(final_data: Dictionary) -> String:
 		if not value.is_empty():
 			return value
 	return ""
+
+func _extract_backend_error(final_data: Dictionary) -> String:
+	if final_data.is_empty():
+		return ""
+	if not final_data.has("ok"):
+		return ""
+	if bool(final_data.get("ok", true)):
+		return ""
+
+	var err_text := String(final_data.get("error", "")).strip_edges()
+	if err_text.is_empty():
+		err_text = String(final_data.get("dialogue", "")).strip_edges()
+	if err_text.is_empty():
+		err_text = "backend_model_error"
+	return err_text
 
 func _build_url(path: String) -> String:
 	var protocol = "https" if use_https else "http"

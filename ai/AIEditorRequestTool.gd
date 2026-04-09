@@ -10,7 +10,9 @@ class_name AIEditorRequestTool
 @export var probe_endpoint_path: String = "/model/probe"
 @export var clear_memory_endpoint_path: String = "/memory/clear"
 
-@export var session_id: String = "editor_session"
+@export var session_id: String = "default_session"
+@export var shared_runtime_session_id: String = "default_session"
+@export var auto_map_editor_session: bool = true
 @export var player_text: String = "你好，小空。"
 @export var given_item: String = ""
 @export var day: int = 1
@@ -28,6 +30,7 @@ class_name AIEditorRequestTool
 @export_multiline var last_request_json: String = "{}"
 @export_multiline var last_response_json: String = "{}"
 @export var last_status: String = "idle"
+@export var warn_when_game_not_running: bool = true
 
 var _send_chat_trigger: bool = false
 @export var send_chat_now: bool:
@@ -100,6 +103,9 @@ func _editor_send_chat() -> void:
 	_chat_busy = true
 	last_status = "chat_requesting"
 	print("[AIEditorRequestTool] chat_request payload=%s" % last_request_json)
+	if warn_when_game_not_running and not _is_editor_playing_scene():
+		var hint := _get_editor_scene_hint()
+		push_warning("[AIEditorRequestTool] 当前未运行游戏场景，3D字幕不会显示。请先运行关卡场景（建议 level_001）。当前编辑场景=%s" % hint)
 
 func _editor_probe_model() -> void:
 	_ensure_requests()
@@ -127,8 +133,10 @@ func _editor_clear_memory() -> void:
 
 	var clean_session := session_id.strip_edges()
 	if clean_session.is_empty():
-		clean_session = "editor_session"
+		clean_session = "default_session"
 		session_id = clean_session
+	clean_session = _resolve_effective_session_id(clean_session)
+	session_id = clean_session
 	var payload := {
 		"clear_all": false,
 		"session_id": clean_session,
@@ -151,11 +159,15 @@ func _editor_clear_memory() -> void:
 func _on_chat_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_chat_busy = false
 	var body_text := body.get_string_from_utf8()
+	var response_data := _parse_json_dict(body_text)
 	last_response_json = _to_pretty_response(body_text)
 	if result != HTTPRequest.RESULT_SUCCESS:
 		last_status = "chat_network_error_%d" % result
 	elif response_code < 200 or response_code >= 300:
 		last_status = "chat_http_%d" % response_code
+	elif response_data.has("ok") and not bool(response_data.get("ok", true)):
+		var err_text := String(response_data.get("error", "backend_error"))
+		last_status = "chat_backend_error_%s" % _error_to_status_suffix(err_text)
 	else:
 		last_status = "chat_ok_%d" % response_code
 	print("[AIEditorRequestTool] %s response=%s" % [last_status, last_response_json])
@@ -163,11 +175,15 @@ func _on_chat_completed(result: int, response_code: int, _headers: PackedStringA
 func _on_probe_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_probe_busy = false
 	var body_text := body.get_string_from_utf8()
+	var response_data := _parse_json_dict(body_text)
 	last_response_json = _to_pretty_response(body_text)
 	if result != HTTPRequest.RESULT_SUCCESS:
 		last_status = "probe_network_error_%d" % result
 	elif response_code < 200 or response_code >= 300:
 		last_status = "probe_http_%d" % response_code
+	elif response_data.has("ok") and not bool(response_data.get("ok", true)):
+		var probe_error := String(response_data.get("error", response_data.get("status", "probe_error")))
+		last_status = "probe_backend_error_%s" % _error_to_status_suffix(probe_error)
 	else:
 		last_status = "probe_ok_%d" % response_code
 	print("[AIEditorRequestTool] %s response=%s" % [last_status, last_response_json])
@@ -175,11 +191,15 @@ func _on_probe_completed(result: int, response_code: int, _headers: PackedString
 func _on_clear_memory_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_clear_busy = false
 	var body_text := body.get_string_from_utf8()
+	var response_data := _parse_json_dict(body_text)
 	last_response_json = _to_pretty_response(body_text)
 	if result != HTTPRequest.RESULT_SUCCESS:
 		last_status = "clear_memory_network_error_%d" % result
 	elif response_code < 200 or response_code >= 300:
 		last_status = "clear_memory_http_%d" % response_code
+	elif response_data.has("ok") and not bool(response_data.get("ok", true)):
+		var clear_error := String(response_data.get("error", "clear_memory_failed"))
+		last_status = "clear_memory_backend_error_%s" % _error_to_status_suffix(clear_error)
 	else:
 		last_status = "clear_memory_ok_%d" % response_code
 	print("[AIEditorRequestTool] %s response=%s" % [last_status, last_response_json])
@@ -187,8 +207,10 @@ func _on_clear_memory_completed(result: int, response_code: int, _headers: Packe
 func _build_chat_payload() -> Dictionary:
 	var clean_session := session_id.strip_edges()
 	if clean_session.is_empty():
-		clean_session = "editor_session"
+		clean_session = "default_session"
 		session_id = clean_session
+	clean_session = _resolve_effective_session_id(clean_session)
+	session_id = clean_session
 
 	var context_dict := _parse_context_json(context_json)
 	context_dict["debug_transparent"] = debug_transparent
@@ -214,6 +236,17 @@ func _build_chat_payload() -> Dictionary:
 		payload["max_context_turns"] = max_context_turns
 	return payload
 
+func _resolve_effective_session_id(raw_session_id: String) -> String:
+	var clean := raw_session_id.strip_edges()
+	if clean.is_empty():
+		clean = "default_session"
+	if auto_map_editor_session and clean == "editor_session":
+		var mapped := shared_runtime_session_id.strip_edges()
+		if not mapped.is_empty():
+			return mapped
+		return "default_session"
+	return clean
+
 func _parse_context_json(raw_text: String) -> Dictionary:
 	var parser := JSON.new()
 	if parser.parse(raw_text) == OK and parser.data is Dictionary:
@@ -225,6 +258,21 @@ func _to_pretty_response(raw_text: String) -> String:
 	if parser.parse(raw_text) == OK:
 		return JSON.stringify(parser.data, "\t", false)
 	return raw_text
+
+func _parse_json_dict(raw_text: String) -> Dictionary:
+	var parser := JSON.new()
+	if parser.parse(raw_text) == OK and parser.data is Dictionary:
+		return (parser.data as Dictionary).duplicate(true)
+	return {}
+
+func _error_to_status_suffix(raw_text: String) -> String:
+	var clean := raw_text.strip_edges()
+	if clean.is_empty():
+		return "unknown_error"
+	var safe := clean.replace(" ", "_").replace(":", "_").replace("/", "_").replace("\\", "_")
+	if safe.length() > 48:
+		safe = safe.substr(0, 48)
+	return safe
 
 func _build_url(path: String) -> String:
 	var protocol := "https" if use_https else "http"
@@ -259,3 +307,20 @@ func _ensure_requests() -> void:
 		add_child(_clear_request)
 		if not _clear_request.request_completed.is_connected(_on_clear_memory_completed):
 			_clear_request.request_completed.connect(_on_clear_memory_completed)
+
+func _is_editor_playing_scene() -> bool:
+	var editor_interface = Engine.get_singleton("EditorInterface")
+	if editor_interface == null:
+		return false
+	return bool(editor_interface.is_playing_scene())
+
+func _get_editor_scene_hint() -> String:
+	var editor_interface = Engine.get_singleton("EditorInterface")
+	if editor_interface == null:
+		return "<unknown>"
+	var scene = editor_interface.get_edited_scene_root()
+	if scene == null:
+		return "<none>"
+	if not String(scene.scene_file_path).is_empty():
+		return String(scene.scene_file_path)
+	return String(scene.name)

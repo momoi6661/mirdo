@@ -4,19 +4,20 @@
 
 [node name="AIEditorRequestTool" type="Node" unique_id=1417425313]
 script = ExtResource("1_tool")
-player_text = "你好吗"
+session_id = "default_session"
+player_text = "你叫什么名字"
 last_request_json = "{
 	\"day\": 1,
 	\"time\": 540,
 	\"time_min\": 540,
-	\"session_id\": \"editor_session\",
+	\"session_id\": \"default_session\",
 	\"npc_stats\": {
 		\"hunger\": 50,
 		\"thirst\": 50,
 		\"mood\": 50,
 		\"favor\": 20
 	},
-	\"player_text\": \"你好吗\",
+	\"player_text\": \"你叫什么名字\",
 	\"given_item\": \"\",
 	\"context\": {
 		\"debug_transparent\": true,
@@ -26,21 +27,22 @@ last_request_json = "{
 	\"max_context_turns\": 8
 }"
 last_response_json = "{
-	\"dialogue\": \"我在。今天也一起把避难所照看好。\",
-	\"emotion\": \"neutral\",
-	\"action\": \"Idle\",
+	\"dialogue\": \"我叫小空。你愿意先告诉我你的名字吗？现在就能做的是确认彼此称呼，方便接下来配合。\",
+	\"emotion\": \"平静\",
+	\"action\": \"StandingGreeting\",
 	\"stat_change\": {
 		\"hunger\": 0.0,
 		\"thirst\": 0.0,
 		\"mood\": 1.0,
-		\"favor\": 0.0
+		\"favor\": 1.0
 	},
 	\"memory_tags\": [
-		\"local_fallback\",
-		\"model_error\"
+		\"topic:dialogue\",
+		\"topic:name\"
 	],
-	\"session_id\": \"editor_session\",
-	\"turn_id\": 89.0,
+	\"session_id\": \"default_session\",
+	\"turn_id\": 135.0,
+	\"ok\": true,
 	\"used_skills\": [],
 	\"_debug\": {
 		\"request_echo\": {
@@ -53,13 +55,13 @@ last_response_json = "{
 				\"mood\": 50.0,
 				\"favor\": 20.0
 			},
-			\"session_id\": \"editor_session\",
+			\"session_id\": \"default_session\",
 			\"max_context_turns\": 8.0,
 			\"ai_hunger\": null,
 			\"ai_thirst\": null,
 			\"ai_mood\": null,
 			\"ai_favor\": null,
-			\"player_text\": \"你好吗\",
+			\"player_text\": \"你叫什么名字\",
 			\"given_item\": \"\",
 			\"context\": {
 				\"debug_transparent\": true,
@@ -67,16 +69,22 @@ last_response_json = "{
 				\"source\": \"godot_editor_tool\"
 			}
 		},
-		\"response_source\": \"local_fallback_model_error\",
-		\"model_error\": \"empty_model_content\",
-		\"chat_model\": \"gpt-5.2\",
+		\"response_source\": \"model\",
+		\"model_error\": \"\",
+		\"chat_model\": \"gpt-5.2-codex\",
+		\"chat_model_used\": \"gpt-5.2-codex\",
+		\"raw_model_text_preview\": \"{\\\"dialogue\\\":\\\"我叫小空。你愿意先告诉我你的名字吗？现在就能做的是确认彼此称呼，方便接下来配合。\\\",\\\"emotion\\\":\\\"平静\\\",\\\"action\\\":\\\"StandingGreeting\\\",\\\"stat_change\\\":{\\\"hunger\\\":0,\\\"thirst\\\":0,\\\"mood\\\":1,\\\"favor\\\":1},\\\"memory_tags\\\":[\\\"topic:dialogue\\\",\\\"topic:name\\\"]}\",
 		\"retrieved_sources\": [
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\dialogue_protocol.md\",
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\xiaokong_persona.md\",
 			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\seed.md\",
-			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\survival_mechanics.md\",
-			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\xiaokong_persona.md\"
+			\"D:\\\\AAgodot\\\\AI_Backend\\\\data\\\\knowledge\\\\worldview.md\"
 		],
 		\"skill_calls\": [],
-		\"memory_summary_preview\": \"\"
+		\"memory_summary_preview\": \"\",
+		\"memory_snippets\": [
+			\"Player: 你叫什么名字\"
+		]
 	}
 }"
 last_status = "chat_ok_200"
