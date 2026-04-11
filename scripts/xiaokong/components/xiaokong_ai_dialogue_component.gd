@@ -769,14 +769,10 @@ func _apply_action_hint(action_hint: Dictionary) -> void:
 	dialogue_action_hint_received.emit(action_hint.duplicate(true))
 
 	var action_name := String(action_hint.get("action", "")).strip_edges()
-	if action_name.is_empty():
-		return
-	if not _early_action_applied.is_empty() and action_name == _early_action_applied:
-		return
 
 	if auto_apply_ai_response and _action_router != null:
-		var route_summary := _action_router.apply_ai_response({"action": action_name})
-		if bool(route_summary.get("action_applied", false)):
+		var route_summary := _action_router.apply_ai_response(action_hint.duplicate(true))
+		if not action_name.is_empty() and bool(route_summary.get("action_applied", false)):
 			_early_action_applied = action_name
 			_log("early_action_applied action=%s" % action_name)
 

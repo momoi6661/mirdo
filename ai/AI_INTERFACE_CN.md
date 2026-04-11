@@ -2,13 +2,16 @@
 
 ## 1. 这版的主链路
 
-当前以 **非流式** 为主，不依赖 SSE。
+当前默认以 **流式** 为主（SSE）：
+
+- Godot -> `POST /chat_stream`
+- 后端按 chunk 推送字幕文本，最后发送完整 JSON done 包
+- Godot 字幕组件按 chunk 增量显示
+
+调试时可切换为非流式：
 
 - Godot -> `POST /chat`
 - 后端返回完整 JSON
-- Godot 端再做本地逐字显示（伪流式字幕）
-
-这样做的好处是：抓包、对齐请求体、定位问题都更直接。
 
 ---
 
@@ -27,6 +30,42 @@
   "context": Dictionary
 }
 ```
+
+### 2.1 行为命令字段（导航+动作联动）
+
+后端现在可以额外返回 `command`（或 `intent`）来直接驱动导航机制：
+
+```gdscript
+{
+  "command": "follow_player" | "stop_follow" | "go_sleep" | "go_table_sit" | "go_to_marker",
+  "target_marker": "可选，指定具体 Marker3D 名称（推荐）",
+  "location": "可选，地点关键词（如 浴室/厨房/toilet/kitchen）"
+}
+```
+
+说明：
+
+- `follow_player`：小空持续跟随玩家，并自动启用头部 LookAt（IK）看向玩家。
+- `stop_follow`：停止跟随/停止当前导航。
+- `go_sleep`：导航到床位点（优先床躺点），到达后先吸附到目标 Marker，再触发 `Laying`。
+- `go_table_sit`：导航到桌边/凳子坐点，到达后先吸附到目标 Marker，再触发 `SittingIdle`。
+- `go_to_marker`：导航到任意地点 Marker（如 `Bathroom_Room_Mark3D`、`Toilet_Mark3D`、`Kitchen_Room_Mark3D` 等），不强制触发姿态动作。
+- `go_to_marker` 支持 `target_marker/marker_name/marker/destination_marker`，也支持 `location/room/destination/poi/place` 文本字段自动映射到 Mark3D。
+- 如果目标 Marker 带有 `metadata/xiaokong_action`（例如厕所点位 `SittingIdle`），`go_to_marker` 到点后会自动执行该动作。
+- 如果目标 Marker 带有 `metadata/xiaokong_ik_mode`，到点后会自动激活 IK 互动（看向/单手触碰/双手触碰），用于洗手池、淋浴、做饭台、工作台、办公桌等点位。
+- 如果同时返回 `move_target + action`，且 `action` 为 `SittingIdle`/`Laying`，会自动改为“先走到点再播动作”。
+- `command/target_marker/move_target` 也支持放在 `action_hint` 或 `navigation` 子字段中（用于不同后端实现兼容）。
+- 中文/自然语言命令会做容错识别（例如“跟着我”“去睡觉”“去桌边坐下”“去浴室/去厨房/去厕所/去洗手/去洗澡/去做饭/去办公桌”），但后端仍建议优先返回标准枚举值。
+
+### 2.2 Marker 互动 IK 元数据（可选）
+
+在 `Marker3D` 上可配置：
+
+- `metadata/xiaokong_ik_mode`：`look` | `reach_left` | `reach_right` | `reach_both` | `look_reach_left` | `look_reach_right` | `look_reach_both`
+- `metadata/xiaokong_ik_look_offset`：`Vector3`，相对 Marker 的看向目标偏移
+- `metadata/xiaokong_ik_left_hand_offset` / `metadata/xiaokong_ik_right_hand_offset`：`Vector3`，左右手目标偏移
+- `metadata/xiaokong_ik_left_hand_rot_deg` / `metadata/xiaokong_ik_right_hand_rot_deg`：`Vector3`，手部旋转补偿（角度）
+- `metadata/xiaokong_ik_auto_clear_sec`：`float`，到点后保持互动 IK 的秒数（到时自动清除）
 
 ---
 
@@ -93,6 +132,14 @@ dialogue_component.chat("今天先休息一下")
 - `GET /session/{session_id}/history` 仅作补充排障，不是主链路。
 - 调试默认关闭持续轮询：`external_history_poll_enabled=false`。
 - 如需手动拉一次：`pull_external_history_once()`。
+
+---
+
+## 6.1 后端独立性说明
+
+- 当前后端项目 `AI_Backend_MemPalace` 已经独立运行。
+- 长期记忆在后端内置（本地 Chroma + wing/hall/room/drawer 语义）。
+- 不依赖 `D:\download\mempalace-3.1.0` 源码目录。
 
 ---
 

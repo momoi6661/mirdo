@@ -1,0 +1,78 @@
+[gd_scene format=4 uid="uid://c8j0kbeach01"]
+
+[ext_resource type="PackedScene" path="res://scenes/interactables/xiaokong_seat_interactable.tscn" id="1_seat"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_7kxt7"]
+load_path = "res://.godot/imported/table_bench.png-076992c657b1d44d8d22ad5d6fa100a7.s3tc.ctex"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_800ic"]
+resource_name = "table_bench"
+cull_mode = 2
+albedo_texture = SubResource("CompressedTexture2D_7kxt7")
+roughness = 0.5
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_5lman"]
+_surfaces = [{
+"aabb": AABB(-0.275, 0, -0.9, 0.55, 0.38, 1.8),
+"format": 34896613377,
+"index_count": 180,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAACAAEAAwAEAAEABQAAAAIAAwAAAAUABAAGAAIABQACAAYAAwAHAAQAAwAFAAcABwAGAAQABwAFAAYACAAJAAoACAALAAkADAAKAAkACwAMAAkADQAIAAoACwAIAA0ADAAOAAoADQAKAA4ACwAPAAwACwANAA8ADwAOAAwADwANAA4AEAARABIAEAATABEAFAASABEAEwAUABEAFQAQABIAEwAQABUAFAAWABIAFQASABYAEwAXABQAEwAVABcAFwAWABQAFwAVABYAGAAZABoAGAAbABkAHAAaABkAGwAcABkAHQAYABoAGwAYAB0AHAAeABoAHQAaAB4AGwAfABwAGwAdAB8AHwAeABwAHwAdAB4AIAAhACIAIAAjACEAJAAiACEAIwAkACEAJQAgACIAIwAgACUAJAAmACIAJQAiACYAIwAnACQAIwAlACcAJwAmACQAJwAlACYA"),
+"lods": [0.17628103, PackedByteArray("AAABAAIAAAADAAEABAACAAEAAwAEAAEABQAAAAIAAwAAAAUABAAGAAIABQACAAYAAwAHAAQAAwAFAAcABwAGAAQABwAFAAYA")],
+"name": "table_bench",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 40,
+"vertex_data": PackedByteArray("AADJ6///AAAAAP//AAAAAAAA/////wAAAADJ6wAAAAD/////AAAAAP//yev//wAA////////AAD//8nrAAAAANW+AADo8wAA1b7J66TvAADVvsnr6PMAANW+AACk7wAAy8zJ66TvAADLzAAA6PMAAMvMyevo8wAAy8wAAKTvAAAyMwAA6PMAADIzyeuk7wAAMjPJ6+jzAAAyMwAApO8AAClByeuk7wAAKUEAAOjzAAApQcnr6PMAAClBAACk7wAA1b4AAFoQAADVvsnrFgwAANW+yetaEAAA1b4AABYMAADLzMnrFgwAAMvMAABaEAAAy8zJ61oQAADLzAAAFgwAADIzAABaEAAAMjPJ6xYMAAAyM8nrWhAAADIzAAAWDAAAKUHJ6xYMAAApQQAAWhAAAClByetaEAAAKUEAABYMAAA=")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_xggeu"]
+resource_name = "bunker_scene_bench"
+_surfaces = [{
+"aabb": AABB(-0.275, 0, -0.9, 0.55, 0.38, 1.8),
+"attribute_data": PackedByteArray("////f9z9///c/f9//////6T2zViC9Ol/gvTNWKT26X947wAAVu3/f1btAAB47/9/xvjNWKT26X+k9s1Yxvjpf8bR/3+qqv//qqr/f8bR///i+P9/xtH//8bR/3/i+P//x0AWAelC+RnHQPkZ6UIWAbYvFgHYMfkZti/5GdgxFgHpQhYBDEX5GelC+RkMRRYB2DEWAfsz+RnYMfkZ+zMWAYVIHR1jRvsahUj7GmNGHR2nSh0dhUj7GqdK+xqFSB0dDEUWAS5H+RkMRfkZLkcWAT84FgFhOvkZPzj5GWE6FgEuRxYBUEn5GS5H+RlQSRYBYToWAYM8+RlhOvkZgzwWAQ1RHR3rTvsaDVH7GutOHR0wUx0dDVH7GjBT+xoNUR0dUEkWAXJL+RlQSfkZcksWAfszFgEdNvkZ+zP5GR02FgFySxYBlE35GXJL+RmUTRYBHTYWAT84+RkdNvkZPzgWAclMHR2nSvsayUz7GqdKHR3rTh0dyUz7GutO+xrJTB0dlE0WAbZP+RmUTfkZtk8WAYM8FgGlPvkZgzz5GaU+FgG2TxYB2FH5GbZP+RnYURYBpT4WAcdA+RmlPvkZx0AWAVJVHR0wU/saUlX7GjBTHR10Vx0dUlX7GnRX+xpSVR0d"),
+"format": 34896613399,
+"index_count": 180,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAFAAYABAAHAAUACAAJAAoACAALAAkADAANAA4ADAAPAA0AEAARABIAEAATABEAFAAVABYAFAAXABUAGAAZABoAGAAbABkAHAAdAB4AHAAfAB0AIAAhACIAIAAjACEAJAAlACYAJAAnACUAKAApACoAKAArACkALAAtAC4ALAAvAC0AMAAxADIAMAAzADEANAA1ADYANAA3ADUAOAA5ADoAOAA7ADkAPAA9AD4APAA/AD0AQABBAEIAQABDAEEARABFAEYARABHAEUASABJAEoASABLAEkATABNAE4ATABPAE0AUABRAFIAUABTAFEAVABVAFYAVABXAFUAWABZAFoAWABbAFkAXABdAF4AXABfAF0AYABhAGIAYABjAGEAZABlAGYAZABnAGUAaABpAGoAaABrAGkAbABtAG4AbABvAG0AcABxAHIAcABzAHEAdAB1AHYAdAB3AHUA"),
+"lods": [0.17628103, PackedByteArray("AAABAAIAAAADAAEABAAFAAYABAAHAAUACAAJAAoACAALAAkADAANAA4ADAAPAA0AEAARABIAEAATABEAFAAVABYAFAAXABUA")],
+"material": SubResource("StandardMaterial3D_800ic"),
+"name": "table_bench",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 120,
+"vertex_data": PackedByteArray("AADJ6///VNUAAP//AABU1QAA/////1TVAADJ6wAAVNUAAMnrAAD///////8AAP//AAD//wAA/////8nrAAD/////yesAAFTV////////VNX/////AABU1f//yev//1TV///J6////78AAP//////v/////////+/AADJ6////78AAMnrAAD/////yev////////J6wAA//8AAMnr//////////8AAP+/AAD//////78AAP//AAD/v/////////+/1b4AAOjz///VvsnrpO///9W+yevo8///1b4AAKTv///VvgAApO///8vMyeuk7///1b7J66Tv///LzAAApO///8vMAACk7///y8zJ6+jz///LzMnrpO///8vMAADo8///y8wAAOjz///Vvsnr6PP//8vMyevo8///1b4AAOjz///VvgAApO9U1cvMAADo81TVy8wAAKTvVNXVvgAA6PNU1cvMyeuk71TV1b7J6+jzVNXVvsnrpO9U1cvMyevo81TVMjMAAOjz//8yM8nrpO///zIzyevo8///MjMAAKTv//8yMwAApO///ylByeuk7///MjPJ66Tv//8pQQAApO///ylBAACk7///KUHJ6+jz//8pQcnrpO///ylBAADo8///KUEAAOjz//8yM8nr6PP//ylByevo8///MjMAAOjz//8yMwAApO9U1SlBAADo81TVKUEAAKTvVNUyMwAA6PNU1SlByeuk71TVMjPJ6+jzVNUyM8nrpO9U1SlByevo81TV1b4AAFoQ///VvsnrFgz//9W+yetaEP//1b4AABYM///VvgAAFgz//8vMyesWDP//1b7J6xYM///LzAAAFgz//8vMAAAWDP//y8zJ61oQ///LzMnrFgz//8vMAABaEP//y8wAAFoQ///VvsnrWhD//8vMyetaEP//1b4AAFoQ///VvgAAFgxU1cvMAABaEFTVy8wAABYMVNXVvgAAWhBU1cvMyesWDFTV1b7J61oQVNXVvsnrFgxU1cvMyetaEFTVMjMAAFoQ//8yM8nrFgz//zIzyetaEP//MjMAABYM//8yMwAAFgz//ylByesWDP//MjPJ6xYM//8pQQAAFgz//ylBAAAWDP//KUHJ61oQ//8pQcnrFgz//ylBAABaEP//KUEAAFoQ//8yM8nrWhD//ylByetaEP//MjMAAFoQ//8yMwAAFgxU1SlBAABaEFTVKUEAABYMVNUyMwAAWhBU1SlByesWDFTVMjPJ61oQVNUyM8nrFgxU1SlByetaEFTVVFWqqlRVqqpUVaqqVFWqqv8//7//P/+//z//v/8//7+qqlRVqqpUVaqqVFWqqlRV/3//f/9//3//f/9//3//f/9//z//f/8//3//P/9//z////9/////f////3////9//z//f/8//3//P/9//z//f////3////9/////f////3//v/9//7//f/+//3//v/9//3//f/9//3//f/9//3//f1RVVFVUVVRVVFVUVVRVVFVU1aoqVNWqKlTVqipU1aoq/z//f/8//3//P/9//z//f////3////9/////f////3//v/9//7//f/+//3//v/9//3//f/9//3//f/9//3//f1RVVFVUVVRVVFVUVVRVVFVU1aoqVNWqKlTVqipU1aoq/z//f/8//3//P/9//z//f////3////9/////f////3//v/9//7//f/+//3//v/9//3//f/9//3//f/9//3//f1RVVFVUVVRVVFVUVVRVVFVU1aoqVNWqKlTVqipU1aoq/z//f/8//3//P/9//z//f////3////9/////f////3//v/9//7//f/+//3//v/9//3//f/9//3//f/9//3//f1RVVFVUVVRVVFVUVVRVVFVU1aoqVNWqKlTVqipU1aoq")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_5lman")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_beach"]
+size = Vector3(0.56, 0.38, 1.84)
+
+[node name="beach" type="Node3D" unique_id=716639732 groups=["nav_source_bunker"]]
+
+[node name="bench" type="MeshInstance3D" parent="." unique_id=1325852330]
+mesh = SubResource("ArrayMesh_xggeu")
+skeleton = NodePath("")
+
+[node name="bench_col" type="StaticBody3D" parent="." unique_id=264387636]
+collision_layer = 34
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="bench_col" unique_id=747677100]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, 0)
+shape = SubResource("BoxShape3D_beach")
+
+[node name="SeatInteractable" parent="bench_col" unique_id=1045320476 instance=ExtResource("1_seat")]
+prompt_text = "让小空坐下"
+interaction_time = 0.3
+target_marker_path = NodePath("../../Sit_Mark3D")
+stand_marker_path = NodePath("../../Stand_Mark3D")
+stand_toggle_distance = 1.2
+
+[node name="Sit_Mark3D" type="Marker3D" parent="." unique_id=284447878]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.22, 0.41, 0)
+metadata/xiaokong_action = "SittingIdle"
+
+[node name="Stand_Mark3D" type="Marker3D" parent="." unique_id=1943835057]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.3089893, 0.05, 0.065800786)
+metadata/xiaokong_action = "Idle"

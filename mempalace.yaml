@@ -1,0 +1,75 @@
+wing: fps
+rooms:
+- name: addons
+  description: Files from addons/
+  keywords:
+  - addons
+  - addons
+- name: audio
+  description: Files from Audio/
+  keywords:
+  - audio
+  - audio
+- name: frontend
+  description: Files from components/
+  keywords:
+  - frontend
+  - components
+- name: backend
+  description: Files from controllers/
+  keywords:
+  - backend
+  - controllers
+- name: environment
+  description: Files from environment/
+  keywords:
+  - environment
+  - environment
+- name: fonts
+  description: Files from fonts/
+  keywords:
+  - fonts
+  - fonts
+- name: levels
+  description: Files from levels/
+  keywords:
+  - levels
+  - levels
+- name: materials
+  description: Files from materials/
+  keywords:
+  - materials
+  - materials
+- name: resources
+  description: Files from resources/
+  keywords:
+  - resources
+  - resources
+- name: scenes
+  description: Files from scenes/
+  keywords:
+  - scenes
+  - scenes
+- name: scripts
+  description: Files from scripts/
+  keywords:
+  - scripts
+  - scripts
+- name: shaders
+  description: Files from shaders/
+  keywords:
+  - shaders
+  - shaders
+- name: tempfile
+  description: Files from tempfile/
+  keywords:
+  - tempfile
+  - tempfile
+- name: textures
+  description: Files from textures/
+  keywords:
+  - textures
+  - textures
+- name: general
+  description: Files that don't fit other rooms
+  keywords: []

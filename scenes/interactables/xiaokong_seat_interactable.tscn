@@ -1,0 +1,13 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://components/xiaokong_ai_command_dispatcher_component.gd" id="1_dispatch"]
+[ext_resource type="Script" path="res://components/xiaokong_seat_interactable_component.gd" id="2_seat"]
+
+[node name="XiaokongSeatInteractable" type="Node" groups=["xiaokong_interactable"]]
+script = ExtResource("2_seat")
+interaction_enabled = true
+interaction_time = 0.25
+trigger_on_short_interact = false
+
+[node name="CommandDispatcher" type="Node" parent="."]
+script = ExtResource("1_dispatch")

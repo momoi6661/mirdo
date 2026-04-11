@@ -7,6 +7,9 @@ extends Node
 
 @export_category("Settings")
 @export var interact_key: Key = KEY_E
+@export var fallback_group_search_enabled: bool = true
+@export var fallback_interactable_groups: PackedStringArray = PackedStringArray([&"xiaokong_interactable"])
+@export_range(0.1, 3.0, 0.05) var fallback_interactable_max_distance: float = 0.6
 
 var current_interactable: Node = null
 var is_interacting: bool = false
@@ -39,26 +42,70 @@ func _physics_process(delta: float) -> void:
 		return
 		
 	var interactable = _get_interactable(collider)
+	if interactable == null and fallback_group_search_enabled:
+		interactable = _find_nearby_group_interactable(interaction_ray.get_collision_point())
 	
 	if interactable != current_interactable:
 		_clear_target()
 		current_interactable = interactable
 		if current_interactable:
+			_set_interactable_focus(current_interactable, true)
 			var prompt_text = "交互"
 			if current_interactable.has_method("get_prompt_text"):
 				prompt_text = current_interactable.get_prompt_text()
-			interaction_hud.show_prompt("[E] " + prompt_text)
+			var trimmed_prompt: String = String(prompt_text).strip_edges()
+			if trimmed_prompt.is_empty():
+				trimmed_prompt = "交互"
+			interaction_hud.show_prompt("[E] " + trimmed_prompt)
 			
 	if current_interactable:
 		_handle_interaction(delta)
 
 func _get_interactable(node: Node) -> Node:
-	if node.has_method("interact") and node.has_method("get_interaction_time"):
-		return node
-	for child in node.get_children():
-		if child.has_method("interact") and child.has_method("get_interaction_time"):
-			return child
+	var current: Node = node
+	while current != null:
+		if current.has_method("interact") and current.has_method("get_interaction_time"):
+			if current.has_method("is_interaction_enabled") and not bool(current.call("is_interaction_enabled")):
+				pass
+			else:
+				return current
+		for child in current.get_children():
+			if child.has_method("interact") and child.has_method("get_interaction_time"):
+				if child.has_method("is_interaction_enabled") and not bool(child.call("is_interaction_enabled")):
+					continue
+				return child
+		current = current.get_parent()
 	return null
+
+func _find_nearby_group_interactable(hit_position: Vector3) -> Node:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return null
+
+	var max_dist_sq: float = fallback_interactable_max_distance * fallback_interactable_max_distance
+	var best_dist_sq: float = INF
+	var best: Node = null
+
+	for group_name in fallback_interactable_groups:
+		if String(group_name).strip_edges().is_empty():
+			continue
+		var nodes: Array = tree.get_nodes_in_group(group_name)
+		for entry in nodes:
+			var node3d := entry as Node3D
+			if node3d == null or not is_instance_valid(node3d):
+				continue
+
+			var candidate: Node = _get_interactable(node3d)
+			if candidate == null:
+				continue
+
+			var dist_sq: float = node3d.global_position.distance_squared_to(hit_position)
+			if dist_sq > max_dist_sq or dist_sq >= best_dist_sq:
+				continue
+			best_dist_sq = dist_sq
+			best = candidate
+
+	return best
 
 func _handle_interaction(delta: float) -> void:
 	var req_time = 0.0
@@ -111,8 +158,16 @@ func _handle_interaction(delta: float) -> void:
 				interaction_hud.update_progress(0.0)
 
 func _clear_target() -> void:
+	_set_interactable_focus(current_interactable, false)
 	is_interacting = false
 	interact_timer = 0.0
 	current_interactable = null
 	if interaction_hud:
 		interaction_hud.hide_prompt()
+
+func _set_interactable_focus(interactable: Node, focused: bool) -> void:
+	if interactable == null:
+		return
+	if not interactable.has_method("set_interaction_focused"):
+		return
+	interactable.call("set_interaction_focused", focused)

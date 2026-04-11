@@ -1,0 +1,22 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://components/xiaokong_ai_command_dispatcher_component.gd" id="1_dispatch"]
+[ext_resource type="Script" path="res://components/xiaokong_poi_interactable_component.gd" id="2_interact"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_7y31j"]
+radius = 0.52
+
+[node name="XiaokongPOIInteractable" type="StaticBody3D" groups=["xiaokong_interactable"]]
+script = ExtResource("2_interact")
+interaction_enabled = false
+interaction_time = 0.25
+trigger_on_short_interact = false
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+shape = SubResource("SphereShape3D_7y31j")
+
+[node name="CommandDispatcher" type="Node" parent="."]
+script = ExtResource("1_dispatch")

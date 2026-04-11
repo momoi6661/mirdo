@@ -4,6 +4,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_lambert_wrap, specu
 group_uniforms Base;
 uniform vec4 base_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable;
+uniform bool use_albedo_tex = true;
 uniform bool use_alpha_cut = true;
 uniform float alpha_cutoff : hint_range(0.0, 1.0) = 0.35;
 
@@ -16,6 +17,7 @@ group_uniforms Surface;
 uniform float roughness : hint_range(0.0, 1.0) = 0.62;
 uniform float metallic : hint_range(0.0, 1.0) = 0.0;
 uniform float specular_level : hint_range(0.0, 2.0) = 0.30;
+uniform float reflection_reduction : hint_range(0.0, 1.0) = 0.45;
 uniform bool use_ao = false;
 uniform sampler2D ao_tex : hint_default_white, filter_linear_mipmap, repeat_enable;
 uniform float ao_light_affect : hint_range(0.0, 1.0) = 0.42;
@@ -64,7 +66,7 @@ uniform float rim_softness : hint_range(0.001, 0.5) = 0.16;
 uniform vec3 rim_color : source_color = vec3(1.0, 0.92, 0.88);
 
 void fragment() {
-	vec4 tex = texture(albedo_tex, UV);
+	vec4 tex = use_albedo_tex ? texture(albedo_tex, UV) : vec4(1.0);
 	vec4 base = base_color * tex;
 	if (use_alpha_cut && base.a < alpha_cutoff) {
 		discard;
@@ -77,8 +79,8 @@ void fragment() {
 	ALBEDO = clamp(color, 0.0, 1.0);
 
 	METALLIC = clamp(metallic, 0.0, 1.0);
-	ROUGHNESS = clamp(roughness, 0.05, 1.0);
-	SPECULAR = specular_level;
+	ROUGHNESS = clamp(roughness + reflection_reduction * 0.18, 0.05, 1.0);
+	SPECULAR = specular_level * (1.0 - reflection_reduction);
 
 	if (use_ao) {
 		AO = texture(ao_tex, UV).r;
@@ -153,15 +155,19 @@ void light() {
 	float spec = spec_step * highlight_strength * SPECULAR_AMOUNT;
 	spec *= smoothstep(0.14, 0.76, lit);
 	spec *= (1.0 - cloth_mask * 0.45);
-	spec *= mix(1.0, 0.60, skin_mask);
+	spec *= mix(1.0, 0.42, skin_mask);
 	spec *= mix(1.0, 0.82, rough);
+	spec *= (1.0 - reflection_reduction * 0.55);
+	spec *= mix(1.0, 1.0 - reflection_reduction * 0.55, skin_mask);
 
 	float skin_soft_lobe = pow(ndh, mix(6.0, 18.0, 1.0 - rough));
-	float skin_soft_spec = skin_soft_lobe * 0.03 * skin_mask * SPECULAR_AMOUNT * smoothstep(0.18, 0.88, lit);
+	float skin_soft_spec = skin_soft_lobe * 0.012 * skin_mask * SPECULAR_AMOUNT * smoothstep(0.18, 0.88, lit);
+	skin_soft_spec *= (1.0 - reflection_reduction * 0.70);
 	spec += skin_soft_spec;
 
 	float cloth_fres = pow(1.0 - max(dot(n, v), 0.0), cloth_sheen_power);
 	float cloth_sheen = cloth_fres * cloth_sheen_strength * cloth_mask * smoothstep(0.08, 0.90, lit);
+	cloth_sheen *= (1.0 - reflection_reduction * 0.65);
 	vec3 cloth_sheen_col = mix(cloth_sheen_tint, ALBEDO, 0.35);
 
 	float rim_raw = pow(1.0 - max(dot(n, v), 0.0), rim_power);
@@ -172,6 +178,8 @@ void light() {
 	);
 	float rim = rim_step * rim_strength * (0.35 + 0.65 * (1.0 - lit));
 	rim *= (1.0 - cloth_mask * 0.60);
+	rim *= mix(1.0, 0.60, skin_mask);
+	rim *= (1.0 - reflection_reduction * 0.35);
 
 	vec3 diff_final = pow(max(diffuse_col, vec3(0.0)), vec3(midtone_gamma));
 	DIFFUSE_LIGHT += diff_final * light_col * ATTENUATION;
