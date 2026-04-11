@@ -267,9 +267,9 @@ func _compute_next_step(current_state: StringName, target: StringName) -> String
 
 func _step_to_idle(current_state: StringName) -> StringName:
 	if current_state == SIT_TO_STAND_STATE:
-		return SIT_TO_STAND_STATE
+		return TargetState.IDLE
 	if _is_sitting_context_state(current_state):
-		return SIT_TO_STAND_STATE
+		return TargetState.IDLE
 	if _is_laying_context_state(current_state):
 		return TargetState.SITTING_IDLE
 	return TargetState.IDLE

@@ -24,6 +24,8 @@ enum OpenDirectionMode {
 @export var prevent_close_if_player_near: bool = true
 @export var close_block_distance: float = 1.15
 @export var disable_collision_while_moving: bool = true
+@export var disable_collision_while_closing: bool = true
+@export var closing_collision_mask: int = 0
 @export var reenable_collision_delay: float = 0.02
 
 var _door_node: Node3D
@@ -31,7 +33,9 @@ var _base_rotation: Vector3 = Vector3.ZERO
 var _is_open: bool = false
 var _current_open_sign: float = 1.0
 var _tween: Tween
-var _collision_shapes: Array[CollisionShape3D] = []
+var _default_collision_layer: int = 0
+var _default_collision_mask: int = 0
+var _closing_collision_temporarily_disabled: bool = false
 
 func _ready() -> void:
 	_door_node = get_node_or_null(target_door) as Node3D
@@ -39,7 +43,8 @@ func _ready() -> void:
 		push_warning("SwingPushDoorComponent target door missing at: " + str(target_door))
 		return
 	_base_rotation = _door_node.rotation
-	_collect_collision_shapes(self)
+	_default_collision_layer = collision_layer
+	_default_collision_mask = collision_mask
 
 func get_interaction_time() -> float:
 	return interaction_time
@@ -127,29 +132,27 @@ func _is_close_blocked(player: Node) -> bool:
 	var player_node: Node3D = player as Node3D
 	return _door_node.global_position.distance_to(player_node.global_position) < close_block_distance
 
-func _collect_collision_shapes(root: Node) -> void:
-	if root is CollisionShape3D:
-		var shape: CollisionShape3D = root as CollisionShape3D
-		_collision_shapes.append(shape)
-	for child: Node in root.get_children():
-		_collect_collision_shapes(child)
-
-func _set_collision_shapes_disabled(disabled: bool) -> void:
-	for shape: CollisionShape3D in _collision_shapes:
-		if shape == null:
-			continue
-		shape.set_deferred("disabled", disabled)
+func _set_closing_collision_disabled(disabled: bool) -> void:
+	_closing_collision_temporarily_disabled = disabled
+	if disabled:
+		# Keep collision layer unchanged so RayCast/line-of-sight still hits the door.
+		collision_layer = _default_collision_layer
+		collision_mask = closing_collision_mask
+		return
+	collision_layer = _default_collision_layer
+	collision_mask = _default_collision_mask
 
 func _on_motion_finished() -> void:
-	if not disable_collision_while_moving:
+	if not _closing_collision_temporarily_disabled:
 		return
 	if reenable_collision_delay <= 0.0:
-		_set_collision_shapes_disabled(false)
+		_set_closing_collision_disabled(false)
 		return
 
 	var timer: SceneTreeTimer = get_tree().create_timer(reenable_collision_delay)
 	await timer.timeout
-	_set_collision_shapes_disabled(false)
+	if _closing_collision_temporarily_disabled:
+		_set_closing_collision_disabled(false)
 
 func _animate_to(target_angle_degrees: float, is_closing: bool) -> void:
 	if _door_node == null:
@@ -158,8 +161,11 @@ func _animate_to(target_angle_degrees: float, is_closing: bool) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 
-	if disable_collision_while_moving:
-		_set_collision_shapes_disabled(true)
+	var should_disable_collision: bool = disable_collision_while_moving and disable_collision_while_closing and is_closing
+	if should_disable_collision:
+		_set_closing_collision_disabled(true)
+	elif _closing_collision_temporarily_disabled:
+		_set_closing_collision_disabled(false)
 
 	var duration: float = maxf(0.01, close_duration if is_closing else open_duration)
 	var target_y: float = _base_rotation.y + deg_to_rad(target_angle_degrees)

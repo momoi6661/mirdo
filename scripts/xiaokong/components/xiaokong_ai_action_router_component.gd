@@ -29,6 +29,8 @@ const COMMAND_STOP_FOLLOW := "stop_follow"
 const COMMAND_LOOK_AT_PLAYER := "look_at_player"
 const COMMAND_SIT_DOWN := "sit_down"
 const COMMAND_GO_TO_MARKER := "go_to_marker"
+const SEAT_OCCUPIED_META_KEY := "xiaokong_seat_occupied"
+const SEAT_OCCUPANT_META_KEY := "xiaokong_seat_occupant"
 
 const LOCATION_KEYWORD_MARKERS: Dictionary = {}
 
@@ -99,11 +101,20 @@ const COMMAND_ALIASES: Dictionary = {
 @export_range(0.05, 2.0, 0.01) var sit_turn_alignment_timeout_sec: float = 1.1
 @export_range(0.0, 0.8, 0.01) var sit_attach_start_delay_sec: float = 0.32
 @export_range(0.15, 2.0, 0.01) var sit_attach_max_distance: float = 0.5
-@export var sit_attach_preserve_current_height: bool = true
+@export var sit_attach_preserve_current_height: bool = false
+@export var sit_direct_without_navigation_enabled: bool = true
+@export var sit_direct_requires_approach_marker: bool = true
+@export_range(0.1, 2.0, 0.01) var sit_direct_entry_distance: float = 0.42
+@export_range(0.0, 1.0, 0.01) var sit_direct_height_tolerance: float = 0.42
+@export_range(0, 3, 1) var sit_arrival_repath_max_retries: int = 1
 @export var sit_navigation_precision_enabled: bool = true
 @export_range(0.03, 0.8, 0.01) var sit_navigation_path_desired_distance: float = 0.08
 @export_range(0.03, 1.2, 0.01) var sit_navigation_target_desired_distance: float = 0.12
 @export var sit_toggle_stand_when_in_sit_state: bool = true
+@export var stand_before_switching_seat: bool = true
+@export var stand_relocate_after_rise: bool = true
+@export_range(0.3, 5.0, 0.05) var stand_transition_timeout_sec: float = 2.4
+@export_range(0.01, 0.3, 0.01) var stand_transition_poll_interval_sec: float = 0.05
 
 @export var sleep_marker_priority: PackedStringArray = PackedStringArray(["Bed_Lie_Mark3D", "Bed2_Lie_Mark3D"])
 @export var sleep_marker_keywords: PackedStringArray = PackedStringArray(["bed", "lay", "lie", "sleep"])
@@ -140,6 +151,8 @@ var _collision_saved_mask: int = 0
 var _sit_nav_precision_override_active: bool = false
 var _saved_nav_path_desired_distance: float = 0.0
 var _saved_nav_target_desired_distance: float = 0.0
+var _stand_request_serial: int = 0
+var _sit_arrival_repath_retries_left: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -195,6 +208,8 @@ func apply_ai_response(final_data: Dictionary) -> Dictionary:
 			summary["queued_action"] = String(normalized_action)
 		else:
 			if _action_controller != null and _action_controller.has_method("trigger_action"):
+				if normalized_action == &"Idle" and _is_sitting_context_state_name(_get_action_controller_state_name()):
+					_clear_active_sit_marker()
 				_invalidate_pending_snap()
 				_clear_pending_arrival_state()
 				_clear_marker_interaction_ik()
@@ -277,7 +292,7 @@ func _on_navigation_destination_reached() -> void:
 	if arrival_action != &"" and _action_controller != null and _action_controller.has_method("trigger_action"):
 		_action_controller.call("trigger_action", arrival_action)
 	if arrival_action == &"Idle":
-		_active_sit_marker_path = ""
+		_clear_active_sit_marker()
 	_clear_pending_arrival_state()
 
 func _try_handle_pending_sit_arrival() -> bool:
@@ -355,6 +370,164 @@ func _clear_pending_sit_state() -> void:
 	_pending_sit_virtual_approach = false
 	_restore_sit_navigation_precision()
 
+func _set_active_sit_marker(marker: Marker3D) -> void:
+	if marker == null or not is_instance_valid(marker):
+		return
+	var next_path: String = String(marker.get_path())
+	if _active_sit_marker_path == next_path:
+		_set_marker_seat_occupied_state(marker, true)
+		return
+	_clear_active_sit_marker()
+	_active_sit_marker_path = next_path
+	_set_marker_seat_occupied_state(marker, true)
+
+func _clear_active_sit_marker() -> void:
+	var current: Marker3D = _resolve_active_sit_marker()
+	if current != null:
+		_set_marker_seat_occupied_state(current, false)
+	_active_sit_marker_path = ""
+
+func _resolve_active_sit_marker() -> Marker3D:
+	if _active_sit_marker_path.strip_edges().is_empty():
+		return null
+	var by_path: Marker3D = _find_marker_by_path(_active_sit_marker_path, &"SittingIdle")
+	if by_path != null:
+		return by_path
+	var marker_name: String = _active_sit_marker_path.get_file().strip_edges()
+	if marker_name.is_empty():
+		return null
+	return _find_marker_by_name(marker_name, &"SittingIdle")
+
+func _set_marker_seat_occupied_state(marker: Marker3D, occupied: bool) -> void:
+	if marker == null or not is_instance_valid(marker):
+		return
+	marker.set_meta(SEAT_OCCUPIED_META_KEY, occupied)
+	var occupant_text: String = ""
+	if occupied and _action_controller != null:
+		occupant_text = String(_action_controller.name)
+	marker.set_meta(SEAT_OCCUPANT_META_KEY, occupant_text)
+	var stand_marker: Marker3D = _resolve_marker_sibling(marker, "Stand_Mark3D")
+	if stand_marker != null:
+		stand_marker.set_meta(SEAT_OCCUPIED_META_KEY, occupied)
+		stand_marker.set_meta(SEAT_OCCUPANT_META_KEY, occupant_text)
+
+func _is_seat_marker_occupied_by_self(marker: Marker3D) -> bool:
+	if marker == null or not is_instance_valid(marker):
+		return false
+	if not bool(marker.get_meta(SEAT_OCCUPIED_META_KEY, false)):
+		return false
+	if _action_controller == null:
+		return false
+	var occupant_text: String = String(marker.get_meta(SEAT_OCCUPANT_META_KEY, "")).strip_edges()
+	if occupant_text.is_empty():
+		return false
+	return occupant_text == String(_action_controller.name)
+
+func _request_stand_up_only(summary: Dictionary, mode: String = "stand_up") -> bool:
+	if _action_controller == null or not _action_controller.has_method("trigger_action"):
+		summary["errors"].append("action_controller_has_no_trigger_action")
+		return false
+
+	_clear_pending_arrival_state()
+	_clear_pending_sit_state()
+	_clear_marker_interaction_ik()
+	_clear_active_sit_marker()
+	if _action_controller.has_method("stop_navigation"):
+		_action_controller.call("stop_navigation")
+
+	var accepted: bool = bool(_action_controller.call("trigger_action", &"Idle"))
+	if not accepted:
+		summary["errors"].append("stand_trigger_rejected")
+		return false
+
+	summary["command_applied"] = true
+	summary["navigation_mode"] = mode
+	summary["action_requested"] = "Idle"
+	summary["action_queued"] = true
+	summary["queued_action"] = "Idle"
+	return true
+
+func _start_post_stand_relocate(stand_serial: int, stand_marker_path: String, mode: String = "stand_up") -> void:
+	if stand_marker_path.strip_edges().is_empty():
+		return
+	call_deferred("_run_post_stand_relocate", stand_serial, stand_marker_path, mode)
+
+func _run_post_stand_relocate(stand_serial: int, stand_marker_path: String, mode: String) -> void:
+	var transition_ready: bool = await _wait_until_stand_transition_finished(stand_serial)
+	if not transition_ready:
+		return
+	if not _is_stand_request_valid(stand_serial):
+		return
+	var stand_marker: Marker3D = _find_marker_by_path(stand_marker_path)
+	if stand_marker == null:
+		stand_marker = _find_marker_by_name(stand_marker_path.get_file())
+	if stand_marker == null:
+		return
+	var relay_summary: Dictionary = {"errors": []}
+	_navigate_to_marker_and_queue_action(stand_marker, &"Idle", mode, relay_summary)
+
+func _start_post_stand_switch_to_seat(stand_serial: int, approach_marker_path: String, seat_marker_path: String, sit_action_name: StringName) -> void:
+	if seat_marker_path.strip_edges().is_empty():
+		return
+	call_deferred("_run_post_stand_switch_to_seat", stand_serial, approach_marker_path, seat_marker_path, String(sit_action_name))
+
+func _run_post_stand_switch_to_seat(stand_serial: int, approach_marker_path: String, seat_marker_path: String, sit_action_text: String) -> void:
+	var transition_ready: bool = await _wait_until_stand_transition_finished(stand_serial)
+	if not transition_ready:
+		return
+	if not _is_stand_request_valid(stand_serial):
+		return
+
+	var seat_marker: Marker3D = _find_marker_by_path(seat_marker_path, &"SittingIdle")
+	if seat_marker == null:
+		seat_marker = _find_marker_by_name(seat_marker_path.get_file(), &"SittingIdle")
+	if seat_marker == null:
+		return
+
+	var sit_action_name: StringName = _normalize_action_name_for_command(sit_action_text, &"SittingIdle")
+	var approach_marker: Marker3D = null
+	if not approach_marker_path.strip_edges().is_empty():
+		approach_marker = _find_marker_by_path(approach_marker_path)
+		if approach_marker == null:
+			approach_marker = _find_marker_by_name(approach_marker_path.get_file())
+	_sit_arrival_repath_retries_left = maxi(0, sit_arrival_repath_max_retries)
+	if _should_skip_navigation_for_sit(seat_marker, approach_marker):
+		_clear_pending_arrival_state()
+		_clear_pending_sit_state()
+		if _action_controller != null and _action_controller.has_method("stop_navigation"):
+			_action_controller.call("stop_navigation")
+		_start_sit_arrival_sequence(String(seat_marker.get_path()), sit_action_name)
+		return
+
+	var relay_summary: Dictionary = {"errors": []}
+	_apply_sit_navigation_precision()
+	if sit_use_approach_marker_pipeline:
+		if approach_marker != null:
+			_navigate_to_sit_with_approach(approach_marker, seat_marker, sit_action_name, relay_summary)
+			return
+		if sit_auto_generate_approach_when_missing:
+			_navigate_to_sit_with_virtual_approach(seat_marker, sit_action_name, relay_summary)
+			return
+
+	_clear_pending_sit_state()
+	_navigate_to_marker_and_queue_action(seat_marker, sit_action_name, COMMAND_SIT_DOWN, relay_summary)
+
+func _wait_until_stand_transition_finished(stand_serial: int) -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	var timeout_sec: float = maxf(0.3, stand_transition_timeout_sec)
+	var poll_sec: float = maxf(0.01, stand_transition_poll_interval_sec)
+	var elapsed: float = 0.0
+	while elapsed < timeout_sec:
+		if not is_inside_tree() or not _is_stand_request_valid(stand_serial):
+			return false
+		if not _is_sitting_context_state_name(_get_action_controller_state_name()):
+			return true
+		await tree.create_timer(poll_sec).timeout
+		elapsed += poll_sec
+	return not _is_sitting_context_state_name(_get_action_controller_state_name())
+
 func _start_sit_arrival_sequence(seat_marker_path: String, sit_action: StringName) -> void:
 	if seat_marker_path.strip_edges().is_empty():
 		return
@@ -373,7 +546,11 @@ func _run_sit_arrival_sequence(seat_marker_path: String, sit_action: StringName)
 	if not is_inside_tree() or not _is_snap_serial_valid(serial):
 		return
 
-	_active_sit_marker_path = String(seat_marker.get_path())
+	if not _is_body_close_enough_for_sit_attach(seat_marker):
+		_retry_sit_navigation_after_failed_arrival(seat_marker, sit_action)
+		return
+
+	_set_active_sit_marker(seat_marker)
 	if sit_action != &"" and _action_controller != null and _action_controller.has_method("trigger_action"):
 		_action_controller.call("trigger_action", sit_action)
 	_apply_marker_interaction_ik(seat_marker)
@@ -386,6 +563,25 @@ func _run_sit_arrival_sequence(seat_marker_path: String, sit_action: StringName)
 
 	if _is_body_close_enough_for_sit_attach(seat_marker):
 		_smooth_attach_action_controller_to_marker(seat_marker, sit_action, sit_attach_duration_sec)
+
+func _retry_sit_navigation_after_failed_arrival(seat_marker: Marker3D, sit_action: StringName) -> void:
+	if seat_marker == null:
+		return
+	if _sit_arrival_repath_retries_left <= 0:
+		return
+	_sit_arrival_repath_retries_left -= 1
+
+	var relay_summary: Dictionary = {"errors": []}
+	if sit_use_approach_marker_pipeline:
+		var approach_marker: Marker3D = _resolve_marker_sibling(seat_marker, "Approach_Mark3D")
+		if approach_marker != null:
+			_navigate_to_sit_with_approach(approach_marker, seat_marker, sit_action, relay_summary)
+			return
+		if sit_auto_generate_approach_when_missing:
+			_navigate_to_sit_with_virtual_approach(seat_marker, sit_action, relay_summary)
+			return
+
+	_navigate_to_marker_and_queue_action(seat_marker, sit_action, COMMAND_SIT_DOWN, relay_summary)
 
 func _align_body_for_sit_before_action(seat_marker: Marker3D, serial: int) -> void:
 	if seat_marker == null:
@@ -472,6 +668,7 @@ func _is_body_close_enough_for_sit_attach(seat_marker: Marker3D) -> bool:
 
 func _invalidate_pending_snap() -> void:
 	_snap_request_serial += 1
+	_stand_request_serial += 1
 	_clear_pending_sit_state()
 	_restore_sit_navigation_precision()
 
@@ -481,6 +678,13 @@ func _begin_pending_snap() -> int:
 
 func _is_snap_serial_valid(serial: int) -> bool:
 	return serial == _snap_request_serial
+
+func _begin_stand_request() -> int:
+	_stand_request_serial += 1
+	return _stand_request_serial
+
+func _is_stand_request_valid(serial: int) -> bool:
+	return serial == _stand_request_serial
 
 func _apply_sit_navigation_precision() -> void:
 	if not sit_navigation_precision_enabled:
@@ -826,6 +1030,8 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 				summary["errors"].append("action_controller_has_no_follow_target")
 				return true
 			_invalidate_pending_snap()
+			if _is_sitting_context_state_name(_get_action_controller_state_name()):
+				_clear_active_sit_marker()
 			_action_controller.call("follow_target", target_node)
 			_clear_pending_arrival_state()
 			_apply_follow_look_ik(target_node)
@@ -887,22 +1093,62 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 			var toggle_stand: bool = bool(payload.get("toggle_stand_if_seated", false))
 			var stand_check_distance: float = float(payload.get("stand_toggle_distance", stand_toggle_distance_default))
 			var is_sitting_state: bool = _is_sitting_context_state_name(_get_action_controller_state_name())
-			var is_near_requested_seat: bool = _is_currently_sitting_near_marker(sit_marker, stand_check_distance)
-			var has_explicit_stand_target: bool = payload.has("stand_marker") or payload.has("stand_marker_path")
-			var same_active_seat: bool = String(sit_marker.get_path()) == _active_sit_marker_path
-			var allow_state_toggle: bool = sit_toggle_stand_when_in_sit_state and is_sitting_state and has_explicit_stand_target and same_active_seat
-			if toggle_stand and (is_near_requested_seat or allow_state_toggle):
-				_clear_pending_sit_state()
-				_active_sit_marker_path = ""
-				var stand_marker: Marker3D = _extract_stand_marker(payload)
-				if stand_marker == null:
-					stand_marker = sit_marker
-				var stand_action_name: StringName = _normalize_action_name_for_command(payload.get("stand_action", "Idle"), &"Idle")
-				_navigate_to_marker_and_queue_action(stand_marker, stand_action_name, "stand_up", summary)
-				return true
-
 			var sit_action_name: StringName = _normalize_action_name_for_command(payload.get("action", "SittingIdle"), &"SittingIdle")
 			var approach_marker: Marker3D = _extract_approach_marker(payload, sit_marker)
+			_sit_arrival_repath_retries_left = maxi(0, sit_arrival_repath_max_retries)
+			var is_near_requested_seat: bool = _is_currently_sitting_near_marker(sit_marker, stand_check_distance)
+			var is_requested_seat_occupied_by_self: bool = _is_seat_marker_occupied_by_self(sit_marker)
+			var has_active_seat_path: bool = not _active_sit_marker_path.strip_edges().is_empty()
+			var requested_seat_path: String = String(sit_marker.get_path())
+			var has_explicit_stand_target: bool = payload.has("stand_marker") or payload.has("stand_marker_path")
+			var same_active_seat: bool = requested_seat_path == _active_sit_marker_path
+			var allow_state_toggle: bool = sit_toggle_stand_when_in_sit_state and has_explicit_stand_target and same_active_seat
+			var allow_distance_toggle: bool = is_near_requested_seat and (not has_active_seat_path or same_active_seat)
+			var should_toggle_stand: bool = toggle_stand and is_sitting_state and (allow_state_toggle or allow_distance_toggle or is_requested_seat_occupied_by_self)
+			var should_switch_seat: bool = is_sitting_state and not same_active_seat and not is_requested_seat_occupied_by_self
+			if should_toggle_stand:
+				_clear_pending_sit_state()
+				_begin_stand_request()
+				var accepted_stand: bool = _request_stand_up_only(summary, "stand_up")
+				if accepted_stand:
+					summary["moved"] = false
+				return true
+
+			var should_direct_sit_without_navigation: bool = not is_sitting_state and _should_skip_navigation_for_sit(sit_marker, approach_marker)
+			if should_direct_sit_without_navigation:
+				_clear_pending_arrival_state()
+				_clear_pending_sit_state()
+				if _action_controller.has_method("stop_navigation"):
+					_action_controller.call("stop_navigation")
+				_start_sit_arrival_sequence(requested_seat_path, sit_action_name)
+				summary["command_applied"] = true
+				summary["moved"] = false
+				summary["navigation_mode"] = "sit_direct"
+				summary["target_marker"] = requested_seat_path
+				summary["action_requested"] = String(sit_action_name)
+				summary["action_queued"] = true
+				summary["queued_action"] = String(sit_action_name)
+				return true
+
+			if should_switch_seat and stand_before_switching_seat:
+				var stand_then_sit_serial: int = _begin_stand_request()
+				var accepted_stand_then_sit: bool = _request_stand_up_only(summary, "stand_then_sit")
+				if accepted_stand_then_sit:
+					_start_post_stand_switch_to_seat(
+						stand_then_sit_serial,
+						String(approach_marker.get_path()) if approach_marker != null else "",
+						requested_seat_path,
+						sit_action_name
+					)
+					summary["target_marker"] = requested_seat_path
+					summary["move_target"] = _project_to_navigation_target(_build_marker_navigation_probe(sit_marker))
+					summary["moved"] = true
+					summary["queued_action"] = String(sit_action_name)
+				return true
+
+			if should_switch_seat:
+				_clear_active_sit_marker()
+
 			_apply_sit_navigation_precision()
 			if sit_use_approach_marker_pipeline:
 				if approach_marker != null:
@@ -929,6 +1175,8 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 			if target_marker == null:
 				summary["errors"].append("target_marker_not_found")
 				return true
+			if _is_sitting_context_state_name(_get_action_controller_state_name()):
+				_clear_active_sit_marker()
 			_navigate_to_marker(target_marker, COMMAND_GO_TO_MARKER, summary)
 			return true
 
@@ -1462,6 +1710,71 @@ func _build_virtual_sit_approach_position(seat_marker: Marker3D) -> Vector3:
 			best_target = projected
 
 	return best_target
+
+func _should_skip_navigation_for_sit(seat_marker: Marker3D, approach_marker: Marker3D = null) -> bool:
+	if not sit_direct_without_navigation_enabled:
+		return false
+	if seat_marker == null:
+		return false
+	if not (_action_controller is Node3D):
+		return false
+
+	var entry_position: Vector3 = _compute_sit_entry_position_for_direct_check(seat_marker, approach_marker)
+	if entry_position == Vector3.INF:
+		return false
+	var direct_threshold: float = maxf(0.05, sit_direct_entry_distance)
+	return _is_body_near_world_point(entry_position, direct_threshold, sit_direct_height_tolerance)
+
+func _compute_sit_entry_position_for_direct_check(seat_marker: Marker3D, approach_marker: Marker3D = null) -> Vector3:
+	if approach_marker != null and is_instance_valid(approach_marker):
+		return approach_marker.global_position
+	if sit_direct_requires_approach_marker:
+		return Vector3.INF
+	return _build_virtual_sit_approach_position_unprojected(seat_marker)
+
+func _build_virtual_sit_approach_position_unprojected(seat_marker: Marker3D) -> Vector3:
+	if seat_marker == null:
+		return Vector3.INF
+	var final_body_transform: Transform3D = _compute_body_transform_for_marker(seat_marker, true, true)
+	var final_body_pos: Vector3 = final_body_transform.origin
+	var marker_forward: Vector3 = _extract_marker_flat_forward(seat_marker)
+	if marker_forward.length_squared() <= 0.0001:
+		return final_body_pos
+
+	var approach_distance: float = maxf(0.2, sit_auto_approach_distance)
+	var body_pos: Vector3 = _get_action_controller_world_position()
+	var candidate_offsets: PackedFloat32Array = PackedFloat32Array()
+	if sit_virtual_approach_auto_choose_side:
+		candidate_offsets.append(1.0)
+		candidate_offsets.append(-1.0)
+	else:
+		candidate_offsets.append(1.0 if sit_virtual_approach_use_positive_marker_z else -1.0)
+
+	var best_target: Vector3 = final_body_pos + marker_forward * float(candidate_offsets[0]) * approach_distance
+	var best_score: float = INF
+	for offset_sign in candidate_offsets:
+		var candidate: Vector3 = final_body_pos + marker_forward * float(offset_sign) * approach_distance
+		if body_pos != Vector3.INF:
+			candidate.y = body_pos.y
+		var score: float = _score_sit_approach_target(candidate, body_pos)
+		if score < best_score:
+			best_score = score
+			best_target = candidate
+	return best_target
+
+func _is_body_near_world_point(target_position: Vector3, planar_threshold: float, height_threshold: float) -> bool:
+	if target_position == Vector3.INF:
+		return false
+	if not (_action_controller is Node3D):
+		return false
+	var body := _action_controller as Node3D
+	var body_pos: Vector3 = body.global_position
+	var dx: float = body_pos.x - target_position.x
+	var dz: float = body_pos.z - target_position.z
+	var planar_distance: float = sqrt(dx * dx + dz * dz)
+	if planar_distance > maxf(0.05, planar_threshold):
+		return false
+	return absf(body_pos.y - target_position.y) <= maxf(0.05, height_threshold)
 
 func _score_sit_approach_target(candidate: Vector3, body_pos: Vector3) -> float:
 	if body_pos == Vector3.INF:

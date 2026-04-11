@@ -9,6 +9,7 @@ class_name XiaokongSeatInteractableComponent
 @export var trigger_on_short_interact: bool = false
 
 @export_category("Seat Target")
+@export var occupied_prompt_text: String = "让小空站起来"
 @export var approach_marker_name: String = ""
 @export var approach_marker_path: NodePath
 @export var target_marker_name: String = ""
@@ -35,6 +36,7 @@ var _highlight_meshes: Array[MeshInstance3D] = []
 var _original_mesh_overlays: Dictionary = {}
 var _highlight_overlay: StandardMaterial3D
 var _focused: bool = false
+const SEAT_OCCUPIED_META_KEY := "xiaokong_seat_occupied"
 
 func _ready() -> void:
 	_refresh_highlight_meshes()
@@ -50,6 +52,11 @@ func get_interaction_time() -> float:
 func get_prompt_text() -> String:
 	if not interaction_enabled:
 		return ""
+	var target_marker: Marker3D = _resolve_target_seat_marker()
+	if target_marker != null and bool(target_marker.get_meta(SEAT_OCCUPIED_META_KEY, false)):
+		var occupied_prompt: String = occupied_prompt_text.strip_edges()
+		if not occupied_prompt.is_empty():
+			return occupied_prompt
 	var trimmed: String = prompt_text.strip_edges()
 	if trimmed.is_empty():
 		return ""
@@ -224,6 +231,9 @@ func _resolve_marker_path_string(path_hint: NodePath, marker_name_hint: String) 
 	if not fallback.is_empty():
 		return fallback
 	return ""
+
+func _resolve_target_seat_marker() -> Marker3D:
+	return _resolve_marker(target_marker_path, target_marker_name.strip_edges())
 
 func _resolve_marker(path_hint: NodePath, marker_name_hint: String) -> Marker3D:
 	if path_hint != NodePath():

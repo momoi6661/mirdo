@@ -1153,3 +1153,59 @@ python.exe - 应用程序错误
 - See Also: ERR-20260411-002
 
 ---
+## [ERR-20260411-004] rg-access-denied-in-codex-windowsapps
+
+**Logged**: 2026-04-11T20:20:02+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tooling
+
+### Summary
+g 在当前 Codex WindowsApps 路径下启动被拒绝访问，导致默认代码检索命令不可用。
+
+### Error
+`	ext
+Program 'rg.exe' failed to run ... with working directory 'D:\AAgodot\FPS'. 拒绝访问。
+`
+
+### Context
+- Command/operation attempted: g -n ....
+- Goal: 快速定位坐下/起立导航与吸附逻辑。
+
+### Suggested Fix
+在该环境默认回退到 Select-String + Get-Content，并保留 g 仅作可用时加速路径。
+
+### Metadata
+- Reproducible: yes
+- Related Files: scripts/xiaokong/components/xiaokong_ai_action_router_component.gd
+- See Also: ERR-20260410-TOOL12
+
+---
+## [ERR-20260411-005] rg-access-denied-repeat
+
+**Logged**: 2026-04-11T22:16:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: tooling
+
+### Summary
+`rg.exe` failed to launch again in this Codex desktop environment and required PowerShell fallback.
+
+### Error
+```text
+Program 'rg.exe' failed to run ... with working directory 'D:\AAgodot\FPS'. 拒绝访问。
+```
+
+### Context
+- Command/operation attempted: recursive text search for raycast/collision usages.
+- Workaround: switched to `Get-ChildItem | Select-String`.
+
+### Suggested Fix
+Treat `Select-String` fallback as default in this environment when `rg` fails.
+
+### Metadata
+- Reproducible: yes
+- Related Files: N/A
+- See Also: ERR-20260411-004
+
+---
