@@ -27,10 +27,12 @@ radius = 6.5739846
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_u6tj1"]
 radius = 0.25
+height = 1.7
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_6tv51"]
 material = ExtResource("2_gldw4")
 radius = 0.25
+height = 1.7
 
 [sub_resource type="Animation" id="Animation_ca8e7"]
 length = 0.001
@@ -44,7 +46,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [2.0]
+"values": [1.7]
 }
 tracks/1/type = "value"
 tracks/1/imported = false
@@ -56,7 +58,7 @@ tracks/1/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [Vector3(0, 1, 0)]
+"values": [Vector3(0, 0.85, 0)]
 }
 tracks/2/type = "value"
 tracks/2/imported = false
@@ -68,7 +70,7 @@ tracks/2/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [Vector3(0, 1.5, 0)]
+"values": [Vector3(0, 1.35, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_xc2pf"]
@@ -83,7 +85,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0, 1),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [2.0, 1.5]
+"values": [1.7, 1.5]
 }
 tracks/1/type = "value"
 tracks/1/imported = false
@@ -95,7 +97,7 @@ tracks/1/keys = {
 "times": PackedFloat32Array(0, 1),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [Vector3(0, 1, 0), Vector3(0, 0.75, 0)]
+"values": [Vector3(0, 0.85, 0), Vector3(0, 0.75, 0)]
 }
 tracks/2/type = "value"
 tracks/2/imported = false
@@ -107,7 +109,7 @@ tracks/2/keys = {
 "times": PackedFloat32Array(0, 1),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [Vector3(0, 1.5, 0), Vector3(0, 1, 0)]
+"values": [Vector3(0, 1.35, 0), Vector3(0, 0.85, 0)]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_t6fw5"]
@@ -250,10 +252,11 @@ script = ExtResource("19_xk_ctrl")
 default_target_path = NodePath("../../../Xiaokong1/xiaokong")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=3143502]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
 shape = SubResource("CapsuleShape3D_u6tj1")
 
 [node name="PlaceholderMesh" type="MeshInstance3D" parent="CollisionShape3D" unique_id=239223935]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0021640062, 0)
 layers = 2
 mesh = SubResource("CapsuleMesh_6tv51")
 
@@ -261,12 +264,12 @@ mesh = SubResource("CapsuleMesh_6tv51")
 libraries/ = SubResource("AnimationLibrary_t6fw5")
 
 [node name="Marker3D" type="Marker3D" parent="." unique_id=1226719117]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
 
 [node name="CameraOffset" type="Node3D" parent="Marker3D" unique_id=2006593265]
 
 [node name="Camera3D" type="Camera3D" parent="Marker3D/CameraOffset" unique_id=2006032877]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3412707, 0)
 top_level = true
 cull_mask = 1
 
@@ -345,15 +348,6 @@ offset_right = 200.0
 offset_bottom = 75.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_rk4xh")
 
-[node name="XiaokongStatusPanel" parent="Control" unique_id=1020198871 instance=ExtResource("21_xk_status")]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -332.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 214.0
-
 [node name="MarginContainer" type="MarginContainer" parent="Control/DebugPanel" unique_id=-294967294]
 layout_mode = 2
 theme_override_constants/margin_left = 10
@@ -372,6 +366,17 @@ text = "State: Idle"
 [node name="SpeedLabel" type="Label" parent="Control/DebugPanel/MarginContainer/VBoxContainer" unique_id=-1294967294]
 layout_mode = 2
 text = "Speed: 0.0"
+
+[node name="XiaokongStatusPanel" parent="Control" unique_id=1020198871 instance=ExtResource("21_xk_status")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -332.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 214.0
+grow_horizontal = 0
 
 [node name="XiaokongControlPanel" type="PanelContainer" parent="Control" unique_id=118273645]
 visible = false

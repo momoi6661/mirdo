@@ -9,6 +9,7 @@ class_name XiaokongFaceAnimationComponent
 @export var face_talk_animation: StringName = &"face_talk_loop"
 @export var face_talk_blend_duration: float = 0.12
 @export_range(0.0, 1.0, 0.01) var face_expression_transition_duration: float = 0.16
+@export_range(0.05, 2.0, 0.01) var face_setup_retry_interval: float = 0.2
 
 @onready var face_animation_player: AnimationPlayer = _resolve_face_animation_player()
 @onready var face_animation_tree: AnimationTree = _resolve_face_animation_tree()
@@ -52,12 +53,25 @@ var _face_talk_blend_from: float = 0.0
 var _face_talk_blend_to: float = 0.0
 var _face_talk_blend_elapsed: float = 0.0
 var _face_talk_blend_duration_runtime: float = 0.0
+var _face_setup_pending := true
+var _face_setup_retry_cooldown: float = 0.0
+var _face_setup_last_issue := ""
 
 func _ready() -> void:
-	_setup_face_animation()
+	if face_animation_tree != null:
+		face_animation_tree.active = false
+	_face_setup_pending = not _setup_face_animation()
+	_face_setup_retry_cooldown = 0.0
 	set_process(true)
 
 func _process(delta: float) -> void:
+	if _face_setup_pending:
+		_face_setup_retry_cooldown -= delta
+		if _face_setup_retry_cooldown <= 0.0:
+			_face_setup_pending = not _setup_face_animation()
+			_face_setup_retry_cooldown = maxf(face_setup_retry_interval, 0.05)
+		if _face_setup_pending:
+			return
 	_update_face_talk_blend(delta)
 
 func set_face_expression(expression_name: StringName) -> bool:
@@ -87,46 +101,50 @@ func set_face_talk_enabled(enabled: bool) -> bool:
 func get_face_expression() -> StringName:
 	return _current_face_expression
 
-func _setup_face_animation() -> void:
+func _setup_face_animation() -> bool:
+	_clear_face_runtime_links()
 	if face_animation_player == null:
-		push_warning("xiaokong face setup is missing FaceAnimationPlayer.")
-		return
+		_report_face_setup_issue("xiaokong face setup is missing FaceAnimationPlayer.")
+		return false
 	if face_animation_tree == null:
-		push_warning("xiaokong face setup is missing FaceAnimationTree.")
-		return
+		_report_face_setup_issue("xiaokong face setup is missing FaceAnimationTree.")
+		return false
 
-	face_animation_tree.active = true
 	var face_tree_root := face_animation_tree.tree_root as AnimationNodeBlendTree
 	if face_tree_root == null:
-		push_warning("FaceAnimationTree root is not AnimationNodeBlendTree.")
-		return
+		_report_face_setup_issue("FaceAnimationTree root is not AnimationNodeBlendTree.")
+		return false
 
 	var face_expression_sm := face_tree_root.get_node(FACE_EXPR_SM_NODE) as AnimationNodeStateMachine
 	_face_talk_node = face_tree_root.get_node(FACE_TALK_NODE) as AnimationNodeAnimation
 	_face_blink_node = face_tree_root.get_node(FACE_BLINK_NODE) as AnimationNodeAnimation
 	if face_expression_sm == null or _face_talk_node == null or _face_blink_node == null:
-		push_warning("FaceAnimationTree missing required nodes: ExpressionSM/Talk/Blink.")
-		return
+		_report_face_setup_issue("FaceAnimationTree missing required nodes: ExpressionSM/Talk/Blink.")
+		return false
 
 	_ensure_face_expression_transitions(face_expression_sm)
 	_face_expression_playback = face_animation_tree.get(FACE_EXPR_PLAYBACK_PATH) as AnimationNodeStateMachinePlayback
 	if _face_expression_playback == null:
-		push_warning("FaceAnimationTree is missing state machine playback at %s." % FACE_EXPR_PLAYBACK_PATH)
-		return
+		_report_face_setup_issue("FaceAnimationTree is missing state machine playback at %s." % FACE_EXPR_PLAYBACK_PATH)
+		return false
 	if not _has_face_animation(face_talk_animation):
-		push_warning("Missing facial talk animation: %s" % String(face_talk_animation))
-		return
+		_report_face_setup_issue("Missing facial talk animation: %s" % String(face_talk_animation))
+		return false
 	if not _has_face_animation(face_blink_animation):
-		push_warning("Missing facial blink animation: %s" % String(face_blink_animation))
-		return
+		_report_face_setup_issue("Missing facial blink animation: %s" % String(face_blink_animation))
+		return false
+	if not _are_face_blend_shape_targets_ready():
+		_report_face_setup_issue("FaceAnimationTree is waiting for face mesh blend shapes to finish loading.")
+		return false
 
 	_current_face_expression = _resolve_initial_face_expression()
 	if _current_face_expression == &"":
-		push_warning("No valid default face expression animation found.")
-		return
+		_report_face_setup_issue("No valid default face expression animation found.")
+		return false
 
 	_face_talk_node.animation = face_talk_animation
 	_face_blink_node.animation = face_blink_animation
+	face_animation_tree.active = true
 	_start_face_expression_state(_current_face_expression)
 
 	_face_talk_blend_value = 0.0
@@ -138,6 +156,8 @@ func _setup_face_animation() -> void:
 
 	var blink_weight := 1.0 if auto_face_blink else 0.0
 	_set_face_tree_param(FACE_BLINK_BLEND_PATH, blink_weight)
+	_report_face_setup_issue("")
+	return true
 
 func _resolve_initial_face_expression() -> StringName:
 	if _is_face_expression_animation(default_face_expression):
@@ -157,7 +177,60 @@ func _has_face_animation(animation_name: StringName) -> bool:
 	return face_animation_player != null and animation_name != &"" and face_animation_player.has_animation(animation_name)
 
 func _is_face_tree_ready() -> bool:
-	return face_animation_tree != null and _face_expression_playback != null and _face_talk_node != null and _face_blink_node != null
+	return not _face_setup_pending and face_animation_tree != null and _face_expression_playback != null and _face_talk_node != null and _face_blink_node != null
+
+func _clear_face_runtime_links() -> void:
+	_face_expression_playback = null
+	_face_talk_node = null
+	_face_blink_node = null
+
+func _report_face_setup_issue(issue: String) -> void:
+	if issue.is_empty():
+		_face_setup_last_issue = ""
+		return
+	if issue == _face_setup_last_issue:
+		return
+	_face_setup_last_issue = issue
+	push_warning(issue)
+
+func _are_face_blend_shape_targets_ready() -> bool:
+	if face_animation_player == null:
+		return false
+	var animation_names := face_animation_player.get_animation_list()
+	for index in range(animation_names.size()):
+		var animation_name = animation_names[index]
+		var animation := face_animation_player.get_animation(animation_name)
+		if animation == null:
+			continue
+		if not _is_blend_shape_animation_ready(animation):
+			return false
+	return true
+
+func _is_blend_shape_animation_ready(animation: Animation) -> bool:
+	for track_index in range(animation.get_track_count()):
+		if animation.track_get_type(track_index) != Animation.TYPE_BLEND_SHAPE:
+			continue
+		var track_path := String(animation.track_get_path(track_index))
+		if not _is_blend_shape_track_ready(track_path):
+			return false
+	return true
+
+func _is_blend_shape_track_ready(track_path: String) -> bool:
+	var separator_index := track_path.find(":")
+	if separator_index <= 0 or separator_index >= track_path.length() - 1:
+		return false
+	var node_path := NodePath(track_path.substr(0, separator_index))
+	var blend_shape_name := track_path.substr(separator_index + 1)
+	var mesh_node := get_node_or_null(node_path) as MeshInstance3D
+	if mesh_node == null or mesh_node.mesh == null:
+		return false
+	var blend_shape_count: int = mesh_node.mesh.get_blend_shape_count()
+	if blend_shape_count <= 0:
+		return false
+	for index in range(blend_shape_count):
+		if String(mesh_node.mesh.get_blend_shape_name(index)) == blend_shape_name:
+			return true
+	return false
 
 func _find_face_expression_transition(
 	face_expression_sm: AnimationNodeStateMachine,

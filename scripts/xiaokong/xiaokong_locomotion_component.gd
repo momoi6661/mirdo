@@ -45,6 +45,9 @@ func _ready() -> void:
 
 	if _navigation != null:
 		_navigation.motion_command.connect(_on_motion_command)
+		var destination_callback := Callable(self, "_on_navigation_destination_reached")
+		if not _navigation.destination_reached.is_connected(destination_callback):
+			_navigation.destination_reached.connect(destination_callback)
 	else:
 		push_warning("AutoLocomotion could not find navigation component at %s." % String(navigation_component_path))
 
@@ -61,6 +64,9 @@ func _physics_process(delta: float) -> void:
 		_body.velocity.x = 0.0
 		_body.velocity.z = 0.0
 		_cancel_navigation_turn(false)
+		_set_animation_turn(0.0)
+		_push_animation_motion(Vector3.ZERO)
+		_request_idle_after_navigation_stop()
 
 	if navigation_active and not _nav_turn_active:
 		_try_start_navigation_turn()
@@ -120,6 +126,23 @@ func clear_motion() -> void:
 
 func _on_motion_command(desired_velocity: Vector3, turn_amount: float) -> void:
 	set_desired_motion(desired_velocity, turn_amount)
+
+func _on_navigation_destination_reached() -> void:
+	clear_motion()
+	if _body != null:
+		_body.velocity.x = 0.0
+		_body.velocity.z = 0.0
+	_cancel_navigation_turn(false)
+	_set_animation_turn(0.0)
+	_push_animation_motion(Vector3.ZERO)
+	_request_idle_after_navigation_stop()
+
+func _request_idle_after_navigation_stop() -> void:
+	if _animation == null or not _animation.has_method("trigger_action"):
+		return
+	var state := _get_animation_state_name()
+	if state == &"Walk" or state == &"LeftTurn" or state == &"RightTurn":
+		_animation.call("trigger_action", &"Idle")
 
 func _apply_rotation(delta: float, current_horizontal: Vector3, target_turn: float) -> void:
 	var navigation_active := _navigation != null and _navigation.is_active()

@@ -8,6 +8,9 @@ signal destination_reached
 @export var follow_target_path: NodePath
 @export var path_desired_distance: float = 0.12
 @export var target_desired_distance: float = 0.16
+@export var effective_arrival_distance: float = 0.28
+@export var effective_arrival_speed_threshold: float = 0.12
+@export var effective_arrival_confirm_time: float = 0.1
 @export var max_speed: float = 1.2
 @export var repath_interval: float = 0.2
 @export var follow_update_distance: float = 3.0
@@ -35,6 +38,7 @@ var _turn_request_action: StringName = &""
 var _turn_request_angle := 0.0
 var _turn_request_cooldown := 0.0
 var _door_open_cooldowns: Dictionary = {}
+var _arrival_confirm_elapsed := 0.0
 
 @onready var _body: CharacterBody3D = _resolve_body()
 @onready var _agent: NavigationAgent3D = get_node_or_null(navigation_agent_path) as NavigationAgent3D
@@ -73,16 +77,11 @@ func _physics_process(delta: float) -> void:
 		_follow_hold_active = false
 
 	if _agent.is_navigation_finished():
-		if _follow_target == null:
-			_active = false
-		_turn_request_pending = false
-		_turn_request_running = false
-		_turn_request_action = &""
-		_turn_request_angle = 0.0
-		if not _reported_reached:
-			_reported_reached = true
-			destination_reached.emit()
-		_emit_idle_motion()
+		_complete_destination_reached()
+		return
+
+	if _follow_target == null and _is_effectively_arrived(delta):
+		_complete_destination_reached()
 		return
 
 	if _turn_request_pending or _turn_request_running:
@@ -123,6 +122,7 @@ func navigate_to(world_position: Vector3) -> void:
 	_follow_target = null
 	_follow_hold_active = false
 	_active = true
+	_arrival_confirm_elapsed = 0.0
 	_set_target_position(world_position)
 
 func follow_target(target_node: Node3D) -> void:
@@ -131,6 +131,7 @@ func follow_target(target_node: Node3D) -> void:
 	_follow_target = target_node
 	_follow_hold_active = false
 	_active = true
+	_arrival_confirm_elapsed = 0.0
 	_set_target_position(_build_follow_target_position())
 
 func stop_navigation() -> void:
@@ -145,6 +146,7 @@ func stop_navigation() -> void:
 	_turn_request_angle = 0.0
 	_last_turn_sign = 1.0
 	_door_open_cooldowns.clear()
+	_arrival_confirm_elapsed = 0.0
 	_emit_idle_motion()
 
 func is_active() -> bool:
@@ -202,8 +204,51 @@ func _set_target_position(world_position: Vector3) -> void:
 	_target_position = _project_to_navigation_map(world_position)
 	_repath_elapsed = 0.0
 	_reported_reached = false
+	_arrival_confirm_elapsed = 0.0
 	if _agent.is_inside_tree() and _body != null and _body.get_world_3d() != null:
 		_agent.target_position = _target_position
+
+func _complete_destination_reached() -> void:
+	if _follow_target == null:
+		_active = false
+	_turn_request_pending = false
+	_turn_request_running = false
+	_turn_request_action = &""
+	_turn_request_angle = 0.0
+	_arrival_confirm_elapsed = 0.0
+	if not _reported_reached:
+		_reported_reached = true
+		destination_reached.emit()
+	_emit_idle_motion()
+
+func _is_effectively_arrived(delta: float) -> bool:
+	if _body == null or _agent == null:
+		_arrival_confirm_elapsed = 0.0
+		return false
+
+	var threshold: float = maxf(effective_arrival_distance, maxf(path_desired_distance, target_desired_distance))
+	var body_pos: Vector3 = _body.global_position
+	var final_pos: Vector3 = _agent.get_final_position()
+	var target_pos: Vector3 = _target_position
+	var distance_to_final: float = _horizontal_distance(body_pos, final_pos)
+	var distance_to_target: float = _horizontal_distance(body_pos, target_pos)
+	var best_distance: float = minf(distance_to_final, distance_to_target)
+	if best_distance > threshold:
+		_arrival_confirm_elapsed = 0.0
+		return false
+
+	var horizontal_speed: float = Vector2(_body.velocity.x, _body.velocity.z).length()
+	if horizontal_speed > effective_arrival_speed_threshold:
+		_arrival_confirm_elapsed = 0.0
+		return false
+
+	_arrival_confirm_elapsed += delta
+	return _arrival_confirm_elapsed >= maxf(0.01, effective_arrival_confirm_time)
+
+func _horizontal_distance(a: Vector3, b: Vector3) -> float:
+	var offset: Vector3 = b - a
+	offset.y = 0.0
+	return offset.length()
 
 func _project_to_navigation_map(world_position: Vector3) -> Vector3:
 	if _agent == null:

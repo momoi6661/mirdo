@@ -27,6 +27,15 @@ enum OpenDirectionMode {
 @export var disable_collision_while_closing: bool = true
 @export var closing_collision_mask: int = 0
 @export var reenable_collision_delay: float = 0.02
+@export var pause_close_if_blocked: bool = true
+@export_flags_3d_physics var close_blocker_collision_mask: int = 4
+@export var close_blocker_check_interval: float = 0.05
+@export var close_blocker_query_margin: float = 0.02
+@export var open_sound: AudioStream
+@export var close_sound: AudioStream
+@export var sound_volume_db: float = -4.0
+@export var sound_max_distance: float = 18.0
+@export var sound_unit_size: float = 2.5
 
 var _door_node: Node3D
 var _base_rotation: Vector3 = Vector3.ZERO
@@ -36,6 +45,11 @@ var _tween: Tween
 var _default_collision_layer: int = 0
 var _default_collision_mask: int = 0
 var _closing_collision_temporarily_disabled: bool = false
+var _is_closing_motion: bool = false
+var _closing_tween_paused_by_blocker: bool = false
+var _close_blocker_elapsed: float = 0.0
+var _door_collision_shapes: Array[CollisionShape3D] = []
+var _sfx_player: AudioStreamPlayer3D
 
 func _ready() -> void:
 	_door_node = get_node_or_null(target_door) as Node3D
@@ -45,6 +59,23 @@ func _ready() -> void:
 	_base_rotation = _door_node.rotation
 	_default_collision_layer = collision_layer
 	_default_collision_mask = collision_mask
+	_cache_collision_shapes()
+	_ensure_sfx_player()
+	set_physics_process(false)
+
+func _physics_process(delta: float) -> void:
+	if not _is_closing_motion:
+		return
+	if _tween == null or not _tween.is_valid():
+		_stop_closing_monitor()
+		return
+
+	_close_blocker_elapsed += delta
+	if _close_blocker_elapsed < maxf(0.01, close_blocker_check_interval):
+		return
+
+	_close_blocker_elapsed = 0.0
+	_update_close_blocker_state()
 
 func get_interaction_time() -> float:
 	return interaction_time
@@ -68,17 +99,20 @@ func _toggle_door(player: Node) -> void:
 		if two_way and open_sign != _current_open_sign:
 			_current_open_sign = open_sign
 			_animate_to(open_angle_degrees * _current_open_sign, false)
+			_play_door_sound(false)
 			return
 
 		if _is_close_blocked(player):
 			return
 
 		_animate_to(close_angle_degrees, true)
+		_play_door_sound(true)
 		_is_open = false
 		return
 
 	_current_open_sign = open_sign
 	_animate_to(open_angle_degrees * open_sign, false)
+	_play_door_sound(false)
 	_is_open = true
 
 func _compute_open_sign(player: Node) -> float:
@@ -142,7 +176,116 @@ func _set_closing_collision_disabled(disabled: bool) -> void:
 	collision_layer = _default_collision_layer
 	collision_mask = _default_collision_mask
 
+func _ensure_sfx_player() -> void:
+	if _sfx_player != null and is_instance_valid(_sfx_player):
+		return
+	_sfx_player = get_node_or_null("DoorSfxPlayer") as AudioStreamPlayer3D
+	if _sfx_player == null:
+		_sfx_player = AudioStreamPlayer3D.new()
+		_sfx_player.name = "DoorSfxPlayer"
+		add_child(_sfx_player)
+	_configure_sfx_player()
+
+func _configure_sfx_player() -> void:
+	if _sfx_player == null:
+		return
+	_sfx_player.volume_db = sound_volume_db
+	_sfx_player.max_distance = sound_max_distance
+	_sfx_player.unit_size = sound_unit_size
+	_sfx_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+
+func _play_door_sound(is_closing: bool) -> void:
+	var stream: AudioStream = close_sound if is_closing else open_sound
+	if stream == null:
+		return
+	_ensure_sfx_player()
+	if _sfx_player == null:
+		return
+	_configure_sfx_player()
+	_sfx_player.stop()
+	_sfx_player.stream = stream
+	_sfx_player.play()
+
+func _cache_collision_shapes() -> void:
+	_door_collision_shapes.clear()
+	_collect_collision_shapes_recursive(self)
+
+func _collect_collision_shapes_recursive(node: Node) -> void:
+	for child in node.get_children():
+		if child is CollisionShape3D:
+			var collision_shape: CollisionShape3D = child as CollisionShape3D
+			if collision_shape.shape != null:
+				_door_collision_shapes.append(collision_shape)
+		_collect_collision_shapes_recursive(child)
+
+func _stop_closing_monitor() -> void:
+	_is_closing_motion = false
+	_closing_tween_paused_by_blocker = false
+	_close_blocker_elapsed = 0.0
+	set_physics_process(false)
+
+func _start_closing_monitor() -> void:
+	_is_closing_motion = true
+	_closing_tween_paused_by_blocker = false
+	_close_blocker_elapsed = close_blocker_check_interval
+	set_physics_process(true)
+	_update_close_blocker_state()
+
+func _is_close_path_blocked() -> bool:
+	if close_blocker_collision_mask == 0:
+		return false
+	if _door_collision_shapes.is_empty():
+		return false
+
+	var world: World3D = get_world_3d()
+	if world == null:
+		return false
+	var space_state: PhysicsDirectSpaceState3D = world.direct_space_state
+	if space_state == null:
+		return false
+
+	for collision_shape in _door_collision_shapes:
+		if collision_shape == null:
+			continue
+		if collision_shape.disabled or collision_shape.shape == null:
+			continue
+
+		var shape_query := PhysicsShapeQueryParameters3D.new()
+		shape_query.shape = collision_shape.shape
+		shape_query.transform = collision_shape.global_transform
+		shape_query.margin = close_blocker_query_margin
+		shape_query.collision_mask = close_blocker_collision_mask
+		shape_query.collide_with_bodies = true
+		shape_query.collide_with_areas = false
+		shape_query.exclude = [get_rid()]
+
+		var hits: Array[Dictionary] = space_state.intersect_shape(shape_query, 1)
+		if not hits.is_empty():
+			return true
+
+	return false
+
+func _update_close_blocker_state() -> void:
+	if not pause_close_if_blocked:
+		return
+	if not _is_closing_motion:
+		return
+	if _tween == null or not _tween.is_valid():
+		return
+
+	var blocked: bool = _is_close_path_blocked()
+	if blocked and not _closing_tween_paused_by_blocker:
+		_tween.pause()
+		_closing_tween_paused_by_blocker = true
+		return
+
+	if not blocked and _closing_tween_paused_by_blocker:
+		_tween.play()
+		_closing_tween_paused_by_blocker = false
+
 func _on_motion_finished() -> void:
+	_stop_closing_monitor()
+
 	if not _closing_collision_temporarily_disabled:
 		return
 	if reenable_collision_delay <= 0.0:
@@ -158,6 +301,8 @@ func _animate_to(target_angle_degrees: float, is_closing: bool) -> void:
 	if _door_node == null:
 		return
 
+	_stop_closing_monitor()
+
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 
@@ -170,6 +315,8 @@ func _animate_to(target_angle_degrees: float, is_closing: bool) -> void:
 	var duration: float = maxf(0.01, close_duration if is_closing else open_duration)
 	var target_y: float = _base_rotation.y + deg_to_rad(target_angle_degrees)
 	_tween = create_tween()
+	if is_closing and pause_close_if_blocked:
+		_start_closing_monitor()
 	if is_closing or overshoot_degrees <= 0.0:
 		_tween.set_trans(Tween.TRANS_SINE)
 		_tween.set_ease(Tween.EASE_IN_OUT)

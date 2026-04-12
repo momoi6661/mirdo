@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://61utplg7jalh" path="res://components/swing_push_door_component.gd" id="1_ubfro"]
 [ext_resource type="Script" uid="uid://dy24fqwfoy8kt" path="res://components/door_instance_config.gd" id="2_cfg"]
+[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-opening-door-450444.mp3" id="3_open"]
+[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-door-close-effect-382710.mp3" id="4_close"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_823f6"]
 resource_name = "door"
@@ -129,6 +131,11 @@ open_angle_degrees = 92.0
 open_duration = 0.7
 close_duration = 0.62
 overshoot_degrees = 2.0
+open_sound = ExtResource("3_open")
+close_sound = ExtResource("4_close")
+sound_volume_db = -4.5
+sound_max_distance = 20.0
+sound_unit_size = 2.6
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="door_001_col" unique_id=1925316422]
 shape = SubResource("ConcavePolygonShape3D_jujbo")

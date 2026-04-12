@@ -1209,3 +1209,31 @@ Treat `Select-String` fallback as default in this environment when `rg` fails.
 - See Also: ERR-20260411-004
 
 ---
+## [ERR-20260412-001] hastur-executor-id-rotated-again
+
+**Logged**: 2026-04-12T11:26:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: tooling
+
+### Summary
+Remote execute failed once again because cached executor id no longer matched after Godot editor reconnect.
+
+### Error
+```text
+No connected Hastur Executor matched the query
+```
+
+### Context
+- Command/operation attempted: POST `/api/execute` with previous executor_id.
+- Workaround: refresh via GET `/api/executors` and retry with new id.
+
+### Suggested Fix
+Always resolve executor_id just before validation scripts in this session.
+
+### Metadata
+- Reproducible: yes
+- Related Files: N/A
+- See Also: ERR-20260410-HAS08
+
+---

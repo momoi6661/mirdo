@@ -233,9 +233,14 @@ func _get_walk_reference_speed() -> float:
 
 func _update_requested_route() -> void:
 	if _requested_action == &"":
-		if not pending_action.is_empty():
-			pending_action = ""
-		return
+		var navigation_active := auto_navigation != null and auto_navigation.is_active()
+		var current_state := _get_current_state()
+		if not navigation_active and current_state == WALK_STATE and move_speed <= move_exit_threshold:
+			_requested_action = TargetState.IDLE
+		else:
+			if not pending_action.is_empty():
+				pending_action = ""
+			return
 
 	var current_state := _get_current_state()
 	if _is_request_satisfied(current_state, _requested_action):

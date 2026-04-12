@@ -251,7 +251,7 @@ func _ready():
 	if not is_in_group("Player"):
 		add_to_group("Player")
 		
-	shape_cast_3d.position.y=2.0
+	shape_cast_3d.position.y=1.7
 	Global.player=self
 	
 	print("step_handler: ", step_handler)
@@ -320,7 +320,7 @@ func _load_custom_save_data(data: Dictionary) -> void:
 		else:
 			_speed = SPEED_DEFAULT
 			is_crouching = false
-			shape_cast_3d.position.y = 2.0
+			shape_cast_3d.position.y = 1.7
 			animation_player.play("RESET")
 			animation_player.advance(1.0)
 		

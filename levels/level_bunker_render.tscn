@@ -77,7 +77,7 @@ omni_attenuation = 1.1
 omni_shadow_mode = 0
 
 [node name="LampLight_002" type="OmniLight3D" parent="." unique_id=982181162]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.55, 2.5091772, 0.068478)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7297912, 2.5091772, 0.068478)
 light_color = Color(1, 0.86, 0.68, 1)
 light_energy = 2.25
 light_indirect_energy = 1.6
@@ -182,9 +182,6 @@ omni_attenuation = 1.9
 
 [node name="PauseMenu" parent="." unique_id=294635434 instance=ExtResource("4_u5pho")]
 
-[node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.17597294, 1.1920929e-07, -0.14682612)
-
 [node name="BunkerNavigationRegion" type="NavigationRegion3D" parent="." unique_id=2082380198]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.012566328, -0.013422966, -0.0017654896)
 navigation_mesh = SubResource("NavigationMesh_qn8gb")
@@ -198,3 +195,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0, 0)
 radius = 12.5
 vertices = PackedVector3Array(2.339568, 0, -4.010972, 3.634578, 0, -4.003727, 3.6179812, 0, -5.6834793, 2.4656045, 0, -5.7302933)
 affect_navigation_mesh = true
+
+[node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
