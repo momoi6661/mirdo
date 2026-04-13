@@ -16,6 +16,17 @@ extends CharacterBody3D
 @export var inventory_handler:InventoryHandler
 @export var unique_id: String = "player_001"
 
+@export_category("Footstep Audio")
+@export var footstep_player_path: NodePath = NodePath("FootstepAudio3D")
+@export var footstep_volume_db: float = -16.0
+@export var footstep_min_speed: float = 0.9
+@export var footstep_interval_walk: float = 0.45
+@export var footstep_interval_sprint: float = 0.33
+@export var footstep_pitch_min: float = 0.96
+@export var footstep_pitch_max: float = 1.06
+@export var footstep_clips: Array[AudioStream] = []
+@export_dir var footstep_folder_path: String = "res://Audio/footsteps/concrete"
+
 var interact_hold_timer:float=0.0
 var is_interacting:bool=false
 @export var long_press_time:float=0.50
@@ -39,6 +50,8 @@ var _jump_y_offset:float=0
 var is_crouching:bool=false
 var is_on_crouching:bool=false
 var is_on_stand:bool=false
+var _footstep_player: AudioStreamPlayer3D
+var _footstep_elapsed: float = 0.0
 
 var _mouse_rotation : Vector3
 var _player_rotation : Vector3
@@ -207,6 +220,72 @@ func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target:
 		
 		if step_handler:
 			step_handler.handle_after_move_slide(delta)
+
+	_update_footstep_audio(delta)
+
+func _resolve_footstep_player() -> void:
+	_footstep_player = get_node_or_null(footstep_player_path) as AudioStreamPlayer3D
+	if _footstep_player == null:
+		_footstep_player = get_node_or_null("FootstepAudio3D") as AudioStreamPlayer3D
+
+func _autoload_footstep_clips() -> void:
+	if not footstep_clips.is_empty():
+		return
+	if footstep_folder_path.is_empty():
+		return
+
+	var dir := DirAccess.open(footstep_folder_path)
+	if dir == null:
+		return
+
+	var file_names: PackedStringArray = dir.get_files()
+	file_names.sort()
+	for file_name in file_names:
+		var lower_name := file_name.to_lower()
+		var is_audio_file := lower_name.ends_with(".ogg") or lower_name.ends_with(".wav") or lower_name.ends_with(".mp3")
+		if not is_audio_file:
+			continue
+		var stream_path := footstep_folder_path.path_join(file_name)
+		var clip := load(stream_path) as AudioStream
+		if clip != null:
+			footstep_clips.append(clip)
+
+func _apply_footstep_volume() -> void:
+	if _footstep_player == null:
+		return
+	_footstep_player.volume_db = footstep_volume_db
+
+func _update_footstep_audio(delta: float) -> void:
+	if _footstep_player == null:
+		return
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	var should_play_step := is_on_floor() and horizontal_speed >= footstep_min_speed
+	if not should_play_step:
+		_footstep_elapsed = 0.0
+		return
+
+	var base_interval: float = footstep_interval_sprint if _is_sprinting else footstep_interval_walk
+	var speed_scale: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.75, 2.0)
+	var step_interval: float = maxf(0.08, base_interval / speed_scale)
+	_footstep_elapsed += delta
+	if _footstep_elapsed < step_interval:
+		return
+	_footstep_elapsed = 0.0
+	_play_footstep_audio()
+
+func _play_footstep_audio() -> void:
+	if _footstep_player == null:
+		return
+	if not footstep_clips.is_empty():
+		var clip_index: int = randi() % footstep_clips.size()
+		var clip: AudioStream = footstep_clips[clip_index]
+		if clip != null:
+			_footstep_player.stream = clip
+	if _footstep_player.stream == null:
+		return
+	_apply_footstep_volume()
+	_footstep_player.pitch_scale = randf_range(footstep_pitch_min, footstep_pitch_max)
+	_footstep_player.play()
 	
 func handle_rigid_body_collisions():
 	if not has_node("KickArea"):
@@ -242,8 +321,12 @@ func push_rigid_body(rigid_body: RigidBody3D, collision: KinematicCollision3D):
 	pass # 保留空函数防止有其他地方调用
 	
 func _ready():
+	randomize()
 	_speed=SPEED_DEFAULT
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_resolve_footstep_player()
+	_autoload_footstep_clips()
+	_apply_footstep_volume()
 	shape_cast_3d.add_exception($'.')
 	add_to_group("player")
 	if not is_in_group("Savable"):

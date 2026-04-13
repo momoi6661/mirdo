@@ -58,9 +58,13 @@ const REQUIRED_TREE_STATES: Array[StringName] = [
 @export var walk_min_playback_scale: float = 0.75
 @export var walk_max_playback_scale: float = 1.25
 @export var walk_playback_lerp_rate: float = 12.0
+@export var enable_ik_idle_offset_driver: bool = false
 @export var ik_idle_offset_states: PackedStringArray = PackedStringArray(["Idle"])
 @export var ik_idle_offset_blend_speed: float = 8.0
 @export var auto_navigation_path: NodePath = NodePath("AutoNavigation")
+@export var update_in_physics: bool = true
+@export var animation_tree_physics_process_priority: int = 10
+@export var enforce_animation_tree_physics_callback_mode: bool = true
 
 @onready var animation_player: AnimationPlayer = $AnimationPlayer
 @onready var animation_tree: AnimationTree = $AnimationTree
@@ -94,6 +98,10 @@ func _ready() -> void:
 		return
 
 	animation_tree.active = auto_activate_tree
+	animation_tree.set_process_priority(animation_tree_physics_process_priority)
+	animation_tree.set_physics_process_priority(animation_tree_physics_process_priority)
+	if enforce_animation_tree_physics_callback_mode:
+		animation_tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS if update_in_physics else AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_IDLE
 	_validate_animation_tree_states()
 	_playback = animation_tree.get("parameters/playback") as AnimationNodeStateMachinePlayback
 	_setup_drinking_blend_tree()
@@ -103,8 +111,12 @@ func _ready() -> void:
 		_last_state = TargetState.IDLE
 
 	_resolve_ik_target_driver()
-	_update_ik_idle_offset(0.0)
-	set_process(true)
+	if enable_ik_idle_offset_driver:
+		_update_ik_idle_offset(0.0)
+	else:
+		_apply_ik_idle_offset_weight(0.0)
+	set_process(not update_in_physics)
+	set_physics_process(update_in_physics)
 
 func _setup_drinking_blend_tree() -> void:
 	animation_tree.set(DRINKING_STANDING_BLEND_PATH, 1.0)
@@ -112,6 +124,16 @@ func _setup_drinking_blend_tree() -> void:
 	animation_tree.set(DRINKING_CONTEXT_BLEND_PATH, 0.0)
 
 func _process(delta: float) -> void:
+	if update_in_physics:
+		return
+	_tick_animation_state(delta)
+
+func _physics_process(delta: float) -> void:
+	if not update_in_physics:
+		return
+	_tick_animation_state(delta)
+
+func _tick_animation_state(delta: float) -> void:
 	_update_move_speed()
 	_update_requested_route()
 	_update_walk_playback_scale(delta)
@@ -125,7 +147,8 @@ func _process(delta: float) -> void:
 			turn_amount = 0.0
 		_last_state = current_state
 
-	_update_ik_idle_offset(delta)
+	if enable_ik_idle_offset_driver:
+		_update_ik_idle_offset(delta)
 
 func set_motion_velocity(value: Vector3) -> void:
 	_motion_velocity = value
@@ -234,8 +257,8 @@ func _get_walk_reference_speed() -> float:
 func _update_requested_route() -> void:
 	if _requested_action == &"":
 		var navigation_active := auto_navigation != null and auto_navigation.is_active()
-		var current_state := _get_current_state()
-		if not navigation_active and current_state == WALK_STATE and move_speed <= move_exit_threshold:
+		var current_state_when_idle := _get_current_state()
+		if not navigation_active and current_state_when_idle == WALK_STATE and move_speed <= move_exit_threshold:
 			_requested_action = TargetState.IDLE
 		else:
 			if not pending_action.is_empty():
@@ -324,11 +347,14 @@ func _update_ik_idle_offset(delta: float) -> void:
 	else:
 		_ik_idle_offset_weight = target_weight
 
+	_apply_ik_idle_offset_weight(_ik_idle_offset_weight)
+
+func _apply_ik_idle_offset_weight(weight: float) -> void:
 	_resolve_ik_target_driver()
 	if _ik_target_driver == null or not is_instance_valid(_ik_target_driver):
 		return
 	if _ik_target_driver.has_method("set_idle_arm_offset_weight"):
-		_ik_target_driver.call("set_idle_arm_offset_weight", _ik_idle_offset_weight)
+		_ik_target_driver.call("set_idle_arm_offset_weight", clampf(weight, 0.0, 1.0))
 
 func _resolve_ik_target_driver() -> void:
 	if _ik_target_driver != null and is_instance_valid(_ik_target_driver):

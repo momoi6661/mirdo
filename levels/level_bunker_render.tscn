@@ -167,9 +167,6 @@ visible = false
 cast_shadow = 3
 mesh = SubResource("BoxMesh_light_blocker")
 
-[node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.9195693, 0.035391666, -0.45686728)
-
 [node name="XiaokongFillLight" type="OmniLight3D" parent="." unique_id=1218802202]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.52, 1.62, -1.02)
 visible = false
@@ -198,3 +195,6 @@ affect_navigation_mesh = true
 
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
+
+[node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5113752, 0.0219687, -0.6291559)

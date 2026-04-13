@@ -21,6 +21,7 @@
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
 [ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
+[ext_resource type="AudioStream" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -191,6 +192,12 @@ inventory_handler = NodePath("Control/InventoryUi")
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
 unique_id = "player_001"
+
+[node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="."]
+stream = ExtResource("22_step_sfx")
+volume_db = -16.0
+max_distance = 10.0
+unit_size = 2.0
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]
 collision_layer = 0

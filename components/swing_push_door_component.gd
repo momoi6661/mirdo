@@ -31,11 +31,9 @@ enum OpenDirectionMode {
 @export_flags_3d_physics var close_blocker_collision_mask: int = 4
 @export var close_blocker_check_interval: float = 0.05
 @export var close_blocker_query_margin: float = 0.02
-@export var open_sound: AudioStream
-@export var close_sound: AudioStream
-@export var sound_volume_db: float = -4.0
-@export var sound_max_distance: float = 18.0
-@export var sound_unit_size: float = 2.5
+@export var open_sfx_player_path: NodePath = NodePath("OpenSfx3D")
+@export var close_sfx_player_path: NodePath = NodePath("CloseSfx3D")
+@export var sound_volume_db: float = -9.0
 
 var _door_node: Node3D
 var _base_rotation: Vector3 = Vector3.ZERO
@@ -49,7 +47,8 @@ var _is_closing_motion: bool = false
 var _closing_tween_paused_by_blocker: bool = false
 var _close_blocker_elapsed: float = 0.0
 var _door_collision_shapes: Array[CollisionShape3D] = []
-var _sfx_player: AudioStreamPlayer3D
+var _open_sfx_player: AudioStreamPlayer3D
+var _close_sfx_player: AudioStreamPlayer3D
 
 func _ready() -> void:
 	_door_node = get_node_or_null(target_door) as Node3D
@@ -60,7 +59,8 @@ func _ready() -> void:
 	_default_collision_layer = collision_layer
 	_default_collision_mask = collision_mask
 	_cache_collision_shapes()
-	_ensure_sfx_player()
+	_resolve_sfx_players()
+	_apply_sfx_volume()
 	set_physics_process(false)
 
 func _physics_process(delta: float) -> void:
@@ -176,35 +176,27 @@ func _set_closing_collision_disabled(disabled: bool) -> void:
 	collision_layer = _default_collision_layer
 	collision_mask = _default_collision_mask
 
-func _ensure_sfx_player() -> void:
-	if _sfx_player != null and is_instance_valid(_sfx_player):
-		return
-	_sfx_player = get_node_or_null("DoorSfxPlayer") as AudioStreamPlayer3D
-	if _sfx_player == null:
-		_sfx_player = AudioStreamPlayer3D.new()
-		_sfx_player.name = "DoorSfxPlayer"
-		add_child(_sfx_player)
-	_configure_sfx_player()
+func _resolve_sfx_players() -> void:
+	_open_sfx_player = get_node_or_null(open_sfx_player_path) as AudioStreamPlayer3D
+	if _open_sfx_player == null:
+		_open_sfx_player = get_node_or_null("OpenSfx3D") as AudioStreamPlayer3D
+	_close_sfx_player = get_node_or_null(close_sfx_player_path) as AudioStreamPlayer3D
+	if _close_sfx_player == null:
+		_close_sfx_player = get_node_or_null("CloseSfx3D") as AudioStreamPlayer3D
 
-func _configure_sfx_player() -> void:
-	if _sfx_player == null:
-		return
-	_sfx_player.volume_db = sound_volume_db
-	_sfx_player.max_distance = sound_max_distance
-	_sfx_player.unit_size = sound_unit_size
-	_sfx_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+func _apply_sfx_volume() -> void:
+	if _open_sfx_player != null:
+		_open_sfx_player.volume_db = sound_volume_db
+	if _close_sfx_player != null:
+		_close_sfx_player.volume_db = sound_volume_db
 
 func _play_door_sound(is_closing: bool) -> void:
-	var stream: AudioStream = close_sound if is_closing else open_sound
-	if stream == null:
+	var player: AudioStreamPlayer3D = _close_sfx_player if is_closing else _open_sfx_player
+	if player == null:
 		return
-	_ensure_sfx_player()
-	if _sfx_player == null:
-		return
-	_configure_sfx_player()
-	_sfx_player.stop()
-	_sfx_player.stream = stream
-	_sfx_player.play()
+	_apply_sfx_volume()
+	player.stop()
+	player.play()
 
 func _cache_collision_shapes() -> void:
 	_door_collision_shapes.clear()

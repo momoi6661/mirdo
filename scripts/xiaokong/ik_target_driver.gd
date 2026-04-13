@@ -9,11 +9,31 @@ const META_IK_RIGHT_HAND_OFFSET := &"xiaokong_ik_right_hand_offset"
 const META_IK_LEFT_HAND_ROTATION_DEG := &"xiaokong_ik_left_hand_rot_deg"
 const META_IK_RIGHT_HAND_ROTATION_DEG := &"xiaokong_ik_right_hand_rot_deg"
 const META_IK_AUTO_CLEAR_SEC := &"xiaokong_ik_auto_clear_sec"
+const META_NODE_FORWARD_OFFSET := &"ik_forward_offset"
+const META_NODE_POLE_DISTANCE_SCALE := &"ik_pole_distance_scale"
+const META_NODE_POLE_FALLBACK_LOCAL := &"ik_pole_fallback_local"
+const META_NODE_GROUND_FOOT_AUTO := &"ik_ground_auto_enabled"
+const IK_CHANNEL_LOOK := &"look"
+const IK_CHANNEL_SPINE := &"spine"
+const IK_CHANNEL_ARM_REACH := &"arm_reach"
+const IK_CHANNEL_ARM_IDLE := &"arm_idle"
+const IK_CHANNEL_LEG_GROUND := &"leg_ground"
+const IK_CHANNEL_HAND_ROT := &"hand_rot"
+const IK_CHANNELS: Array[StringName] = [
+	IK_CHANNEL_LOOK,
+	IK_CHANNEL_SPINE,
+	IK_CHANNEL_ARM_REACH,
+	IK_CHANNEL_ARM_IDLE,
+	IK_CHANNEL_LEG_GROUND,
+	IK_CHANNEL_HAND_ROT,
+]
+const STATE_PROFILE_DEFAULT := &"default"
+const DEFAULT_ELBOW_POLE_DISTANCE_SCALE := 0.9
+const DEFAULT_KNEE_POLE_DISTANCE_SCALE := 1.0
+const TARGET_CONTROL_MODE_OVERLAY := 0
+const TARGET_CONTROL_MODE_FULL_CONTROL := 1
 
-@export var elbow_pole_distance_scale: float = 0.9
-@export var knee_pole_distance_scale: float = 1.0
 @export var look_at_follow_bone_name: StringName = &"头部"
-@export var look_at_auto_forward_offset: float = 0.08
 @export var auto_manage_influence: bool = true
 @export var manage_head_look_at: bool = true
 @export var position_offset_threshold: float = 0.002
@@ -29,37 +49,178 @@ const META_IK_AUTO_CLEAR_SEC := &"xiaokong_ik_auto_clear_sec"
 @export var interaction_default_right_hand_offset: Vector3 = Vector3(0.12, 1.05, 0.0)
 @export var interaction_default_left_hand_offset: Vector3 = Vector3(-0.12, 1.05, 0.0)
 @export var interaction_default_auto_clear_sec: float = 0.0
+@export_group("Runtime Update")
+@export var runtime_update_in_physics: bool = true
+@export var animation_state_provider_path: NodePath = NodePath("../..")
+@export var runtime_ik_enabled: bool = true
+@export var state_profile_enabled: bool = true
+@export_group("Editor Preview")
+@export var editor_auto_follow_enabled: bool = true
+@export var editor_pose_preview_enabled: bool = true
+@export var editor_runtime_preview_enabled: bool = false
+@export_enum("Overlay", "Full Control") var target_control_mode: int = TARGET_CONTROL_MODE_OVERLAY
+@export var hide_targets_in_game: bool = true
+@export_range(0.0, 1.0, 0.01) var master_ik_weight: float = 1.0
+@export var master_ik_blend_speed: float = 8.0
+@export var ik_driver_physics_process_priority: int = 20
+@export var skeleton_modifier_physics_process_priority: int = 30
+@export var enforce_physics_modifier_callback_mode: bool = true
+@export_group("State IK Multipliers")
+@export var state_channel_multipliers: Dictionary = {
+	"default": {
+		"look": 1.0,
+		"spine": 1.0,
+		"arm_reach": 1.0,
+		"arm_idle": 1.0,
+		"leg_ground": 1.0,
+		"hand_rot": 1.0,
+	},
+	"Idle": {
+		"look": 1.0,
+		"spine": 1.0,
+		"arm_reach": 1.0,
+		"arm_idle": 1.0,
+		"leg_ground": 1.0,
+		"hand_rot": 1.0,
+	},
+	"Walk": {
+		"look": 0.65,
+		"spine": 0.2,
+		"arm_reach": 0.65,
+		"arm_idle": 0.35,
+		"leg_ground": 0.55,
+		"hand_rot": 0.6,
+	},
+	"LeftTurn": {
+		"look": 0.5,
+		"spine": 0.35,
+		"arm_reach": 0.45,
+		"arm_idle": 0.3,
+		"leg_ground": 0.0,
+		"hand_rot": 0.5,
+	},
+	"RightTurn": {
+		"look": 0.5,
+		"spine": 0.35,
+		"arm_reach": 0.45,
+		"arm_idle": 0.3,
+		"leg_ground": 0.0,
+		"hand_rot": 0.5,
+	},
+	"SitDown": {
+		"look": 0.25,
+		"spine": 0.0,
+		"arm_reach": 0.25,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.3,
+	},
+	"SitToStand": {
+		"look": 0.25,
+		"spine": 0.0,
+		"arm_reach": 0.25,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.3,
+	},
+	"LayDown": {
+		"look": 0.2,
+		"spine": 0.0,
+		"arm_reach": 0.25,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.3,
+	},
+	"LayUp": {
+		"look": 0.2,
+		"spine": 0.0,
+		"arm_reach": 0.25,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.3,
+	},
+	"SittingIdle": {
+		"look": 0.35,
+		"spine": 0.15,
+		"arm_reach": 0.55,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.6,
+	},
+	"Laying": {
+		"look": 0.3,
+		"spine": 0.15,
+		"arm_reach": 0.45,
+		"arm_idle": 0.0,
+		"leg_ground": 0.0,
+		"hand_rot": 0.55,
+	},
+}
+@export_group("Channel Blend Speeds")
+@export var channel_look_blend_speed: float = 8.0
+@export var channel_spine_blend_speed: float = 8.0
+@export var channel_arm_reach_blend_speed: float = 8.0
+@export var channel_arm_idle_blend_speed: float = 8.0
+@export var channel_leg_ground_blend_speed: float = 8.0
+@export var channel_hand_rot_blend_speed: float = 8.0
+@export_group("Spine CCDIK")
+@export var enable_spine_ccdik: bool = true
+@export var spine_follow_bone_name: StringName = &"UpperChest"
+@export var spine_ccdik_look_weight: float = 0.45
+@export_group("Ground Foot IK")
+@export_flags_3d_physics var ground_foot_ik_collision_mask: int = 1
+@export var ground_foot_ik_raycast_up: float = 0.4
+@export var ground_foot_ik_raycast_down: float = 1.0
+@export var ground_foot_ik_foot_height: float = 0.03
+@export var ground_foot_ik_max_target_distance: float = 0.35
+@export var ground_foot_ik_position_lerp_speed: float = 14.0
+@export var ground_foot_ik_rotation_lerp_speed: float = 10.0
+@export var ground_foot_ik_influence_blend_speed: float = 8.0
+@export var ground_foot_ik_disable_speed: float = 1.8
+@export var ground_foot_ik_align_to_normal: bool = true
 
-@onready var skeleton: Skeleton3D = get_parent().get_node_or_null("GeneralSkeleton") as Skeleton3D
-@onready var left_hand_auto: Node3D = get_node_or_null("LeftHandAuto") as Node3D
-@onready var right_hand_auto: Node3D = get_node_or_null("RightHandAuto") as Node3D
-@onready var left_hand_rot_auto: Node3D = get_node_or_null("LeftHandRotAuto") as Node3D
-@onready var right_hand_rot_auto: Node3D = get_node_or_null("RightHandRotAuto") as Node3D
-@onready var left_foot_auto: Node3D = get_node_or_null("LeftFootAuto") as Node3D
-@onready var right_foot_auto: Node3D = get_node_or_null("RightFootAuto") as Node3D
-@onready var look_at_auto: Node3D = get_node_or_null("LookAtAuto") as Node3D
-@onready var left_elbow_pole_auto: Node3D = get_node_or_null("LeftElbowPoleAuto") as Node3D
-@onready var right_elbow_pole_auto: Node3D = get_node_or_null("RightElbowPoleAuto") as Node3D
-@onready var left_knee_pole_auto: Node3D = get_node_or_null("LeftKneePoleAuto") as Node3D
-@onready var right_knee_pole_auto: Node3D = get_node_or_null("RightKneePoleAuto") as Node3D
-@onready var left_hand_target: Marker3D = get_node_or_null("LeftHandAuto/LeftHandTarget") as Marker3D
-@onready var right_hand_target: Marker3D = get_node_or_null("RightHandAuto/RightHandTarget") as Marker3D
-@onready var left_hand_rot_target: Marker3D = get_node_or_null("LeftHandRotAuto/LeftHandRotTarget") as Marker3D
-@onready var right_hand_rot_target: Marker3D = get_node_or_null("RightHandRotAuto/RightHandRotTarget") as Marker3D
-@onready var left_foot_target: Marker3D = get_node_or_null("LeftFootAuto/LeftFootTarget") as Marker3D
-@onready var right_foot_target: Marker3D = get_node_or_null("RightFootAuto/RightFootTarget") as Marker3D
-@onready var left_elbow_pole_target: Marker3D = get_node_or_null("LeftElbowPoleAuto/LeftElbowPoleTarget") as Marker3D
-@onready var right_elbow_pole_target: Marker3D = get_node_or_null("RightElbowPoleAuto/RightElbowPoleTarget") as Marker3D
-@onready var left_knee_pole_target: Marker3D = get_node_or_null("LeftKneePoleAuto/LeftKneePoleTarget") as Marker3D
-@onready var right_knee_pole_target: Marker3D = get_node_or_null("RightKneePoleAuto/RightKneePoleTarget") as Marker3D
-@onready var mark_look_at_target: Marker3D = get_node_or_null("LookAtAuto/mark3d") as Marker3D
-@onready var head_look_at: LookAtModifier3D = get_parent().get_node_or_null("GeneralSkeleton/HeadLookAt") as LookAtModifier3D
-@onready var left_arm_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/LeftArmIK") as TwoBoneIK3D
-@onready var right_arm_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/RightArmIK") as TwoBoneIK3D
-@onready var left_leg_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/LeftLegIK") as TwoBoneIK3D
-@onready var right_leg_ik: TwoBoneIK3D = get_parent().get_node_or_null("GeneralSkeleton/RightLegIK") as TwoBoneIK3D
-@onready var left_hand_copy_rotation: CopyTransformModifier3D = get_parent().get_node_or_null("GeneralSkeleton/LeftHandCopyRotation") as CopyTransformModifier3D
-@onready var right_hand_copy_rotation: CopyTransformModifier3D = get_parent().get_node_or_null("GeneralSkeleton/RightHandCopyRotation") as CopyTransformModifier3D
+var skeleton: Skeleton3D
+var left_hand_auto: Node3D
+var right_hand_auto: Node3D
+var left_hand_rot_auto: Node3D
+var right_hand_rot_auto: Node3D
+var left_foot_auto: Node3D
+var right_foot_auto: Node3D
+var spine_bend_auto: Node3D
+var look_at_auto: Node3D
+var left_elbow_pole_auto: Node3D
+var right_elbow_pole_auto: Node3D
+var left_knee_pole_auto: Node3D
+var right_knee_pole_auto: Node3D
+var left_hand_target: Node3D
+var right_hand_target: Node3D
+var left_hand_rot_target: Node3D
+var right_hand_rot_target: Node3D
+var left_foot_target: Node3D
+var right_foot_target: Node3D
+var spine_bend_target: Node3D
+var left_elbow_pole_target: Node3D
+var right_elbow_pole_target: Node3D
+var left_knee_pole_target: Node3D
+var right_knee_pole_target: Node3D
+var mark_look_at_target: Node3D
+var head_look_at: LookAtModifier3D
+var left_arm_ik: TwoBoneIK3D
+var right_arm_ik: TwoBoneIK3D
+var left_leg_ik: TwoBoneIK3D
+var right_leg_ik: TwoBoneIK3D
+var spine_ccdik: CCDIK3D
+var left_hand_copy_rotation: CopyTransformModifier3D
+var right_hand_copy_rotation: CopyTransformModifier3D
+
+var _owner_body: CharacterBody3D
+var _left_leg_auto_weight: float = 0.0
+var _right_leg_auto_weight: float = 0.0
+var _animation_state_provider: Node
+var _channel_runtime_weights: Dictionary = {}
+var _channel_smoothed_weights: Dictionary = {}
+var _channel_state_weights: Dictionary = {}
+var _active_master_weight: float = 1.0
 
 var left_upper_arm_bone: int = -1
 var left_lower_arm_bone: int = -1
@@ -73,7 +234,21 @@ var left_foot_bone: int = -1
 var right_upper_leg_bone: int = -1
 var right_lower_leg_bone: int = -1
 var right_foot_bone: int = -1
+var spine_follow_bone: int = -1
 var look_at_follow_bone: int = -1
+
+var _left_hand_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _right_hand_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _left_hand_rot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _right_hand_rot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _left_foot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _right_foot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _spine_bend_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _look_at_auto_follow_offset: Transform3D = Transform3D.IDENTITY
+var _left_elbow_pole_profile: Dictionary = {}
+var _right_elbow_pole_profile: Dictionary = {}
+var _left_knee_pole_profile: Dictionary = {}
+var _right_knee_pole_profile: Dictionary = {}
 
 var left_hand_target_base: Transform3D
 var right_hand_target_base: Transform3D
@@ -81,6 +256,7 @@ var left_hand_rot_target_base: Transform3D
 var right_hand_rot_target_base: Transform3D
 var left_foot_target_base: Transform3D
 var right_foot_target_base: Transform3D
+var spine_bend_target_base: Transform3D
 var left_elbow_pole_target_base: Transform3D
 var right_elbow_pole_target_base: Transform3D
 var left_knee_pole_target_base: Transform3D
@@ -102,33 +278,386 @@ var _interaction_left_hand_offset: Vector3 = Vector3.ZERO
 var _interaction_right_hand_offset: Vector3 = Vector3.ZERO
 var _interaction_left_hand_rotation_deg: Vector3 = Vector3.ZERO
 var _interaction_right_hand_rotation_deg: Vector3 = Vector3.ZERO
+var _full_control_target_globals: Dictionary = {}
+var _initialized: bool = false
 
 func _ready() -> void:
+	_initialize_driver()
+
+func _initialize_driver() -> bool:
+	_ensure_target_nodes()
+	_resolve_scene_references()
 	if skeleton == null:
 		push_warning("IKTargetDriver could not find sibling GeneralSkeleton.")
-		return
+		_initialized = false
+		return false
 
+	if _channel_runtime_weights.is_empty() or _channel_smoothed_weights.is_empty() or _channel_state_weights.is_empty():
+		_initialize_channel_weights()
+	_resolve_animation_state_provider()
+	_owner_body = _resolve_owner_body()
 	_cache_bones()
+	_cache_auto_follow_offsets()
+	_cache_pole_profiles()
 	_cache_base_target_transforms()
+	_initialized = true
+	_sync_helper_visibility()
 	if not skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
 		skeleton.pose_updated.connect(_on_skeleton_pose_updated)
 	_on_skeleton_pose_updated()
+	_apply_target_control_mode()
 	_apply_idle_arm_offsets(0.0)
-	set_process(true)
+	_configure_runtime_order()
+	_sync_update_callbacks()
+	return true
+
+func _ensure_target_nodes() -> void:
+	var created_any := false
+	created_any = _ensure_auto_target_pair("LeftHandAuto", "LeftHandTarget") or created_any
+	created_any = _ensure_auto_target_pair("RightHandAuto", "RightHandTarget") or created_any
+	created_any = _ensure_auto_target_pair("LeftHandRotAuto", "LeftHandRotTarget") or created_any
+	created_any = _ensure_auto_target_pair("RightHandRotAuto", "RightHandRotTarget") or created_any
+	created_any = _ensure_auto_target_pair("LeftFootAuto", "LeftFootTarget") or created_any
+	created_any = _ensure_auto_target_pair("RightFootAuto", "RightFootTarget") or created_any
+	created_any = _ensure_auto_target_pair("SpineBendAuto", "SpineBendTarget") or created_any
+	created_any = _ensure_auto_target_pair("LookAtAuto", "mark3d") or created_any
+	created_any = _ensure_auto_target_pair("LeftElbowPoleAuto", "LeftElbowPoleTarget") or created_any
+	created_any = _ensure_auto_target_pair("RightElbowPoleAuto", "RightElbowPoleTarget") or created_any
+	created_any = _ensure_auto_target_pair("LeftKneePoleAuto", "LeftKneePoleTarget") or created_any
+	created_any = _ensure_auto_target_pair("RightKneePoleAuto", "RightKneePoleTarget") or created_any
+	if created_any:
+		_initialized = false
+
+func _ensure_auto_target_pair(auto_name: String, target_name: String) -> bool:
+	var created_any := false
+	var auto_node := get_node_or_null(auto_name) as Node3D
+	if auto_node == null:
+		auto_node = Node3D.new()
+		auto_node.name = auto_name
+		add_child(auto_node)
+		auto_node.owner = owner if owner != null else self
+		created_any = true
+
+	var target_node := auto_node.get_node_or_null(target_name) as Node3D
+	if target_node == null:
+		var marker := Marker3D.new()
+		marker.name = target_name
+		auto_node.add_child(marker)
+		marker.owner = owner if owner != null else self
+		created_any = true
+	return created_any
+
+func _resolve_scene_references() -> void:
+	skeleton = get_parent().get_node_or_null("GeneralSkeleton") as Skeleton3D
+	left_hand_auto = get_node_or_null("LeftHandAuto") as Node3D
+	right_hand_auto = get_node_or_null("RightHandAuto") as Node3D
+	left_hand_rot_auto = get_node_or_null("LeftHandRotAuto") as Node3D
+	right_hand_rot_auto = get_node_or_null("RightHandRotAuto") as Node3D
+	left_foot_auto = get_node_or_null("LeftFootAuto") as Node3D
+	right_foot_auto = get_node_or_null("RightFootAuto") as Node3D
+	spine_bend_auto = get_node_or_null("SpineBendAuto") as Node3D
+	look_at_auto = get_node_or_null("LookAtAuto") as Node3D
+	left_elbow_pole_auto = get_node_or_null("LeftElbowPoleAuto") as Node3D
+	right_elbow_pole_auto = get_node_or_null("RightElbowPoleAuto") as Node3D
+	left_knee_pole_auto = get_node_or_null("LeftKneePoleAuto") as Node3D
+	right_knee_pole_auto = get_node_or_null("RightKneePoleAuto") as Node3D
+	left_hand_target = get_node_or_null("LeftHandAuto/LeftHandTarget") as Node3D
+	right_hand_target = get_node_or_null("RightHandAuto/RightHandTarget") as Node3D
+	left_hand_rot_target = get_node_or_null("LeftHandRotAuto/LeftHandRotTarget") as Node3D
+	right_hand_rot_target = get_node_or_null("RightHandRotAuto/RightHandRotTarget") as Node3D
+	left_foot_target = get_node_or_null("LeftFootAuto/LeftFootTarget") as Node3D
+	right_foot_target = get_node_or_null("RightFootAuto/RightFootTarget") as Node3D
+	spine_bend_target = get_node_or_null("SpineBendAuto/SpineBendTarget") as Node3D
+	left_elbow_pole_target = get_node_or_null("LeftElbowPoleAuto/LeftElbowPoleTarget") as Node3D
+	right_elbow_pole_target = get_node_or_null("RightElbowPoleAuto/RightElbowPoleTarget") as Node3D
+	left_knee_pole_target = get_node_or_null("LeftKneePoleAuto/LeftKneePoleTarget") as Node3D
+	right_knee_pole_target = get_node_or_null("RightKneePoleAuto/RightKneePoleTarget") as Node3D
+	mark_look_at_target = get_node_or_null("LookAtAuto/mark3d") as Node3D
+	head_look_at = get_parent().get_node_or_null("GeneralSkeleton/HeadLookAt") as LookAtModifier3D
+	left_arm_ik = get_parent().get_node_or_null("GeneralSkeleton/LeftArmIK") as TwoBoneIK3D
+	right_arm_ik = get_parent().get_node_or_null("GeneralSkeleton/RightArmIK") as TwoBoneIK3D
+	left_leg_ik = get_parent().get_node_or_null("GeneralSkeleton/LeftLegIK") as TwoBoneIK3D
+	right_leg_ik = get_parent().get_node_or_null("GeneralSkeleton/RightLegIK") as TwoBoneIK3D
+	spine_ccdik = get_parent().get_node_or_null("GeneralSkeleton/SpineCCDIK") as CCDIK3D
+	left_hand_copy_rotation = get_parent().get_node_or_null("GeneralSkeleton/LeftHandCopyRotation") as CopyTransformModifier3D
+	right_hand_copy_rotation = get_parent().get_node_or_null("GeneralSkeleton/RightHandCopyRotation") as CopyTransformModifier3D
+
+func _ensure_initialized() -> bool:
+	if _initialized and skeleton != null and is_instance_valid(skeleton):
+		return true
+	return _initialize_driver()
 
 func _process(delta: float) -> void:
+	if not _ensure_initialized():
+		return
 	if skeleton == null:
 		return
+	_sync_helper_visibility()
 	if Engine.is_editor_hint():
-		_on_skeleton_pose_updated()
+		if _is_full_control_enabled():
+			_capture_full_control_targets()
+		if editor_auto_follow_enabled:
+			_on_skeleton_pose_updated()
+		_apply_target_control_mode()
+		if editor_pose_preview_enabled:
+			_update_channel_weights(0.0)
+			if auto_manage_influence:
+				_update_modifier_influence()
+		if editor_runtime_preview_enabled:
+			_run_runtime_update(delta)
+		return
+	if runtime_update_in_physics:
+		return
+	_run_runtime_update(delta)
 
-	if _idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON:
+func _physics_process(delta: float) -> void:
+	if not _ensure_initialized():
+		return
+	if skeleton == null:
+		return
+	if Engine.is_editor_hint() or not runtime_update_in_physics:
+		return
+	_run_runtime_update(delta)
+
+func _run_runtime_update(delta: float) -> void:
+	if not _ensure_initialized():
+		return
+	if _is_full_control_enabled():
+		_capture_full_control_targets()
+	_resolve_animation_state_provider()
+	_update_channel_weights(delta)
+	if not _is_full_control_enabled() and (_idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON):
 		_apply_idle_arm_offsets(delta)
-	_update_marker_interaction(delta)
+	_update_ground_foot_targets(delta)
+	if not _is_full_control_enabled():
+		_update_marker_interaction(delta)
+	_apply_target_control_mode()
+	if auto_manage_influence:
+		_update_modifier_influence()
 
 func _exit_tree() -> void:
+	_initialized = false
 	if skeleton != null and skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
 		skeleton.pose_updated.disconnect(_on_skeleton_pose_updated)
+
+func _sync_update_callbacks() -> void:
+	if Engine.is_editor_hint():
+		set_process(true)
+		set_physics_process(false)
+		return
+	set_process(not runtime_update_in_physics)
+	set_physics_process(runtime_update_in_physics)
+
+func _sync_helper_visibility() -> void:
+	visible = Engine.is_editor_hint() or not hide_targets_in_game
+
+func _is_full_control_enabled() -> bool:
+	return target_control_mode == TARGET_CONTROL_MODE_FULL_CONTROL
+
+func _get_pose_target_nodes() -> Array[Node3D]:
+	return [
+		left_hand_target,
+		right_hand_target,
+		left_hand_rot_target,
+		right_hand_rot_target,
+		left_foot_target,
+		right_foot_target,
+		spine_bend_target,
+		mark_look_at_target,
+		left_elbow_pole_target,
+		right_elbow_pole_target,
+		left_knee_pole_target,
+		right_knee_pole_target,
+	]
+
+func _capture_full_control_targets() -> void:
+	if not _is_full_control_enabled():
+		return
+	for node in _get_pose_target_nodes():
+		if node == null:
+			continue
+		_full_control_target_globals[self.get_path_to(node)] = node.global_transform
+
+func _apply_target_control_mode() -> void:
+	if not _is_full_control_enabled():
+		_full_control_target_globals.clear()
+		return
+	for node in _get_pose_target_nodes():
+		if node == null:
+			continue
+		var key := self.get_path_to(node)
+		if not _full_control_target_globals.has(key):
+			_full_control_target_globals[key] = node.global_transform
+		var target_global: Variant = _full_control_target_globals.get(key)
+		if target_global is Transform3D:
+			node.global_transform = target_global as Transform3D
+
+func _configure_runtime_order() -> void:
+	set_process_priority(ik_driver_physics_process_priority)
+	set_physics_process_priority(ik_driver_physics_process_priority)
+	if skeleton == null:
+		return
+	skeleton.set_physics_process_priority(skeleton_modifier_physics_process_priority)
+	if runtime_update_in_physics and enforce_physics_modifier_callback_mode:
+		skeleton.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS
+
+func _initialize_channel_weights() -> void:
+	for channel in IK_CHANNELS:
+		_channel_runtime_weights[channel] = 1.0
+		_channel_smoothed_weights[channel] = 1.0
+		_channel_state_weights[channel] = 1.0
+	_active_master_weight = clampf(master_ik_weight, 0.0, 1.0)
+
+func _resolve_animation_state_provider() -> void:
+	if Engine.is_editor_hint():
+		_animation_state_provider = null
+		return
+	if _animation_state_provider != null and is_instance_valid(_animation_state_provider):
+		return
+	if animation_state_provider_path != NodePath():
+		var provider := get_node_or_null(animation_state_provider_path)
+		if provider != null:
+			_animation_state_provider = provider
+			return
+	var fallback := get_parent()
+	if fallback != null and fallback.get_parent() != null:
+		_animation_state_provider = fallback.get_parent()
+
+func _get_animation_state_name() -> StringName:
+	if Engine.is_editor_hint():
+		return &""
+	if _animation_state_provider == null or not is_instance_valid(_animation_state_provider):
+		return &""
+	if _animation_state_provider.has_method("get_current_state_name"):
+		var raw_state: Variant = _animation_state_provider.call("get_current_state_name")
+		if raw_state is StringName:
+			return raw_state as StringName
+		if raw_state is String:
+			return StringName(String(raw_state))
+	return &""
+
+func _update_channel_weights(delta: float) -> void:
+	var state_name := _get_animation_state_name()
+	var state_multiplier_enabled := state_profile_enabled and not state_channel_multipliers.is_empty()
+	var master_target := clampf(master_ik_weight, 0.0, 1.0)
+	if not runtime_ik_enabled:
+		master_target = 0.0
+	var master_step := maxf(master_ik_blend_speed, 0.0) * maxf(delta, 0.0)
+	if master_step > 0.0:
+		_active_master_weight = move_toward(_active_master_weight, master_target, master_step)
+	else:
+		_active_master_weight = master_target
+
+	for channel in IK_CHANNELS:
+		var runtime_multiplier := float(_channel_runtime_weights.get(channel, 1.0))
+		var state_multiplier := 1.0
+		if state_multiplier_enabled:
+			state_multiplier = _get_state_channel_multiplier(state_name, channel)
+		_channel_state_weights[channel] = state_multiplier
+
+		var target := clampf(_active_master_weight * runtime_multiplier * state_multiplier, 0.0, 1.0)
+		var current := float(_channel_smoothed_weights.get(channel, 1.0))
+		var speed := _get_channel_blend_speed(channel)
+		var step := maxf(speed, 0.0) * maxf(delta, 0.0)
+		if step > 0.0:
+			current = move_toward(current, target, step)
+		else:
+			current = target
+		_channel_smoothed_weights[channel] = current
+
+func _get_state_channel_multiplier(state_name: StringName, channel: StringName) -> float:
+	if state_channel_multipliers.is_empty():
+		return 1.0
+	var state_key := String(state_name)
+	var channel_key := String(channel)
+	var profile := _get_state_profile(state_key)
+	if profile.is_empty():
+		profile = _get_state_profile(String(STATE_PROFILE_DEFAULT))
+	if profile.is_empty():
+		return 1.0
+	return clampf(_read_dict_float(profile, channel_key, 1.0), 0.0, 1.0)
+
+func _get_state_profile(state_key: String) -> Dictionary:
+	if state_key.is_empty():
+		return {}
+	if state_channel_multipliers.has(state_key):
+		var direct: Variant = state_channel_multipliers[state_key]
+		if direct is Dictionary:
+			return direct as Dictionary
+	var state_key_lower := state_key.to_lower()
+	for key in state_channel_multipliers.keys():
+		if String(key).to_lower() == state_key_lower:
+			var profile: Variant = state_channel_multipliers[key]
+			if profile is Dictionary:
+				return profile as Dictionary
+	return {}
+
+func _read_dict_float(source: Dictionary, key: String, fallback: float) -> float:
+	if source.has(key):
+		return float(source[key])
+	var key_lower := key.to_lower()
+	for source_key in source.keys():
+		if String(source_key).to_lower() == key_lower:
+			return float(source[source_key])
+	return fallback
+
+func _get_channel_blend_speed(channel: StringName) -> float:
+	match channel:
+		IK_CHANNEL_LOOK:
+			return channel_look_blend_speed
+		IK_CHANNEL_SPINE:
+			return channel_spine_blend_speed
+		IK_CHANNEL_ARM_REACH:
+			return channel_arm_reach_blend_speed
+		IK_CHANNEL_ARM_IDLE:
+			return channel_arm_idle_blend_speed
+		IK_CHANNEL_LEG_GROUND:
+			return channel_leg_ground_blend_speed
+		IK_CHANNEL_HAND_ROT:
+			return channel_hand_rot_blend_speed
+		_:
+			return master_ik_blend_speed
+
+func _normalize_channel_name(channel: StringName) -> StringName:
+	var key := String(channel).strip_edges().to_lower()
+	match key:
+		"look":
+			return IK_CHANNEL_LOOK
+		"spine":
+			return IK_CHANNEL_SPINE
+		"arm_reach":
+			return IK_CHANNEL_ARM_REACH
+		"arm_idle":
+			return IK_CHANNEL_ARM_IDLE
+		"leg_ground":
+			return IK_CHANNEL_LEG_GROUND
+		"hand_rot":
+			return IK_CHANNEL_HAND_ROT
+		_:
+			return &""
+
+func _get_channel_weight(channel: StringName) -> float:
+	return clampf(float(_channel_smoothed_weights.get(channel, 1.0)), 0.0, 1.0)
+
+func set_channel_weight(channel: StringName, weight: float) -> void:
+	var normalized := _normalize_channel_name(channel)
+	if normalized == &"":
+		return
+	_channel_runtime_weights[normalized] = clampf(weight, 0.0, 1.0)
+
+func set_runtime_ik_enabled(enabled: bool) -> void:
+	runtime_ik_enabled = enabled
+	if not auto_manage_influence:
+		return
+	if not runtime_ik_enabled:
+		_set_all_modifier_influence(0.0)
+	else:
+		_update_modifier_influence()
+
+func set_state_profile_enabled(enabled: bool) -> void:
+	state_profile_enabled = enabled
+	if auto_manage_influence:
+		_update_modifier_influence()
 
 func _cache_bones() -> void:
 	left_upper_arm_bone = skeleton.find_bone("LeftUpperArm")
@@ -144,6 +673,12 @@ func _cache_bones() -> void:
 	right_lower_leg_bone = skeleton.find_bone("RightLowerLeg")
 	right_foot_bone = skeleton.find_bone("RightFoot")
 
+	spine_follow_bone = skeleton.find_bone(String(spine_follow_bone_name))
+	if spine_follow_bone == -1:
+		spine_follow_bone = skeleton.find_bone("UpperChest")
+	if spine_follow_bone == -1:
+		spine_follow_bone = skeleton.find_bone("Chest")
+
 	look_at_follow_bone = skeleton.find_bone(String(look_at_follow_bone_name))
 	if look_at_follow_bone == -1:
 		look_at_follow_bone = skeleton.find_bone("头部")
@@ -152,39 +687,130 @@ func _cache_bones() -> void:
 	if look_at_follow_bone == -1:
 		push_warning("IKTargetDriver could not find a LookAt follow bone.")
 
-func _on_skeleton_pose_updated() -> void:
-	_set_auto_from_bone(left_hand_auto, left_hand_bone)
-	_set_auto_from_bone(right_hand_auto, right_hand_bone)
-	_set_auto_from_bone(left_hand_rot_auto, left_hand_bone)
-	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
-	_set_auto_from_bone(left_foot_auto, left_foot_bone)
-	_set_auto_from_bone(right_foot_auto, right_foot_bone)
-	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, look_at_auto_forward_offset)
+func _cache_auto_follow_offsets() -> void:
+	_left_hand_auto_follow_offset = _compute_auto_follow_offset(left_hand_auto, left_hand_bone)
+	_right_hand_auto_follow_offset = _compute_auto_follow_offset(right_hand_auto, right_hand_bone)
+	_left_hand_rot_auto_follow_offset = _compute_auto_follow_offset(left_hand_rot_auto, left_hand_bone)
+	_right_hand_rot_auto_follow_offset = _compute_auto_follow_offset(right_hand_rot_auto, right_hand_bone)
+	_left_foot_auto_follow_offset = _compute_auto_follow_offset(left_foot_auto, left_foot_bone)
+	_right_foot_auto_follow_offset = _compute_auto_follow_offset(right_foot_auto, right_foot_bone)
+	_spine_bend_auto_follow_offset = _compute_auto_follow_offset(spine_bend_auto, spine_follow_bone)
+	_look_at_auto_follow_offset = _compute_auto_follow_offset(look_at_auto, look_at_follow_bone)
 
-	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
-	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, Vector3(0, 0, -1), elbow_pole_distance_scale)
-	_update_pole_auto(left_knee_pole_auto, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, Vector3(0, 0, 1), knee_pole_distance_scale)
-	_update_pole_auto(right_knee_pole_auto, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, Vector3(0, 0, 1), knee_pole_distance_scale)
-
-	if auto_manage_influence:
-		_update_modifier_influence()
-
-func _set_auto_from_bone(target: Node3D, bone_idx: int) -> void:
+func _compute_auto_follow_offset(target: Node3D, bone_idx: int) -> Transform3D:
 	if target == null or bone_idx == -1:
-		return
-
-	target.global_transform = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
-
-func _set_auto_from_bone_with_forward_offset(target: Node3D, bone_idx: int, forward_offset: float) -> void:
-	if target == null or bone_idx == -1:
-		return
-
+		return Transform3D.IDENTITY
 	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
+	return bone_global.affine_inverse() * target.global_transform
+
+func _cache_pole_profiles() -> void:
+	_left_elbow_pole_profile = _build_pole_profile(left_elbow_pole_auto, left_arm_ik, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, DEFAULT_ELBOW_POLE_DISTANCE_SCALE)
+	_right_elbow_pole_profile = _build_pole_profile(right_elbow_pole_auto, right_arm_ik, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, DEFAULT_ELBOW_POLE_DISTANCE_SCALE)
+	_left_knee_pole_profile = _build_pole_profile(left_knee_pole_auto, left_leg_ik, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, DEFAULT_KNEE_POLE_DISTANCE_SCALE)
+	_right_knee_pole_profile = _build_pole_profile(right_knee_pole_auto, right_leg_ik, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, DEFAULT_KNEE_POLE_DISTANCE_SCALE)
+
+func _build_pole_profile(target: Node3D, modifier: TwoBoneIK3D, root_bone_idx: int, middle_bone_idx: int, end_bone_idx: int, default_distance_scale: float) -> Dictionary:
+	var profile := {
+		"distance_scale": default_distance_scale,
+		"fallback_local": Vector3.FORWARD,
+	}
+	if modifier != null:
+		profile["distance_scale"] = _read_two_bone_meta_float(modifier, META_NODE_POLE_DISTANCE_SCALE, default_distance_scale)
+		var meta_fallback := _read_two_bone_meta_vector3(modifier, META_NODE_POLE_FALLBACK_LOCAL, Vector3.ZERO)
+		if meta_fallback.length_squared() > EPSILON:
+			profile["fallback_local"] = meta_fallback.normalized()
+
+	if target == null or root_bone_idx == -1 or middle_bone_idx == -1 or end_bone_idx == -1:
+		return profile
+
+	var root_transform: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(root_bone_idx)
+	var middle_transform: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(middle_bone_idx)
+	var end_transform: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(end_bone_idx)
+	var upper_len: float = (middle_transform.origin - root_transform.origin).length()
+	var lower_len: float = (end_transform.origin - middle_transform.origin).length()
+	var max_len: float = maxf(maxf(upper_len, lower_len), EPSILON)
+	var current_distance: float = (target.global_transform.origin - middle_transform.origin).length()
+	if current_distance > EPSILON and not (modifier != null and modifier.has_meta(META_NODE_POLE_DISTANCE_SCALE)):
+		profile["distance_scale"] = clampf(current_distance / max_len, 0.05, 4.0)
+
+	var fallback_world: Vector3 = target.global_transform.origin - middle_transform.origin
+	if fallback_world.length_squared() > EPSILON and not (modifier != null and modifier.has_meta(META_NODE_POLE_FALLBACK_LOCAL)):
+		profile["fallback_local"] = (root_transform.basis.inverse() * fallback_world.normalized()).normalized()
+	elif modifier != null and (profile["fallback_local"] as Vector3).length_squared() <= EPSILON:
+		var secondary_dir := int(modifier.get("settings/0/pole_direction"))
+		profile["fallback_local"] = _secondary_direction_to_local_axis(secondary_dir)
+
+	return profile
+
+func _read_two_bone_meta_float(modifier: TwoBoneIK3D, key: StringName, fallback: float) -> float:
+	if modifier == null or not modifier.has_meta(key):
+		return fallback
+	return float(modifier.get_meta(key))
+
+func _read_two_bone_meta_vector3(modifier: TwoBoneIK3D, key: StringName, fallback: Vector3) -> Vector3:
+	if modifier == null or not modifier.has_meta(key):
+		return fallback
+	var raw_value: Variant = modifier.get_meta(key)
+	if raw_value is Vector3:
+		return raw_value as Vector3
+	return fallback
+
+func _secondary_direction_to_local_axis(secondary_direction: int) -> Vector3:
+	match secondary_direction:
+		1:
+			return Vector3.RIGHT
+		2:
+			return Vector3.LEFT
+		3:
+			return Vector3.UP
+		4:
+			return Vector3.DOWN
+		5:
+			return Vector3.BACK
+		6:
+			return Vector3.FORWARD
+		_:
+			return Vector3.FORWARD
+
+func _read_node_meta_float(node: Node, key: StringName, fallback: float) -> float:
+	if node == null or not node.has_meta(key):
+		return fallback
+	return float(node.get_meta(key))
+
+func _on_skeleton_pose_updated() -> void:
+	if not _ensure_initialized():
+		return
+	_set_auto_from_bone(left_hand_auto, left_hand_bone, _left_hand_auto_follow_offset)
+	_set_auto_from_bone(right_hand_auto, right_hand_bone, _right_hand_auto_follow_offset)
+	_set_auto_from_bone(left_hand_rot_auto, left_hand_bone, _left_hand_rot_auto_follow_offset)
+	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone, _right_hand_rot_auto_follow_offset)
+	_set_auto_from_bone(left_foot_auto, left_foot_bone, _left_foot_auto_follow_offset)
+	_set_auto_from_bone(right_foot_auto, right_foot_bone, _right_foot_auto_follow_offset)
+	_set_auto_from_bone(spine_bend_auto, spine_follow_bone, _spine_bend_auto_follow_offset)
+	var look_forward_offset := _read_node_meta_float(look_at_auto, META_NODE_FORWARD_OFFSET, 0.0)
+	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, _look_at_auto_follow_offset, look_forward_offset)
+
+	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, _left_elbow_pole_profile)
+	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, _right_elbow_pole_profile)
+	_update_pole_auto(left_knee_pole_auto, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, _left_knee_pole_profile)
+	_update_pole_auto(right_knee_pole_auto, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, _right_knee_pole_profile)
+
+func _set_auto_from_bone(target: Node3D, bone_idx: int, follow_offset: Transform3D = Transform3D.IDENTITY) -> void:
+	if target == null or bone_idx == -1:
+		return
+	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
+	target.global_transform = bone_global * follow_offset
+
+func _set_auto_from_bone_with_forward_offset(target: Node3D, bone_idx: int, follow_offset: Transform3D, forward_offset: float) -> void:
+	if target == null or bone_idx == -1:
+		return
+
+	var bone_global: Transform3D = (skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)) * follow_offset
 	var forward: Vector3 = -bone_global.basis.z.normalized()
 	bone_global.origin += forward * forward_offset
 	target.global_transform = bone_global
 
-func _update_pole_auto(target: Node3D, root_bone_idx: int, middle_bone_idx: int, end_bone_idx: int, fallback_direction: Vector3, distance_scale: float) -> void:
+func _update_pole_auto(target: Node3D, root_bone_idx: int, middle_bone_idx: int, end_bone_idx: int, profile: Dictionary) -> void:
 	if target == null or root_bone_idx == -1 or middle_bone_idx == -1 or end_bone_idx == -1:
 		return
 
@@ -205,6 +831,11 @@ func _update_pole_auto(target: Node3D, root_bone_idx: int, middle_bone_idx: int,
 	var root_to_middle: Vector3 = middle_position - root_position
 	var projected_middle: Vector3 = root_to_end_dir * root_to_middle.dot(root_to_end_dir)
 	var pole_direction: Vector3 = root_to_middle - projected_middle
+	var distance_scale := clampf(float(profile.get("distance_scale", 1.0)), 0.05, 4.0)
+	var fallback_local := profile.get("fallback_local", Vector3.FORWARD) as Vector3
+	if fallback_local.length_squared() <= EPSILON:
+		fallback_local = Vector3.FORWARD
+	var fallback_direction: Vector3 = (root_transform.basis * fallback_local).normalized()
 	if pole_direction.length_squared() <= EPSILON:
 		pole_direction = fallback_direction.normalized()
 	else:
@@ -223,6 +854,7 @@ func _cache_base_target_transforms() -> void:
 	right_hand_rot_target_base = _safe_local_transform(right_hand_rot_target)
 	left_foot_target_base = _safe_local_transform(left_foot_target)
 	right_foot_target_base = _safe_local_transform(right_foot_target)
+	spine_bend_target_base = _safe_local_transform(spine_bend_target)
 	left_elbow_pole_target_base = _safe_local_transform(left_elbow_pole_target)
 	right_elbow_pole_target_base = _safe_local_transform(right_elbow_pole_target)
 	left_knee_pole_target_base = _safe_local_transform(left_knee_pole_target)
@@ -360,8 +992,10 @@ func _update_marker_interaction(delta: float) -> void:
 	if _interaction_look_enabled:
 		var look_world: Vector3 = anchor_transform * _interaction_look_offset
 		_blend_global_pose(mark_look_at_target, mark_look_at_target_base, look_world, Basis.IDENTITY, false, true)
+		_blend_spine_target_towards(look_world)
 	else:
 		_blend_to_base_global(mark_look_at_target, mark_look_at_target_base, false, true)
+		_blend_to_base_global(spine_bend_target, spine_bend_target_base, false, true)
 
 	if _interaction_left_hand_enabled:
 		var left_world: Vector3 = anchor_transform * _interaction_left_hand_offset
@@ -388,11 +1022,23 @@ func _restore_targets_after_interaction_clear() -> void:
 	_interaction_anchor = null
 	_interaction_mode = &""
 	_restore_local_transform(mark_look_at_target, mark_look_at_target_base)
+	_restore_local_transform(spine_bend_target, spine_bend_target_base)
 	_restore_local_transform(left_hand_rot_target, left_hand_rot_target_base)
 	_restore_local_transform(right_hand_rot_target, right_hand_rot_target_base)
 	_apply_arm_target_offsets(_idle_arm_offset_weight)
 	if auto_manage_influence:
 		_update_modifier_influence()
+
+func _blend_spine_target_towards(look_world: Vector3) -> void:
+	if spine_bend_target == null:
+		return
+	var parent_node := spine_bend_target.get_parent_node_3d()
+	if parent_node == null:
+		return
+	var base_global: Transform3D = parent_node.global_transform * spine_bend_target_base
+	var weight := clampf(spine_ccdik_look_weight, 0.0, 1.0)
+	var spine_world: Vector3 = base_global.origin.lerp(look_world, weight)
+	_blend_global_pose(spine_bend_target, spine_bend_target_base, spine_world, Basis.IDENTITY, false, true)
 
 func _blend_idle_arm_target_to_base(node: Node3D, base_transform: Transform3D, idle_offset: Vector3) -> void:
 	if node == null:
@@ -528,7 +1174,174 @@ func _restore_local_transform(node: Node3D, base_transform: Transform3D) -> void
 		return
 	node.transform = base_transform
 
+func _update_ground_foot_targets(delta: float) -> void:
+	if _is_full_control_enabled():
+		_left_leg_auto_weight = 0.0
+		_right_leg_auto_weight = 0.0
+		return
+	if Engine.is_editor_hint():
+		return
+
+	var leg_ground_channel_weight := _get_channel_weight(IK_CHANNEL_LEG_GROUND)
+	var blend_step := maxf(ground_foot_ik_influence_blend_speed, 0.0) * maxf(delta, 0.0)
+	var left_manual := _has_position_offset(left_foot_target, left_foot_target_base) or _has_position_offset(left_knee_pole_target, left_knee_pole_target_base)
+	var right_manual := _has_position_offset(right_foot_target, right_foot_target_base) or _has_position_offset(right_knee_pole_target, right_knee_pole_target_base)
+	if leg_ground_channel_weight <= EPSILON:
+		_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 0.0, blend_step)
+		_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 0.0, blend_step)
+		if auto_manage_influence:
+			_update_modifier_influence()
+		return
+
+	if _owner_body == null or not is_instance_valid(_owner_body):
+		_owner_body = _resolve_owner_body()
+
+	var left_ground_auto_enabled := _is_leg_ground_auto_enabled(left_leg_ik) and not left_manual
+	var right_ground_auto_enabled := _is_leg_ground_auto_enabled(right_leg_ik) and not right_manual
+	var disable_for_speed: bool = _get_owner_horizontal_speed() > maxf(ground_foot_ik_disable_speed, 0.0)
+	var left_active := false
+	var right_active := false
+	if disable_for_speed:
+		if left_ground_auto_enabled and not left_manual:
+			_move_target_to_base(left_foot_target, left_foot_target_base, delta)
+		if right_ground_auto_enabled and not right_manual:
+			_move_target_to_base(right_foot_target, right_foot_target_base, delta)
+	else:
+		if left_ground_auto_enabled:
+			left_active = _apply_ground_foot_target(left_foot_target, left_foot_target_base, left_foot_auto, delta)
+		elif not left_manual:
+			_move_target_to_base(left_foot_target, left_foot_target_base, delta)
+		if right_ground_auto_enabled:
+			right_active = _apply_ground_foot_target(right_foot_target, right_foot_target_base, right_foot_auto, delta)
+		elif not right_manual:
+			_move_target_to_base(right_foot_target, right_foot_target_base, delta)
+
+	_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 1.0 if left_active else 0.0, blend_step)
+	_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 1.0 if right_active else 0.0, blend_step)
+
+	if auto_manage_influence:
+		_update_modifier_influence()
+
+func _is_leg_ground_auto_enabled(modifier: TwoBoneIK3D) -> bool:
+	if modifier == null or not modifier.has_meta(META_NODE_GROUND_FOOT_AUTO):
+		return false
+	return bool(modifier.get_meta(META_NODE_GROUND_FOOT_AUTO))
+
+func _apply_ground_foot_target(target_node: Node3D, base_local: Transform3D, foot_auto_node: Node3D, delta: float) -> bool:
+	if target_node == null or foot_auto_node == null:
+		return false
+
+	var hit: Dictionary = _sample_ground_hit(foot_auto_node.global_transform.origin)
+	if hit.is_empty():
+		_move_target_to_base(target_node, base_local, delta)
+		return false
+
+	var parent_node := target_node.get_parent_node_3d()
+	if parent_node == null:
+		return false
+
+	var base_global: Transform3D = parent_node.global_transform * base_local
+	var hit_position: Vector3 = hit["position"]
+	var hit_normal: Vector3 = (hit["normal"] as Vector3).normalized()
+	if hit_normal.length_squared() <= EPSILON:
+		hit_normal = Vector3.UP
+
+	var desired_origin := hit_position + hit_normal * ground_foot_ik_foot_height
+	var desired_delta: Vector3 = desired_origin - base_global.origin
+	var max_distance := maxf(ground_foot_ik_max_target_distance, 0.0)
+	if max_distance > EPSILON and desired_delta.length() > max_distance:
+		desired_origin = base_global.origin + desired_delta.normalized() * max_distance
+
+	var desired_basis := base_global.basis
+	if ground_foot_ik_align_to_normal:
+		desired_basis = _build_ground_aligned_basis(base_global.basis, hit_normal)
+
+	var current_global: Transform3D = target_node.global_transform
+	var next_global := current_global
+	var position_weight := clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
+	var rotation_weight := clampf(maxf(ground_foot_ik_rotation_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
+	next_global.origin = current_global.origin.lerp(desired_origin, position_weight)
+	next_global.basis = _slerp_basis(current_global.basis, desired_basis, rotation_weight)
+	target_node.global_transform = next_global
+	return true
+
+func _sample_ground_hit(origin: Vector3) -> Dictionary:
+	var world_3d := get_world_3d()
+	if world_3d == null:
+		return {}
+
+	var up_distance := maxf(ground_foot_ik_raycast_up, 0.01)
+	var down_distance := maxf(ground_foot_ik_raycast_down, 0.05)
+	var from := origin + Vector3.UP * up_distance
+	var to := origin - Vector3.UP * down_distance
+	var query := PhysicsRayQueryParameters3D.create(from, to, ground_foot_ik_collision_mask)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	if _owner_body != null and is_instance_valid(_owner_body):
+		query.exclude = [_owner_body.get_rid()]
+	return world_3d.direct_space_state.intersect_ray(query)
+
+func _move_target_to_base(target_node: Node3D, base_local: Transform3D, delta: float) -> void:
+	if target_node == null:
+		return
+
+	var parent_node := target_node.get_parent_node_3d()
+	if parent_node == null:
+		target_node.transform = target_node.transform.interpolate_with(base_local, clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0))
+		return
+
+	var base_global: Transform3D = parent_node.global_transform * base_local
+	var current_global: Transform3D = target_node.global_transform
+	var next_global := current_global
+	var position_weight := clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
+	var rotation_weight := clampf(maxf(ground_foot_ik_rotation_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
+	next_global.origin = current_global.origin.lerp(base_global.origin, position_weight)
+	next_global.basis = _slerp_basis(current_global.basis, base_global.basis, rotation_weight)
+	target_node.global_transform = next_global
+
+func _build_ground_aligned_basis(base_basis: Basis, up_direction: Vector3) -> Basis:
+	var up: Vector3 = up_direction.normalized()
+	if up.length_squared() <= EPSILON:
+		return base_basis
+
+	var forward: Vector3 = -base_basis.z.normalized()
+	var projected_forward: Vector3 = forward - up * forward.dot(up)
+	if projected_forward.length_squared() <= EPSILON:
+		projected_forward = base_basis.x.cross(up)
+	if projected_forward.length_squared() <= EPSILON:
+		projected_forward = Vector3.FORWARD
+	projected_forward = projected_forward.normalized()
+
+	var right: Vector3 = up.cross(projected_forward).normalized()
+	if right.length_squared() <= EPSILON:
+		right = base_basis.x.normalized()
+	return Basis(right, up, -projected_forward).orthonormalized()
+
+func _get_owner_horizontal_speed() -> float:
+	if _owner_body == null or not is_instance_valid(_owner_body):
+		return 0.0
+	return Vector2(_owner_body.velocity.x, _owner_body.velocity.z).length()
+
+func _resolve_owner_body() -> CharacterBody3D:
+	var cursor: Node = self
+	while cursor != null:
+		if cursor is CharacterBody3D:
+			return cursor as CharacterBody3D
+		cursor = cursor.get_parent()
+	return null
+
 func _update_modifier_influence() -> void:
+	if not runtime_ik_enabled:
+		_set_all_modifier_influence(0.0)
+		return
+
+	var look_channel := _get_channel_weight(IK_CHANNEL_LOOK)
+	var spine_channel := _get_channel_weight(IK_CHANNEL_SPINE)
+	var arm_reach_channel := _get_channel_weight(IK_CHANNEL_ARM_REACH)
+	var arm_idle_channel := _get_channel_weight(IK_CHANNEL_ARM_IDLE)
+	var leg_ground_channel := _get_channel_weight(IK_CHANNEL_LEG_GROUND)
+	var hand_rot_channel := _get_channel_weight(IK_CHANNEL_HAND_ROT)
+
 	var left_arm_active: bool = _has_position_offset(left_hand_target, left_hand_target_base) or _has_position_offset(left_elbow_pole_target, left_elbow_pole_target_base)
 	var right_arm_active: bool = _has_position_offset(right_hand_target, right_hand_target_base) or _has_position_offset(right_elbow_pole_target, right_elbow_pole_target_base)
 	var left_leg_active: bool = _has_position_offset(left_foot_target, left_foot_target_base) or _has_position_offset(left_knee_pole_target, left_knee_pole_target_base)
@@ -536,21 +1349,82 @@ func _update_modifier_influence() -> void:
 	var left_hand_rot_active: bool = _has_rotation_offset(left_hand_rot_target, left_hand_rot_target_base)
 	var right_hand_rot_active: bool = _has_rotation_offset(right_hand_rot_target, right_hand_rot_target_base)
 
-	_set_influence(left_arm_ik, 1.0 if left_arm_active else 0.0)
-	_set_influence(right_arm_ik, 1.0 if right_arm_active else 0.0)
-	_set_influence(left_leg_ik, 1.0 if left_leg_active else 0.0)
-	_set_influence(right_leg_ik, 1.0 if right_leg_active else 0.0)
-	_set_influence(left_hand_copy_rotation, 1.0 if left_hand_rot_active else 0.0)
-	_set_influence(right_hand_copy_rotation, 1.0 if right_hand_rot_active else 0.0)
+	var left_reach_active: bool = _interaction_left_hand_enabled and _interaction_weight > EPSILON
+	var right_reach_active: bool = _interaction_right_hand_enabled and _interaction_weight > EPSILON
+	var left_idle_active: bool = not left_reach_active and _idle_arm_offset_weight > EPSILON
+	var right_idle_active: bool = not right_reach_active and _idle_arm_offset_weight > EPSILON
+
+	var left_arm_weight := 0.0
+	var right_arm_weight := 0.0
+	if left_reach_active:
+		left_arm_weight = maxf(left_arm_weight, arm_reach_channel)
+	if left_idle_active:
+		left_arm_weight = maxf(left_arm_weight, arm_idle_channel)
+	if left_arm_weight <= EPSILON and left_arm_active:
+		left_arm_weight = arm_reach_channel
+
+	if right_reach_active:
+		right_arm_weight = maxf(right_arm_weight, arm_reach_channel)
+	if right_idle_active:
+		right_arm_weight = maxf(right_arm_weight, arm_idle_channel)
+	if right_arm_weight <= EPSILON and right_arm_active:
+		right_arm_weight = arm_reach_channel
+
+	var left_leg_manual_weight: float = 1.0 if left_leg_active else 0.0
+	var right_leg_manual_weight: float = 1.0 if right_leg_active else 0.0
+	var left_leg_weight: float = clampf(left_leg_manual_weight + _left_leg_auto_weight * leg_ground_channel, 0.0, 1.0)
+	var right_leg_weight: float = clampf(right_leg_manual_weight + _right_leg_auto_weight * leg_ground_channel, 0.0, 1.0)
+
+	_set_influence(left_arm_ik, (1.0 if left_arm_active else 0.0) * left_arm_weight)
+	_set_influence(right_arm_ik, (1.0 if right_arm_active else 0.0) * right_arm_weight)
+	_set_influence(left_leg_ik, left_leg_weight)
+	_set_influence(right_leg_ik, right_leg_weight)
+	_set_influence(left_hand_copy_rotation, (1.0 if left_hand_rot_active else 0.0) * hand_rot_channel)
+	_set_influence(right_hand_copy_rotation, (1.0 if right_hand_rot_active else 0.0) * hand_rot_channel)
+
+	if enable_spine_ccdik and spine_ccdik != null:
+		var spine_active: bool = _has_position_offset(spine_bend_target, spine_bend_target_base)
+		var spine_weight := 0.0
+		if spine_active:
+			if _interaction_look_enabled and _interaction_weight > EPSILON:
+				spine_weight = clampf(_interaction_weight * clampf(spine_ccdik_look_weight, 0.0, 1.0), 0.0, 1.0)
+			else:
+				spine_weight = 1.0
+		_set_influence(spine_ccdik, spine_weight * spine_channel)
 
 	if manage_head_look_at:
 		var head_active: bool = _has_position_offset(mark_look_at_target, mark_look_at_target_base)
-		_set_influence(head_look_at, 1.0 if head_active else 0.0)
+		_set_influence(head_look_at, (1.0 if head_active else 0.0) * look_channel)
+
+func _set_all_modifier_influence(value: float) -> void:
+	_set_influence(left_arm_ik, value)
+	_set_influence(right_arm_ik, value)
+	_set_influence(left_leg_ik, value)
+	_set_influence(right_leg_ik, value)
+	_set_influence(left_hand_copy_rotation, value)
+	_set_influence(right_hand_copy_rotation, value)
+	_set_influence(spine_ccdik, value)
+	_set_influence(head_look_at, value)
 
 func _set_influence(modifier: SkeletonModifier3D, value: float) -> void:
 	if modifier == null:
 		return
 	modifier.influence = value
+
+func debug_left_arm_state() -> Dictionary:
+	var target_node := left_hand_target
+	var pole_node := left_elbow_pole_target
+	var active := _has_position_offset(target_node, left_hand_target_base) or _has_position_offset(pole_node, left_elbow_pole_target_base)
+	var arm_reach_channel := _get_channel_weight(IK_CHANNEL_ARM_REACH)
+	var weight := arm_reach_channel if active else 0.0
+	return {
+		"target": str(target_node),
+		"pole": str(pole_node),
+		"ik": str(left_arm_ik),
+		"active": active,
+		"channel": arm_reach_channel,
+		"weight": weight,
+	}
 
 func _has_position_offset(node: Node3D, base_transform: Transform3D) -> bool:
 	if node == null:

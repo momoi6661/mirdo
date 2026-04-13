@@ -131,11 +131,21 @@ open_angle_degrees = 92.0
 open_duration = 0.7
 close_duration = 0.62
 overshoot_degrees = 2.0
-open_sound = ExtResource("3_open")
-close_sound = ExtResource("4_close")
-sound_volume_db = -4.5
-sound_max_distance = 20.0
-sound_unit_size = 2.6
+open_sfx_player_path = NodePath("OpenSfx3D")
+close_sfx_player_path = NodePath("CloseSfx3D")
+sound_volume_db = -9.5
+
+[node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="door_001_col"]
+stream = ExtResource("3_open")
+volume_db = -9.5
+max_distance = 14.0
+unit_size = 2.2
+
+[node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="door_001_col"]
+stream = ExtResource("4_close")
+volume_db = -9.5
+max_distance = 14.0
+unit_size = 2.2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="door_001_col" unique_id=1925316422]
 shape = SubResource("ConcavePolygonShape3D_jujbo")
