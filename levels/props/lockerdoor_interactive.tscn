@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://61utplg7jalh" path="res://components/swing_push_door_component.gd" id="1_2i6yw"]
 [ext_resource type="Script" path="res://components/door_instance_config.gd" id="2_cfg"]
-[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-opening-door-450444.mp3" id="3_open"]
-[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-door-close-effect-382710.mp3" id="4_close"]
+[ext_resource type="AudioStream" path="res://Audio/door/lockerdoor_open_metal.ogg" id="3_open"]
+[ext_resource type="AudioStream" path="res://Audio/door/lockerdoor_close_metal.ogg" id="4_close"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_0smre"]
 load_path = "res://.godot/imported/white_metal.png-8362bb9e4e2325283b9ac03c65ccf377.s3tc.ctex"
@@ -87,21 +87,26 @@ open_angle_degrees = 82.0
 open_duration = 0.62
 close_duration = 0.56
 overshoot_degrees = 1.6
-open_sfx_player_path = NodePath("OpenSfx3D")
-close_sfx_player_path = NodePath("CloseSfx3D")
-sound_volume_db = -10.0
+open_sfx_player_path = NodePath("../SfxAnchor/OpenSfx3D")
+close_sfx_player_path = NodePath("../SfxAnchor/CloseSfx3D")
+sound_volume_db = -11.5
 
-[node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="locker_door_col"]
+[node name="SfxAnchor" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.022, 0, 0.325)
+
+[node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor"]
 stream = ExtResource("3_open")
-volume_db = -10.0
-max_distance = 12.0
-unit_size = 2.0
+volume_db = -11.5
+max_distance = 6.5
+unit_size = 3.2
+pitch_scale = 1.08
 
-[node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="locker_door_col"]
+[node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor"]
 stream = ExtResource("4_close")
-volume_db = -10.0
-max_distance = 12.0
-unit_size = 2.0
+volume_db = -11.5
+max_distance = 6.5
+unit_size = 3.2
+pitch_scale = 1.12
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="locker_door_col" unique_id=2021367450]
 shape = SubResource("ConcavePolygonShape3D_kg4op")

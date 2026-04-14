@@ -1254,11 +1254,6 @@ func _update_ground_foot_targets(delta: float) -> void:
 	if auto_manage_influence:
 		_update_modifier_influence()
 
-func _is_leg_ground_auto_enabled(modifier: TwoBoneIK3D) -> bool:
-	if modifier == null or not modifier.has_meta(META_NODE_GROUND_FOOT_AUTO):
-		return false
-	return bool(modifier.get_meta(META_NODE_GROUND_FOOT_AUTO))
-
 func _update_ground_leg_target(target_node: Node3D, base_local: Transform3D, foot_auto_node: Node3D, modifier: TwoBoneIK3D, profile: Dictionary, plant_state: Dictionary, manual_active: bool, delta: float) -> bool:
 	if target_node == null or foot_auto_node == null:
 		return false
@@ -1266,7 +1261,7 @@ func _update_ground_leg_target(target_node: Node3D, base_local: Transform3D, foo
 		_clear_foot_plant_lock(plant_state)
 		_remember_foot_auto_origin(plant_state, foot_auto_node)
 		return false
-	if not _is_leg_ground_auto_enabled(modifier):
+	if not _get_ground_profile_bool(profile, "auto_enabled", false):
 		_clear_foot_plant_lock(plant_state)
 		_remember_foot_auto_origin(plant_state, foot_auto_node)
 		return false
@@ -1565,21 +1560,6 @@ func _set_influence(modifier: SkeletonModifier3D, value: float) -> void:
 	if modifier == null:
 		return
 	modifier.influence = value
-
-func debug_left_arm_state() -> Dictionary:
-	var target_node := left_hand_target
-	var pole_node := left_elbow_pole_target
-	var active := _has_position_offset(target_node, left_hand_target_base) or _has_position_offset(pole_node, left_elbow_pole_target_base)
-	var arm_reach_channel := _get_channel_weight(IK_CHANNEL_ARM_REACH)
-	var weight := arm_reach_channel if active else 0.0
-	return {
-		"target": str(target_node),
-		"pole": str(pole_node),
-		"ik": str(left_arm_ik),
-		"active": active,
-		"channel": arm_reach_channel,
-		"weight": weight,
-	}
 
 func _has_position_offset(node: Node3D, base_transform: Transform3D) -> bool:
 	if node == null:

@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://61utplg7jalh" path="res://components/swing_push_door_component.gd" id="1_ubfro"]
 [ext_resource type="Script" uid="uid://dy24fqwfoy8kt" path="res://components/door_instance_config.gd" id="2_cfg"]
-[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-opening-door-450444.mp3" id="3_open"]
-[ext_resource type="AudioStream" path="res://Audio/door/dragon-studio-door-close-effect-382710.mp3" id="4_close"]
+[ext_resource type="AudioStream" path="res://Audio/door/door001_open_metal.ogg" id="3_open"]
+[ext_resource type="AudioStream" path="res://Audio/door/door001_close_metal.ogg" id="4_close"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_823f6"]
 resource_name = "door"
@@ -131,21 +131,26 @@ open_angle_degrees = 92.0
 open_duration = 0.7
 close_duration = 0.62
 overshoot_degrees = 2.0
-open_sfx_player_path = NodePath("OpenSfx3D")
-close_sfx_player_path = NodePath("CloseSfx3D")
-sound_volume_db = -9.5
+open_sfx_player_path = NodePath("../SfxAnchor/OpenSfx3D")
+close_sfx_player_path = NodePath("../SfxAnchor/CloseSfx3D")
+sound_volume_db = -8.0
 
-[node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="door_001_col"]
+[node name="SfxAnchor" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.78, 0, 0)
+
+[node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor"]
 stream = ExtResource("3_open")
-volume_db = -9.5
-max_distance = 14.0
-unit_size = 2.2
+volume_db = -8.0
+max_distance = 9.0
+unit_size = 4.5
+pitch_scale = 0.96
 
-[node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="door_001_col"]
+[node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor"]
 stream = ExtResource("4_close")
-volume_db = -9.5
-max_distance = 14.0
-unit_size = 2.2
+volume_db = -8.0
+max_distance = 9.0
+unit_size = 4.5
+pitch_scale = 0.92
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="door_001_col" unique_id=1925316422]
 shape = SubResource("ConcavePolygonShape3D_jujbo")

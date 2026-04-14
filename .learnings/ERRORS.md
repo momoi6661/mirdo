@@ -114,6 +114,35 @@ Keep snippet scripts flat; avoid local function declarations. If reuse is needed
 
 ---
 
+## [ERR-20260414-001] godot-remote-executor
+
+**Logged**: 2026-04-14T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: config
+
+### Summary
+Hastur broker was reachable, but there was no connected Godot editor executor available for remote validation.
+
+### Error
+`
+{"success":true,"data":[],"hint":"No Hastur Executors are currently connected. Ensure the Hastur Executor plugin is enabled in a Godot editor and can reach the broker-server."}
+`
+
+### Context
+- Command/operation attempted: Query connected executors before validating updated door scenes
+- Input or parameters used: GET http://localhost:5302/api/executors with the provided bearer token
+- Environment details if relevant: D:\AAgodot\FPS on Godot 4.6.2, broker reachable but editor plugin not connected
+
+### Suggested Fix
+If no executor is connected, fall back immediately to launching the local Godot editor and validating via project import/run instead of blocking on Hastur.
+
+### Metadata
+- Reproducible: yes
+- Related Files: C:\Users\liuyuquan1.LIUYUQUAN\.codex\skills\godot-remote-executor\SKILL.md
+
+---
+
 ## [ERR-20260408-005] ripgrep binary access denied
 
 **Logged**: 2026-04-08T11:05:00+08:00
