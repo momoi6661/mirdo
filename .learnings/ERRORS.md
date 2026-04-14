@@ -1237,3 +1237,207 @@ Always resolve executor_id just before validation scripts in this session.
 - See Also: ERR-20260410-HAS08
 
 ---
+## [ERR-20260413-001] ripgrep access denied in Codex desktop
+
+**Logged**: 2026-04-13T16:24:52.7715855+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tooling
+
+### Summary
+Bundled `rg.exe` could not start in this Codex desktop Windows environment while tracing Xiaokong material references.
+
+### Error
+```text
+Program 'rg.exe' failed to run with working directory 'D:\AAgodot\FPS': access denied.
+```
+
+### Context
+- Command/operation attempted: recursive text search for Xiaokong skin/material/shader references.
+- Environment: Codex desktop bundled ripgrep under WindowsApps.
+- Fallback used: `Get-ChildItem` + `Select-String`.
+
+### Suggested Fix
+If `rg` fails with access denied here, switch to PowerShell search primitives immediately instead of retrying the bundled binary.
+
+### Metadata
+- Reproducible: yes
+- Related Files: N/A
+- See Also: ERR-20260408-005
+
+---
+## [ERR-20260413-002] shader rollback missed cloth_mask declaration
+
+**Logged**: 2026-04-13T17:09:31.2693219+08:00
+**Priority**: high
+**Status**: pending
+**Area**: rendering
+
+### Summary
+While rolling back the character shader, the local `cloth_mask` declaration in `fragment()` was accidentally omitted, breaking the clothing and hair material path.
+
+### Error
+```text
+Character clothing/hair appeared to lose material detail after shader rollback because `cloth_mask` was referenced before declaration in fragment logic.
+```
+
+### Context
+- Operation: restore `anime_filmic_character_cull_back.gdshader` and `anime_filmic_character_cull_disabled.gdshader` to a stable version.
+- Impact: clothing/hair layered materials looked like they lost textures in the editor.
+- Fix: restore `float cloth_mask = clamp(cloth_profile, 0.0, 1.0);` in both shaders and reload live materials.
+
+### Suggested Fix
+When manually reverting shader edits, diff the full function body instead of piecemeal blocks so local declarations are not dropped.
+
+### Metadata
+- Reproducible: yes
+- Related Files: shaders/character/anime_filmic_character_cull_back.gdshader, shaders/character/anime_filmic_character_cull_disabled.gdshader
+- See Also: LRN-20260413-001
+
+---
+## [ERR-20260413-003] godot-remote-executor no connected executors
+
+**Logged**: 2026-04-13T17:23:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tooling
+
+### Summary
+Broker-server was reachable but returned no connected Hastur executors, so live Godot validation could not run.
+
+### Error
+```text
+{
+  "success": true,
+  "data": [],
+  "hint": "No Hastur Executors are currently connected. Ensure the Hastur Executor plugin is enabled in a Godot editor and can reach the broker-server."
+}
+```
+
+### Context
+- Operation: `GET http://localhost:5302/api/executors`
+- Goal: live-refresh Xiaokong skin shader/material edits in editor
+- Environment: project files already updated locally, but editor connection unavailable
+
+### Suggested Fix
+If live validation is needed, ensure the Godot editor is open with the Hastur Executor plugin enabled, then refresh `/api/executors` before each execute call.
+
+### Metadata
+- Reproducible: yes
+- Related Files: models/xiaokong/xiaokong1.tscn, shaders/character/anime_filmic_character_cull_back.gdshader, shaders/character/anime_filmic_character_cull_disabled.gdshader
+- See Also: ERR-20260408-001
+
+---
+## [ERR-20260413-001] rg_unavailable_in_codex_app
+
+**Logged**: 2026-04-13T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: config
+
+### Summary
+g could not be launched from this Codex desktop environment, so file search needed a PowerShell fallback.
+
+### Error
+`
+Program 'rg.exe' failed to run ... working directory 'D:\AAgodot\FPS'. 拒绝访问。
+`
+
+### Context
+- Command attempted: rg -n ...
+- Environment: Codex desktop app on Windows, project under D:\AAgodot\FPS
+- Fallback needed for repo search tasks
+
+### Suggested Fix
+Prefer Select-String / Get-ChildItem fallback immediately when g launch is denied in this environment.
+
+### Metadata
+- Reproducible: yes
+- Related Files: .learnings/ERRORS.md
+
+---
+## [ERR-20260413-001] godot-remote-executor
+
+**Logged**: 2026-04-13T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: config
+
+### Summary
+Hastur snippet failed when using := with values whose types Godot could not infer.
+
+### Error
+`
+Parse Error: Cannot infer the type of "scene" variable because the value doesn't have a set type.
+Parse Error: Cannot infer the type of "n" variable because the value doesn't have a set type.
+`
+
+### Context
+- Command/operation attempted: Remote GDScript inspection of level_bunker_render.tscn
+- Input or parameters used: ar scene := load(...).instantiate() and ar n := scene.get_node(name)
+- Environment details if relevant: Godot 4.6.2 via Hastur executor
+
+### Suggested Fix
+Use explicit types or plain = assignments when loading packed scenes and generic nodes in remote snippets.
+
+### Metadata
+- Reproducible: yes
+- Related Files: C:\Users\liuyuquan1.LIUYUQUAN\.codex\skills\godot-remote-executor\SKILL.md
+
+---
+## [ERR-20260413-002] godot-remote-executor
+
+**Logged**: 2026-04-13T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: config
+
+### Summary
+A helper unc declared in Hastur snippet mode triggered a parse failure during live scene light updates.
+
+### Error
+`
+Parse Error: Standalone lambdas cannot be accessed. Consider assigning it to a variable.
+`
+
+### Context
+- Command/operation attempted: Apply updated bunker light settings to the currently edited LevelBunkerRender scene
+- Input or parameters used: Snippet-mode GDScript containing a top-level helper function
+- Environment details if relevant: Godot 4.6.2 via Hastur executor
+
+### Suggested Fix
+Avoid helper function declarations in snippet mode and use a flat sequential script, or switch to full class mode with xtends and xecute().
+
+### Metadata
+- Reproducible: yes
+- Related Files: C:\Users\liuyuquan1.LIUYUQUAN\.codex\skills\godot-remote-executor\SKILL.md
+
+---
+## [ERR-20260413-003] apply_patch
+
+**Logged**: 2026-04-13T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: config
+
+### Summary
+Patch context for level_bunker_render.tscn drifted from the expected light block and could not be applied directly.
+
+### Error
+`
+apply_patch verification failed: Failed to find expected lines in D:\AAgodot\FPS\levels\level_bunker_render.tscn
+`
+
+### Context
+- Command/operation attempted: Update light shadows and reflection probe intensities in level_bunker_render.tscn
+- Input or parameters used: Patch based on a stale snapshot of the scene file
+- Environment details if relevant: Godot scene also had live edits applied through Hastur
+
+### Suggested Fix
+Re-read the exact scene section before patching when the file may have drifted from prior live/editor changes.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:\AAgodot\FPS\levels\level_bunker_render.tscn
+
+---

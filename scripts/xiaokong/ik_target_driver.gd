@@ -13,6 +13,22 @@ const META_NODE_FORWARD_OFFSET := &"ik_forward_offset"
 const META_NODE_POLE_DISTANCE_SCALE := &"ik_pole_distance_scale"
 const META_NODE_POLE_FALLBACK_LOCAL := &"ik_pole_fallback_local"
 const META_NODE_GROUND_FOOT_AUTO := &"ik_ground_auto_enabled"
+const META_NODE_GROUND_COLLISION_MASK := &"ik_ground_collision_mask"
+const META_NODE_GROUND_RAYCAST_UP := &"ik_ground_raycast_up"
+const META_NODE_GROUND_RAYCAST_DOWN := &"ik_ground_raycast_down"
+const META_NODE_GROUND_FOOT_HEIGHT := &"ik_ground_foot_height"
+const META_NODE_GROUND_MAX_TARGET_DISTANCE := &"ik_ground_max_target_distance"
+const META_NODE_GROUND_POSITION_LERP_SPEED := &"ik_ground_position_lerp_speed"
+const META_NODE_GROUND_ROTATION_LERP_SPEED := &"ik_ground_rotation_lerp_speed"
+const META_NODE_GROUND_INFLUENCE_BLEND_SPEED := &"ik_ground_influence_blend_speed"
+const META_NODE_GROUND_DISABLE_SPEED := &"ik_ground_disable_speed"
+const META_NODE_GROUND_ALIGN_TO_NORMAL := &"ik_ground_align_to_normal"
+const META_NODE_PLANT_ENABLED := &"ik_plant_enabled"
+const META_NODE_PLANT_HEIGHT_THRESHOLD := &"ik_plant_height_threshold"
+const META_NODE_PLANT_VERTICAL_SPEED_THRESHOLD := &"ik_plant_vertical_speed_threshold"
+const META_NODE_PLANT_RELEASE_DISTANCE := &"ik_plant_release_distance"
+const META_NODE_PLANT_RELEASE_HEIGHT := &"ik_plant_release_height"
+const META_NODE_PLANT_MIN_HOLD_TIME := &"ik_plant_min_hold_time"
 const IK_CHANNEL_LOOK := &"look"
 const IK_CHANNEL_SPINE := &"spine"
 const IK_CHANNEL_ARM_REACH := &"arm_reach"
@@ -30,8 +46,22 @@ const IK_CHANNELS: Array[StringName] = [
 const STATE_PROFILE_DEFAULT := &"default"
 const DEFAULT_ELBOW_POLE_DISTANCE_SCALE := 0.9
 const DEFAULT_KNEE_POLE_DISTANCE_SCALE := 1.0
-const TARGET_CONTROL_MODE_OVERLAY := 0
-const TARGET_CONTROL_MODE_FULL_CONTROL := 1
+const DEFAULT_GROUND_COLLISION_MASK := 1
+const DEFAULT_GROUND_RAYCAST_UP := 0.4
+const DEFAULT_GROUND_RAYCAST_DOWN := 1.0
+const DEFAULT_GROUND_FOOT_HEIGHT := 0.03
+const DEFAULT_GROUND_MAX_TARGET_DISTANCE := 0.35
+const DEFAULT_GROUND_POSITION_LERP_SPEED := 14.0
+const DEFAULT_GROUND_ROTATION_LERP_SPEED := 10.0
+const DEFAULT_GROUND_INFLUENCE_BLEND_SPEED := 8.0
+const DEFAULT_GROUND_DISABLE_SPEED := 1.8
+const DEFAULT_GROUND_ALIGN_TO_NORMAL := true
+const DEFAULT_PLANT_ENABLED := false
+const DEFAULT_PLANT_HEIGHT_THRESHOLD := 0.045
+const DEFAULT_PLANT_VERTICAL_SPEED_THRESHOLD := 0.18
+const DEFAULT_PLANT_RELEASE_DISTANCE := 0.16
+const DEFAULT_PLANT_RELEASE_HEIGHT := 0.06
+const DEFAULT_PLANT_MIN_HOLD_TIME := 0.08
 
 @export var look_at_follow_bone_name: StringName = &"头部"
 @export var auto_manage_influence: bool = true
@@ -57,8 +87,6 @@ const TARGET_CONTROL_MODE_FULL_CONTROL := 1
 @export_group("Editor Preview")
 @export var editor_auto_follow_enabled: bool = true
 @export var editor_pose_preview_enabled: bool = true
-@export var editor_runtime_preview_enabled: bool = false
-@export_enum("Overlay", "Full Control") var target_control_mode: int = TARGET_CONTROL_MODE_OVERLAY
 @export var hide_targets_in_game: bool = true
 @export_range(0.0, 1.0, 0.01) var master_ik_weight: float = 1.0
 @export var master_ik_blend_speed: float = 8.0
@@ -167,17 +195,6 @@ const TARGET_CONTROL_MODE_FULL_CONTROL := 1
 @export var enable_spine_ccdik: bool = true
 @export var spine_follow_bone_name: StringName = &"UpperChest"
 @export var spine_ccdik_look_weight: float = 0.45
-@export_group("Ground Foot IK")
-@export_flags_3d_physics var ground_foot_ik_collision_mask: int = 1
-@export var ground_foot_ik_raycast_up: float = 0.4
-@export var ground_foot_ik_raycast_down: float = 1.0
-@export var ground_foot_ik_foot_height: float = 0.03
-@export var ground_foot_ik_max_target_distance: float = 0.35
-@export var ground_foot_ik_position_lerp_speed: float = 14.0
-@export var ground_foot_ik_rotation_lerp_speed: float = 10.0
-@export var ground_foot_ik_influence_blend_speed: float = 8.0
-@export var ground_foot_ik_disable_speed: float = 1.8
-@export var ground_foot_ik_align_to_normal: bool = true
 
 var skeleton: Skeleton3D
 var left_hand_auto: Node3D
@@ -237,18 +254,14 @@ var right_foot_bone: int = -1
 var spine_follow_bone: int = -1
 var look_at_follow_bone: int = -1
 
-var _left_hand_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _right_hand_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _left_hand_rot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _right_hand_rot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _left_foot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _right_foot_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _spine_bend_auto_follow_offset: Transform3D = Transform3D.IDENTITY
-var _look_at_auto_follow_offset: Transform3D = Transform3D.IDENTITY
 var _left_elbow_pole_profile: Dictionary = {}
 var _right_elbow_pole_profile: Dictionary = {}
 var _left_knee_pole_profile: Dictionary = {}
 var _right_knee_pole_profile: Dictionary = {}
+var _left_ground_foot_profile: Dictionary = {}
+var _right_ground_foot_profile: Dictionary = {}
+var _left_foot_plant_state: Dictionary = {}
+var _right_foot_plant_state: Dictionary = {}
 
 var left_hand_target_base: Transform3D
 var right_hand_target_base: Transform3D
@@ -278,7 +291,6 @@ var _interaction_left_hand_offset: Vector3 = Vector3.ZERO
 var _interaction_right_hand_offset: Vector3 = Vector3.ZERO
 var _interaction_left_hand_rotation_deg: Vector3 = Vector3.ZERO
 var _interaction_right_hand_rotation_deg: Vector3 = Vector3.ZERO
-var _full_control_target_globals: Dictionary = {}
 var _initialized: bool = false
 
 func _ready() -> void:
@@ -297,15 +309,19 @@ func _initialize_driver() -> bool:
 	_resolve_animation_state_provider()
 	_owner_body = _resolve_owner_body()
 	_cache_bones()
-	_cache_auto_follow_offsets()
 	_cache_pole_profiles()
+	_ensure_ground_foot_state_defaults()
+	_cache_ground_foot_profiles()
+	_clear_foot_plant_lock(_left_foot_plant_state)
+	_clear_foot_plant_lock(_right_foot_plant_state)
+	_remember_foot_auto_origin(_left_foot_plant_state, left_foot_auto)
+	_remember_foot_auto_origin(_right_foot_plant_state, right_foot_auto)
 	_cache_base_target_transforms()
 	_initialized = true
 	_sync_helper_visibility()
 	if not skeleton.pose_updated.is_connected(_on_skeleton_pose_updated):
 		skeleton.pose_updated.connect(_on_skeleton_pose_updated)
-	_on_skeleton_pose_updated()
-	_apply_target_control_mode()
+	refresh_editor_targets()
 	_apply_idle_arm_offsets(0.0)
 	_configure_runtime_order()
 	_sync_update_callbacks()
@@ -394,17 +410,12 @@ func _process(delta: float) -> void:
 		return
 	_sync_helper_visibility()
 	if Engine.is_editor_hint():
-		if _is_full_control_enabled():
-			_capture_full_control_targets()
 		if editor_auto_follow_enabled:
-			_on_skeleton_pose_updated()
-		_apply_target_control_mode()
+			refresh_editor_targets()
 		if editor_pose_preview_enabled:
 			_update_channel_weights(0.0)
 			if auto_manage_influence:
 				_update_modifier_influence()
-		if editor_runtime_preview_enabled:
-			_run_runtime_update(delta)
 		return
 	if runtime_update_in_physics:
 		return
@@ -422,16 +433,12 @@ func _physics_process(delta: float) -> void:
 func _run_runtime_update(delta: float) -> void:
 	if not _ensure_initialized():
 		return
-	if _is_full_control_enabled():
-		_capture_full_control_targets()
 	_resolve_animation_state_provider()
 	_update_channel_weights(delta)
-	if not _is_full_control_enabled() and (_idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON):
+	if _idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON:
 		_apply_idle_arm_offsets(delta)
 	_update_ground_foot_targets(delta)
-	if not _is_full_control_enabled():
-		_update_marker_interaction(delta)
-	_apply_target_control_mode()
+	_update_marker_interaction(delta)
 	if auto_manage_influence:
 		_update_modifier_influence()
 
@@ -451,46 +458,12 @@ func _sync_update_callbacks() -> void:
 func _sync_helper_visibility() -> void:
 	visible = Engine.is_editor_hint() or not hide_targets_in_game
 
-func _is_full_control_enabled() -> bool:
-	return target_control_mode == TARGET_CONTROL_MODE_FULL_CONTROL
-
-func _get_pose_target_nodes() -> Array[Node3D]:
-	return [
-		left_hand_target,
-		right_hand_target,
-		left_hand_rot_target,
-		right_hand_rot_target,
-		left_foot_target,
-		right_foot_target,
-		spine_bend_target,
-		mark_look_at_target,
-		left_elbow_pole_target,
-		right_elbow_pole_target,
-		left_knee_pole_target,
-		right_knee_pole_target,
-	]
-
-func _capture_full_control_targets() -> void:
-	if not _is_full_control_enabled():
+func refresh_editor_targets() -> void:
+	if not _ensure_initialized():
 		return
-	for node in _get_pose_target_nodes():
-		if node == null:
-			continue
-		_full_control_target_globals[self.get_path_to(node)] = node.global_transform
-
-func _apply_target_control_mode() -> void:
-	if not _is_full_control_enabled():
-		_full_control_target_globals.clear()
-		return
-	for node in _get_pose_target_nodes():
-		if node == null:
-			continue
-		var key := self.get_path_to(node)
-		if not _full_control_target_globals.has(key):
-			_full_control_target_globals[key] = node.global_transform
-		var target_global: Variant = _full_control_target_globals.get(key)
-		if target_global is Transform3D:
-			node.global_transform = target_global as Transform3D
+	_cache_pole_profiles()
+	_cache_ground_foot_profiles()
+	_on_skeleton_pose_updated()
 
 func _configure_runtime_order() -> void:
 	set_process_priority(ik_driver_physics_process_priority)
@@ -660,48 +633,71 @@ func set_state_profile_enabled(enabled: bool) -> void:
 		_update_modifier_influence()
 
 func _cache_bones() -> void:
-	left_upper_arm_bone = skeleton.find_bone("LeftUpperArm")
-	left_lower_arm_bone = skeleton.find_bone("LeftLowerArm")
-	left_hand_bone = skeleton.find_bone("LeftHand")
-	right_upper_arm_bone = skeleton.find_bone("RightUpperArm")
-	right_lower_arm_bone = skeleton.find_bone("RightLowerArm")
-	right_hand_bone = skeleton.find_bone("RightHand")
-	left_upper_leg_bone = skeleton.find_bone("LeftUpperLeg")
-	left_lower_leg_bone = skeleton.find_bone("LeftLowerLeg")
-	left_foot_bone = skeleton.find_bone("LeftFoot")
-	right_upper_leg_bone = skeleton.find_bone("RightUpperLeg")
-	right_lower_leg_bone = skeleton.find_bone("RightLowerLeg")
-	right_foot_bone = skeleton.find_bone("RightFoot")
+	left_upper_arm_bone = _read_two_bone_setting_int(left_arm_ik, "root_bone", "LeftUpperArm")
+	left_lower_arm_bone = _read_two_bone_setting_int(left_arm_ik, "middle_bone", "LeftLowerArm")
+	left_hand_bone = _read_two_bone_setting_int(left_arm_ik, "end_bone", "LeftHand")
+	right_upper_arm_bone = _read_two_bone_setting_int(right_arm_ik, "root_bone", "RightUpperArm")
+	right_lower_arm_bone = _read_two_bone_setting_int(right_arm_ik, "middle_bone", "RightLowerArm")
+	right_hand_bone = _read_two_bone_setting_int(right_arm_ik, "end_bone", "RightHand")
+	left_upper_leg_bone = _read_two_bone_setting_int(left_leg_ik, "root_bone", "LeftUpperLeg")
+	left_lower_leg_bone = _read_two_bone_setting_int(left_leg_ik, "middle_bone", "LeftLowerLeg")
+	left_foot_bone = _read_two_bone_setting_int(left_leg_ik, "end_bone", "LeftFoot")
+	right_upper_leg_bone = _read_two_bone_setting_int(right_leg_ik, "root_bone", "RightUpperLeg")
+	right_lower_leg_bone = _read_two_bone_setting_int(right_leg_ik, "middle_bone", "RightLowerLeg")
+	right_foot_bone = _read_two_bone_setting_int(right_leg_ik, "end_bone", "RightFoot")
 
-	spine_follow_bone = skeleton.find_bone(String(spine_follow_bone_name))
+	spine_follow_bone = _read_ccdik_setting_int(spine_ccdik, "end_bone", String(spine_follow_bone_name))
 	if spine_follow_bone == -1:
-		spine_follow_bone = skeleton.find_bone("UpperChest")
-	if spine_follow_bone == -1:
-		spine_follow_bone = skeleton.find_bone("Chest")
+		spine_follow_bone = _find_bone_fallback(["UpperChest", "Chest"])
 
-	look_at_follow_bone = skeleton.find_bone(String(look_at_follow_bone_name))
+	look_at_follow_bone = _read_look_at_bone(head_look_at, String(look_at_follow_bone_name))
 	if look_at_follow_bone == -1:
-		look_at_follow_bone = skeleton.find_bone("头部")
-	if look_at_follow_bone == -1:
-		look_at_follow_bone = skeleton.find_bone("Head")
+		look_at_follow_bone = _find_bone_fallback(["头部", "Head"])
 	if look_at_follow_bone == -1:
 		push_warning("IKTargetDriver could not find a LookAt follow bone.")
 
-func _cache_auto_follow_offsets() -> void:
-	_left_hand_auto_follow_offset = _compute_auto_follow_offset(left_hand_auto, left_hand_bone)
-	_right_hand_auto_follow_offset = _compute_auto_follow_offset(right_hand_auto, right_hand_bone)
-	_left_hand_rot_auto_follow_offset = _compute_auto_follow_offset(left_hand_rot_auto, left_hand_bone)
-	_right_hand_rot_auto_follow_offset = _compute_auto_follow_offset(right_hand_rot_auto, right_hand_bone)
-	_left_foot_auto_follow_offset = _compute_auto_follow_offset(left_foot_auto, left_foot_bone)
-	_right_foot_auto_follow_offset = _compute_auto_follow_offset(right_foot_auto, right_foot_bone)
-	_spine_bend_auto_follow_offset = _compute_auto_follow_offset(spine_bend_auto, spine_follow_bone)
-	_look_at_auto_follow_offset = _compute_auto_follow_offset(look_at_auto, look_at_follow_bone)
+func _read_two_bone_setting_int(modifier: TwoBoneIK3D, key: String, fallback_bone_name: String) -> int:
+	if modifier != null:
+		var setting_key := "settings/0/%s" % key
+		var raw_value: Variant = modifier.get(setting_key)
+		if raw_value != null:
+			var bone_idx := int(raw_value)
+			if bone_idx >= 0:
+				return bone_idx
+	return skeleton.find_bone(fallback_bone_name)
 
-func _compute_auto_follow_offset(target: Node3D, bone_idx: int) -> Transform3D:
-	if target == null or bone_idx == -1:
-		return Transform3D.IDENTITY
-	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
-	return bone_global.affine_inverse() * target.global_transform
+func _read_ccdik_setting_int(modifier: CCDIK3D, key: String, fallback_bone_name: String) -> int:
+	if modifier != null:
+		var setting_key := "settings/0/%s" % key
+		var raw_value: Variant = modifier.get(setting_key)
+		if raw_value != null:
+			var bone_idx := int(raw_value)
+			if bone_idx >= 0:
+				return bone_idx
+	if fallback_bone_name.is_empty():
+		return -1
+	return skeleton.find_bone(fallback_bone_name)
+
+func _read_look_at_bone(modifier: LookAtModifier3D, fallback_bone_name: String) -> int:
+	if modifier != null:
+		var bone_idx := int(modifier.get("bone"))
+		if bone_idx >= 0:
+			return bone_idx
+		var bone_name := String(modifier.get("bone_name"))
+		if not bone_name.is_empty():
+			var resolved := skeleton.find_bone(bone_name)
+			if resolved >= 0:
+				return resolved
+	if fallback_bone_name.is_empty():
+		return -1
+	return skeleton.find_bone(fallback_bone_name)
+
+func _find_bone_fallback(candidates: Array[String]) -> int:
+	for bone_name in candidates:
+		var bone_idx := skeleton.find_bone(bone_name)
+		if bone_idx >= 0:
+			return bone_idx
+	return -1
 
 func _cache_pole_profiles() -> void:
 	_left_elbow_pole_profile = _build_pole_profile(left_elbow_pole_auto, left_arm_ik, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, DEFAULT_ELBOW_POLE_DISTANCE_SCALE)
@@ -747,6 +743,16 @@ func _read_two_bone_meta_float(modifier: TwoBoneIK3D, key: StringName, fallback:
 		return fallback
 	return float(modifier.get_meta(key))
 
+func _read_two_bone_meta_int(modifier: TwoBoneIK3D, key: StringName, fallback: int) -> int:
+	if modifier == null or not modifier.has_meta(key):
+		return fallback
+	return int(modifier.get_meta(key))
+
+func _read_two_bone_meta_bool(modifier: TwoBoneIK3D, key: StringName, fallback: bool) -> bool:
+	if modifier == null or not modifier.has_meta(key):
+		return fallback
+	return bool(modifier.get_meta(key))
+
 func _read_two_bone_meta_vector3(modifier: TwoBoneIK3D, key: StringName, fallback: Vector3) -> Vector3:
 	if modifier == null or not modifier.has_meta(key):
 		return fallback
@@ -754,6 +760,46 @@ func _read_two_bone_meta_vector3(modifier: TwoBoneIK3D, key: StringName, fallbac
 	if raw_value is Vector3:
 		return raw_value as Vector3
 	return fallback
+
+func _ensure_ground_foot_state_defaults() -> void:
+	if _left_foot_plant_state.is_empty():
+		_left_foot_plant_state = _make_ground_foot_state()
+	if _right_foot_plant_state.is_empty():
+		_right_foot_plant_state = _make_ground_foot_state()
+
+func _make_ground_foot_state() -> Dictionary:
+	return {
+		"planted": false,
+		"lock_transform": Transform3D.IDENTITY,
+		"last_auto_origin": Vector3.ZERO,
+		"has_last_auto": false,
+		"plant_time": 0.0,
+	}
+
+func _cache_ground_foot_profiles() -> void:
+	_left_ground_foot_profile = _build_ground_foot_profile(left_leg_ik)
+	_right_ground_foot_profile = _build_ground_foot_profile(right_leg_ik)
+
+func _build_ground_foot_profile(modifier: TwoBoneIK3D) -> Dictionary:
+	return {
+		"auto_enabled": _read_two_bone_meta_bool(modifier, META_NODE_GROUND_FOOT_AUTO, false),
+		"collision_mask": _read_two_bone_meta_int(modifier, META_NODE_GROUND_COLLISION_MASK, DEFAULT_GROUND_COLLISION_MASK),
+		"raycast_up": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_RAYCAST_UP, DEFAULT_GROUND_RAYCAST_UP), 0.01),
+		"raycast_down": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_RAYCAST_DOWN, DEFAULT_GROUND_RAYCAST_DOWN), 0.05),
+		"foot_height": _read_two_bone_meta_float(modifier, META_NODE_GROUND_FOOT_HEIGHT, DEFAULT_GROUND_FOOT_HEIGHT),
+		"max_target_distance": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_MAX_TARGET_DISTANCE, DEFAULT_GROUND_MAX_TARGET_DISTANCE), 0.0),
+		"position_lerp_speed": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_POSITION_LERP_SPEED, DEFAULT_GROUND_POSITION_LERP_SPEED), 0.0),
+		"rotation_lerp_speed": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_ROTATION_LERP_SPEED, DEFAULT_GROUND_ROTATION_LERP_SPEED), 0.0),
+		"influence_blend_speed": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_INFLUENCE_BLEND_SPEED, DEFAULT_GROUND_INFLUENCE_BLEND_SPEED), 0.0),
+		"disable_speed": maxf(_read_two_bone_meta_float(modifier, META_NODE_GROUND_DISABLE_SPEED, DEFAULT_GROUND_DISABLE_SPEED), 0.0),
+		"align_to_normal": _read_two_bone_meta_bool(modifier, META_NODE_GROUND_ALIGN_TO_NORMAL, DEFAULT_GROUND_ALIGN_TO_NORMAL),
+		"plant_enabled": _read_two_bone_meta_bool(modifier, META_NODE_PLANT_ENABLED, DEFAULT_PLANT_ENABLED),
+		"plant_height_threshold": maxf(_read_two_bone_meta_float(modifier, META_NODE_PLANT_HEIGHT_THRESHOLD, DEFAULT_PLANT_HEIGHT_THRESHOLD), 0.0),
+		"plant_vertical_speed_threshold": maxf(_read_two_bone_meta_float(modifier, META_NODE_PLANT_VERTICAL_SPEED_THRESHOLD, DEFAULT_PLANT_VERTICAL_SPEED_THRESHOLD), 0.0),
+		"plant_release_distance": maxf(_read_two_bone_meta_float(modifier, META_NODE_PLANT_RELEASE_DISTANCE, DEFAULT_PLANT_RELEASE_DISTANCE), 0.0),
+		"plant_release_height": maxf(_read_two_bone_meta_float(modifier, META_NODE_PLANT_RELEASE_HEIGHT, DEFAULT_PLANT_RELEASE_HEIGHT), 0.0),
+		"plant_min_hold_time": maxf(_read_two_bone_meta_float(modifier, META_NODE_PLANT_MIN_HOLD_TIME, DEFAULT_PLANT_MIN_HOLD_TIME), 0.0),
+	}
 
 func _secondary_direction_to_local_axis(secondary_direction: int) -> Vector3:
 	match secondary_direction:
@@ -780,32 +826,32 @@ func _read_node_meta_float(node: Node, key: StringName, fallback: float) -> floa
 func _on_skeleton_pose_updated() -> void:
 	if not _ensure_initialized():
 		return
-	_set_auto_from_bone(left_hand_auto, left_hand_bone, _left_hand_auto_follow_offset)
-	_set_auto_from_bone(right_hand_auto, right_hand_bone, _right_hand_auto_follow_offset)
-	_set_auto_from_bone(left_hand_rot_auto, left_hand_bone, _left_hand_rot_auto_follow_offset)
-	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone, _right_hand_rot_auto_follow_offset)
-	_set_auto_from_bone(left_foot_auto, left_foot_bone, _left_foot_auto_follow_offset)
-	_set_auto_from_bone(right_foot_auto, right_foot_bone, _right_foot_auto_follow_offset)
-	_set_auto_from_bone(spine_bend_auto, spine_follow_bone, _spine_bend_auto_follow_offset)
+	_set_auto_from_bone(left_hand_auto, left_hand_bone)
+	_set_auto_from_bone(right_hand_auto, right_hand_bone)
+	_set_auto_from_bone(left_hand_rot_auto, left_hand_bone)
+	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
+	_set_auto_from_bone(left_foot_auto, left_foot_bone)
+	_set_auto_from_bone(right_foot_auto, right_foot_bone)
+	_set_auto_from_bone(spine_bend_auto, spine_follow_bone)
 	var look_forward_offset := _read_node_meta_float(look_at_auto, META_NODE_FORWARD_OFFSET, 0.0)
-	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, _look_at_auto_follow_offset, look_forward_offset)
+	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, look_forward_offset)
 
 	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, _left_elbow_pole_profile)
 	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, _right_elbow_pole_profile)
 	_update_pole_auto(left_knee_pole_auto, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, _left_knee_pole_profile)
 	_update_pole_auto(right_knee_pole_auto, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, _right_knee_pole_profile)
 
-func _set_auto_from_bone(target: Node3D, bone_idx: int, follow_offset: Transform3D = Transform3D.IDENTITY) -> void:
+func _set_auto_from_bone(target: Node3D, bone_idx: int) -> void:
 	if target == null or bone_idx == -1:
 		return
 	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
-	target.global_transform = bone_global * follow_offset
+	target.global_transform = bone_global
 
-func _set_auto_from_bone_with_forward_offset(target: Node3D, bone_idx: int, follow_offset: Transform3D, forward_offset: float) -> void:
+func _set_auto_from_bone_with_forward_offset(target: Node3D, bone_idx: int, forward_offset: float) -> void:
 	if target == null or bone_idx == -1:
 		return
 
-	var bone_global: Transform3D = (skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)) * follow_offset
+	var bone_global: Transform3D = skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx)
 	var forward: Vector3 = -bone_global.basis.z.normalized()
 	bone_global.origin += forward * forward_offset
 	target.global_transform = bone_global
@@ -1175,20 +1221,23 @@ func _restore_local_transform(node: Node3D, base_transform: Transform3D) -> void
 	node.transform = base_transform
 
 func _update_ground_foot_targets(delta: float) -> void:
-	if _is_full_control_enabled():
-		_left_leg_auto_weight = 0.0
-		_right_leg_auto_weight = 0.0
-		return
 	if Engine.is_editor_hint():
 		return
 
 	var leg_ground_channel_weight := _get_channel_weight(IK_CHANNEL_LEG_GROUND)
-	var blend_step := maxf(ground_foot_ik_influence_blend_speed, 0.0) * maxf(delta, 0.0)
 	var left_manual := _has_position_offset(left_foot_target, left_foot_target_base) or _has_position_offset(left_knee_pole_target, left_knee_pole_target_base)
 	var right_manual := _has_position_offset(right_foot_target, right_foot_target_base) or _has_position_offset(right_knee_pole_target, right_knee_pole_target_base)
+	var left_blend_step := _get_ground_profile_float(_left_ground_foot_profile, "influence_blend_speed", DEFAULT_GROUND_INFLUENCE_BLEND_SPEED) * maxf(delta, 0.0)
+	var right_blend_step := _get_ground_profile_float(_right_ground_foot_profile, "influence_blend_speed", DEFAULT_GROUND_INFLUENCE_BLEND_SPEED) * maxf(delta, 0.0)
 	if leg_ground_channel_weight <= EPSILON:
-		_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 0.0, blend_step)
-		_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 0.0, blend_step)
+		_clear_foot_plant_lock(_left_foot_plant_state)
+		_clear_foot_plant_lock(_right_foot_plant_state)
+		if not left_manual:
+			_move_target_to_base(left_foot_target, left_foot_target_base, _left_ground_foot_profile, delta)
+		if not right_manual:
+			_move_target_to_base(right_foot_target, right_foot_target_base, _right_ground_foot_profile, delta)
+		_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 0.0, left_blend_step)
+		_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 0.0, right_blend_step)
 		if auto_manage_influence:
 			_update_modifier_influence()
 		return
@@ -1196,28 +1245,11 @@ func _update_ground_foot_targets(delta: float) -> void:
 	if _owner_body == null or not is_instance_valid(_owner_body):
 		_owner_body = _resolve_owner_body()
 
-	var left_ground_auto_enabled := _is_leg_ground_auto_enabled(left_leg_ik) and not left_manual
-	var right_ground_auto_enabled := _is_leg_ground_auto_enabled(right_leg_ik) and not right_manual
-	var disable_for_speed: bool = _get_owner_horizontal_speed() > maxf(ground_foot_ik_disable_speed, 0.0)
-	var left_active := false
-	var right_active := false
-	if disable_for_speed:
-		if left_ground_auto_enabled and not left_manual:
-			_move_target_to_base(left_foot_target, left_foot_target_base, delta)
-		if right_ground_auto_enabled and not right_manual:
-			_move_target_to_base(right_foot_target, right_foot_target_base, delta)
-	else:
-		if left_ground_auto_enabled:
-			left_active = _apply_ground_foot_target(left_foot_target, left_foot_target_base, left_foot_auto, delta)
-		elif not left_manual:
-			_move_target_to_base(left_foot_target, left_foot_target_base, delta)
-		if right_ground_auto_enabled:
-			right_active = _apply_ground_foot_target(right_foot_target, right_foot_target_base, right_foot_auto, delta)
-		elif not right_manual:
-			_move_target_to_base(right_foot_target, right_foot_target_base, delta)
+	var left_active := _update_ground_leg_target(left_foot_target, left_foot_target_base, left_foot_auto, left_leg_ik, _left_ground_foot_profile, _left_foot_plant_state, left_manual, delta)
+	var right_active := _update_ground_leg_target(right_foot_target, right_foot_target_base, right_foot_auto, right_leg_ik, _right_ground_foot_profile, _right_foot_plant_state, right_manual, delta)
 
-	_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 1.0 if left_active else 0.0, blend_step)
-	_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 1.0 if right_active else 0.0, blend_step)
+	_left_leg_auto_weight = move_toward(_left_leg_auto_weight, 1.0 if left_active else 0.0, left_blend_step)
+	_right_leg_auto_weight = move_toward(_right_leg_auto_weight, 1.0 if right_active else 0.0, right_blend_step)
 
 	if auto_manage_influence:
 		_update_modifier_influence()
@@ -1227,13 +1259,30 @@ func _is_leg_ground_auto_enabled(modifier: TwoBoneIK3D) -> bool:
 		return false
 	return bool(modifier.get_meta(META_NODE_GROUND_FOOT_AUTO))
 
-func _apply_ground_foot_target(target_node: Node3D, base_local: Transform3D, foot_auto_node: Node3D, delta: float) -> bool:
+func _update_ground_leg_target(target_node: Node3D, base_local: Transform3D, foot_auto_node: Node3D, modifier: TwoBoneIK3D, profile: Dictionary, plant_state: Dictionary, manual_active: bool, delta: float) -> bool:
 	if target_node == null or foot_auto_node == null:
 		return false
+	if manual_active:
+		_clear_foot_plant_lock(plant_state)
+		_remember_foot_auto_origin(plant_state, foot_auto_node)
+		return false
+	if not _is_leg_ground_auto_enabled(modifier):
+		_clear_foot_plant_lock(plant_state)
+		_remember_foot_auto_origin(plant_state, foot_auto_node)
+		return false
 
-	var hit: Dictionary = _sample_ground_hit(foot_auto_node.global_transform.origin)
+	var disable_speed := _get_ground_profile_float(profile, "disable_speed", DEFAULT_GROUND_DISABLE_SPEED)
+	if disable_speed > EPSILON and _get_owner_horizontal_speed() > disable_speed:
+		_clear_foot_plant_lock(plant_state)
+		_remember_foot_auto_origin(plant_state, foot_auto_node)
+		_move_target_to_base(target_node, base_local, profile, delta)
+		return false
+
+	var hit: Dictionary = _sample_ground_hit(foot_auto_node.global_transform.origin, profile)
 	if hit.is_empty():
-		_move_target_to_base(target_node, base_local, delta)
+		_clear_foot_plant_lock(plant_state)
+		_remember_foot_auto_origin(plant_state, foot_auto_node)
+		_move_target_to_base(target_node, base_local, profile, delta)
 		return false
 
 	var parent_node := target_node.get_parent_node_3d()
@@ -1241,63 +1290,169 @@ func _apply_ground_foot_target(target_node: Node3D, base_local: Transform3D, foo
 		return false
 
 	var base_global: Transform3D = parent_node.global_transform * base_local
+	var desired_global := _build_ground_target_transform(base_global, hit, profile)
+	_update_foot_plant_state(plant_state, foot_auto_node, desired_global, profile, delta)
+
+	var target_global := desired_global
+	if _is_foot_planted(plant_state):
+		target_global = _get_foot_lock_transform(plant_state, desired_global)
+	_apply_ground_target_global(target_node, target_global, profile, delta)
+	return true
+
+func _build_ground_target_transform(base_global: Transform3D, hit: Dictionary, profile: Dictionary) -> Transform3D:
 	var hit_position: Vector3 = hit["position"]
 	var hit_normal: Vector3 = (hit["normal"] as Vector3).normalized()
 	if hit_normal.length_squared() <= EPSILON:
 		hit_normal = Vector3.UP
 
-	var desired_origin := hit_position + hit_normal * ground_foot_ik_foot_height
+	var desired_origin := hit_position + hit_normal * _get_ground_profile_float(profile, "foot_height", DEFAULT_GROUND_FOOT_HEIGHT)
 	var desired_delta: Vector3 = desired_origin - base_global.origin
-	var max_distance := maxf(ground_foot_ik_max_target_distance, 0.0)
+	var max_distance := _get_ground_profile_float(profile, "max_target_distance", DEFAULT_GROUND_MAX_TARGET_DISTANCE)
 	if max_distance > EPSILON and desired_delta.length() > max_distance:
 		desired_origin = base_global.origin + desired_delta.normalized() * max_distance
 
 	var desired_basis := base_global.basis
-	if ground_foot_ik_align_to_normal:
+	if _get_ground_profile_bool(profile, "align_to_normal", DEFAULT_GROUND_ALIGN_TO_NORMAL):
 		desired_basis = _build_ground_aligned_basis(base_global.basis, hit_normal)
 
-	var current_global: Transform3D = target_node.global_transform
-	var next_global := current_global
-	var position_weight := clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
-	var rotation_weight := clampf(maxf(ground_foot_ik_rotation_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
-	next_global.origin = current_global.origin.lerp(desired_origin, position_weight)
-	next_global.basis = _slerp_basis(current_global.basis, desired_basis, rotation_weight)
-	target_node.global_transform = next_global
-	return true
+	return Transform3D(desired_basis, desired_origin)
 
-func _sample_ground_hit(origin: Vector3) -> Dictionary:
+func _sample_ground_hit(origin: Vector3, profile: Dictionary) -> Dictionary:
 	var world_3d := get_world_3d()
 	if world_3d == null:
 		return {}
 
-	var up_distance := maxf(ground_foot_ik_raycast_up, 0.01)
-	var down_distance := maxf(ground_foot_ik_raycast_down, 0.05)
+	var up_distance := _get_ground_profile_float(profile, "raycast_up", DEFAULT_GROUND_RAYCAST_UP)
+	var down_distance := _get_ground_profile_float(profile, "raycast_down", DEFAULT_GROUND_RAYCAST_DOWN)
 	var from := origin + Vector3.UP * up_distance
 	var to := origin - Vector3.UP * down_distance
-	var query := PhysicsRayQueryParameters3D.create(from, to, ground_foot_ik_collision_mask)
+	var collision_mask := _get_ground_profile_int(profile, "collision_mask", DEFAULT_GROUND_COLLISION_MASK)
+	var query := PhysicsRayQueryParameters3D.create(from, to, collision_mask)
 	query.collide_with_areas = false
 	query.collide_with_bodies = true
 	if _owner_body != null and is_instance_valid(_owner_body):
 		query.exclude = [_owner_body.get_rid()]
 	return world_3d.direct_space_state.intersect_ray(query)
 
-func _move_target_to_base(target_node: Node3D, base_local: Transform3D, delta: float) -> void:
+func _apply_ground_target_global(target_node: Node3D, desired_global: Transform3D, profile: Dictionary, delta: float) -> void:
+	if target_node == null:
+		return
+
+	var current_global: Transform3D = target_node.global_transform
+	var next_global := current_global
+	var position_weight := clampf(_get_ground_profile_float(profile, "position_lerp_speed", DEFAULT_GROUND_POSITION_LERP_SPEED) * maxf(delta, 0.0), 0.0, 1.0)
+	var rotation_weight := clampf(_get_ground_profile_float(profile, "rotation_lerp_speed", DEFAULT_GROUND_ROTATION_LERP_SPEED) * maxf(delta, 0.0), 0.0, 1.0)
+	next_global.origin = current_global.origin.lerp(desired_global.origin, position_weight)
+	next_global.basis = _slerp_basis(current_global.basis, desired_global.basis, rotation_weight)
+	target_node.global_transform = next_global
+
+func _move_target_to_base(target_node: Node3D, base_local: Transform3D, profile: Dictionary, delta: float) -> void:
 	if target_node == null:
 		return
 
 	var parent_node := target_node.get_parent_node_3d()
 	if parent_node == null:
-		target_node.transform = target_node.transform.interpolate_with(base_local, clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0))
+		target_node.transform = target_node.transform.interpolate_with(base_local, clampf(_get_ground_profile_float(profile, "position_lerp_speed", DEFAULT_GROUND_POSITION_LERP_SPEED) * maxf(delta, 0.0), 0.0, 1.0))
 		return
 
 	var base_global: Transform3D = parent_node.global_transform * base_local
-	var current_global: Transform3D = target_node.global_transform
-	var next_global := current_global
-	var position_weight := clampf(maxf(ground_foot_ik_position_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
-	var rotation_weight := clampf(maxf(ground_foot_ik_rotation_lerp_speed, 0.0) * maxf(delta, 0.0), 0.0, 1.0)
-	next_global.origin = current_global.origin.lerp(base_global.origin, position_weight)
-	next_global.basis = _slerp_basis(current_global.basis, base_global.basis, rotation_weight)
-	target_node.global_transform = next_global
+	_apply_ground_target_global(target_node, base_global, profile, delta)
+
+func _update_foot_plant_state(state: Dictionary, foot_auto_node: Node3D, desired_global: Transform3D, profile: Dictionary, delta: float) -> void:
+	if foot_auto_node == null:
+		_clear_foot_plant_lock(state)
+		return
+
+	var current_auto_origin: Vector3 = foot_auto_node.global_transform.origin
+	var last_auto_origin := _get_state_vector3(state, "last_auto_origin", current_auto_origin)
+	var has_last_auto := bool(state.get("has_last_auto", false))
+	var vertical_speed := 0.0
+	if has_last_auto and delta > EPSILON:
+		vertical_speed = absf(current_auto_origin.y - last_auto_origin.y) / delta
+
+	var up_axis := desired_global.basis.y.normalized()
+	if up_axis.length_squared() <= EPSILON:
+		up_axis = Vector3.UP
+	var distance_to_ground_target := current_auto_origin.distance_to(desired_global.origin)
+	var planted := _is_foot_planted(state)
+	var plant_time := _get_state_float(state, "plant_time", 0.0)
+
+	if planted:
+		plant_time += maxf(delta, 0.0)
+		var lock_transform := _get_foot_lock_transform(state, desired_global)
+		var release_distance := desired_global.origin.distance_to(lock_transform.origin)
+		var release_height := absf((current_auto_origin - lock_transform.origin).dot(lock_transform.basis.y.normalized()))
+		var min_hold_time := _get_ground_profile_float(profile, "plant_min_hold_time", DEFAULT_PLANT_MIN_HOLD_TIME)
+		if plant_time >= min_hold_time:
+			var release_distance_limit := _get_ground_profile_float(profile, "plant_release_distance", DEFAULT_PLANT_RELEASE_DISTANCE)
+			var release_height_limit := _get_ground_profile_float(profile, "plant_release_height", DEFAULT_PLANT_RELEASE_HEIGHT)
+			if release_distance > release_distance_limit or release_height > release_height_limit:
+				planted = false
+				plant_time = 0.0
+
+	if not planted and _get_ground_profile_bool(profile, "plant_enabled", DEFAULT_PLANT_ENABLED):
+		var height_threshold := _get_ground_profile_float(profile, "plant_height_threshold", DEFAULT_PLANT_HEIGHT_THRESHOLD)
+		var vertical_speed_threshold := _get_ground_profile_float(profile, "plant_vertical_speed_threshold", DEFAULT_PLANT_VERTICAL_SPEED_THRESHOLD)
+		if distance_to_ground_target <= height_threshold and vertical_speed <= vertical_speed_threshold:
+			planted = true
+			plant_time = 0.0
+			state["lock_transform"] = desired_global
+
+	state["planted"] = planted
+	state["plant_time"] = plant_time
+	state["last_auto_origin"] = current_auto_origin
+	state["has_last_auto"] = true
+
+func _clear_foot_plant_lock(state: Dictionary) -> void:
+	state["planted"] = false
+	state["plant_time"] = 0.0
+
+func _remember_foot_auto_origin(state: Dictionary, foot_auto_node: Node3D) -> void:
+	if foot_auto_node == null:
+		state["has_last_auto"] = false
+		state["last_auto_origin"] = Vector3.ZERO
+		return
+	state["last_auto_origin"] = foot_auto_node.global_transform.origin
+	state["has_last_auto"] = true
+
+func _is_foot_planted(state: Dictionary) -> bool:
+	return bool(state.get("planted", false))
+
+func _get_foot_lock_transform(state: Dictionary, fallback: Transform3D) -> Transform3D:
+	if not state.has("lock_transform"):
+		return fallback
+	var raw_value: Variant = state["lock_transform"]
+	if raw_value is Transform3D:
+		return raw_value as Transform3D
+	return fallback
+
+func _get_state_vector3(state: Dictionary, key: String, fallback: Vector3) -> Vector3:
+	if not state.has(key):
+		return fallback
+	var raw_value: Variant = state[key]
+	if raw_value is Vector3:
+		return raw_value as Vector3
+	return fallback
+
+func _get_state_float(state: Dictionary, key: String, fallback: float) -> float:
+	if not state.has(key):
+		return fallback
+	return float(state[key])
+
+func _get_ground_profile_float(profile: Dictionary, key: String, fallback: float) -> float:
+	if not profile.has(key):
+		return fallback
+	return float(profile[key])
+
+func _get_ground_profile_int(profile: Dictionary, key: String, fallback: int) -> int:
+	if not profile.has(key):
+		return fallback
+	return int(profile[key])
+
+func _get_ground_profile_bool(profile: Dictionary, key: String, fallback: bool) -> bool:
+	if not profile.has(key):
+		return fallback
+	return bool(profile[key])
 
 func _build_ground_aligned_basis(base_basis: Basis, up_direction: Vector3) -> Basis:
 	var up: Vector3 = up_direction.normalized()

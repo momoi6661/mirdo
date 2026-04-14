@@ -21,7 +21,7 @@
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
 [ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
-[ext_resource type="AudioStream" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
+[ext_resource type="AudioStream" uid="uid://dc3ojh2l6f4oi" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -193,11 +193,11 @@ inventory_handler = NodePath("Control/InventoryUi")
 script = ExtResource("17_save_comp")
 unique_id = "player_001"
 
-[node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="."]
+[node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=630296697]
 stream = ExtResource("22_step_sfx")
 volume_db = -16.0
-max_distance = 10.0
 unit_size = 2.0
+max_distance = 10.0
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]
 collision_layer = 0
@@ -264,7 +264,10 @@ shape = SubResource("CapsuleShape3D_u6tj1")
 
 [node name="PlaceholderMesh" type="MeshInstance3D" parent="CollisionShape3D" unique_id=239223935]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0021640062, 0)
+visible = false
 layers = 2
+gi_mode = 0
+cast_shadow = 0
 mesh = SubResource("CapsuleMesh_6tv51")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=784737969]

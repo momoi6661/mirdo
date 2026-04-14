@@ -45,6 +45,9 @@ uniform float skin_scatter_strength : hint_range(0.0, 1.0) = 0.12;
 uniform float skin_scatter_power : hint_range(0.5, 8.0) = 2.3;
 uniform vec3 skin_subdermal_tint : source_color = vec3(1.0, 0.42, 0.35);
 uniform float skin_subdermal_strength : hint_range(0.0, 1.0) = 0.58;
+uniform float face_normal_flatten : hint_range(0.0, 1.0) = 0.0;
+uniform float skin_shadow_soften : hint_range(0.0, 1.0) = 0.0;
+uniform float skin_specular_strength : hint_range(0.0, 1.0) = 1.0;
 
 group_uniforms Cloth;
 uniform float cloth_weave_scale : hint_range(20.0, 260.0) = 120.0;
@@ -87,6 +90,10 @@ void fragment() {
 		AO_LIGHT_AFFECT = ao_light_affect;
 	}
 
+	float skin_mask = clamp(skin_profile, 0.0, 1.0);
+	SPECULAR *= mix(1.0, skin_specular_strength, skin_mask);
+	SPECULAR = mix(SPECULAR, 0.0, skin_mask);
+
 	if (use_normal_map) {
 		NORMAL_MAP = texture(normal_tex, UV).rgb;
 		NORMAL_MAP_DEPTH = normal_scale;
@@ -115,9 +122,10 @@ void light() {
 
 	float skin_mask = clamp(skin_profile, 0.0, 1.0);
 	float cloth_mask = clamp(cloth_profile, 0.0, 1.0);
+	vec3 shade_n = normalize(mix(n, v, face_normal_flatten * skin_mask));
 
 	float effective_wrap = clamp(wrap_light + 0.10 * skin_mask, 0.0, 1.0);
-	float ndl = dot(n, l);
+	float ndl = dot(shade_n, l);
 	float wrapped = clamp((ndl + effective_wrap) / (1.0 + effective_wrap), 0.0, 1.0);
 	float effective_softness = mix(shadow_softness, min(0.24, shadow_softness * 1.35), skin_mask);
 	float smooth_lit = smoothstep(
@@ -130,24 +138,25 @@ void light() {
 	float banded_lit = floor(smooth_lit * (bands - 1.0) + 0.5) / (bands - 1.0);
 	float toon_mix = toon_strength * mix(1.0, 0.78, skin_mask);
 	float lit = mix(smooth_lit, banded_lit, toon_mix);
-	float face_fill = pow(1.0 - max(dot(n, v), 0.0), 1.65) * 0.04 * skin_mask;
-	lit = clamp(max(lit, ambient_lift + face_fill), 0.0, 1.0);
+	float ambient_floor = ambient_lift * mix(0.10, 0.0, skin_mask);
+	lit = clamp(max(lit, ambient_floor), 0.0, 1.0);
 	float lit_curve = pow(lit, 0.90);
 
 	vec3 diffuse_col = mix(ALBEDO * shadow_tint, ALBEDO, lit_curve);
 
+	float shadow_edge_gate = smoothstep(-0.08, 0.28, ndl) * (1.0 - smoothstep(0.35, 0.82, wrapped));
 	float skin_wrap = pow(clamp(1.0 - wrapped, 0.0, 1.0), skin_scatter_power) * skin_scatter_strength * skin_mask;
-	float view_forward = pow(clamp(dot(-v, l), 0.0, 1.0), 2.2);
-	float subdermal = skin_wrap * (0.35 + 0.65 * view_forward) * skin_subdermal_strength;
-	float skin_fres = pow(1.0 - max(dot(n, v), 0.0), 1.8) * skin_mask * skin_scatter_strength * 0.40;
-	diffuse_col += ALBEDO * skin_scatter_tint * (skin_wrap + skin_fres);
-	diffuse_col += skin_subdermal_tint * subdermal * 0.28;
+	skin_wrap *= shadow_edge_gate;
+	float view_forward = pow(clamp(dot(-v, l), 0.0, 1.0), 2.6);
+	float subdermal = skin_wrap * (0.16 + 0.34 * view_forward) * skin_subdermal_strength;
+	diffuse_col += ALBEDO * skin_scatter_tint * (skin_wrap * 0.22);
+	diffuse_col += skin_subdermal_tint * subdermal * 0.08;
 
 	vec3 compressed_light = LIGHT_COLOR / (LIGHT_COLOR + vec3(1.0));
 	vec3 light_col = mix(LIGHT_COLOR, compressed_light, light_compress);
 
 	vec3 h = normalize(l + v);
-	float ndh = max(dot(n, h), 0.0);
+	float ndh = max(dot(shade_n, h), 0.0);
 	float rough = clamp(ROUGHNESS, 0.0, 1.0);
 	float shininess = mix(22.0, 96.0, 1.0 - rough);
 	float spec_raw = pow(ndh, shininess);
@@ -163,10 +172,12 @@ void light() {
 	spec *= mix(1.0, 0.82, rough);
 	spec *= (1.0 - reflection_reduction * 0.55);
 	spec *= mix(1.0, 1.0 - reflection_reduction * 0.55, skin_mask);
+	spec *= mix(1.0, skin_specular_strength, skin_mask);
 
 	float skin_soft_lobe = pow(ndh, mix(6.0, 18.0, 1.0 - rough));
 	float skin_soft_spec = skin_soft_lobe * 0.012 * skin_mask * SPECULAR_AMOUNT * smoothstep(0.18, 0.88, lit);
 	skin_soft_spec *= (1.0 - reflection_reduction * 0.70);
+	skin_soft_spec *= skin_specular_strength;
 	spec += skin_soft_spec;
 
 	float cloth_fres = pow(1.0 - max(dot(n, v), 0.0), cloth_sheen_power);
@@ -186,6 +197,9 @@ void light() {
 	rim *= (1.0 - reflection_reduction * 0.35);
 
 	vec3 diff_final = pow(max(diffuse_col, vec3(0.0)), vec3(midtone_gamma));
-	DIFFUSE_LIGHT += diff_final * light_col * ATTENUATION;
-	SPECULAR_LIGHT += (highlight_color * spec + rim_color * rim + cloth_sheen_col * cloth_sheen) * light_col * ATTENUATION;
+	float light_atten = clamp(ATTENUATION + (1.0 - ATTENUATION) * skin_shadow_soften * skin_mask, 0.0, 1.0);
+	float light_visibility = smoothstep(-0.08, 0.28, wrapped);
+	float diffuse_energy = lit_curve * light_visibility;
+	DIFFUSE_LIGHT += diff_final * light_col * light_atten * diffuse_energy;
+	SPECULAR_LIGHT += (highlight_color * spec + rim_color * rim + cloth_sheen_col * cloth_sheen) * light_col * light_atten * diffuse_energy;
 }
