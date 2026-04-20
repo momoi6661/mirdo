@@ -3,6 +3,13 @@ extends Node3D
 class_name WorldInteractionPanelComponent
 
 const SUBTITLE_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
+const SUBTITLE_LINE_SCENE: PackedScene = preload("res://controllers/interaction/world_interaction_panel_line.tscn")
+const PINK_SUBTITLE_OUTLINE: Color = Color(0.92, 0.24, 0.60, 1.0)
+const PINK_SUBTITLE_OUTLINE_STRONG: Color = Color(0.98, 0.20, 0.58, 1.0)
+const PINK_SUBTITLE_BACK: Color = Color(1.0, 0.76, 0.90, 1.0)
+const PINK_SUBTITLE_BACK_STRONG: Color = Color(1.0, 0.81, 0.93, 1.0)
+const PINK_SUBTITLE_DISABLED_OUTLINE: Color = Color(0.76, 0.54, 0.67, 1.0)
+const PINK_SUBTITLE_DISABLED_BACK: Color = Color(0.90, 0.79, 0.85, 1.0)
 
 @export_category("Display")
 @export_range(0.0002, 0.01, 0.0001) var pixel_size: float = 0.001
@@ -46,16 +53,15 @@ var _preview_alpha_internal: float = 0.0
 @export_range(120, 1200, 10) var option_column_label_width: float = 260.0
 
 @export_category("Typography")
-@export_range(24, 220, 1) var title_font_size: int = 92
-@export_range(24, 220, 1) var summary_font_size: int = 60
-@export_range(24, 220, 1) var option_font_size: int = 68
-@export_range(24, 220, 1) var detail_font_size: int = 54
-@export_range(24, 220, 1) var hint_font_size: int = 46
-@export_range(0, 32, 1) var front_outline_size: int = 8
-@export_range(0, 32, 1) var selected_front_outline_size: int = 10
-@export_range(0, 64, 1) var outline_size: int = 22
-@export_range(0, 32, 1) var back_outline_extra_size: int = 8
-@export_range(0, 32, 1) var selected_back_outline_extra_size: int = 12
+@export_range(24, 220, 1) var title_font_size: int = 76
+@export_range(24, 220, 1) var summary_font_size: int = 48
+@export_range(24, 220, 1) var option_font_size: int = 52
+@export_range(24, 220, 1) var detail_font_size: int = 42
+@export_range(24, 220, 1) var hint_font_size: int = 34
+@export_range(0.05, 0.4, 0.005) var subtitle_outline_ratio: float = 0.2
+@export_range(0.0, 0.08, 0.005) var selected_outline_ratio_bonus: float = 0.0
+@export_range(1, 24, 1) var subtitle_outline_min_size: int = 5
+@export_range(0, 12, 1) var back_outline_extra_size: int = 0
 @export_range(8, 64, 1) var title_wrap_chars: int = 10
 @export_range(8, 64, 1) var summary_wrap_chars: int = 14
 @export_range(8, 64, 1) var option_wrap_chars: int = 8
@@ -197,8 +203,12 @@ func _refresh_view(force_rebuild: bool = false) -> void:
 
 func _clear_lines() -> void:
 	for pair in _line_pairs:
+		var pair_root := pair.get("root", null) as Node3D
 		var front := pair.get("front", null) as Node3D
 		var back := pair.get("back", null) as Node3D
+		if pair_root != null and is_instance_valid(pair_root):
+			pair_root.queue_free()
+			continue
 		if front != null and is_instance_valid(front):
 			front.queue_free()
 		if back != null and is_instance_valid(back):
@@ -405,33 +415,39 @@ func _create_line_pair(parent_root: Node3D, spec: Dictionary, cursor_y: float) -
 	var category := String(spec.get("category", "summary"))
 	var font_size := int(spec.get("font_size", summary_font_size))
 	var colors := _get_section_colors(category)
+	var pair_root := SUBTITLE_LINE_SCENE.instantiate() as Node3D
+	if pair_root == null:
+		return {}
 
-	var front := _create_label_3d(text, font_size, 14, 14)
-	var back := _create_label_3d(text, font_size, 12, 12)
+	var front := pair_root.get_node_or_null("Label3D") as Label3D
+	var back := pair_root.get_node_or_null("Label3D2") as Label3D
 	if front == null or back == null:
+		pair_root.queue_free()
 		return {}
 
 	var horizontal_alignment := _get_alignment_for_category(category)
 	var label_width := _get_label_width_for_category(category)
-	front.outline_size = _get_outline_size_for_category(category, false)
-	back.outline_size = _get_outline_size_for_category(category, true)
-	front.horizontal_alignment = horizontal_alignment
-	back.horizontal_alignment = horizontal_alignment
-	front.width = label_width
-	back.width = label_width
+	var subtitle_outline_size := _get_subtitle_outline_size(font_size, category)
+	var back_outline_size := subtitle_outline_size + back_outline_extra_size
 
-	parent_root.add_child(back)
-	parent_root.add_child(front)
+	_configure_subtitle_line_label(front, text, font_size, horizontal_alignment, label_width, 32, 32)
+	_configure_subtitle_line_label(back, text, font_size, horizontal_alignment, label_width, 24, 24)
+	front.outline_size = subtitle_outline_size
+	back.outline_size = back_outline_size
+
+	parent_root.add_child(pair_root)
 
 	var base_position := Vector3(0.0, cursor_y, 0.0)
-	back.position = base_position + Vector3(0.0, 0.0, -layer_depth_offset)
-	front.position = base_position
+	pair_root.position = base_position
+	front.position = Vector3.ZERO
+	back.position = Vector3(0.0, 0.0, -layer_depth_offset)
 	front.modulate = Color(colors["front"])
 	front.outline_modulate = Color(colors["front_outline"])
 	back.modulate = Color(colors["back"])
 	back.outline_modulate = Color(colors["back_outline"])
 
 	return {
+		"root": pair_root,
 		"front": front,
 		"back": back,
 		"base_position": base_position,
@@ -439,36 +455,41 @@ func _create_line_pair(parent_root: Node3D, spec: Dictionary, cursor_y: float) -
 		"front_outline": Color(colors["front_outline"]),
 		"back_color": Color(colors["back"]),
 		"back_outline": Color(colors["back_outline"]),
+		"front_outline_size": subtitle_outline_size,
+		"back_outline_size": back_outline_size,
 		"emphasis": float(colors.get("emphasis", 1.0)),
 		"category": category,
-		"back_scale_multiplier": float(colors.get("back_scale", 1.06)),
 	}
 
-func _create_label_3d(text: String, font_size: int, render_priority_value: int, outline_priority_value: int) -> Label3D:
-	var label := Label3D.new()
+func _configure_subtitle_line_label(
+	label: Label3D,
+	text: String,
+	font_size: int,
+	horizontal_alignment: HorizontalAlignment,
+	label_width: float,
+	render_priority_value: int,
+	outline_priority_value: int
+) -> void:
 	label.text = text
 	label.font = subtitle_font
 	label.font_size = font_size
-	label.outline_size = outline_size
+	label.outline_size = subtitle_outline_min_size
 	label.pixel_size = pixel_size
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.position = Vector3.ZERO
+	label.horizontal_alignment = horizontal_alignment
+	label.width = label_width
 	label.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	label.double_sided = true
 	label.shaded = false
 	label.no_depth_test = true
 	label.render_priority = render_priority_value
 	label.outline_render_priority = outline_priority_value
-	return label
 
-func _get_outline_size_for_category(category: String, is_back: bool) -> int:
-	if not is_back:
-		if _is_selected_option_category(category):
-			return selected_front_outline_size
-		return front_outline_size
+func _get_subtitle_outline_size(font_size: int, category: String) -> int:
+	var ratio := subtitle_outline_ratio
+	var min_size := subtitle_outline_min_size
 	if _is_selected_option_category(category):
-		return outline_size + selected_back_outline_extra_size
-	return outline_size + back_outline_extra_size
+		ratio += selected_outline_ratio_bonus
+	return maxi(min_size, int(round(float(font_size) * ratio)))
 
 func _get_alignment_for_category(category: String) -> HorizontalAlignment:
 	match category:
@@ -489,12 +510,13 @@ func _make_palette(
 	inner_outline: Color,
 	outer_outline: Color,
 	emphasis: float = 1.0,
-	back_scale: float = 1.06
+	back_scale: float = 1.0,
+	back_fill: Color = Color(fill.r, fill.g, fill.b, 0.0)
 ) -> Dictionary:
 	return {
 		"front": fill,
 		"front_outline": inner_outline,
-		"back": Color(fill.r, fill.g, fill.b, 0.0),
+		"back": back_fill,
 		"back_outline": outer_outline,
 		"emphasis": emphasis,
 		"back_scale": back_scale,
@@ -508,74 +530,83 @@ func _get_section_colors(category: String) -> Dictionary:
 		"title":
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.92, 0.36, 0.69, 1.0),
-				Color(1.0, 0.60, 0.84, 1.0),
+				PINK_SUBTITLE_OUTLINE_STRONG,
+				PINK_SUBTITLE_BACK_STRONG,
 				1.04,
-				1.08
+				1.0,
+				PINK_SUBTITLE_BACK_STRONG
 			)
 		"summary":
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.86, 0.34, 0.64, 1.0),
-				Color(0.98, 0.61, 0.82, 0.96),
+				PINK_SUBTITLE_OUTLINE,
+				PINK_SUBTITLE_BACK,
 				1.0,
-				1.07
+				1.0,
+				PINK_SUBTITLE_BACK
 			)
 		"option_selected":
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.95, 0.32, 0.70, 1.0),
-				Color(1.0, 0.62, 0.86, 1.0),
-				1.06,
-				1.12
+				PINK_SUBTITLE_OUTLINE_STRONG,
+				PINK_SUBTITLE_BACK_STRONG,
+				1.05,
+				1.0,
+				PINK_SUBTITLE_BACK_STRONG
 			)
 		"option_disabled_selected":
 			return _make_palette(
 				_white_fill(0.96),
-				Color(0.63, 0.33, 0.47, 0.98),
-				Color(0.82, 0.58, 0.70, 0.9),
-				1.03,
-				1.10
+				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.88),
+				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.88),
+				1.02,
+				1.0,
+				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.88)
 			)
 		"option_disabled":
 			return _make_palette(
 				_white_fill(0.92),
-				Color(0.56, 0.31, 0.43, 0.94),
-				Color(0.72, 0.50, 0.60, 0.82),
+				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.84),
+				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.84),
 				1.0,
-				1.06
+				1.0,
+				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.84)
 			)
 		"detail_emphasis":
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.94, 0.34, 0.68, 1.0),
-				Color(1.0, 0.66, 0.87, 0.98),
+				PINK_SUBTITLE_OUTLINE_STRONG,
+				PINK_SUBTITLE_BACK_STRONG,
 				1.03,
-				1.09
+				1.0,
+				PINK_SUBTITLE_BACK_STRONG
 			)
 		"detail_warning":
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.95, 0.43, 0.57, 1.0),
-				Color(1.0, 0.67, 0.73, 0.96),
+				PINK_SUBTITLE_OUTLINE_STRONG,
+				PINK_SUBTITLE_BACK_STRONG,
 				1.0,
-				1.08
+				1.0,
+				PINK_SUBTITLE_BACK_STRONG
 			)
 		"hint":
 			return _make_palette(
 				_white_fill(0.95),
-				Color(0.77, 0.34, 0.58, 0.95),
-				Color(0.94, 0.60, 0.80, 0.88),
+				PINK_SUBTITLE_OUTLINE,
+				PINK_SUBTITLE_BACK,
 				1.0,
-				1.07
+				1.0,
+				PINK_SUBTITLE_BACK
 			)
 		_:
 			return _make_palette(
 				_white_fill(1.0),
-				Color(0.84, 0.34, 0.62, 1.0),
-				Color(0.98, 0.62, 0.83, 0.95),
+				PINK_SUBTITLE_OUTLINE,
+				PINK_SUBTITLE_BACK,
 				1.0,
-				1.08
+				1.0,
+				PINK_SUBTITLE_BACK
 			)
 
 func _play_show_animation() -> void:
@@ -616,15 +647,15 @@ func _apply_line_visual_state() -> void:
 	var lift := lerpf(fade_lift_distance, 0.0, alpha)
 
 	for pair in _line_pairs:
+		var pair_root := pair.get("root", null) as Node3D
 		var front := pair.get("front", null) as Label3D
 		var back := pair.get("back", null) as Label3D
-		if front == null or back == null:
+		if pair_root == null or front == null or back == null:
 			continue
 
 		var base_position := pair.get("base_position", Vector3.ZERO) as Vector3
 		var emphasis := float(pair.get("emphasis", 1.0))
 		var category := String(pair.get("category", ""))
-		var back_scale_multiplier := float(pair.get("back_scale_multiplier", 1.06))
 		var line_scale := Vector3.ONE * scale_factor * emphasis
 
 		var selected_pulse := 0.0
@@ -634,10 +665,14 @@ func _apply_line_visual_state() -> void:
 		var selected_scale := 1.0 + selected_option_scale_boost * selected_pulse
 		var selected_lift := selected_option_lift_boost * selected_pulse
 
-		front.position = base_position + Vector3(0.0, lift + selected_lift, 0.0)
-		back.position = base_position + Vector3(0.0, lift + selected_lift, -layer_depth_offset)
-		front.scale = line_scale * selected_scale
-		back.scale = line_scale * back_scale_multiplier * selected_scale
+		pair_root.position = base_position + Vector3(0.0, lift + selected_lift, 0.0)
+		pair_root.scale = line_scale * selected_scale
+		front.position = Vector3.ZERO
+		back.position = Vector3(0.0, 0.0, -layer_depth_offset)
+		front.scale = Vector3.ONE
+		back.scale = Vector3.ONE
+		front.outline_size = int(pair.get("front_outline_size", front.outline_size))
+		back.outline_size = int(pair.get("back_outline_size", back.outline_size))
 
 		var front_color := pair.get("front_color", Color.WHITE) as Color
 		var front_outline := pair.get("front_outline", Color.BLACK) as Color
@@ -645,8 +680,8 @@ func _apply_line_visual_state() -> void:
 		var back_outline := pair.get("back_outline", Color.BLACK) as Color
 		if selected_pulse > 0.0:
 			front_color = front_color.lerp(Color(1.0, 1.0, 1.0, front_color.a), 0.18 * selected_pulse)
-			front_outline = front_outline.lerp(Color(1.0, 0.48, 0.80, front_outline.a), 0.18 * selected_pulse)
-			back_outline = back_outline.lerp(Color(1.0, 0.82, 0.93, back_outline.a), 0.16 * selected_pulse)
+			front_outline = front_outline.lerp(Color(1.0, 0.26, 0.66, front_outline.a), 0.16 * selected_pulse)
+			back_outline = back_outline.lerp(Color(1.0, 0.86, 0.95, back_outline.a), 0.14 * selected_pulse)
 
 		front.modulate = _with_alpha(front_color, alpha)
 		front.outline_modulate = _with_alpha(front_outline, alpha)

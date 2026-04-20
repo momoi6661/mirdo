@@ -44,7 +44,7 @@ _data = {
 top_level = true
 visible = false
 script = ExtResource("1_panel")
-preview_alpha = 0.0
+preview_alpha = 1.0
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1261073179]
 libraries/ = SubResource("AnimationLibrary_s01jv")

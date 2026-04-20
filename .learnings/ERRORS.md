@@ -1526,3 +1526,38 @@ Windows 环境优先用 `Get-ChildItem | Select-String` 替代 `rg`；Hastur 远
 - Related Files: .learnings/ERRORS.md
 
 ---
+## [ERR-20260420-002] hastur_executor_disconnect
+
+**Logged**: 2026-04-20T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+Godot 编辑器进程仍在，但 Hastur broker 返回 `No Hastur Executors are currently connected`，导致无法热刷新编辑器预览实例。
+
+### Error
+```text
+GET http://localhost:5302/api/executors
+{
+  "success": true,
+  "data": [],
+  "hint": "No Hastur Executors are currently connected. Ensure the Hastur Executor plugin is enabled in a Godot editor and can reach the broker-server."
+}
+```
+
+### Context
+- 工作区：`D:\AAgodot\FPS`
+- Godot 进程仍在运行：`Godot_v4.6.2-stable_win64`
+- RuntimeBroker 进程也在运行
+- 但 Hastur executor 插件当前未向 broker 报到，因此远程 `api/execute` 无法继续用于编辑器页签热刷新
+
+### Suggested Fix
+看到 `data: []` 时，不要假设编辑器预览已刷新；先提示用户检查/重连 Hastur Executor 插件，或让用户手动重开场景页签读取磁盘最新脚本。
+
+### Metadata
+- Reproducible: yes
+- Related Files: .learnings/ERRORS.md
+- See Also: ERR-20260420-001
+
+---

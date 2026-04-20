@@ -123,6 +123,9 @@ _data = {
 [sub_resource type="SphereShape3D" id="SphereShape3D_yvtcv"]
 radius = 0.01
 
+[sub_resource type="SphereShape3D" id="SphereShape3D_panel_arm"]
+radius = 0.03
+
 [sub_resource type="SphereShape3D" id="SphereShape3D_ca8e7"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rk4xh"]
@@ -254,8 +257,8 @@ follow_speed = 15.0
 script = ExtResource("13_yvtcv")
 interaction_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
 interaction_hud = NodePath("../../Control/FPSInteractionHUD")
-world_panel_path = NodePath("../../Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D/WorldInteractionPanel")
-world_panel_anchor_path = NodePath("../../Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D")
+world_panel_path = NodePath("../../Marker3D/CameraOffset/InteractionPanelArm/InteractionPanelMark3D/WorldInteractionPanel")
+world_panel_anchor_path = NodePath("../../Marker3D/CameraOffset/InteractionPanelArm/InteractionPanelMark3D")
 
 [node name="XiaokongControlComponent" type="Node" parent="Components" unique_id=1029384756]
 script = ExtResource("19_xk_ctrl")
@@ -299,13 +302,15 @@ spring_length = -1.2
 [node name="ArmEnd" type="Node3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=172098117]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2)
 
-[node name="InteractionPanelMark3D" type="Marker3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=2109468123]
-transform = Transform3D(1, 0, 0, 0, 0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0.34, 0.38, -0.44)
+[node name="InteractionPanelArm" type="SpringArm3D" parent="Marker3D/CameraOffset" unique_id=1029475632]
+shape = SubResource("SphereShape3D_panel_arm")
+spring_length = -1.0
 
-[node name="WorldInteractionPanel" parent="Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D" unique_id=1042864282 instance=ExtResource("23_world_panel")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-visible = true
-preview_alpha = 1.0
+[node name="InteractionPanelMark3D" type="Marker3D" parent="Marker3D/CameraOffset/InteractionPanelArm" unique_id=2109468123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, -0.04)
+
+[node name="WorldInteractionPanel" parent="Marker3D/CameraOffset/InteractionPanelArm/InteractionPanelMark3D" unique_id=1042864282 instance=ExtResource("23_world_panel")]
+preview_alpha = 0.0
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1882923, 0)
