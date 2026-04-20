@@ -28,6 +28,11 @@ const COMMAND_FOLLOW_PLAYER := "follow_player"
 const COMMAND_STOP_FOLLOW := "stop_follow"
 const COMMAND_LOOK_AT_PLAYER := "look_at_player"
 const COMMAND_SIT_DOWN := "sit_down"
+const COMMAND_ENTER_LADDER := "enter_ladder"
+const COMMAND_CLIMB_LADDER := "climb_ladder"
+const COMMAND_JUMP_LADDER := "jump_ladder"
+const COMMAND_SLIDE_LADDER := "slide_ladder"
+const COMMAND_EXIT_LADDER := "exit_ladder"
 const COMMAND_GO_TO_MARKER := "go_to_marker"
 const SEAT_OCCUPIED_META_KEY := "xiaokong_seat_occupied"
 const SEAT_OCCUPANT_META_KEY := "xiaokong_seat_occupant"
@@ -61,6 +66,16 @@ const COMMAND_ALIASES: Dictionary = {
 	"坐着": COMMAND_SIT_DOWN,
 	"坐一会": COMMAND_SIT_DOWN,
 	"去坐下": COMMAND_SIT_DOWN,
+	"enter_ladder": COMMAND_ENTER_LADDER,
+	"上梯子": COMMAND_ENTER_LADDER,
+	"climb_ladder": COMMAND_CLIMB_LADDER,
+	"爬梯子": COMMAND_CLIMB_LADDER,
+	"jump_ladder": COMMAND_JUMP_LADDER,
+	"梯子跳": COMMAND_JUMP_LADDER,
+	"slide_ladder": COMMAND_SLIDE_LADDER,
+	"滑下梯子": COMMAND_SLIDE_LADDER,
+	"exit_ladder": COMMAND_EXIT_LADDER,
+	"下梯子": COMMAND_EXIT_LADDER,
 	"go_to_marker": COMMAND_GO_TO_MARKER,
 	"goto_marker": COMMAND_GO_TO_MARKER,
 	"go_marker": COMMAND_GO_TO_MARKER,
@@ -74,6 +89,7 @@ const COMMAND_ALIASES: Dictionary = {
 @export var follow_target_path: NodePath
 @export var markers_root_path: NodePath
 @export var ik_target_driver_path: NodePath = NodePath("../../根/IKTargets")
+@export var ladder_climb_component_path: NodePath = NodePath("../LadderClimbComponent")
 @export var sit_anchor_path: NodePath = NodePath("根/GeneralSkeleton/SitAnchorAttachment/SitAnchor_Mark3D")
 @export var fallback_action: StringName = &"Idle"
 @export var snap_to_marker_position_on_arrival: bool = true
@@ -134,6 +150,7 @@ var _state_component: XiaokongStateComponent
 var _navigation_component: XiaokongNavigationComponent
 var _navigation_agent: NavigationAgent3D
 var _ik_target_driver: Node
+var _ladder_climb_component: Node
 var _sit_anchor: Node3D
 
 var _pending_action_on_arrival: StringName = &""
@@ -153,6 +170,11 @@ var _saved_nav_path_desired_distance: float = 0.0
 var _saved_nav_target_desired_distance: float = 0.0
 var _stand_request_serial: int = 0
 var _sit_arrival_repath_retries_left: int = 0
+var _pending_ladder_travel_mode: String = ""
+var _pending_ladder_exit_at_top: bool = false
+var _pending_ladder_auto_exit: bool = false
+var _pending_ladder_followup_payload: Dictionary = {}
+var _pending_ladder_enter_payload: Dictionary = {}
 
 func _ready() -> void:
 	_refresh_refs()
@@ -227,11 +249,14 @@ func apply_ai_response(final_data: Dictionary) -> Dictionary:
 func _refresh_refs() -> void:
 	_action_controller = get_node_or_null(action_controller_path)
 	var previous_navigation: XiaokongNavigationComponent = _navigation_component
+	var previous_ladder: Node = _ladder_climb_component
 	_navigation_component = _resolve_navigation_component()
 	_navigation_agent = _resolve_navigation_agent()
 	_ik_target_driver = _resolve_ik_target_driver()
+	_ladder_climb_component = _resolve_ladder_climb_component()
 	_sit_anchor = _resolve_sit_anchor()
 	_rebind_navigation_signal(previous_navigation, _navigation_component)
+	_rebind_ladder_signals(previous_ladder, _ladder_climb_component)
 
 	_state_component = get_node_or_null(state_component_path) as XiaokongStateComponent
 	if _state_component == null:
@@ -259,6 +284,15 @@ func _resolve_ik_target_driver() -> Node:
 			return by_export
 	return _find_node_with_method_recursive(_action_controller, &"apply_marker_interaction")
 
+func _resolve_ladder_climb_component() -> Node:
+	if _action_controller == null:
+		return null
+	if ladder_climb_component_path != NodePath():
+		var by_export := _action_controller.get_node_or_null(ladder_climb_component_path)
+		if by_export != null and by_export.has_method("attach_to_ladder"):
+			return by_export
+	return _find_node_with_method_recursive(_action_controller, &"attach_to_ladder")
+
 func _resolve_sit_anchor() -> Node3D:
 	if _action_controller == null:
 		return null
@@ -278,7 +312,36 @@ func _rebind_navigation_signal(previous_navigation: XiaokongNavigationComponent,
 	if next_navigation != null and not next_navigation.destination_reached.is_connected(callback):
 		next_navigation.destination_reached.connect(callback)
 
+func _rebind_ladder_signals(previous_ladder: Node, next_ladder: Node) -> void:
+	var attached_callback := Callable(self, "_on_ladder_attached")
+	var moved_callback := Callable(self, "_on_ladder_move_finished")
+	var exited_callback := Callable(self, "_on_ladder_exited")
+	var cancelled_callback := Callable(self, "_on_ladder_cancelled")
+
+	if previous_ladder != null and previous_ladder != next_ladder:
+		if previous_ladder.has_signal("ladder_attached") and previous_ladder.is_connected("ladder_attached", attached_callback):
+			previous_ladder.disconnect("ladder_attached", attached_callback)
+		if previous_ladder.has_signal("ladder_move_finished") and previous_ladder.is_connected("ladder_move_finished", moved_callback):
+			previous_ladder.disconnect("ladder_move_finished", moved_callback)
+		if previous_ladder.has_signal("ladder_exited") and previous_ladder.is_connected("ladder_exited", exited_callback):
+			previous_ladder.disconnect("ladder_exited", exited_callback)
+		if previous_ladder.has_signal("ladder_cancelled") and previous_ladder.is_connected("ladder_cancelled", cancelled_callback):
+			previous_ladder.disconnect("ladder_cancelled", cancelled_callback)
+
+	if next_ladder == null:
+		return
+	if next_ladder.has_signal("ladder_attached") and not next_ladder.is_connected("ladder_attached", attached_callback):
+		next_ladder.connect("ladder_attached", attached_callback)
+	if next_ladder.has_signal("ladder_move_finished") and not next_ladder.is_connected("ladder_move_finished", moved_callback):
+		next_ladder.connect("ladder_move_finished", moved_callback)
+	if next_ladder.has_signal("ladder_exited") and not next_ladder.is_connected("ladder_exited", exited_callback):
+		next_ladder.connect("ladder_exited", exited_callback)
+	if next_ladder.has_signal("ladder_cancelled") and not next_ladder.is_connected("ladder_cancelled", cancelled_callback):
+		next_ladder.connect("ladder_cancelled", cancelled_callback)
+
 func _on_navigation_destination_reached() -> void:
+	if _try_handle_pending_ladder_entry():
+		return
 	if _try_handle_pending_sit_arrival():
 		return
 	if _pending_action_on_arrival == &"" and _pending_marker_name.strip_edges().is_empty():
@@ -294,6 +357,43 @@ func _on_navigation_destination_reached() -> void:
 	if arrival_action == &"Idle":
 		_clear_active_sit_marker()
 	_clear_pending_arrival_state()
+
+func _on_ladder_attached(_ladder_path: NodePath, _enter_from_top: bool) -> void:
+	if _pending_ladder_travel_mode.is_empty():
+		return
+	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
+		_clear_pending_ladder_sequence()
+		return
+	var accepted := false
+	if _pending_ladder_travel_mode == "climb" and _ladder_climb_component.has_method("start_climb"):
+		accepted = bool(_ladder_climb_component.call("start_climb", _pending_ladder_exit_at_top))
+	elif _ladder_climb_component.has_method("climb_ladder"):
+		accepted = bool(_ladder_climb_component.call("climb_ladder", _pending_ladder_exit_at_top, _pending_ladder_travel_mode))
+	if not accepted:
+		_clear_pending_ladder_sequence()
+
+func _on_ladder_move_finished(_ladder_path: NodePath, _progress: float) -> void:
+	if not _pending_ladder_auto_exit:
+		return
+	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
+		_clear_pending_ladder_sequence()
+		return
+	if not _ladder_climb_component.has_method("exit_ladder"):
+		_clear_pending_ladder_sequence()
+		return
+	var accepted: bool = bool(_ladder_climb_component.call("exit_ladder", _pending_ladder_exit_at_top))
+	if not accepted:
+		_clear_pending_ladder_sequence()
+
+func _on_ladder_exited(_ladder_path: NodePath, _exit_at_top: bool) -> void:
+	var followup: Dictionary = _pending_ladder_followup_payload.duplicate(true)
+	_clear_pending_ladder_sequence()
+	if followup.is_empty():
+		return
+	apply_ai_response(followup)
+
+func _on_ladder_cancelled(_ladder_path: NodePath) -> void:
+	_clear_pending_ladder_sequence()
 
 func _try_handle_pending_sit_arrival() -> bool:
 	if _pending_sit_seat_marker_name.strip_edges().is_empty():
@@ -327,6 +427,20 @@ func _try_handle_pending_sit_arrival() -> bool:
 	var seat_marker_path: String = String(seat_marker.get_path())
 	_clear_pending_sit_state()
 	_start_sit_arrival_sequence(seat_marker_path, sit_action)
+	return true
+
+func _try_handle_pending_ladder_entry() -> bool:
+	if _pending_ladder_enter_payload.is_empty():
+		return false
+
+	var payload: Dictionary = _pending_ladder_enter_payload.duplicate(true)
+	var arrival_marker: Marker3D = _resolve_pending_arrival_marker()
+	if arrival_marker != null:
+		if _action_controller != null and _action_controller.has_method("stop_navigation"):
+			_action_controller.call("stop_navigation")
+		_snap_action_controller_to_marker(arrival_marker)
+	_clear_pending_arrival_state()
+	_start_ladder_enter_now(payload)
 	return true
 
 func _resolve_pending_sit_approach_marker() -> Marker3D:
@@ -397,6 +511,12 @@ func _resolve_active_sit_marker() -> Marker3D:
 	if marker_name.is_empty():
 		return null
 	return _find_marker_by_name(marker_name, &"SittingIdle")
+
+func get_active_sit_marker() -> Marker3D:
+	return _resolve_active_sit_marker()
+
+func get_active_sit_marker_path() -> String:
+	return _active_sit_marker_path
 
 func _set_marker_seat_occupied_state(marker: Marker3D, occupied: bool) -> void:
 	if marker == null or not is_instance_valid(marker):
@@ -671,6 +791,34 @@ func _invalidate_pending_snap() -> void:
 	_stand_request_serial += 1
 	_clear_pending_sit_state()
 	_restore_sit_navigation_precision()
+	_clear_pending_ladder_sequence()
+	if _ladder_climb_component != null and is_instance_valid(_ladder_climb_component) and _ladder_climb_component.has_method("stop_ladder"):
+		_ladder_climb_component.call("stop_ladder")
+
+func _payload_has_ladder_queue(payload: Dictionary) -> bool:
+	return payload.has("queue_travel_mode") \
+		or payload.has("queue_exit_at_top") \
+		or payload.has("queue_auto_exit") \
+		or payload.has("queue_followup_payload")
+
+func _queue_ladder_sequence(payload: Dictionary, default_travel_mode: String, default_exit_at_top: bool) -> void:
+	var raw_travel_mode: String = String(payload.get("queue_travel_mode", default_travel_mode)).strip_edges().to_lower()
+	if raw_travel_mode != "jump" and raw_travel_mode != "slide":
+		raw_travel_mode = "climb"
+	_pending_ladder_travel_mode = raw_travel_mode
+	_pending_ladder_exit_at_top = _extract_ladder_exit_at_top(payload, default_exit_at_top)
+	_pending_ladder_auto_exit = bool(payload.get("queue_auto_exit", true))
+	var followup_variant: Variant = payload.get("queue_followup_payload", {})
+	if followup_variant is Dictionary:
+		_pending_ladder_followup_payload = (followup_variant as Dictionary).duplicate(true)
+	else:
+		_pending_ladder_followup_payload = {}
+
+func _clear_pending_ladder_sequence() -> void:
+	_pending_ladder_travel_mode = ""
+	_pending_ladder_exit_at_top = false
+	_pending_ladder_auto_exit = false
+	_pending_ladder_followup_payload.clear()
 
 func _begin_pending_snap() -> int:
 	_snap_request_serial += 1
@@ -1180,9 +1328,130 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 			_navigate_to_marker(target_marker, COMMAND_GO_TO_MARKER, summary)
 			return true
 
+		COMMAND_ENTER_LADDER:
+			return _handle_enter_ladder_command(payload, summary)
+
+		COMMAND_CLIMB_LADDER:
+			return _handle_ladder_travel_command(payload, summary, "climb", true)
+
+		COMMAND_JUMP_LADDER:
+			return _handle_ladder_travel_command(payload, summary, "jump", true)
+
+		COMMAND_SLIDE_LADDER:
+			return _handle_ladder_travel_command(payload, summary, "slide", false)
+
+		COMMAND_EXIT_LADDER:
+			return _handle_exit_ladder_command(payload, summary)
+
 		_:
 			summary["errors"].append("unsupported_command:" + command_name)
 			return true
+
+func _handle_enter_ladder_command(payload: Dictionary, summary: Dictionary) -> bool:
+	var ladder: Node3D = _resolve_ladder_target(payload)
+	if ladder == null:
+		summary["errors"].append("ladder_target_not_found")
+		return true
+
+	var enter_from_top: bool = _extract_ladder_enter_from_top(payload)
+	var entry_marker: Marker3D = _resolve_ladder_entry_marker(payload, ladder, enter_from_top)
+	if entry_marker != null:
+		_prepare_for_ladder_navigation()
+		_navigate_to_marker(entry_marker, COMMAND_ENTER_LADDER, summary)
+		_pending_ladder_enter_payload = payload.duplicate(true)
+		return true
+
+	_start_ladder_enter_now(payload, summary)
+	return true
+
+func _start_ladder_enter_now(payload: Dictionary, summary: Dictionary = {}) -> bool:
+	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
+		if not summary.is_empty():
+			summary["errors"].append("ladder_climb_component_missing")
+		return false
+	if not _ladder_climb_component.has_method("attach_to_ladder"):
+		if not summary.is_empty():
+			summary["errors"].append("ladder_climb_component_has_no_attach")
+		return false
+
+	var ladder: Node3D = _resolve_ladder_target(payload)
+	if ladder == null:
+		if not summary.is_empty():
+			summary["errors"].append("ladder_target_not_found")
+		return false
+
+	var enter_from_top: bool = _extract_ladder_enter_from_top(payload)
+	_prepare_for_ladder_navigation()
+	if _payload_has_ladder_queue(payload):
+		_queue_ladder_sequence(payload, "climb", not enter_from_top)
+	var accepted: bool = bool(_ladder_climb_component.call("attach_to_ladder", ladder, enter_from_top))
+	if not accepted:
+		_clear_pending_ladder_sequence()
+		if not summary.is_empty():
+			summary["errors"].append("ladder_attach_rejected")
+		return false
+
+	if not summary.is_empty():
+		summary["command_applied"] = true
+		summary["moved"] = false
+		summary["navigation_mode"] = COMMAND_ENTER_LADDER
+		summary["target_marker"] = String(ladder.get_path())
+	return true
+
+func _prepare_for_ladder_navigation() -> void:
+	_clear_pending_arrival_state()
+	_clear_pending_sit_state()
+	_restore_sit_navigation_precision()
+	_clear_marker_interaction_ik()
+	if _is_sitting_context_state_name(_get_action_controller_state_name()):
+		_clear_active_sit_marker()
+	_clear_pending_ladder_sequence()
+
+func _handle_ladder_travel_command(payload: Dictionary, summary: Dictionary, travel_mode: String, default_exit_at_top: bool) -> bool:
+	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
+		summary["errors"].append("ladder_climb_component_missing")
+		return true
+
+	var exit_at_top: bool = _extract_ladder_exit_at_top(payload, default_exit_at_top)
+	var accepted := false
+	if travel_mode == "climb" and _ladder_climb_component.has_method("start_climb"):
+		accepted = bool(_ladder_climb_component.call("start_climb", exit_at_top))
+	elif _ladder_climb_component.has_method("climb_ladder"):
+		accepted = bool(_ladder_climb_component.call("climb_ladder", exit_at_top, travel_mode))
+	else:
+		summary["errors"].append("ladder_climb_component_has_no_climb")
+		return true
+	if not accepted:
+		summary["errors"].append("ladder_travel_rejected")
+		return true
+
+	summary["command_applied"] = true
+	summary["moved"] = true
+	summary["navigation_mode"] = COMMAND_CLIMB_LADDER if travel_mode == "climb" else COMMAND_JUMP_LADDER if travel_mode == "jump" else COMMAND_SLIDE_LADDER
+	if _ladder_climb_component.has_method("get_active_ladder"):
+		var ladder: Variant = _ladder_climb_component.call("get_active_ladder")
+		if ladder is Node:
+			summary["target_marker"] = String((ladder as Node).get_path())
+	return true
+
+func _handle_exit_ladder_command(payload: Dictionary, summary: Dictionary) -> bool:
+	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
+		summary["errors"].append("ladder_climb_component_missing")
+		return true
+	if not _ladder_climb_component.has_method("exit_ladder"):
+		summary["errors"].append("ladder_climb_component_has_no_exit")
+		return true
+
+	var exit_at_top: bool = _extract_ladder_exit_at_top(payload, false)
+	var accepted: bool = bool(_ladder_climb_component.call("exit_ladder", exit_at_top))
+	if not accepted:
+		summary["errors"].append("ladder_exit_rejected")
+		return true
+
+	summary["command_applied"] = true
+	summary["moved"] = true
+	summary["navigation_mode"] = COMMAND_EXIT_LADDER
+	return true
 
 func _extract_command_value(payload: Dictionary) -> Variant:
 	var top_value: Variant = _extract_command_value_from_dict(payload)
@@ -1459,6 +1728,147 @@ func _extract_marker_name_by_keys_from_dict(source: Dictionary, keys: PackedStri
 			return inferred_marker
 		return raw_text
 	return ""
+
+func _extract_variant_by_keys(payload: Dictionary, keys: PackedStringArray) -> Variant:
+	var top_value: Variant = _extract_variant_from_dict(payload, keys)
+	if top_value != null:
+		return top_value
+
+	var command_value: Variant = _extract_command_value(payload)
+	if command_value is Dictionary:
+		var command_dict: Dictionary = command_value as Dictionary
+		var nested_value: Variant = _extract_variant_from_dict(command_dict, keys)
+		if nested_value != null:
+			return nested_value
+
+	for nested_key in ["action_hint", "navigation", "intent_payload", "command_payload"]:
+		if not payload.has(nested_key):
+			continue
+		var nested_variant: Variant = payload[nested_key]
+		if nested_variant is not Dictionary:
+			continue
+		var nested_dict: Dictionary = nested_variant as Dictionary
+		var found: Variant = _extract_variant_from_dict(nested_dict, keys)
+		if found != null:
+			return found
+	return null
+
+func _extract_variant_from_dict(source: Dictionary, keys: PackedStringArray) -> Variant:
+	for key in keys:
+		if source.has(key):
+			return source[key]
+	return null
+
+func _extract_ladder_enter_from_top(payload: Dictionary) -> bool:
+	return _extract_ladder_top_flag(
+		payload,
+		PackedStringArray(["enter_from_top", "from_top", "top_entry"]),
+		PackedStringArray(["entry_side", "enter_side", "entry", "from_side", "from"]),
+		false
+	)
+
+func _extract_ladder_exit_at_top(payload: Dictionary, default_value: bool) -> bool:
+	return _extract_ladder_top_flag(
+		payload,
+		PackedStringArray(["exit_at_top", "to_top", "top_exit"]),
+		PackedStringArray(["exit_side", "to_side", "exit", "to"]),
+		default_value
+	)
+
+func _extract_ladder_top_flag(payload: Dictionary, bool_keys: PackedStringArray, text_keys: PackedStringArray, default_value: bool) -> bool:
+	var bool_value: Variant = _extract_variant_by_keys(payload, bool_keys)
+	if bool_value != null:
+		return _variant_to_bool(bool_value, default_value)
+	var text_value: Variant = _extract_variant_by_keys(payload, text_keys)
+	return _parse_ladder_top_flag(text_value, default_value)
+
+func _variant_to_bool(value: Variant, default_value: bool) -> bool:
+	if value is bool:
+		return value as bool
+	return _parse_ladder_top_flag(value, default_value)
+
+func _parse_ladder_top_flag(value: Variant, default_value: bool) -> bool:
+	if value == null:
+		return default_value
+	var text: String = String(value).strip_edges().to_lower()
+	if text.is_empty():
+		return default_value
+	if text == "true" or text == "1" or text == "yes":
+		return true
+	if text == "false" or text == "0" or text == "no":
+		return false
+	if text.find("top") >= 0 or text.find("upper") >= 0 or text.find("上") >= 0:
+		return true
+	if text.find("bottom") >= 0 or text.find("lower") >= 0 or text.find("下") >= 0:
+		return false
+	return default_value
+
+func _resolve_ladder_target(payload: Dictionary) -> Node3D:
+	var ladder_path_value: Variant = _extract_variant_by_keys(
+		payload,
+		PackedStringArray(["ladder_path", "ladder_node_path", "target_node_path", "target_path", "node_path"])
+	)
+	if ladder_path_value != null:
+		var ladder_path: String = String(ladder_path_value).strip_edges()
+		if not ladder_path.is_empty():
+			var by_path: Node = _find_node_by_path(ladder_path)
+			if _is_valid_ladder_node(by_path):
+				return by_path as Node3D
+
+	var ladder_name_value: Variant = _extract_variant_by_keys(
+		payload,
+		PackedStringArray(["ladder_name", "ladder_node", "ladder", "target_node", "target_name", "node_name"])
+	)
+	if ladder_name_value != null:
+		var ladder_name: String = String(ladder_name_value).strip_edges()
+		if not ladder_name.is_empty():
+			var root: Node = _get_scene_search_root()
+			var by_name: Node3D = _find_node3d_by_name_recursive(root, ladder_name.to_lower())
+			if _is_valid_ladder_node(by_name):
+				return by_name
+
+	var scene_root: Node = _get_scene_search_root()
+	var fallback: Node = _find_node_with_method_recursive(scene_root, &"get_attach_transform")
+	if _is_valid_ladder_node(fallback):
+		return fallback as Node3D
+	return null
+
+func _resolve_ladder_entry_marker(payload: Dictionary, ladder: Node3D, enter_from_top: bool) -> Marker3D:
+	var marker_path_value: Variant = _extract_variant_by_keys(
+		payload,
+		PackedStringArray(["entry_marker_path", "ladder_entry_marker_path", "approach_marker_path", "target_marker_path"])
+	)
+	if marker_path_value != null:
+		var marker_path: String = String(marker_path_value).strip_edges()
+		if not marker_path.is_empty():
+			var by_path: Node = _find_node_by_path(marker_path)
+			if by_path is Marker3D:
+				return by_path as Marker3D
+
+	if ladder != null and ladder.has_method("get_navigation_entry_marker"):
+		var marker_variant: Variant = ladder.call("get_navigation_entry_marker", enter_from_top)
+		if marker_variant is Marker3D:
+			return marker_variant as Marker3D
+	return null
+
+func _find_node_by_path(node_path: String) -> Node:
+	var normalized_path: String = node_path.strip_edges()
+	if normalized_path.is_empty():
+		return null
+	var by_path: Node = get_node_or_null(NodePath(normalized_path))
+	if by_path != null:
+		return by_path
+	var root: Node = _get_scene_search_root()
+	if root != null:
+		return root.get_node_or_null(NodePath(normalized_path))
+	return null
+
+func _is_valid_ladder_node(candidate: Node) -> bool:
+	return candidate is Node3D \
+		and candidate.has_method("get_attach_transform") \
+		and candidate.has_method("get_exit_transform") \
+		and candidate.has_method("get_navigation_entry_marker") \
+		and candidate.has_method("get_layer_count")
 
 func _find_marker_by_path(marker_path: String, preferred_action: StringName = &"") -> Marker3D:
 	var normalized_path: String = marker_path.strip_edges()

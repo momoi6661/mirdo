@@ -16,16 +16,29 @@ func _ready() -> void:
 			
 	add_to_group("SavableComponent")
 
+func _get_save_manager() -> Node:
+	return get_node_or_null("/root/SaveManager")
+
 # 手动标记该物体已被永久销毁（拾取、消耗等）
 func mark_destroyed() -> void:
-	if SaveManager.has_method("register_destroyed_object"):
-		SaveManager.register_destroyed_object(unique_id)
+	var save_manager := _get_save_manager()
+	if save_manager != null and save_manager.has_method("register_destroyed_object"):
+		save_manager.call("register_destroyed_object", unique_id)
 
-func _exit_tree():
+func _exit_tree() -> void:
 	# 自动检测销毁：确保不是因为场景整体切换导致的误判
-	if not Engine.is_editor_hint() and get_parent().is_queued_for_deletion():
-		if get_tree().current_scene != get_parent() and not get_tree().current_scene.is_queued_for_deletion():
-			mark_destroyed()
+	if Engine.is_editor_hint():
+		return
+	var parent = get_parent()
+	if parent == null or not parent.is_queued_for_deletion():
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	var current_scene: Node = tree.current_scene
+	if current_scene == null or current_scene == parent or current_scene.is_queued_for_deletion():
+		return
+	mark_destroyed()
 
 func get_save_data() -> Dictionary:
 	var parent = get_parent()

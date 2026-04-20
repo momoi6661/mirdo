@@ -1,13 +1,13 @@
-[gd_scene format=4]
+[gd_scene format=3 uid="uid://f3cr6gpu3jui"]
 
-[ext_resource type="Script" path="res://components/xiaokong_ai_command_dispatcher_component.gd" id="1_dispatch"]
-[ext_resource type="Script" path="res://components/xiaokong_seat_interactable_component.gd" id="2_seat"]
+[ext_resource type="Script" uid="uid://b1edxcstxachk" path="res://components/xiaokong_ai_command_dispatcher_component.gd" id="1_dispatch"]
+[ext_resource type="Script" uid="uid://swnltcwwquxf" path="res://components/xiaokong_seat_interactable_component.gd" id="2_seat"]
 
-[node name="XiaokongSeatInteractable" type="Node" groups=["xiaokong_interactable"]]
+[node name="XiaokongSeatInteractable" type="Node" unique_id=1317713478 groups=["xiaokong_interactable"]]
 script = ExtResource("2_seat")
-interaction_enabled = true
-interaction_time = 0.25
-trigger_on_short_interact = false
+prompt_text = "坐下"
+occupied_prompt_text = "站起"
+world_panel_summary_text = ""
 
-[node name="CommandDispatcher" type="Node" parent="."]
+[node name="CommandDispatcher" type="Node" parent="." unique_id=860351775]
 script = ExtResource("1_dispatch")

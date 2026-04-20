@@ -5,6 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_suxrs"]
 [ext_resource type="PackedScene" uid="uid://b6svd2wt3lxks" path="res://models/xiaokong/xiaokong1.tscn" id="4_qn8gb"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="4_u5pho"]
+[ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://models/water_bottle.tscn" id="6_2kvbe"]
+[ext_resource type="PackedScene" uid="uid://cqwb5ngi64ksv" path="res://models/can_soup.tscn" id="7_b0r85"]
 
 [sub_resource type="FogMaterial" id="FogMaterial_main_haze"]
 density = 0.014
@@ -196,3 +198,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.0
 
 [node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5113752, 0.0219687, -0.6291559)
+
+[node name="water_bottle" parent="." unique_id=2119110613 instance=ExtResource("6_2kvbe")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3309464, 1.1920929e-07, -0.95876676)
+
+[node name="can_soup" parent="." unique_id=1404458673 node_paths=PackedStringArray("highlight_meshes") instance=ExtResource("7_b0r85")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9284813, 0.015239999, -0.16258852)
+highlight_meshes = [NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_01 - Default_0"), NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_02 - Default_0"), null, null]

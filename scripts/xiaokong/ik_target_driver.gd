@@ -292,6 +292,8 @@ var _interaction_right_hand_offset: Vector3 = Vector3.ZERO
 var _interaction_left_hand_rotation_deg: Vector3 = Vector3.ZERO
 var _interaction_right_hand_rotation_deg: Vector3 = Vector3.ZERO
 var _initialized: bool = false
+var _external_arm_targets_locked: bool = false
+var _external_leg_targets_locked: bool = false
 
 func _ready() -> void:
 	_initialize_driver()
@@ -435,9 +437,10 @@ func _run_runtime_update(delta: float) -> void:
 		return
 	_resolve_animation_state_provider()
 	_update_channel_weights(delta)
-	if _idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON:
+	if not _external_arm_targets_locked and (_idle_arm_offset_dirty or _idle_arm_offset_weight > EPSILON or _idle_arm_offset_target_weight > EPSILON):
 		_apply_idle_arm_offsets(delta)
-	_update_ground_foot_targets(delta)
+	if not _external_leg_targets_locked:
+		_update_ground_foot_targets(delta)
 	_update_marker_interaction(delta)
 	if auto_manage_influence:
 		_update_modifier_influence()
@@ -826,20 +829,23 @@ func _read_node_meta_float(node: Node, key: StringName, fallback: float) -> floa
 func _on_skeleton_pose_updated() -> void:
 	if not _ensure_initialized():
 		return
-	_set_auto_from_bone(left_hand_auto, left_hand_bone)
-	_set_auto_from_bone(right_hand_auto, right_hand_bone)
-	_set_auto_from_bone(left_hand_rot_auto, left_hand_bone)
-	_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
-	_set_auto_from_bone(left_foot_auto, left_foot_bone)
-	_set_auto_from_bone(right_foot_auto, right_foot_bone)
 	_set_auto_from_bone(spine_bend_auto, spine_follow_bone)
 	var look_forward_offset := _read_node_meta_float(look_at_auto, META_NODE_FORWARD_OFFSET, 0.0)
 	_set_auto_from_bone_with_forward_offset(look_at_auto, look_at_follow_bone, look_forward_offset)
 
-	_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, _left_elbow_pole_profile)
-	_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, _right_elbow_pole_profile)
-	_update_pole_auto(left_knee_pole_auto, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, _left_knee_pole_profile)
-	_update_pole_auto(right_knee_pole_auto, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, _right_knee_pole_profile)
+	if not _external_arm_targets_locked:
+		_set_auto_from_bone(left_hand_auto, left_hand_bone)
+		_set_auto_from_bone(right_hand_auto, right_hand_bone)
+		_set_auto_from_bone(left_hand_rot_auto, left_hand_bone)
+		_set_auto_from_bone(right_hand_rot_auto, right_hand_bone)
+		_update_pole_auto(left_elbow_pole_auto, left_upper_arm_bone, left_lower_arm_bone, left_hand_bone, _left_elbow_pole_profile)
+		_update_pole_auto(right_elbow_pole_auto, right_upper_arm_bone, right_lower_arm_bone, right_hand_bone, _right_elbow_pole_profile)
+
+	if not _external_leg_targets_locked:
+		_set_auto_from_bone(left_foot_auto, left_foot_bone)
+		_set_auto_from_bone(right_foot_auto, right_foot_bone)
+		_update_pole_auto(left_knee_pole_auto, left_upper_leg_bone, left_lower_leg_bone, left_foot_bone, _left_knee_pole_profile)
+		_update_pole_auto(right_knee_pole_auto, right_upper_leg_bone, right_lower_leg_bone, right_foot_bone, _right_knee_pole_profile)
 
 func _set_auto_from_bone(target: Node3D, bone_idx: int) -> void:
 	if target == null or bone_idx == -1:
@@ -925,6 +931,40 @@ func reset_arm_targets_to_base() -> void:
 
 	if auto_manage_influence:
 		_update_modifier_influence()
+
+func get_channel_weight(channel: StringName) -> float:
+	return _get_channel_weight(channel)
+
+func get_channel_weights(channels: PackedStringArray = PackedStringArray()) -> Dictionary:
+	var requested_channels := channels
+	if requested_channels.is_empty():
+		requested_channels = PackedStringArray(IK_CHANNELS)
+
+	var weights: Dictionary = {}
+	for channel in requested_channels:
+		var channel_name := StringName(channel)
+		weights[String(channel_name)] = _get_channel_weight(channel_name)
+	return weights
+
+func set_channel_weights(weights: Dictionary) -> void:
+	for key in weights.keys():
+		var channel := StringName(String(key))
+		set_channel_weight(channel, float(weights[key]))
+
+func reset_all_targets_to_base() -> void:
+	reset_arm_targets_to_base()
+	_restore_local_transform(left_foot_target, left_foot_target_base)
+	_restore_local_transform(right_foot_target, right_foot_target_base)
+	_restore_local_transform(left_knee_pole_target, left_knee_pole_target_base)
+	_restore_local_transform(right_knee_pole_target, right_knee_pole_target_base)
+	_restore_local_transform(spine_bend_target, spine_bend_target_base)
+	_restore_local_transform(mark_look_at_target, mark_look_at_target_base)
+	if auto_manage_influence:
+		_update_modifier_influence()
+
+func set_external_target_locks(arm_locked: bool, leg_locked: bool) -> void:
+	_external_arm_targets_locked = arm_locked
+	_external_leg_targets_locked = leg_locked
 
 func set_idle_arm_offset_weight(weight: float) -> void:
 	if _interaction_target_weight > EPSILON or _interaction_weight > EPSILON:
@@ -1043,21 +1083,21 @@ func _update_marker_interaction(delta: float) -> void:
 		_blend_to_base_global(mark_look_at_target, mark_look_at_target_base, false, true)
 		_blend_to_base_global(spine_bend_target, spine_bend_target_base, false, true)
 
-	if _interaction_left_hand_enabled:
+	if not _external_arm_targets_locked and _interaction_left_hand_enabled:
 		var left_world: Vector3 = anchor_transform * _interaction_left_hand_offset
 		var left_basis: Basis = anchor_transform.basis * Basis.from_euler(_deg_to_rad_vec3(_interaction_left_hand_rotation_deg))
 		_blend_global_pose(left_hand_target, left_hand_target_base, left_world, Basis.IDENTITY, false, true)
 		_blend_global_pose(left_hand_rot_target, left_hand_rot_target_base, Vector3.ZERO, left_basis, true, false)
-	else:
+	elif not _external_arm_targets_locked:
 		_blend_idle_arm_target_to_base(left_hand_target, left_hand_target_base, idle_left_hand_offset)
 		_blend_to_base_global(left_hand_rot_target, left_hand_rot_target_base, true, false)
 
-	if _interaction_right_hand_enabled:
+	if not _external_arm_targets_locked and _interaction_right_hand_enabled:
 		var right_world: Vector3 = anchor_transform * _interaction_right_hand_offset
 		var right_basis: Basis = anchor_transform.basis * Basis.from_euler(_deg_to_rad_vec3(_interaction_right_hand_rotation_deg))
 		_blend_global_pose(right_hand_target, right_hand_target_base, right_world, Basis.IDENTITY, false, true)
 		_blend_global_pose(right_hand_rot_target, right_hand_rot_target_base, Vector3.ZERO, right_basis, true, false)
-	else:
+	elif not _external_arm_targets_locked:
 		_blend_idle_arm_target_to_base(right_hand_target, right_hand_target_base, idle_right_hand_offset)
 		_blend_to_base_global(right_hand_rot_target, right_hand_rot_target_base, true, false)
 
@@ -1069,9 +1109,10 @@ func _restore_targets_after_interaction_clear() -> void:
 	_interaction_mode = &""
 	_restore_local_transform(mark_look_at_target, mark_look_at_target_base)
 	_restore_local_transform(spine_bend_target, spine_bend_target_base)
-	_restore_local_transform(left_hand_rot_target, left_hand_rot_target_base)
-	_restore_local_transform(right_hand_rot_target, right_hand_rot_target_base)
-	_apply_arm_target_offsets(_idle_arm_offset_weight)
+	if not _external_arm_targets_locked:
+		_restore_local_transform(left_hand_rot_target, left_hand_rot_target_base)
+		_restore_local_transform(right_hand_rot_target, right_hand_rot_target_base)
+		_apply_arm_target_offsets(_idle_arm_offset_weight)
 	if auto_manage_influence:
 		_update_modifier_influence()
 

@@ -42,7 +42,7 @@ func _ready() -> void:
 	if not InventoryGrid:
 		push_error("InventoryGrid 未设置")
 		return
-		
+
 	InventorySlots.clear()
 	var existing_slots = []
 	for child in InventoryGrid.get_children():
@@ -221,6 +221,7 @@ func clear_info_display():
 	if itemIconDisplay:
 		itemIconDisplay.texture = null
 		itemIconDisplay.visible = false
+
 func ItemDroppedOnSlot(fromSlotId,toSlotId, dropAmount:int=0):
 	if fromSlotId == toSlotId: return
 	

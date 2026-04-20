@@ -22,6 +22,7 @@
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
 [ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
 [ext_resource type="AudioStream" uid="uid://dc3ojh2l6f4oi" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
+[ext_resource type="PackedScene" uid="uid://cih1ba2m6uqc5" path="res://controllers/interaction/world_interaction_panel.tscn" id="23_world_panel"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -253,6 +254,8 @@ follow_speed = 15.0
 script = ExtResource("13_yvtcv")
 interaction_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
 interaction_hud = NodePath("../../Control/FPSInteractionHUD")
+world_panel_path = NodePath("../../Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D/WorldInteractionPanel")
+world_panel_anchor_path = NodePath("../../Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D")
 
 [node name="XiaokongControlComponent" type="Node" parent="Components" unique_id=1029384756]
 script = ExtResource("19_xk_ctrl")
@@ -266,8 +269,8 @@ shape = SubResource("CapsuleShape3D_u6tj1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0021640062, 0)
 visible = false
 layers = 2
-gi_mode = 0
 cast_shadow = 0
+gi_mode = 0
 mesh = SubResource("CapsuleMesh_6tv51")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=784737969]
@@ -296,8 +299,16 @@ spring_length = -1.2
 [node name="ArmEnd" type="Node3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=172098117]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2)
 
+[node name="InteractionPanelMark3D" type="Marker3D" parent="Marker3D/CameraOffset/PickUpArm" unique_id=2109468123]
+transform = Transform3D(1, 0, 0, 0, 0.99026805, -0.1391731, 0, 0.1391731, 0.99026805, 0.34, 0.38, -0.44)
+
+[node name="WorldInteractionPanel" parent="Marker3D/CameraOffset/PickUpArm/InteractionPanelMark3D" unique_id=1042864282 instance=ExtResource("23_world_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+visible = true
+preview_alpha = 1.0
+
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1882923, 0)
 shape = SubResource("SphereShape3D_ca8e7")
 target_position = Vector3(0, 0.5, 0)
 debug_shape_custom_color = Color(1.4514787, 1.2296157, 0.6632813, 0.88235295)

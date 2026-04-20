@@ -82,6 +82,8 @@ surface_material_override/0 = SubResource("StandardMaterial3D_7algo")
 [node name="locker_door_col" type="StaticBody3D" parent="." unique_id=780530606]
 script = ExtResource("1_2i6yw")
 prompt_text = "Open Locker Door"
+world_panel_title = "柜门"
+world_panel_summary_text = "视线停留后，可直接通过浮空面板交互。"
 two_way = false
 open_angle_degrees = 82.0
 open_duration = 0.62
@@ -110,3 +112,4 @@ pitch_scale = 1.12
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="locker_door_col" unique_id=2021367450]
 shape = SubResource("ConcavePolygonShape3D_kg4op")
+

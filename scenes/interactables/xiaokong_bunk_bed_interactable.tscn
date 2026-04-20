@@ -1,0 +1,18 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://components/xiaokong_ai_command_dispatcher_component.gd" id="1_dispatch"]
+[ext_resource type="Script" path="res://components/xiaokong_bunk_bed_interactable_component.gd" id="2_bunk"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_interact"]
+size = Vector3(1.7, 0.34, 2.7)
+
+[node name="XiaokongBunkBedInteractable" type="StaticBody3D" groups=["xiaokong_interactable"]]
+script = ExtResource("2_bunk")
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_interact")
+
+[node name="CommandDispatcher" type="Node" parent="."]
+script = ExtResource("1_dispatch")

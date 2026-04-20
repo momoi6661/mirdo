@@ -1,3 +1,4 @@
+@tool
 class_name SwingPushDoorComponent
 extends StaticBody3D
 
@@ -34,6 +35,10 @@ enum OpenDirectionMode {
 @export var open_sfx_player_path: NodePath = NodePath("OpenSfx3D")
 @export var close_sfx_player_path: NodePath = NodePath("CloseSfx3D")
 @export var sound_volume_db: float = -9.0
+
+@export_category("World Panel")
+@export var world_panel_title: String = "门"
+@export_multiline var world_panel_summary_text: String = ""
 
 var _door_node: Node3D
 var _base_rotation: Vector3 = Vector3.ZERO
@@ -82,6 +87,28 @@ func get_interaction_time() -> float:
 
 func get_prompt_text() -> String:
 	return "Close" if _is_open else "Open"
+
+func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldInteractionPanelModel:
+	var model := WorldInteractionPanelModel.new()
+	model.title = world_panel_title
+	model.summary_lines = PackedStringArray([
+		"状态 · " + ("已开启" if _is_open else "已关闭")
+	])
+	if not world_panel_summary_text.strip_edges().is_empty():
+		model.detail_text = world_panel_summary_text.strip_edges()
+	model.options.append(
+		WorldInteractionOption.create(
+			"toggle",
+			"关闭" if _is_open else "打开",
+			"切换门的开关状态。"
+		)
+	)
+	return model
+
+func execute_world_panel_option(option_id: String, _helper: Node, context: Dictionary, _completed_by_hold: bool, _hold_time: float) -> void:
+	if option_id != "toggle":
+		return
+	_toggle_door(context.get("player", null))
 
 func interact(player: Node) -> void:
 	_toggle_door(player)

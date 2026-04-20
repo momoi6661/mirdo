@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="XiaokongLadderLayoutResource" format=3 uid="uid://bfb52in242xih"]
+
+[ext_resource type="Script" uid="uid://cr278q4lkvtdq" path="res://scripts/xiaokong/resources/xiaokong_ladder_layer_resource.gd" id="1_rbevw"]
+[ext_resource type="Script" uid="uid://b0bscfwaraqvw" path="res://scripts/xiaokong/resources/xiaokong_ladder_layout_resource.gd" id="2_lef8n"]
+
+[sub_resource type="Resource" id="Resource_rbevw"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer00_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer00_Right_Mark3D")
+
+[sub_resource type="Resource" id="Resource_lef8n"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer01_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer01_Right_Mark3D")
+
+[sub_resource type="Resource" id="Resource_n6smv"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer02_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer02_Right_Mark3D")
+
+[sub_resource type="Resource" id="Resource_d5cx5"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer03_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer03_Right_Mark3D")
+
+[sub_resource type="Resource" id="Resource_gg7q3"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer04_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer04_Right_Mark3D")
+
+[sub_resource type="Resource" id="Resource_dxlpv"]
+script = ExtResource("1_rbevw")
+left_marker_path = NodePath("../LadderRungs/Layer05_Left_Mark3D")
+right_marker_path = NodePath("../LadderRungs/Layer05_Right_Mark3D")
+
+[resource]
+script = ExtResource("2_lef8n")
+bottom_entry_marker_path = NodePath("BottomEntry_Mark3D")
+bottom_attach_marker_path = NodePath("BottomAttach_Mark3D")
+bottom_exit_marker_path = NodePath("BottomExit_Mark3D")
+top_entry_marker_path = NodePath("TopEntry_Mark3D")
+top_attach_marker_path = NodePath("TopAttach_Mark3D")
+top_exit_marker_path = NodePath("TopExit_Mark3D")
+body_anchor_marker_path = NodePath("BodyAnchor_Mark3D")
+layers = Array[ExtResource("1_rbevw")]([SubResource("Resource_rbevw"), SubResource("Resource_lef8n"), SubResource("Resource_n6smv"), SubResource("Resource_d5cx5"), SubResource("Resource_gg7q3"), SubResource("Resource_dxlpv")])

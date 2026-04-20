@@ -1,3 +1,4 @@
+@tool
 extends Node
 class_name XiaokongSeatInteractableComponent
 
@@ -31,6 +32,10 @@ class_name XiaokongSeatInteractableComponent
 @export var dispatcher_path: NodePath = NodePath("CommandDispatcher")
 @export var marker_search_root_path: NodePath
 
+@export_category("World Panel")
+@export var world_panel_title: String = "椅子"
+@export_multiline var world_panel_summary_text: String = "安排小空在这里入座，或让她起身。"
+
 var _last_trigger_time_msec: int = -1000000
 var _highlight_meshes: Array[MeshInstance3D] = []
 var _original_mesh_overlays: Dictionary = {}
@@ -61,6 +66,28 @@ func get_prompt_text() -> String:
 	if trimmed.is_empty():
 		return ""
 	return trimmed
+
+func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldInteractionPanelModel:
+	var model := WorldInteractionPanelModel.new()
+	model.title = world_panel_title
+	if not world_panel_summary_text.strip_edges().is_empty():
+		model.summary_lines = PackedStringArray([world_panel_summary_text.strip_edges()])
+	var option_label := get_prompt_text().strip_edges()
+	if option_label.is_empty():
+		option_label = "交互"
+	model.options.append(
+		WorldInteractionOption.create(
+			"seat_toggle",
+			option_label,
+			"让小空执行当前座位交互。"
+		)
+	)
+	return model
+
+func execute_world_panel_option(option_id: String, _helper: Node, _context: Dictionary, _completed_by_hold: bool, _hold_time: float) -> void:
+	if option_id != "seat_toggle":
+		return
+	_trigger_command()
 
 func interact(_player: Node) -> void:
 	if not interaction_enabled:
@@ -149,6 +176,9 @@ func set_interaction_focused(focused: bool) -> void:
 		return
 	_focused = focused
 	_apply_focus_visual(focused)
+
+func set_world_panel_focused(focused: bool) -> void:
+	set_interaction_focused(focused)
 
 func _apply_focus_visual(focused: bool) -> void:
 	if not focus_highlight_enabled:

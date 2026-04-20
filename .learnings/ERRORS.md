@@ -1470,3 +1470,59 @@ Re-read the exact scene section before patching when the file may have drifted f
 - Related Files: D:\AAgodot\FPS\levels\level_bunker_render.tscn
 
 ---
+## [ERR-20260417-001] rg-exe-launch-failure
+
+**Logged**: 2026-04-17T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tooling
+
+### Summary
+Bundled g.exe could not start from Codex app path, so repo search needed a PowerShell fallback.
+
+### Error
+`
+Program 'rg.exe' failed to run ... with working directory 'D:\AAgodot\FPS'. 拒绝访问。
+`
+
+### Context
+- Command/operation attempted: g -n ...
+- Environment details: Codex desktop app on Windows, workspace D:\AAgodot\FPS
+
+### Suggested Fix
+Fallback to Select-String/Get-ChildItem when g launch returns access denied in this environment.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: .learnings/ERRORS.md
+
+---
+Cannot overwrite variable Error because it is read-only or constant.
+## [ERR-20260420-001] tool_compatibility
+
+**Logged**: 2026-04-20T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: infra
+
+### Summary
+当前 Codex Windows 环境里的 `rg.exe` 启动会被拒绝访问，且 Hastur full-class/递归脚本偶发内部执行错误。
+
+### Error
+```text
+rg.exe: 拒绝访问。
+Hastur execute: Internal script error! Opcode: 28 (please report).
+```
+
+### Context
+- 在 Windows Codex app 内尝试直接运行 `rg`
+- 在 Hastur 远程执行里用 full-class + 递归函数遍历节点树
+
+### Suggested Fix
+Windows 环境优先用 `Get-ChildItem | Select-String` 替代 `rg`；Hastur 远程执行优先使用顺序 snippet、避免不必要的递归/复杂类型标注。
+
+### Metadata
+- Reproducible: yes
+- Related Files: .learnings/ERRORS.md
+
+---

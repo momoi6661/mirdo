@@ -30,6 +30,7 @@ var _nav_turn_duration := 0.0
 var _nav_turn_action: StringName = &""
 var _nav_turn_started_anim := false
 var _turn_state_current_speed_rad := 0.0
+var _external_motion_lock := false
 
 @onready var _body: CharacterBody3D = _resolve_body()
 @onready var _animation: Node = get_node_or_null(animation_controller_path)
@@ -55,6 +56,16 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if _body == null:
+		return
+
+	if _external_motion_lock:
+		_desired_velocity = Vector3.ZERO
+		_desired_turn_amount = 0.0
+		_body.velocity = Vector3.ZERO
+		_cancel_navigation_turn(false)
+		_set_animation_turn(0.0)
+		_push_animation_motion(Vector3.ZERO)
+		_was_navigation_active = _navigation != null and _navigation.is_active()
 		return
 
 	var navigation_active := _navigation != null and _navigation.is_active()
@@ -123,6 +134,17 @@ func set_desired_motion(desired_velocity: Vector3, turn_amount: float) -> void:
 func clear_motion() -> void:
 	_desired_velocity = Vector3.ZERO
 	_desired_turn_amount = 0.0
+
+func set_external_motion_lock(enabled: bool) -> void:
+	_external_motion_lock = enabled
+	if not enabled:
+		return
+	clear_motion()
+	if _body != null:
+		_body.velocity = Vector3.ZERO
+
+func is_external_motion_locked() -> bool:
+	return _external_motion_lock
 
 func _on_motion_command(desired_velocity: Vector3, turn_amount: float) -> void:
 	set_desired_motion(desired_velocity, turn_amount)

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://dp3xsip8d64ax"]
+
+[ext_resource type="Texture2D" uid="uid://cud85xk8bg4ff" path="res://3DModel/cansoup/can-soup_0.jpg" id="1_bq181"]
+[ext_resource type="Script" uid="uid://fwdycesy23hk" path="res://scripts/xiaokong/resources/xiaokong_stat_modifier.gd" id="2_02k4i"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="3_g1nii"]
+
+[sub_resource type="Resource" id="Resource_5xh6h"]
+script = ExtResource("2_02k4i")
+hunger_delta = 25
+
+[resource]
+script = ExtResource("3_g1nii")
+ItemName = "罐头"
+Description = "一罐能直接食用的罐头。适合给小空补充饱食度。"
+Icon = ExtResource("1_bq181")
+ItemModelScenePath = "res://models/can_soup.tscn"
+MaxStackSize = 5
+consumable_effect = SubResource("Resource_5xh6h")
