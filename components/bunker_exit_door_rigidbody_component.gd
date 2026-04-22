@@ -4,36 +4,37 @@ extends RigidBody3D
 signal outside_requested
 
 @export var interaction_time: float = 1.2
-@export var prompt_text: String = "Hold E: Go Outside"
-@export var ui_group_name: StringName = &"outside_ui"
-@export var ui_method_name: StringName = &"open_outside_panel"
-@export var log_when_ui_missing: bool = true
+
+@export_category("World Panel")
+@export var world_panel_title: String = "外出大门"
+@export_multiline var world_panel_summary_text: String = "离开当前掩体。"
+@export var world_panel_option_label: String = "外出"
+@export_multiline var world_panel_option_description: String = "长按确认外出。"
 
 func _ready() -> void:
 	# Keep the bunker blast door as a fixed interactable door.
 	freeze = true
 
-func get_interaction_time() -> float:
-	return interaction_time
+func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldInteractionPanelModel:
+	var model := WorldInteractionPanelModel.new()
+	model.title = world_panel_title.strip_edges()
+	var summary_text: String = world_panel_summary_text.strip_edges()
+	if not summary_text.is_empty():
+		model.summary_lines = PackedStringArray([summary_text])
+	model.options.append(
+		WorldInteractionOption.create(
+			"go_outside",
+			world_panel_option_label.strip_edges() if not world_panel_option_label.strip_edges().is_empty() else "外出",
+			world_panel_option_description.strip_edges(),
+			WorldInteractionOption.TRIGGER_HOLD,
+			maxf(interaction_time, 0.05)
+		)
+	)
+	return model
 
-func get_prompt_text() -> String:
-	return prompt_text
-
-func interact(_player: Node) -> void:
-	_request_outside_ui()
-
-func short_interact(_player: Node) -> void:
-	# Long press only; short press does nothing.
-	pass
-
-func _request_outside_ui() -> void:
-	outside_requested.emit()
-
-	var tree := get_tree()
-	if tree == null:
+func execute_world_panel_option(option_id: String, _helper: Node, _context: Dictionary, completed_by_hold: bool, _hold_time: float) -> void:
+	if option_id != "go_outside":
 		return
-
-	if tree.has_group(ui_group_name):
-		tree.call_group(ui_group_name, ui_method_name)
-	elif log_when_ui_missing:
-		push_warning("Outside UI is not implemented yet. Requested method: " + str(ui_method_name))
+	if not completed_by_hold:
+		return
+	outside_requested.emit()

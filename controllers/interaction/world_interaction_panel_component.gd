@@ -6,17 +6,21 @@ const SUBTITLE_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
 const SUBTITLE_LINE_SCENE: PackedScene = preload("res://controllers/interaction/world_interaction_panel_line.tscn")
 const PINK_SUBTITLE_OUTLINE: Color = Color(0.92, 0.24, 0.60, 1.0)
 const PINK_SUBTITLE_OUTLINE_STRONG: Color = Color(0.98, 0.20, 0.58, 1.0)
-const PINK_SUBTITLE_BACK: Color = Color(1.0, 0.76, 0.90, 1.0)
-const PINK_SUBTITLE_BACK_STRONG: Color = Color(1.0, 0.81, 0.93, 1.0)
+const PINK_SUBTITLE_BACK: Color = Color(0.70, 0.24, 0.50, 0.88)
+const PINK_SUBTITLE_BACK_STRONG: Color = Color(0.80, 0.18, 0.50, 0.95)
 const PINK_SUBTITLE_DISABLED_OUTLINE: Color = Color(0.76, 0.54, 0.67, 1.0)
-const PINK_SUBTITLE_DISABLED_BACK: Color = Color(0.90, 0.79, 0.85, 1.0)
+const PINK_SUBTITLE_DISABLED_BACK: Color = Color(0.54, 0.38, 0.47, 0.72)
+const BACK_LAYER_RENDER_PRIORITY := 60
+const BACK_LAYER_OUTLINE_PRIORITY := 59
+const FRONT_LAYER_RENDER_PRIORITY := 70
+const FRONT_LAYER_OUTLINE_PRIORITY := 69
+const MIN_BACK_LAYER_SCALE := 1.018
 
 @export_category("Display")
 @export_range(0.0002, 0.01, 0.0001) var pixel_size: float = 0.001
 @export var y_only_rotation: bool = true
 @export_range(0.0, 30.0, 0.1) var rotation_follow_smooth_speed: float = 10.0
 @export_range(0.0, 0.05, 0.001) var rotation_follow_snap_epsilon: float = 0.008
-@export_range(0.0, 0.2, 0.005) var layer_depth_offset: float = 0.001
 @export_range(0.0, 0.4, 0.005) var fade_lift_distance: float = 0.05
 @export_range(0.8, 1.6, 0.01) var hidden_scale_multiplier: float = 1.12
 @export var subtitle_font: FontFile = SUBTITLE_FONT
@@ -53,14 +57,14 @@ var _preview_alpha_internal: float = 0.0
 @export_range(120, 1200, 10) var option_column_label_width: float = 260.0
 
 @export_category("Typography")
-@export_range(24, 220, 1) var title_font_size: int = 76
-@export_range(24, 220, 1) var summary_font_size: int = 48
-@export_range(24, 220, 1) var option_font_size: int = 52
-@export_range(24, 220, 1) var detail_font_size: int = 42
-@export_range(24, 220, 1) var hint_font_size: int = 34
-@export_range(0.05, 0.4, 0.005) var subtitle_outline_ratio: float = 0.2
+@export_range(24, 220, 1) var title_font_size: int = 96
+@export_range(24, 220, 1) var summary_font_size: int = 62
+@export_range(24, 220, 1) var option_font_size: int = 68
+@export_range(24, 220, 1) var detail_font_size: int = 54
+@export_range(24, 220, 1) var hint_font_size: int = 44
+@export_range(0.05, 0.4, 0.005) var subtitle_outline_ratio: float = 0.17
 @export_range(0.0, 0.08, 0.005) var selected_outline_ratio_bonus: float = 0.0
-@export_range(1, 24, 1) var subtitle_outline_min_size: int = 5
+@export_range(1, 24, 1) var subtitle_outline_min_size: int = 4
 @export_range(0, 12, 1) var back_outline_extra_size: int = 0
 @export_range(8, 64, 1) var title_wrap_chars: int = 10
 @export_range(8, 64, 1) var summary_wrap_chars: int = 14
@@ -96,6 +100,7 @@ func _ready() -> void:
 	_ensure_runtime()
 	_capture_initial_transforms()
 	top_level = true
+	process_priority = 10
 	_animation_player = get_node_or_null(animation_player_path) as AnimationPlayer
 	if _animation_player != null and not _animation_player.animation_finished.is_connected(_on_animation_finished):
 		_animation_player.animation_finished.connect(_on_animation_finished)
@@ -205,14 +210,11 @@ func _clear_lines() -> void:
 	for pair in _line_pairs:
 		var pair_root := pair.get("root", null) as Node3D
 		var front := pair.get("front", null) as Node3D
-		var back := pair.get("back", null) as Node3D
 		if pair_root != null and is_instance_valid(pair_root):
 			pair_root.queue_free()
 			continue
 		if front != null and is_instance_valid(front):
 			front.queue_free()
-		if back != null and is_instance_valid(back):
-			back.queue_free()
 	_line_pairs.clear()
 	_last_render_signature = ""
 
@@ -341,6 +343,8 @@ func _estimate_line_height(font_size: int, category: String) -> float:
 	return maxf(height, maxf(min_spacing, 0.045))
 
 func _build_option_display_text(label_text: String, _selected: bool) -> String:
+	if _selected:
+		return "◆ " + label_text
 	return label_text
 
 func _build_render_signature(model: WorldInteractionPanelModel) -> String:
@@ -428,35 +432,53 @@ func _create_line_pair(parent_root: Node3D, spec: Dictionary, cursor_y: float) -
 	var horizontal_alignment := _get_alignment_for_category(category)
 	var label_width := _get_label_width_for_category(category)
 	var subtitle_outline_size := _get_subtitle_outline_size(font_size, category)
-	var back_outline_size := subtitle_outline_size + back_outline_extra_size
+	var back_outline_size: int = maxi(0, back_outline_extra_size)
 
-	_configure_subtitle_line_label(front, text, font_size, horizontal_alignment, label_width, 32, 32)
-	_configure_subtitle_line_label(back, text, font_size, horizontal_alignment, label_width, 24, 24)
-	front.outline_size = subtitle_outline_size
+	_configure_subtitle_line_label(
+		back,
+		text,
+		font_size,
+		horizontal_alignment,
+		label_width,
+		BACK_LAYER_RENDER_PRIORITY,
+		BACK_LAYER_OUTLINE_PRIORITY
+	)
+	_configure_subtitle_line_label(
+		front,
+		text,
+		font_size,
+		horizontal_alignment,
+		label_width,
+		FRONT_LAYER_RENDER_PRIORITY,
+		FRONT_LAYER_OUTLINE_PRIORITY
+	)
+
 	back.outline_size = back_outline_size
+	front.outline_size = subtitle_outline_size
 
 	parent_root.add_child(pair_root)
 
 	var base_position := Vector3(0.0, cursor_y, 0.0)
 	pair_root.position = base_position
+	back.position = Vector3.ZERO
 	front.position = Vector3.ZERO
-	back.position = Vector3(0.0, 0.0, -layer_depth_offset)
-	front.modulate = Color(colors["front"])
-	front.outline_modulate = Color(colors["front_outline"])
 	back.modulate = Color(colors["back"])
 	back.outline_modulate = Color(colors["back_outline"])
+	front.modulate = Color(colors["front"])
+	front.outline_modulate = Color(colors["front_outline"])
 
 	return {
 		"root": pair_root,
-		"front": front,
 		"back": back,
+		"front": front,
 		"base_position": base_position,
-		"front_color": Color(colors["front"]),
-		"front_outline": Color(colors["front_outline"]),
 		"back_color": Color(colors["back"]),
 		"back_outline": Color(colors["back_outline"]),
-		"front_outline_size": subtitle_outline_size,
 		"back_outline_size": back_outline_size,
+		"back_scale": float(colors.get("back_scale", MIN_BACK_LAYER_SCALE)),
+		"front_color": Color(colors["front"]),
+		"front_outline": Color(colors["front_outline"]),
+		"front_outline_size": subtitle_outline_size,
 		"emphasis": float(colors.get("emphasis", 1.0)),
 		"category": category,
 	}
@@ -513,13 +535,16 @@ func _make_palette(
 	back_scale: float = 1.0,
 	back_fill: Color = Color(fill.r, fill.g, fill.b, 0.0)
 ) -> Dictionary:
+	var resolved_back_fill := back_fill
+	if resolved_back_fill.a <= 0.001:
+		resolved_back_fill = outer_outline
 	return {
 		"front": fill,
 		"front_outline": inner_outline,
-		"back": back_fill,
+		"back": resolved_back_fill,
 		"back_outline": outer_outline,
 		"emphasis": emphasis,
-		"back_scale": back_scale,
+		"back_scale": maxf(back_scale, MIN_BACK_LAYER_SCALE),
 	}
 
 func _white_fill(alpha: float = 1.0) -> Color:
@@ -533,8 +558,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE_STRONG,
 				PINK_SUBTITLE_BACK_STRONG,
 				1.04,
-				1.0,
-				PINK_SUBTITLE_BACK_STRONG
+				1.028
 			)
 		"summary":
 			return _make_palette(
@@ -542,8 +566,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE,
 				PINK_SUBTITLE_BACK,
 				1.0,
-				1.0,
-				PINK_SUBTITLE_BACK
+				1.022
 			)
 		"option_selected":
 			return _make_palette(
@@ -551,8 +574,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE_STRONG,
 				PINK_SUBTITLE_BACK_STRONG,
 				1.05,
-				1.0,
-				PINK_SUBTITLE_BACK_STRONG
+				1.03
 			)
 		"option_disabled_selected":
 			return _make_palette(
@@ -560,8 +582,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.88),
 				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.88),
 				1.02,
-				1.0,
-				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.88)
+				1.022
 			)
 		"option_disabled":
 			return _make_palette(
@@ -569,8 +590,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.84),
 				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.84),
 				1.0,
-				1.0,
-				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.84)
+				1.02
 			)
 		"detail_emphasis":
 			return _make_palette(
@@ -578,8 +598,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE_STRONG,
 				PINK_SUBTITLE_BACK_STRONG,
 				1.03,
-				1.0,
-				PINK_SUBTITLE_BACK_STRONG
+				1.026
 			)
 		"detail_warning":
 			return _make_palette(
@@ -587,8 +606,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE_STRONG,
 				PINK_SUBTITLE_BACK_STRONG,
 				1.0,
-				1.0,
-				PINK_SUBTITLE_BACK_STRONG
+				1.024
 			)
 		"hint":
 			return _make_palette(
@@ -596,8 +614,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE,
 				PINK_SUBTITLE_BACK,
 				1.0,
-				1.0,
-				PINK_SUBTITLE_BACK
+				1.02
 			)
 		_:
 			return _make_palette(
@@ -605,8 +622,7 @@ func _get_section_colors(category: String) -> Dictionary:
 				PINK_SUBTITLE_OUTLINE,
 				PINK_SUBTITLE_BACK,
 				1.0,
-				1.0,
-				PINK_SUBTITLE_BACK
+				1.022
 			)
 
 func _play_show_animation() -> void:
@@ -648,9 +664,9 @@ func _apply_line_visual_state() -> void:
 
 	for pair in _line_pairs:
 		var pair_root := pair.get("root", null) as Node3D
-		var front := pair.get("front", null) as Label3D
 		var back := pair.get("back", null) as Label3D
-		if pair_root == null or front == null or back == null:
+		var front := pair.get("front", null) as Label3D
+		if pair_root == null or back == null or front == null:
 			continue
 
 		var base_position := pair.get("base_position", Vector3.ZERO) as Vector3
@@ -667,26 +683,27 @@ func _apply_line_visual_state() -> void:
 
 		pair_root.position = base_position + Vector3(0.0, lift + selected_lift, 0.0)
 		pair_root.scale = line_scale * selected_scale
-		front.position = Vector3.ZERO
-		back.position = Vector3(0.0, 0.0, -layer_depth_offset)
-		front.scale = Vector3.ONE
-		back.scale = Vector3.ONE
-		front.outline_size = int(pair.get("front_outline_size", front.outline_size))
+		back.position = Vector3.ZERO
+		back.scale = Vector3.ONE * float(pair.get("back_scale", MIN_BACK_LAYER_SCALE))
 		back.outline_size = int(pair.get("back_outline_size", back.outline_size))
+		front.position = Vector3.ZERO
+		front.scale = Vector3.ONE
+		front.outline_size = int(pair.get("front_outline_size", front.outline_size))
 
-		var front_color := pair.get("front_color", Color.WHITE) as Color
-		var front_outline := pair.get("front_outline", Color.BLACK) as Color
 		var back_color := pair.get("back_color", Color.WHITE) as Color
 		var back_outline := pair.get("back_outline", Color.BLACK) as Color
+		var front_color := pair.get("front_color", Color.WHITE) as Color
+		var front_outline := pair.get("front_outline", Color.BLACK) as Color
 		if selected_pulse > 0.0:
+			back_color = back_color.lerp(Color(1.0, 0.86, 0.93, back_color.a), 0.12 * selected_pulse)
+			back_outline = back_outline.lerp(Color(1.0, 0.30, 0.68, back_outline.a), 0.18 * selected_pulse)
 			front_color = front_color.lerp(Color(1.0, 1.0, 1.0, front_color.a), 0.18 * selected_pulse)
 			front_outline = front_outline.lerp(Color(1.0, 0.26, 0.66, front_outline.a), 0.16 * selected_pulse)
-			back_outline = back_outline.lerp(Color(1.0, 0.86, 0.95, back_outline.a), 0.14 * selected_pulse)
 
-		front.modulate = _with_alpha(front_color, alpha)
-		front.outline_modulate = _with_alpha(front_outline, alpha)
 		back.modulate = _with_alpha(back_color, alpha)
 		back.outline_modulate = _with_alpha(back_outline, alpha)
+		front.modulate = _with_alpha(front_color, alpha)
+		front.outline_modulate = _with_alpha(front_outline, alpha)
 
 func _with_alpha(color: Color, alpha: float) -> Color:
 	return Color(color.r, color.g, color.b, color.a * alpha)
@@ -698,9 +715,11 @@ func _update_world_transform(delta: float) -> void:
 	var anchor_node := _resolve_display_anchor()
 	var has_anchor_basis := false
 	var anchor_basis := Basis.IDENTITY
+	var anchor_is_camera_owned := false
 	if anchor_node != null and anchor_node != self and is_instance_valid(anchor_node):
 		has_anchor_basis = true
 		anchor_basis = anchor_node.global_basis
+		anchor_is_camera_owned = _is_camera_owned_anchor(anchor_node)
 		global_position = anchor_node.global_position + _local_offset
 	else:
 		global_position = _local_offset
@@ -713,15 +732,29 @@ func _update_world_transform(delta: float) -> void:
 		if _camera == null:
 			return
 
-		_pivot.look_at(_camera.global_position, Vector3.UP, true)
+		var target_position := _camera.global_position
 		if y_only_rotation:
-			_pivot.rotation = Vector3(0.0, _pivot.rotation.y, 0.0)
+			target_position.y = _pivot.global_position.y
+		if target_position.distance_squared_to(_pivot.global_position) <= 0.00001:
+			return
+
+		var current_basis := _pivot.global_basis.orthonormalized()
+		_pivot.look_at(target_position, Vector3.UP, true)
+		var target_basis := _pivot.global_basis.orthonormalized()
+		var weight := clampf(delta * rotation_follow_smooth_speed, 0.0, 1.0)
+		if weight >= 0.999:
+			_pivot.global_basis = target_basis
+		else:
+			_pivot.global_basis = current_basis.slerp(target_basis, weight).orthonormalized()
 		return
 
 	if has_anchor_basis:
 		if y_only_rotation:
 			var target_yaw := _get_horizontal_yaw_from_basis(anchor_basis)
-			if not _horizontal_yaw_initialized:
+			if anchor_is_camera_owned:
+				_smoothed_horizontal_yaw = target_yaw
+				_horizontal_yaw_initialized = true
+			elif not _horizontal_yaw_initialized:
 				_smoothed_horizontal_yaw = target_yaw
 				_horizontal_yaw_initialized = true
 			else:
@@ -747,3 +780,10 @@ func _get_horizontal_yaw_from_basis(anchor_basis: Basis) -> float:
 	forward = forward.normalized()
 	var horizontal_basis := Basis.looking_at(forward, Vector3.UP)
 	return horizontal_basis.get_euler().y
+
+func _is_camera_owned_anchor(anchor_node: Node3D) -> bool:
+	if anchor_node == null:
+		return false
+	if _camera == null or not is_instance_valid(_camera):
+		return false
+	return anchor_node == _camera or _camera.is_ancestor_of(anchor_node)
