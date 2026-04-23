@@ -2,10 +2,12 @@ class_name PlayerInteractionComponent
 extends Node
 
 const WorldPanelContract := preload("res://controllers/interaction/world_panel_provider_contract.gd")
+const MODE_NONE: StringName = &""
+const MODE_WORLD: StringName = &"world"
+const MODE_LEGACY_WORLD: StringName = &"legacy_world"
 
 @export_category("References")
 @export var interaction_ray: RayCast3D
-@export var interaction_hud: Control
 
 @export_category("World Panel")
 @export var world_panel_path: NodePath
@@ -22,9 +24,12 @@ const WorldPanelContract := preload("res://controllers/interaction/world_panel_p
 @export_range(0.1, 3.0, 0.05) var fallback_interactable_max_distance: float = 0.6
 @export_range(0, 8, 1) var world_interactable_descendant_search_depth: int = 4
 @export_range(0, 8, 1) var world_interactable_parent_search_depth: int = 6
+@export_range(0, 3, 1) var world_interactable_sibling_scan_parent_levels: int = 1
+@export_range(1, 64, 1) var world_interactable_sibling_scan_max_children: int = 12
+@export_range(0.2, 6.0, 0.1) var world_interactable_sibling_scan_max_distance: float = 2.4
 
 var current_interactable: Node = null
-var current_interaction_mode: StringName = &""
+var current_interaction_mode: StringName = MODE_NONE
 var is_interacting: bool = false
 var interact_timer: float = 0.0
 var _last_interact_pressed: bool = false
@@ -35,6 +40,7 @@ var _world_panel_model: WorldInteractionPanelModel
 var _world_panel_refresh_elapsed: float = 0.0
 var _world_panel_selected_option_id: String = ""
 var _world_panel_hold_executed: bool = false
+var _ignored_held_collision: CollisionObject3D = null
 
 func _ready() -> void:
 	set_process_unhandled_input(true)
@@ -42,26 +48,27 @@ func _ready() -> void:
 	_world_panel_anchor = get_node_or_null(world_panel_anchor_path) as Node3D
 
 func _physics_process(delta: float) -> void:
-	var input_state := _poll_interact_input_state()
-	if not interaction_ray:
+	var input_state: Dictionary = _poll_interact_input_state()
+	if interaction_ray == null:
 		return
+	_sync_held_object_exception()
 
 	if _is_inventory_open():
 		_clear_target()
 		return
 
-	if _is_holding_object() or not interaction_ray.is_colliding():
+	if not interaction_ray.is_colliding():
 		_clear_target()
 		return
 
-	var collider := interaction_ray.get_collider() as Node
+	var collider: Node = interaction_ray.get_collider() as Node
 	if collider == null:
 		_clear_target()
 		return
 
-	var target_info := _resolve_interaction_target(collider, interaction_ray.get_collision_point())
-	var next_interactable: Node = target_info.get("target", null)
-	var next_mode: StringName = target_info.get("mode", &"")
+	var target_info: Dictionary = _resolve_interaction_target(collider, interaction_ray.get_collision_point())
+	var next_interactable: Node = target_info.get("target", null) as Node
+	var next_mode: StringName = StringName(target_info.get("mode", MODE_NONE))
 
 	if next_interactable != current_interactable or next_mode != current_interaction_mode:
 		_clear_target()
@@ -73,29 +80,35 @@ func _physics_process(delta: float) -> void:
 	if current_interactable == null:
 		return
 
-	if current_interaction_mode == &"world":
+	if _is_world_mode(current_interaction_mode):
 		_handle_world_interaction(delta, input_state)
-		_world_panel_refresh_elapsed += delta
-		if _world_panel_refresh_elapsed >= world_panel_refresh_interval_sec:
-			_world_panel_refresh_elapsed = 0.0
-			_refresh_world_panel()
+		var should_refresh_model: bool = true
+		if is_interacting:
+			var refreshing_option: WorldInteractionOption = _get_selected_world_option()
+			if refreshing_option != null and refreshing_option.supports_hold():
+				should_refresh_model = false
+		if should_refresh_model:
+			_world_panel_refresh_elapsed += delta
+			if _world_panel_refresh_elapsed >= world_panel_refresh_interval_sec:
+				_world_panel_refresh_elapsed = 0.0
+				_refresh_world_panel()
 		return
 
-	_handle_legacy_interaction(delta, input_state)
+	_clear_target()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if current_interaction_mode != &"world" or current_interactable == null:
+	if not _is_world_mode(current_interaction_mode) or current_interactable == null:
 		return
-	if _is_inventory_open() or _is_holding_object():
+	if _is_inventory_open():
 		return
 	if event is not InputEventMouseButton:
 		return
 
-	var mouse_event := event as InputEventMouseButton
+	var mouse_event: InputEventMouseButton = event as InputEventMouseButton
 	if not mouse_event.pressed:
 		return
 
-	var step := 0
+	var step: int = 0
 	if mouse_event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		step = -1
 	elif mouse_event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -107,47 +120,94 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _resolve_interaction_target(collider: Node, hit_position: Vector3) -> Dictionary:
-	var legacy_target: Node = _get_legacy_interactable(collider)
-	if _should_prefer_legacy_target(legacy_target):
-		return {"target": legacy_target, "mode": StringName(&"legacy")}
-
 	var world_target: Node = _get_world_interactable(collider)
-	if world_target != null:
-		return {"target": world_target, "mode": StringName(&"world")}
+	if world_target != null and not _is_target_held_object(world_target):
+		return {"target": world_target, "mode": MODE_WORLD}
 
-	if legacy_target != null:
-		return {"target": legacy_target, "mode": StringName(&"legacy")}
+	var legacy_target: Node = _get_legacy_interactable(collider)
+	if legacy_target != null and not _is_target_held_object(legacy_target):
+		return {"target": legacy_target, "mode": MODE_LEGACY_WORLD}
 
 	if fallback_group_search_enabled:
-		return _find_nearby_group_target(hit_position)
+		var fallback_info: Dictionary = _find_nearby_group_target(hit_position)
+		var fallback_target: Node = fallback_info.get("target", null) as Node
+		if fallback_target != null and _is_target_held_object(fallback_target):
+			return {"target": null, "mode": MODE_NONE}
+		return fallback_info
 
-	return {"target": null, "mode": StringName(&"")}
+	return {"target": null, "mode": MODE_NONE}
 
 func _get_legacy_interactable(node: Node) -> Node:
 	var current: Node = node
 	while current != null:
-		if current.has_method("interact") and current.has_method("get_interaction_time"):
-			if _is_interaction_enabled(current):
+		if _is_interaction_enabled(current):
+			var has_interact: bool = current.has_method("interact")
+			var has_short: bool = current.has_method("short_interact")
+			var has_timing: bool = current.has_method("get_interaction_time")
+			if has_interact and (has_timing or has_short or _is_pickable_legacy_target(current)):
 				return current
-		for child in current.get_children():
-			var child_node := child as Node
-			if child_node == null:
-				continue
-			if child_node.has_method("interact") and child_node.has_method("get_interaction_time"):
-				if _is_interaction_enabled(child_node):
-					return child_node
 		current = current.get_parent()
 	return null
 
 func _get_world_interactable(node: Node) -> Node:
-	var current: Node = node
-	var depth := 0
+	if node == null or not is_instance_valid(node):
+		return null
+
+	var branch_candidate: Node = _find_world_interactable_recursive(node, world_interactable_descendant_search_depth)
+	if branch_candidate != null:
+		return branch_candidate
+
+	var current: Node = node.get_parent()
+	var source_branch: Node = node
+	var depth: int = 0
+	var sibling_max_distance_sq: float = world_interactable_sibling_scan_max_distance * world_interactable_sibling_scan_max_distance
 	while current != null and depth <= world_interactable_parent_search_depth:
-		var candidate: Node = _find_world_interactable_recursive(current, world_interactable_descendant_search_depth)
-		if candidate != null:
-			return candidate
+		if _is_world_interactable_candidate(current):
+			return current
+
+		if depth <= world_interactable_sibling_scan_parent_levels and current.get_child_count() <= world_interactable_sibling_scan_max_children:
+			var sibling_candidate: Node = _find_world_interactable_sibling(current, source_branch, sibling_max_distance_sq)
+			if sibling_candidate != null:
+				return sibling_candidate
+
+		source_branch = current
 		current = current.get_parent()
 		depth += 1
+	return null
+
+func _find_world_interactable_sibling(parent: Node, source_node: Node, max_distance_sq: float) -> Node:
+	if parent == null or not is_instance_valid(parent):
+		return null
+
+	var source_anchor: Node3D = _get_nearest_node3d(source_node)
+	for child in parent.get_children():
+		var child_node: Node = child as Node
+		if child_node == null or not is_instance_valid(child_node):
+			continue
+		if source_node != null and (child_node == source_node or child_node.is_ancestor_of(source_node)):
+			continue
+
+		var candidate: Node = _find_world_interactable_recursive(child_node, world_interactable_descendant_search_depth)
+		if candidate == null:
+			continue
+
+		if source_anchor != null and max_distance_sq > 0.0:
+			var candidate_anchor: Node3D = _get_nearest_node3d(candidate)
+			if candidate_anchor != null:
+				var dist_sq: float = source_anchor.global_position.distance_squared_to(candidate_anchor.global_position)
+				if dist_sq > max_distance_sq:
+					continue
+
+		return candidate
+
+	return null
+
+func _get_nearest_node3d(node: Node) -> Node3D:
+	var current: Node = node
+	while current != null:
+		if current is Node3D:
+			return current as Node3D
+		current = current.get_parent()
 	return null
 
 func _find_world_interactable_recursive(node: Node, remaining_depth: int) -> Node:
@@ -158,7 +218,7 @@ func _find_world_interactable_recursive(node: Node, remaining_depth: int) -> Nod
 	if remaining_depth <= 0:
 		return null
 	for child in node.get_children():
-		var child_node := child as Node
+		var child_node: Node = child as Node
 		if child_node == null:
 			continue
 		var nested: Node = _find_world_interactable_recursive(child_node, remaining_depth - 1)
@@ -169,25 +229,28 @@ func _find_world_interactable_recursive(node: Node, remaining_depth: int) -> Nod
 func _find_nearby_group_target(hit_position: Vector3) -> Dictionary:
 	var tree: SceneTree = get_tree()
 	if tree == null:
-		return {"target": null, "mode": StringName(&"")}
+		return {"target": null, "mode": MODE_NONE}
 
 	var max_dist_sq: float = fallback_interactable_max_distance * fallback_interactable_max_distance
 	var best_dist_sq: float = INF
 	var best: Node = null
-	var best_mode: StringName = &""
+	var best_mode: StringName = MODE_NONE
 
 	for group_name in fallback_interactable_groups:
 		if String(group_name).strip_edges().is_empty():
 			continue
 		var nodes: Array = tree.get_nodes_in_group(group_name)
 		for entry in nodes:
-			var node3d := entry as Node3D
+			var node3d: Node3D = entry as Node3D
 			if node3d == null or not is_instance_valid(node3d):
 				continue
 
-			var candidate_info := _resolve_group_node_target(node3d)
-			var candidate: Node = candidate_info.get("target", null)
+			var candidate_info: Dictionary = _resolve_group_node_target(node3d)
+			var candidate: Node = candidate_info.get("target", null) as Node
 			if candidate == null:
+				continue
+			var candidate_mode: StringName = StringName(candidate_info.get("mode", MODE_NONE))
+			if candidate_mode != MODE_WORLD:
 				continue
 
 			var dist_sq: float = node3d.global_position.distance_squared_to(hit_position)
@@ -195,48 +258,35 @@ func _find_nearby_group_target(hit_position: Vector3) -> Dictionary:
 				continue
 			best_dist_sq = dist_sq
 			best = candidate
-			best_mode = candidate_info.get("mode", &"")
+			best_mode = candidate_mode
 
 	return {"target": best, "mode": best_mode}
 
 func _resolve_group_node_target(node: Node) -> Dictionary:
 	var legacy_target: Node = _get_legacy_interactable(node)
 	if _should_prefer_legacy_target(legacy_target):
-		return {"target": legacy_target, "mode": StringName(&"legacy")}
+		return {"target": legacy_target, "mode": MODE_LEGACY_WORLD}
 
 	var world_target: Node = _get_world_interactable(node)
 	if world_target != null:
-		return {"target": world_target, "mode": StringName(&"world")}
+		return {"target": world_target, "mode": MODE_WORLD}
 	if legacy_target != null:
-		return {"target": legacy_target, "mode": StringName(&"legacy")}
-	return {"target": null, "mode": StringName(&"")}
+		return {"target": legacy_target, "mode": MODE_LEGACY_WORLD}
+	return {"target": null, "mode": MODE_NONE}
 
 func _focus_current_target() -> void:
 	if current_interactable == null or not is_instance_valid(current_interactable):
 		return
-	if current_interaction_mode == &"world":
-		if interaction_hud != null:
-			if interaction_hud.has_method("hide_prompt"):
-				interaction_hud.hide_prompt()
-			if interaction_hud.has_method("update_progress"):
-				interaction_hud.update_progress(0.0)
-		is_interacting = false
-		interact_timer = 0.0
-		_world_panel_hold_executed = false
-		_world_panel_refresh_elapsed = 0.0
-		_call_world_focus(true)
-		_refresh_world_panel()
+	if not _is_world_mode(current_interaction_mode):
 		return
 
-	_set_interactable_focus(current_interactable, true)
-	var prompt_text := "交互"
-	if current_interactable.has_method("get_prompt_text"):
-		prompt_text = current_interactable.get_prompt_text()
-	var trimmed_prompt: String = String(prompt_text).strip_edges()
-	if trimmed_prompt.is_empty():
-		trimmed_prompt = "交互"
-	if interaction_hud != null and interaction_hud.has_method("show_prompt"):
-		interaction_hud.show_prompt("[E] " + trimmed_prompt)
+	is_interacting = false
+	interact_timer = 0.0
+	_world_panel_hold_executed = false
+	_world_panel_refresh_elapsed = 0.0
+	_world_panel_selected_option_id = ""
+	_call_world_focus(true)
+	_refresh_world_panel()
 
 func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 	if current_interactable == null or not is_instance_valid(current_interactable):
@@ -245,7 +295,7 @@ func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 		_refresh_world_panel()
 
 	var is_pressing: bool = bool(input_state.get("pressed", false))
-	var option := _get_selected_world_option()
+	var option: WorldInteractionOption = _get_selected_world_option()
 	if is_pressing:
 		if not is_interacting:
 			is_interacting = true
@@ -254,7 +304,7 @@ func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 		interact_timer += delta
 
 		if option != null and option.enabled and option.supports_hold():
-			var hold_duration := option.get_safe_hold_duration(world_panel_default_hold_duration_sec)
+			var hold_duration: float = option.get_safe_hold_duration(world_panel_default_hold_duration_sec)
 			if _world_panel_model != null:
 				_world_panel_model.hold_progress = clampf(interact_timer / hold_duration, 0.0, 1.0)
 				_push_world_panel_model()
@@ -271,8 +321,8 @@ func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 	if not is_interacting:
 		return
 
-	var hold_time := interact_timer
-	var should_execute_tap := option != null and option.enabled and not _world_panel_hold_executed and option.supports_tap()
+	var hold_time: float = interact_timer
+	var should_execute_tap: bool = option != null and option.enabled and not _world_panel_hold_executed and option.supports_tap()
 	is_interacting = false
 	interact_timer = 0.0
 	_world_panel_hold_executed = false
@@ -284,81 +334,35 @@ func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 	if should_execute_tap:
 		_execute_world_panel_option(false, hold_time)
 
-func _handle_legacy_interaction(delta: float, input_state: Dictionary) -> void:
-	var req_time := 0.0
-	if current_interactable.has_method("get_interaction_time"):
-		req_time = maxf(float(current_interactable.get_interaction_time()), 0.0)
-
-	var is_pressing: bool = bool(input_state.get("pressed", false))
-	if is_pressing:
-		if not is_interacting:
-			is_interacting = true
-			interact_timer = 0.0
-		interact_timer += delta
-		if interaction_hud != null and interaction_hud.has_method("update_progress") and req_time > 0.0:
-			interaction_hud.update_progress(interact_timer / req_time)
-		if req_time > 0.0 and interact_timer >= req_time:
-			if current_interactable.has_method("interact"):
-				current_interactable.interact(Global.player)
-			_clear_target()
-		return
-
-	if not is_interacting:
-		return
-
-	if interact_timer > 0.0 and interact_timer < req_time:
-		if current_interactable.has_method("short_interact"):
-			current_interactable.short_interact(Global.player)
-	elif req_time <= 0.0:
-		if current_interactable.has_method("interact"):
-			current_interactable.interact(Global.player)
-
-	is_interacting = false
-	interact_timer = 0.0
-	if interaction_hud != null and interaction_hud.has_method("update_progress"):
-		interaction_hud.update_progress(0.0)
-
 func _clear_target() -> void:
-	if current_interactable != null and is_instance_valid(current_interactable):
-		if current_interaction_mode == &"world":
-			_call_world_focus(false)
-			_hide_world_panel()
-		else:
-			_set_interactable_focus(current_interactable, false)
+	if current_interactable != null and is_instance_valid(current_interactable) and _is_world_mode(current_interaction_mode):
+		_call_world_focus(false)
+		_hide_world_panel()
+
 	is_interacting = false
 	interact_timer = 0.0
 	_world_panel_hold_executed = false
 	_world_panel_refresh_elapsed = 0.0
 	current_interactable = null
-	current_interaction_mode = &""
-	if interaction_hud != null:
-		if interaction_hud.has_method("hide_prompt"):
-			interaction_hud.hide_prompt()
-		if interaction_hud.has_method("update_progress"):
-			interaction_hud.update_progress(0.0)
-
-func _set_interactable_focus(interactable: Node, focused: bool) -> void:
-	if interactable == null:
-		return
-	if not interactable.has_method("set_interaction_focused"):
-		return
-	interactable.call("set_interaction_focused", focused)
+	current_interaction_mode = MODE_NONE
 
 func _refresh_world_panel() -> void:
-	if current_interaction_mode != &"world":
+	if not _is_world_mode(current_interaction_mode):
 		return
 	if current_interactable == null or not is_instance_valid(current_interactable):
 		_hide_world_panel()
 		return
-	if not current_interactable.has_method(WorldPanelContract.METHOD_BUILD_MODEL):
-		_hide_world_panel()
-		return
 
-	var model_variant: Variant = current_interactable.call(
-		WorldPanelContract.METHOD_BUILD_MODEL,
-		self,
-		_build_interaction_context()
-	)
+	var model_variant: Variant = null
+	if current_interactable.has_method(WorldPanelContract.METHOD_BUILD_MODEL):
+		model_variant = current_interactable.call(
+			WorldPanelContract.METHOD_BUILD_MODEL,
+			self,
+			_build_interaction_context()
+		)
+	elif current_interaction_mode == MODE_LEGACY_WORLD:
+		model_variant = _build_legacy_world_panel_model(current_interactable)
+
 	if model_variant is not WorldInteractionPanelModel:
 		_hide_world_panel()
 		return
@@ -370,7 +374,7 @@ func _refresh_world_panel() -> void:
 func _push_world_panel_model() -> void:
 	if _world_panel_model == null:
 		return
-	var panel := _resolve_world_panel()
+	var panel: WorldInteractionPanelComponent = _resolve_world_panel()
 	if panel == null:
 		return
 	panel.set_display_context(
@@ -383,7 +387,7 @@ func _push_world_panel_model() -> void:
 
 func _hide_world_panel() -> void:
 	_world_panel_model = null
-	var panel := _resolve_world_panel()
+	var panel: WorldInteractionPanelComponent = _resolve_world_panel()
 	if panel == null:
 		return
 	if panel.has_method("hide_panel"):
@@ -401,13 +405,13 @@ func _resolve_world_panel_anchor() -> Node3D:
 	_world_panel_anchor = get_node_or_null(world_panel_anchor_path) as Node3D
 	if _world_panel_anchor != null:
 		return _world_panel_anchor
-	var panel := _resolve_world_panel()
+	var panel: WorldInteractionPanelComponent = _resolve_world_panel()
 	if panel != null and panel.get_parent() is Node3D:
 		return panel.get_parent() as Node3D
 	return null
 
 func _resolve_panel_camera() -> Camera3D:
-	var viewport := get_viewport()
+	var viewport: Viewport = get_viewport()
 	if viewport == null:
 		return null
 	return viewport.get_camera_3d()
@@ -418,8 +422,8 @@ func _cycle_world_panel_selection(step: int) -> void:
 		if _world_panel_model == null or _world_panel_model.options.is_empty():
 			return
 
-	var option_count := _world_panel_model.options.size()
-	var next_index := _world_panel_model.selected_index + step
+	var option_count: int = _world_panel_model.options.size()
+	var next_index: int = _world_panel_model.selected_index + step
 	if world_panel_wrap_selection and option_count > 0:
 		next_index = posmod(next_index, option_count)
 	else:
@@ -437,23 +441,32 @@ func _get_selected_world_option() -> WorldInteractionOption:
 func _execute_world_panel_option(completed_by_hold: bool, hold_time: float) -> void:
 	if _world_panel_model == null:
 		return
-	var option := _world_panel_model.get_selected_option()
+	var option: WorldInteractionOption = _world_panel_model.get_selected_option()
 	if option == null or not option.enabled:
 		return
 	if current_interactable == null or not is_instance_valid(current_interactable):
 		return
-	if not current_interactable.has_method(WorldPanelContract.METHOD_EXECUTE_OPTION):
-		return
 
 	_world_panel_selected_option_id = _get_world_panel_option_id(option)
-	current_interactable.call(
-		WorldPanelContract.METHOD_EXECUTE_OPTION,
-		_world_panel_selected_option_id,
-		self,
-		_build_interaction_context(),
-		completed_by_hold,
-		hold_time
-	)
+	if current_interactable.has_method(WorldPanelContract.METHOD_EXECUTE_OPTION):
+		current_interactable.call(
+			WorldPanelContract.METHOD_EXECUTE_OPTION,
+			_world_panel_selected_option_id,
+			self,
+			_build_interaction_context(),
+			completed_by_hold,
+			hold_time
+		)
+	elif current_interaction_mode == MODE_LEGACY_WORLD:
+		_execute_legacy_world_panel_option(
+			current_interactable,
+			_world_panel_selected_option_id,
+			completed_by_hold,
+			hold_time
+		)
+	else:
+		return
+
 	_world_panel_refresh_elapsed = 0.0
 	_refresh_world_panel()
 
@@ -465,6 +478,141 @@ func _call_world_focus(focused: bool) -> void:
 	var callback: StringName = WorldPanelContract.METHOD_FOCUS_ENTER if focused else WorldPanelContract.METHOD_FOCUS_EXIT
 	if current_interactable.has_method(callback):
 		current_interactable.call(callback, self, _build_interaction_context())
+
+func _build_legacy_world_panel_model(target: Node) -> WorldInteractionPanelModel:
+	if target == null or not is_instance_valid(target):
+		return null
+
+	var model: WorldInteractionPanelModel = WorldInteractionPanelModel.new()
+	model.title = _get_legacy_panel_title(target)
+	model.summary_lines = PackedStringArray([
+		"滚轮切换",
+		"按E选择",
+	])
+
+	var supports_pickup: bool = _legacy_supports_pickup_hand(target)
+	var supports_stash: bool = _legacy_supports_stash_inventory(target)
+
+	if supports_pickup:
+		model.options.append(
+			WorldInteractionOption.create(
+				"legacy_pickup_hand",
+				"拿起",
+				"拿在手上，便于拖拽放置。",
+				WorldInteractionOption.TRIGGER_TAP
+			)
+		)
+
+	if supports_stash:
+		var can_stash_now: bool = _legacy_can_stash_now(target)
+		model.options.append(
+			WorldInteractionOption.create(
+				"legacy_stash_inventory",
+				"收纳",
+				"放入背包。",
+				WorldInteractionOption.TRIGGER_TAP,
+				0.0,
+				can_stash_now,
+				"" if can_stash_now else "背包空间不足"
+			)
+		)
+
+	if model.options.is_empty():
+		model.options.append(
+			WorldInteractionOption.create(
+				"legacy_interact",
+				"交互",
+				"执行默认交互。",
+				WorldInteractionOption.TRIGGER_TAP
+			)
+		)
+
+	return model
+
+func _execute_legacy_world_panel_option(target: Node, option_id: String, _completed_by_hold: bool, _hold_time: float) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	if Global.player == null:
+		return
+
+	match option_id:
+		"legacy_pickup_hand":
+			if target.has_method("short_interact"):
+				target.call("short_interact", Global.player)
+			elif target.has_method("interact"):
+				target.call("interact", Global.player)
+		"legacy_stash_inventory":
+			if target.has_method("interact"):
+				target.call("interact", Global.player)
+		_:
+			if target.has_method("interact"):
+				target.call("interact", Global.player)
+
+func _legacy_supports_pickup_hand(target: Node) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	if not _is_pickable_legacy_target(target):
+		return false
+	if target.has_method("short_interact"):
+		return true
+	return target.has_method("interact") and not _legacy_supports_stash_inventory(target)
+
+func _legacy_supports_stash_inventory(target: Node) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	if not target.has_method("interact"):
+		return false
+	var item_data: ItemData = _extract_item_data_from_legacy_target(target)
+	return item_data != null
+
+func _legacy_can_stash_now(target: Node) -> bool:
+	var item_data: ItemData = _extract_item_data_from_legacy_target(target)
+	if item_data == null:
+		return false
+	if Global.player == null:
+		return false
+
+	var inventory_handler: Object = Global.player.get("inventory_handler") as Object
+	if inventory_handler == null:
+		return true
+	if inventory_handler.has_method("CanPickupItem"):
+		return bool(inventory_handler.call("CanPickupItem", item_data, 1))
+	return true
+
+func _extract_item_data_from_legacy_target(target: Node) -> ItemData:
+	if target == null or not is_instance_valid(target):
+		return null
+	var item_data_value: Variant = target.get("item_data")
+	if item_data_value is ItemData:
+		return item_data_value as ItemData
+	var parent: Node = target.get_parent()
+	if parent == null or not is_instance_valid(parent):
+		return null
+	item_data_value = parent.get("item_data")
+	if item_data_value is ItemData:
+		return item_data_value as ItemData
+	return null
+
+func _get_legacy_panel_title(target: Node) -> String:
+	var item_data: ItemData = _extract_item_data_from_legacy_target(target)
+	if item_data != null:
+		var item_name: String = String(item_data.ItemName).strip_edges()
+		if not item_name.is_empty():
+			return item_name
+
+	if target != null and target.has_method("get_prompt_text"):
+		var prompt_text: String = String(target.call("get_prompt_text")).strip_edges()
+		if not prompt_text.is_empty():
+			if prompt_text.begins_with("拾取:"):
+				var pure_name_pickup: String = prompt_text.trim_prefix("拾取:").strip_edges()
+				if not pure_name_pickup.is_empty():
+					return pure_name_pickup
+			if prompt_text.begins_with("交互:"):
+				var pure_name_interact: String = prompt_text.trim_prefix("交互:").strip_edges()
+				if not pure_name_interact.is_empty():
+					return pure_name_interact
+			return prompt_text
+	return "物品"
 
 func _apply_world_panel_selection_memory(model: WorldInteractionPanelModel) -> void:
 	if model == null:
@@ -496,6 +644,53 @@ func _is_world_interactable_candidate(node: Node) -> bool:
 	if not _is_interaction_enabled(node):
 		return false
 	return WorldPanelContract.has_any_contract(node)
+
+func _is_world_mode(mode: StringName) -> bool:
+	return mode == MODE_WORLD or mode == MODE_LEGACY_WORLD
+
+func _sync_held_object_exception() -> void:
+	if interaction_ray == null:
+		return
+	var held_collision: CollisionObject3D = _get_held_collision_object()
+	if held_collision == _ignored_held_collision:
+		return
+	if _ignored_held_collision != null and is_instance_valid(_ignored_held_collision):
+		interaction_ray.remove_exception(_ignored_held_collision)
+	_ignored_held_collision = held_collision
+	if _ignored_held_collision != null and is_instance_valid(_ignored_held_collision):
+		interaction_ray.add_exception(_ignored_held_collision)
+
+func _get_held_collision_object() -> CollisionObject3D:
+	if Global.player == null:
+		return null
+	var pickup_handler: Object = Global.player.get("pickup_handler") as Object
+	if pickup_handler == null:
+		return null
+
+	var held_variant: Variant = null
+	if pickup_handler.has_method("get_held_object"):
+		held_variant = pickup_handler.call("get_held_object")
+	else:
+		held_variant = pickup_handler.get("held_object")
+	if held_variant is not CollisionObject3D:
+		return null
+
+	var held_collision: CollisionObject3D = held_variant as CollisionObject3D
+	if held_collision == null or not is_instance_valid(held_collision):
+		return null
+	return held_collision
+
+func _is_target_held_object(target: Node) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	var held_collision: CollisionObject3D = _get_held_collision_object()
+	if held_collision == null:
+		return false
+	return (
+		target == held_collision
+		or held_collision.is_ancestor_of(target)
+		or target.is_ancestor_of(held_collision)
+	)
 
 func _is_interaction_enabled(node: Node) -> bool:
 	if node == null:
@@ -530,7 +725,7 @@ func _has_pickup_signature(node: Node) -> bool:
 	return node is RigidBody3D and node.has_method("short_interact")
 
 func _poll_interact_input_state() -> Dictionary:
-	var pressed := false
+	var pressed: bool = false
 	if InputMap.has_action("interact"):
 		pressed = Input.is_action_pressed("interact")
 	else:
@@ -545,13 +740,22 @@ func _poll_interact_input_state() -> Dictionary:
 	}
 
 func _is_inventory_open() -> bool:
-	var inventory = Global.player.get("inventory_handler") if Global.player else null
-	return inventory != null and bool(inventory.inventory_visible)
+	if Global.player == null:
+		return false
+	var inventory: Object = Global.player.get("inventory_handler") as Object
+	if inventory == null:
+		return false
+	return bool(inventory.get("inventory_visible"))
 
 func _is_holding_object() -> bool:
-	if Global.player == null or Global.player.get("pickup_handler") == null:
+	if Global.player == null:
 		return false
-	return bool(Global.player.pickup_handler.is_holding_object())
+	var pickup_handler: Object = Global.player.get("pickup_handler") as Object
+	if pickup_handler == null:
+		return false
+	if pickup_handler.has_method("is_holding_object"):
+		return bool(pickup_handler.call("is_holding_object"))
+	return false
 
 func _build_interaction_context() -> Dictionary:
 	var context: Dictionary = {

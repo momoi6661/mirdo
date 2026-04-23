@@ -68,3 +68,6 @@ func _reset_object_physics() -> void:
 
 func is_holding_object() -> bool:
 	return held_object != null
+
+func get_held_object() -> RigidBody3D:
+	return held_object

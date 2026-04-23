@@ -9,7 +9,7 @@ signal outside_requested
 @export var world_panel_title: String = "外出大门"
 @export_multiline var world_panel_summary_text: String = "离开当前掩体。"
 @export var world_panel_option_label: String = "外出"
-@export_multiline var world_panel_option_description: String = "长按确认外出。"
+@export_multiline var world_panel_option_description: String = "确认后离开当前掩体。"
 
 func _ready() -> void:
 	# Keep the bunker blast door as a fixed interactable door.

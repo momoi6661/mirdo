@@ -4,6 +4,7 @@ class_name WorldInteractionPanelComponent
 
 const SUBTITLE_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
 const SUBTITLE_LINE_SCENE: PackedScene = preload("res://controllers/interaction/world_interaction_panel_line.tscn")
+const HOLD_RING_SHADER: Shader = preload("res://controllers/interaction/world_interaction_hold_ring.gdshader")
 const PINK_SUBTITLE_OUTLINE: Color = Color(0.92, 0.24, 0.60, 1.0)
 const PINK_SUBTITLE_OUTLINE_STRONG: Color = Color(0.98, 0.20, 0.58, 1.0)
 const PINK_SUBTITLE_BACK: Color = Color(0.70, 0.24, 0.50, 0.88)
@@ -75,6 +76,13 @@ var _preview_alpha_internal: float = 0.0
 @export_range(0.0, 0.2, 0.005) var selected_option_scale_boost: float = 0.055
 @export_range(0.0, 0.05, 0.002) var selected_option_lift_boost: float = 0.014
 
+@export_category("Hold Indicator")
+@export var show_hold_indicator: bool = true
+@export_range(0.02, 0.2, 0.002) var hold_indicator_size: float = 0.072
+@export var hold_indicator_offset: Vector3 = Vector3(-0.11, 0.0, -0.003)
+@export var hold_indicator_track_color: Color = Color(1.0, 0.56, 0.82, 0.45)
+@export var hold_indicator_fill_color: Color = Color(1.0, 0.88, 0.95, 0.95)
+
 var _context_anchor_node: Node3D
 var _camera: Camera3D
 var _follow_camera_rotation: bool = false
@@ -95,6 +103,11 @@ var _initial_pivot_basis_captured: bool = false
 var _smoothed_horizontal_yaw: float = 0.0
 var _horizontal_yaw_initialized: bool = false
 var _last_render_signature: String = ""
+var _hold_indicator_root: Node3D
+var _hold_indicator_track: MeshInstance3D
+var _hold_indicator_fill: MeshInstance3D
+var _hold_indicator_track_material: ShaderMaterial
+var _hold_indicator_fill_material: ShaderMaterial
 
 func _ready() -> void:
 	_ensure_runtime()
@@ -143,6 +156,8 @@ func hide_editor_preview() -> void:
 	if _animation_player != null:
 		_animation_player.stop()
 	_model = null
+	if _hold_indicator_root != null:
+		_hold_indicator_root.visible = false
 	preview_alpha = 0.0
 	visible = false
 
@@ -166,6 +181,7 @@ func _build_runtime() -> void:
 
 	_option_area_root = _resolve_or_create_child_node3d(_pivot, option_area_path, "OptionsArea")
 	_option_area_root.position = right_column_offset + Vector3(0.0, -column_vertical_stagger, 0.0)
+	_ensure_hold_indicator_nodes()
 
 func _capture_initial_transforms() -> void:
 	if not _initial_basis_captured:
@@ -217,6 +233,8 @@ func _clear_lines() -> void:
 			front.queue_free()
 	_line_pairs.clear()
 	_last_render_signature = ""
+	if _hold_indicator_root != null:
+		_hold_indicator_root.visible = false
 
 func _build_left_specs(model: WorldInteractionPanelModel) -> Array[Dictionary]:
 	var specs: Array[Dictionary] = []
@@ -269,10 +287,6 @@ func _build_detail_lines(model: WorldInteractionPanelModel) -> Array[Dictionary]
 				lines.append({"text": disabled_text, "category": "detail_warning"})
 			elif not description.is_empty():
 				lines.append({"text": description, "category": "hint"})
-
-		if selected_option.enabled and selected_option.supports_hold() and model.hold_progress > 0.0:
-			var percent := int(round(clampf(model.hold_progress, 0.0, 1.0) * 100.0))
-			lines.append({"text": "确认 %d%%" % percent, "category": "detail_emphasis"})
 
 	var fallback_detail := String(model.detail_text).strip_edges()
 	if lines.is_empty() and not fallback_detail.is_empty():
@@ -343,8 +357,6 @@ func _estimate_line_height(font_size: int, category: String) -> float:
 	return maxf(height, maxf(min_spacing, 0.045))
 
 func _build_option_display_text(label_text: String, _selected: bool) -> String:
-	if _selected:
-		return "◆ " + label_text
 	return label_text
 
 func _build_render_signature(model: WorldInteractionPanelModel) -> String:
@@ -407,6 +419,118 @@ func _resolve_display_anchor() -> Node3D:
 	if parent_node != null and is_instance_valid(parent_node):
 		return parent_node
 	return self
+
+func _ensure_hold_indicator_nodes() -> void:
+	if _option_area_root == null:
+		return
+
+	if _hold_indicator_root == null or not is_instance_valid(_hold_indicator_root):
+		_hold_indicator_root = _option_area_root.get_node_or_null("HoldIndicator") as Node3D
+	if _hold_indicator_root == null:
+		_hold_indicator_root = Node3D.new()
+		_hold_indicator_root.name = "HoldIndicator"
+		_option_area_root.add_child(_hold_indicator_root)
+
+	_hold_indicator_track = _resolve_or_create_hold_indicator_mesh("Track")
+	_hold_indicator_fill = _resolve_or_create_hold_indicator_mesh("Fill")
+	_configure_hold_indicator_materials()
+	_update_hold_indicator_mesh_size()
+	_hold_indicator_root.visible = false
+
+func _resolve_or_create_hold_indicator_mesh(node_name: String) -> MeshInstance3D:
+	if _hold_indicator_root == null:
+		return null
+	var existing := _hold_indicator_root.get_node_or_null(node_name) as MeshInstance3D
+	if existing != null:
+		return existing
+
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = node_name
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mesh_instance.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	_hold_indicator_root.add_child(mesh_instance)
+	return mesh_instance
+
+func _update_hold_indicator_mesh_size() -> void:
+	if _hold_indicator_track == null or _hold_indicator_fill == null:
+		return
+	var quad_size := Vector2.ONE * hold_indicator_size
+
+	var track_mesh := _hold_indicator_track.mesh as QuadMesh
+	if track_mesh == null:
+		track_mesh = QuadMesh.new()
+		_hold_indicator_track.mesh = track_mesh
+	track_mesh.size = quad_size
+
+	var fill_mesh := _hold_indicator_fill.mesh as QuadMesh
+	if fill_mesh == null:
+		fill_mesh = QuadMesh.new()
+		_hold_indicator_fill.mesh = fill_mesh
+	fill_mesh.size = quad_size
+
+func _configure_hold_indicator_materials() -> void:
+	if _hold_indicator_track == null or _hold_indicator_fill == null:
+		return
+	if _hold_indicator_track_material == null:
+		_hold_indicator_track_material = ShaderMaterial.new()
+		_hold_indicator_track_material.shader = HOLD_RING_SHADER
+	if _hold_indicator_fill_material == null:
+		_hold_indicator_fill_material = ShaderMaterial.new()
+		_hold_indicator_fill_material.shader = HOLD_RING_SHADER
+
+	_hold_indicator_track_material.set_shader_parameter("ring_color", hold_indicator_track_color)
+	_hold_indicator_track_material.set_shader_parameter("fill_color", hold_indicator_track_color)
+	_hold_indicator_track_material.set_shader_parameter("progress", 1.0)
+	_hold_indicator_track_material.set_shader_parameter("alpha_scale", 1.0)
+
+	_hold_indicator_fill_material.set_shader_parameter("ring_color", Color(1.0, 1.0, 1.0, 0.0))
+	_hold_indicator_fill_material.set_shader_parameter("fill_color", hold_indicator_fill_color)
+	_hold_indicator_fill_material.set_shader_parameter("progress", 0.0)
+	_hold_indicator_fill_material.set_shader_parameter("alpha_scale", 1.0)
+
+	_hold_indicator_track.material_override = _hold_indicator_track_material
+	_hold_indicator_fill.material_override = _hold_indicator_fill_material
+
+func _find_selected_option_pair() -> Dictionary:
+	for pair in _line_pairs:
+		var category := String(pair.get("category", ""))
+		if _is_selected_option_category(category):
+			return pair
+	return {}
+
+func _update_hold_indicator_visual(alpha: float) -> void:
+	if _hold_indicator_root == null:
+		return
+	if not show_hold_indicator or _model == null:
+		_hold_indicator_root.visible = false
+		return
+
+	var selected_option := _model.get_selected_option()
+	if selected_option == null or not selected_option.enabled or not selected_option.supports_hold():
+		_hold_indicator_root.visible = false
+		return
+
+	var selected_pair := _find_selected_option_pair()
+	if selected_pair.is_empty():
+		_hold_indicator_root.visible = false
+		return
+	var pair_root := selected_pair.get("root", null) as Node3D
+	if pair_root == null or not is_instance_valid(pair_root):
+		_hold_indicator_root.visible = false
+		return
+
+	_hold_indicator_root.visible = true
+	_hold_indicator_root.position = pair_root.position + hold_indicator_offset
+	_hold_indicator_root.scale = Vector3.ONE * maxf(pair_root.scale.x, 0.0001)
+	_update_hold_indicator_mesh_size()
+	_configure_hold_indicator_materials()
+
+	var progress := clampf(_model.hold_progress, 0.0, 1.0)
+	if _hold_indicator_fill_material != null:
+		_hold_indicator_fill_material.set_shader_parameter("progress", progress)
+		_hold_indicator_fill_material.set_shader_parameter("alpha_scale", alpha)
+	if _hold_indicator_track_material != null:
+		_hold_indicator_track_material.set_shader_parameter("alpha_scale", alpha)
 
 func _create_line_pair(parent_root: Node3D, spec: Dictionary, cursor_y: float) -> Dictionary:
 	if parent_root == null:
@@ -649,6 +773,8 @@ func _play_hide_animation() -> void:
 	preview_alpha = 0.0
 	visible = false
 	_model = null
+	if _hold_indicator_root != null:
+		_hold_indicator_root.visible = false
 
 func _on_animation_finished(animation_name: StringName) -> void:
 	if animation_name != hide_animation_name:
@@ -656,6 +782,8 @@ func _on_animation_finished(animation_name: StringName) -> void:
 	if preview_alpha <= 0.001:
 		visible = false
 	_model = null
+	if _hold_indicator_root != null:
+		_hold_indicator_root.visible = false
 
 func _apply_line_visual_state() -> void:
 	var alpha := clampf(_visibility_alpha, 0.0, 1.0)
@@ -704,6 +832,8 @@ func _apply_line_visual_state() -> void:
 		back.outline_modulate = _with_alpha(back_outline, alpha)
 		front.modulate = _with_alpha(front_color, alpha)
 		front.outline_modulate = _with_alpha(front_outline, alpha)
+
+	_update_hold_indicator_visual(alpha)
 
 func _with_alpha(color: Color, alpha: float) -> Color:
 	return Color(color.r, color.g, color.b, color.a * alpha)
