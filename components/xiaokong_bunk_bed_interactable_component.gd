@@ -67,17 +67,11 @@ func interact(_player: Node) -> void:
 	if not interaction_enabled or not _is_cooldown_ready():
 		return
 
-	var actor: Node3D = _resolve_xiaokong_root()
-	if actor == null:
-		push_warning("Bunk bed interactable could not resolve Xiaokong root: " + String(get_path()))
+	var payload: Dictionary = _build_seat_payload()
+	if payload.is_empty():
+		push_warning("Bunk bed seat payload empty: " + String(get_path()))
 		return
-
-	if _should_route_via_ladder(actor):
-		_dispatch_payload(_build_ladder_payload())
-		_last_trigger_time_msec = Time.get_ticks_msec()
-		return
-
-	_dispatch_payload(_build_seat_payload())
+	_dispatch_payload(payload)
 	_last_trigger_time_msec = Time.get_ticks_msec()
 
 func short_interact(_player: Node) -> void:
@@ -106,23 +100,7 @@ func _dispatch_payload(payload: Dictionary) -> void:
 			push_warning("Bunk bed dispatch failed: " + String(result.get("error", "unknown_error")))
 
 func _build_ladder_payload() -> Dictionary:
-	var ladder: Node3D = _resolve_ladder()
-	if ladder == null:
-		return {}
-	var enter_from_top: bool = bed_level == BedLevel.LOWER
-	var payload: Dictionary = {
-		"command": "enter_ladder",
-		"ladder_path": String(ladder.get_path()),
-		"enter_from_top": enter_from_top,
-		"queue_travel_mode": _normalize_ladder_travel_mode(ladder_travel_mode),
-		"queue_exit_at_top": not enter_from_top,
-		"queue_auto_exit": true,
-		"queue_followup_payload": _build_seat_payload(),
-	}
-	var entry_marker: Marker3D = _resolve_marker(ladder_entry_marker_path)
-	if entry_marker != null:
-		payload["entry_marker_path"] = String(entry_marker.get_path())
-	return payload
+	return _build_seat_payload()
 
 func _build_seat_payload() -> Dictionary:
 	var sit_marker: Marker3D = _resolve_marker(sit_marker_path)
@@ -143,8 +121,8 @@ func _build_seat_payload() -> Dictionary:
 		payload["stand_marker_path"] = String(stand_marker.get_path())
 	return payload
 
-func _should_route_via_ladder(actor: Node3D) -> bool:
-	return not _is_actor_on_target_level(actor)
+func _should_route_via_ladder(_actor: Node3D) -> bool:
+	return false
 
 func _is_actor_on_target_level(actor: Node3D) -> bool:
 	var target_markers := [_resolve_marker(sit_marker_path), _resolve_marker(approach_marker_path), _resolve_marker(stand_marker_path)]

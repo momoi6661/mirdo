@@ -4,6 +4,7 @@ class_name InteractableItem
 
 @export var item_data:ItemData
 @export var highlight_meshes:Array[MeshInstance3D]=[]
+@export var highlight_enabled:bool=true
 @export var show_highlight_in_editor:bool=false:
 	set(value):
 		if show_highlight_in_editor != value:
@@ -25,7 +26,7 @@ func _ready():
 	call_deferred("_update_editor_highlight")
 
 func _update_editor_highlight():
-	if show_highlight_in_editor:
+	if show_highlight_in_editor and highlight_enabled:
 		apply_outline()
 	else:
 		remove_outline()
@@ -47,7 +48,7 @@ func find_all_mesh_instances(node:Node):
 		find_all_mesh_instances(child)
 
 func apply_outline():
-	if is_held:
+	if is_held or not highlight_enabled:
 		return
 	for mesh in highlight_meshes:
 		if mesh and mesh.mesh:
@@ -71,6 +72,9 @@ func remove_outline():
 			mesh.material_overlay=null
 
 func GainFocus():
+	if not highlight_enabled:
+		remove_outline()
+		return
 	apply_outline()
 
 func LoseFocus():

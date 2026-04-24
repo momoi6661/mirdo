@@ -33,6 +33,7 @@ const COMMAND_CLIMB_LADDER := "climb_ladder"
 const COMMAND_JUMP_LADDER := "jump_ladder"
 const COMMAND_SLIDE_LADDER := "slide_ladder"
 const COMMAND_EXIT_LADDER := "exit_ladder"
+const ENABLE_LEGACY_LADDER_ROUTING := false
 const COMMAND_GO_TO_MARKER := "go_to_marker"
 const SEAT_OCCUPIED_META_KEY := "xiaokong_seat_occupied"
 const SEAT_OCCUPANT_META_KEY := "xiaokong_seat_occupant"
@@ -253,10 +254,17 @@ func _refresh_refs() -> void:
 	_navigation_component = _resolve_navigation_component()
 	_navigation_agent = _resolve_navigation_agent()
 	_ik_target_driver = _resolve_ik_target_driver()
-	_ladder_climb_component = _resolve_ladder_climb_component()
+	if ENABLE_LEGACY_LADDER_ROUTING:
+		_ladder_climb_component = _resolve_ladder_climb_component()
+	else:
+		_ladder_climb_component = null
 	_sit_anchor = _resolve_sit_anchor()
 	_rebind_navigation_signal(previous_navigation, _navigation_component)
 	_rebind_ladder_signals(previous_ladder, _ladder_climb_component)
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_pending_ladder_enter_payload.clear()
+		_clear_pending_ladder_sequence()
+		_release_ladder_ik_locks()
 
 	_state_component = get_node_or_null(state_component_path) as XiaokongStateComponent
 	if _state_component == null:
@@ -285,6 +293,8 @@ func _resolve_ik_target_driver() -> Node:
 	return _find_node_with_method_recursive(_action_controller, &"apply_marker_interaction")
 
 func _resolve_ladder_climb_component() -> Node:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		return null
 	if _action_controller == null:
 		return null
 	if ladder_climb_component_path != NodePath():
@@ -359,6 +369,9 @@ func _on_navigation_destination_reached() -> void:
 	_clear_pending_arrival_state()
 
 func _on_ladder_attached(_ladder_path: NodePath, _enter_from_top: bool) -> void:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_clear_pending_ladder_sequence()
+		return
 	if _pending_ladder_travel_mode.is_empty():
 		return
 	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
@@ -373,6 +386,9 @@ func _on_ladder_attached(_ladder_path: NodePath, _enter_from_top: bool) -> void:
 		_clear_pending_ladder_sequence()
 
 func _on_ladder_move_finished(_ladder_path: NodePath, _progress: float) -> void:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_clear_pending_ladder_sequence()
+		return
 	if not _pending_ladder_auto_exit:
 		return
 	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
@@ -386,6 +402,9 @@ func _on_ladder_move_finished(_ladder_path: NodePath, _progress: float) -> void:
 		_clear_pending_ladder_sequence()
 
 func _on_ladder_exited(_ladder_path: NodePath, _exit_at_top: bool) -> void:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_clear_pending_ladder_sequence()
+		return
 	var followup: Dictionary = _pending_ladder_followup_payload.duplicate(true)
 	_clear_pending_ladder_sequence()
 	if followup.is_empty():
@@ -393,6 +412,9 @@ func _on_ladder_exited(_ladder_path: NodePath, _exit_at_top: bool) -> void:
 	apply_ai_response(followup)
 
 func _on_ladder_cancelled(_ladder_path: NodePath) -> void:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_clear_pending_ladder_sequence()
+		return
 	_clear_pending_ladder_sequence()
 
 func _try_handle_pending_sit_arrival() -> bool:
@@ -430,6 +452,9 @@ func _try_handle_pending_sit_arrival() -> bool:
 	return true
 
 func _try_handle_pending_ladder_entry() -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_pending_ladder_enter_payload.clear()
+		return false
 	if _pending_ladder_enter_payload.is_empty():
 		return false
 
@@ -490,15 +515,18 @@ func _set_active_sit_marker(marker: Marker3D) -> void:
 	var next_path: String = String(marker.get_path())
 	if _active_sit_marker_path == next_path:
 		_set_marker_seat_occupied_state(marker, true)
+		_emit_global_seat_state_changed(true, marker)
 		return
 	_clear_active_sit_marker()
 	_active_sit_marker_path = next_path
 	_set_marker_seat_occupied_state(marker, true)
+	_emit_global_seat_state_changed(true, marker)
 
 func _clear_active_sit_marker() -> void:
 	var current: Marker3D = _resolve_active_sit_marker()
 	if current != null:
 		_set_marker_seat_occupied_state(current, false)
+	_emit_global_seat_state_changed(false, current)
 	_active_sit_marker_path = ""
 
 func _resolve_active_sit_marker() -> Marker3D:
@@ -530,6 +558,23 @@ func _set_marker_seat_occupied_state(marker: Marker3D, occupied: bool) -> void:
 	if stand_marker != null:
 		stand_marker.set_meta(SEAT_OCCUPIED_META_KEY, occupied)
 		stand_marker.set_meta(SEAT_OCCUPANT_META_KEY, occupant_text)
+
+func _emit_global_seat_state_changed(seated: bool, marker: Marker3D = null) -> void:
+	var global_node: Node = get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_signal("xiaokong_seat_state_changed"):
+		return
+	var marker_path: String = ""
+	if marker != null and is_instance_valid(marker):
+		marker_path = String(marker.get_path())
+	elif seated:
+		marker_path = _active_sit_marker_path.strip_edges()
+	var payload: Dictionary = {
+		"is_seated": seated,
+		"seat_marker_path": marker_path,
+		"router_path": String(get_path()),
+		"xiaokong_path": String(_action_controller.get_path()) if _action_controller != null and is_instance_valid(_action_controller) else "",
+	}
+	global_node.emit_signal("xiaokong_seat_state_changed", payload)
 
 func _is_seat_marker_occupied_by_self(marker: Marker3D) -> bool:
 	if marker == null or not is_instance_valid(marker):
@@ -794,8 +839,11 @@ func _invalidate_pending_snap() -> void:
 	_clear_pending_ladder_sequence()
 	if _ladder_climb_component != null and is_instance_valid(_ladder_climb_component) and _ladder_climb_component.has_method("stop_ladder"):
 		_ladder_climb_component.call("stop_ladder")
+	_release_ladder_ik_locks()
 
 func _payload_has_ladder_queue(payload: Dictionary) -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		return false
 	return payload.has("queue_travel_mode") \
 		or payload.has("queue_exit_at_top") \
 		or payload.has("queue_auto_exit") \
@@ -1167,6 +1215,7 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 		return true
 
 	summary["command_requested"] = command_name
+	_release_ladder_ik_locks()
 
 	match command_name:
 		COMMAND_FOLLOW_PLAYER:
@@ -1328,26 +1377,35 @@ func _apply_navigation_command(payload: Dictionary, summary: Dictionary) -> bool
 			_navigate_to_marker(target_marker, COMMAND_GO_TO_MARKER, summary)
 			return true
 
-		COMMAND_ENTER_LADDER:
-			return _handle_enter_ladder_command(payload, summary)
-
-		COMMAND_CLIMB_LADDER:
-			return _handle_ladder_travel_command(payload, summary, "climb", true)
-
-		COMMAND_JUMP_LADDER:
-			return _handle_ladder_travel_command(payload, summary, "jump", true)
-
-		COMMAND_SLIDE_LADDER:
-			return _handle_ladder_travel_command(payload, summary, "slide", false)
-
-		COMMAND_EXIT_LADDER:
-			return _handle_exit_ladder_command(payload, summary)
+		COMMAND_ENTER_LADDER, COMMAND_CLIMB_LADDER, COMMAND_JUMP_LADDER, COMMAND_SLIDE_LADDER, COMMAND_EXIT_LADDER:
+			_reject_ladder_command(summary, command_name)
+			return true
 
 		_:
 			summary["errors"].append("unsupported_command:" + command_name)
 			return true
 
+func _reject_ladder_command(summary: Dictionary, command_name: String = "") -> void:
+	_pending_ladder_enter_payload.clear()
+	_clear_pending_ladder_sequence()
+	if _action_controller != null and _action_controller.has_method("stop_navigation"):
+		_action_controller.call("stop_navigation")
+	_release_ladder_ik_locks()
+	var label: String = command_name.strip_edges()
+	if label.is_empty():
+		label = "ladder"
+	summary["errors"].append("ladder_command_disabled:" + label)
+
+func _release_ladder_ik_locks() -> void:
+	if _ik_target_driver == null or not is_instance_valid(_ik_target_driver):
+		return
+	if _ik_target_driver.has_method("set_external_target_locks"):
+		_ik_target_driver.call("set_external_target_locks", false, false)
+
 func _handle_enter_ladder_command(payload: Dictionary, summary: Dictionary) -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_reject_ladder_command(summary, COMMAND_ENTER_LADDER)
+		return true
 	var ladder: Node3D = _resolve_ladder_target(payload)
 	if ladder == null:
 		summary["errors"].append("ladder_target_not_found")
@@ -1365,6 +1423,13 @@ func _handle_enter_ladder_command(payload: Dictionary, summary: Dictionary) -> b
 	return true
 
 func _start_ladder_enter_now(payload: Dictionary, summary: Dictionary = {}) -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_pending_ladder_enter_payload.clear()
+		_clear_pending_ladder_sequence()
+		_release_ladder_ik_locks()
+		if not summary.is_empty():
+			summary["errors"].append("ladder_command_disabled:" + COMMAND_ENTER_LADDER)
+		return false
 	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
 		if not summary.is_empty():
 			summary["errors"].append("ladder_climb_component_missing")
@@ -1399,6 +1464,11 @@ func _start_ladder_enter_now(payload: Dictionary, summary: Dictionary = {}) -> b
 	return true
 
 func _prepare_for_ladder_navigation() -> void:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_pending_ladder_enter_payload.clear()
+		_clear_pending_ladder_sequence()
+		_release_ladder_ik_locks()
+		return
 	_clear_pending_arrival_state()
 	_clear_pending_sit_state()
 	_restore_sit_navigation_precision()
@@ -1408,6 +1478,9 @@ func _prepare_for_ladder_navigation() -> void:
 	_clear_pending_ladder_sequence()
 
 func _handle_ladder_travel_command(payload: Dictionary, summary: Dictionary, travel_mode: String, default_exit_at_top: bool) -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_reject_ladder_command(summary, COMMAND_CLIMB_LADDER if travel_mode == "climb" else COMMAND_JUMP_LADDER if travel_mode == "jump" else COMMAND_SLIDE_LADDER)
+		return true
 	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
 		summary["errors"].append("ladder_climb_component_missing")
 		return true
@@ -1435,6 +1508,9 @@ func _handle_ladder_travel_command(payload: Dictionary, summary: Dictionary, tra
 	return true
 
 func _handle_exit_ladder_command(payload: Dictionary, summary: Dictionary) -> bool:
+	if not ENABLE_LEGACY_LADDER_ROUTING:
+		_reject_ladder_command(summary, COMMAND_EXIT_LADDER)
+		return true
 	if _ladder_climb_component == null or not is_instance_valid(_ladder_climb_component):
 		summary["errors"].append("ladder_climb_component_missing")
 		return true

@@ -5,6 +5,8 @@ const WorldPanelContract := preload("res://controllers/interaction/world_panel_p
 const MODE_NONE: StringName = &""
 const MODE_WORLD: StringName = &"world"
 const MODE_LEGACY_WORLD: StringName = &"legacy_world"
+const XIAOKONG_GROUP: StringName = &"Xiaokong"
+const XIAOKONG_CHARACTER_INTERACTABLE_PATH: NodePath = NodePath("Components/CharacterInteractable")
 
 @export_category("References")
 @export var interaction_ray: RayCast3D
@@ -120,6 +122,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _resolve_interaction_target(collider: Node, hit_position: Vector3) -> Dictionary:
+	var xiaokong_target: Node = _resolve_xiaokong_interactable_target(collider)
+	if xiaokong_target != null and not _is_target_held_object(xiaokong_target):
+		return {"target": xiaokong_target, "mode": MODE_WORLD}
+
 	var world_target: Node = _get_world_interactable(collider)
 	if world_target != null and not _is_target_held_object(world_target):
 		return {"target": world_target, "mode": MODE_WORLD}
@@ -136,6 +142,34 @@ func _resolve_interaction_target(collider: Node, hit_position: Vector3) -> Dicti
 		return fallback_info
 
 	return {"target": null, "mode": MODE_NONE}
+
+func _resolve_xiaokong_interactable_target(collider: Node) -> Node:
+	var xiaokong_root: Node = _find_xiaokong_root(collider)
+	if xiaokong_root == null:
+		xiaokong_root = _find_xiaokong_root_by_interactable_path(collider)
+	if xiaokong_root == null:
+		return null
+	var interactable: Node = xiaokong_root.get_node_or_null(XIAOKONG_CHARACTER_INTERACTABLE_PATH)
+	if _is_world_interactable_candidate(interactable):
+		return interactable
+	return _find_world_interactable_recursive(xiaokong_root, world_interactable_descendant_search_depth + 2)
+
+func _find_xiaokong_root(from_node: Node) -> Node:
+	var current: Node = from_node
+	while current != null:
+		if current.is_in_group(XIAOKONG_GROUP):
+			return current
+		current = current.get_parent()
+	return null
+
+func _find_xiaokong_root_by_interactable_path(from_node: Node) -> Node:
+	var current: Node = from_node
+	while current != null:
+		var interactable: Node = current.get_node_or_null(XIAOKONG_CHARACTER_INTERACTABLE_PATH)
+		if _is_world_interactable_candidate(interactable):
+			return current
+		current = current.get_parent()
+	return null
 
 func _get_legacy_interactable(node: Node) -> Node:
 	var current: Node = node
@@ -758,14 +792,10 @@ func _is_holding_object() -> bool:
 	return false
 
 func _build_interaction_context() -> Dictionary:
-	var context: Dictionary = {
-		"player": Global.player,
-		"source": self,
-		"target": current_interactable,
-		"mode": String(current_interaction_mode),
-	}
-	if interaction_ray != null and interaction_ray.is_colliding():
-		context["collider"] = interaction_ray.get_collider()
-		context["hit_position"] = interaction_ray.get_collision_point()
-		context["hit_normal"] = interaction_ray.get_collision_normal()
-	return context
+	return FPSWorldPanelContext.build(
+		Global.player,
+		self,
+		current_interactable,
+		String(current_interaction_mode),
+		interaction_ray
+	)

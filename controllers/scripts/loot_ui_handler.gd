@@ -173,6 +173,9 @@ func _sync_loot_data() -> void:
 			config.item = null
 			config.amount = 0
 
+	if current_container.has_method("notify_runtime_slots_changed"):
+		current_container.notify_runtime_slots_changed()
+
 # ==========================================
 # 智能一键收取逻辑
 # ==========================================

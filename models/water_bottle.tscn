@@ -141,6 +141,7 @@ angular_damp = 4.434
 script = ExtResource("1_ox4bg")
 item_data = ExtResource("2_rvoh6")
 highlight_meshes = [NodePath("GLTF_SceneRootNode/Cylinder_001_2/Object_6"), NodePath("GLTF_SceneRootNode/Cylinder_002_3/Object_8"), NodePath("GLTF_SceneRootNode/Cylinder_1/Object_4")]
+highlight_enabled = false
 outline_width = 0.1
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1701586429]
