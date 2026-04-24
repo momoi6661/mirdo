@@ -5,12 +5,6 @@ class_name WorldInteractionPanelComponent
 const SUBTITLE_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
 const SUBTITLE_LINE_SCENE: PackedScene = preload("res://controllers/interaction/world_interaction_panel_line.tscn")
 const HOLD_RING_SHADER: Shader = preload("res://controllers/interaction/world_interaction_hold_ring.gdshader")
-const PINK_SUBTITLE_OUTLINE: Color = Color(0.92, 0.24, 0.60, 1.0)
-const PINK_SUBTITLE_OUTLINE_STRONG: Color = Color(0.98, 0.20, 0.58, 1.0)
-const PINK_SUBTITLE_BACK: Color = Color(0.70, 0.24, 0.50, 0.88)
-const PINK_SUBTITLE_BACK_STRONG: Color = Color(0.80, 0.18, 0.50, 0.95)
-const PINK_SUBTITLE_DISABLED_OUTLINE: Color = Color(0.76, 0.54, 0.67, 1.0)
-const PINK_SUBTITLE_DISABLED_BACK: Color = Color(0.54, 0.38, 0.47, 0.72)
 const BACK_LAYER_RENDER_PRIORITY := 60
 const BACK_LAYER_OUTLINE_PRIORITY := 59
 const FRONT_LAYER_RENDER_PRIORITY := 70
@@ -25,6 +19,18 @@ const MIN_BACK_LAYER_SCALE := 1.018
 @export_range(0.0, 0.4, 0.005) var fade_lift_distance: float = 0.05
 @export_range(0.8, 1.6, 0.01) var hidden_scale_multiplier: float = 1.12
 @export var subtitle_font: FontFile = SUBTITLE_FONT
+
+@export_category("Palette")
+@export var subtitle_outline_color: Color = Color(0.92, 0.24, 0.60, 1.0)
+@export var subtitle_outline_strong_color: Color = Color(0.98, 0.20, 0.58, 1.0)
+@export var subtitle_back_color: Color = Color(0.70, 0.24, 0.50, 0.88)
+@export var subtitle_back_strong_color: Color = Color(0.80, 0.18, 0.50, 0.95)
+@export var subtitle_disabled_outline_color: Color = Color(0.76, 0.54, 0.67, 1.0)
+@export var subtitle_disabled_back_color: Color = Color(0.54, 0.38, 0.47, 0.72)
+@export var selected_pulse_back_tint: Color = Color(1.0, 0.86, 0.93, 1.0)
+@export var selected_pulse_outline_tint: Color = Color(1.0, 0.30, 0.68, 1.0)
+@export var selected_pulse_front_tint: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var selected_pulse_front_outline_tint: Color = Color(1.0, 0.26, 0.66, 1.0)
 
 @export_category("Animation")
 @export var animation_player_path: NodePath = NodePath("AnimationPlayer")
@@ -679,72 +685,72 @@ func _get_section_colors(category: String) -> Dictionary:
 		"title":
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE_STRONG,
-				PINK_SUBTITLE_BACK_STRONG,
+				subtitle_outline_strong_color,
+				subtitle_back_strong_color,
 				1.04,
 				1.028
 			)
 		"summary":
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE,
-				PINK_SUBTITLE_BACK,
+				subtitle_outline_color,
+				subtitle_back_color,
 				1.0,
 				1.022
 			)
 		"option_selected":
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE_STRONG,
-				PINK_SUBTITLE_BACK_STRONG,
+				subtitle_outline_strong_color,
+				subtitle_back_strong_color,
 				1.05,
 				1.03
 			)
 		"option_disabled_selected":
 			return _make_palette(
 				_white_fill(0.96),
-				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.88),
-				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.88),
+				Color(subtitle_disabled_outline_color.r, subtitle_disabled_outline_color.g, subtitle_disabled_outline_color.b, 0.88),
+				Color(subtitle_disabled_back_color.r, subtitle_disabled_back_color.g, subtitle_disabled_back_color.b, 0.88),
 				1.02,
 				1.022
 			)
 		"option_disabled":
 			return _make_palette(
 				_white_fill(0.92),
-				Color(PINK_SUBTITLE_DISABLED_OUTLINE.r, PINK_SUBTITLE_DISABLED_OUTLINE.g, PINK_SUBTITLE_DISABLED_OUTLINE.b, 0.84),
-				Color(PINK_SUBTITLE_DISABLED_BACK.r, PINK_SUBTITLE_DISABLED_BACK.g, PINK_SUBTITLE_DISABLED_BACK.b, 0.84),
+				Color(subtitle_disabled_outline_color.r, subtitle_disabled_outline_color.g, subtitle_disabled_outline_color.b, 0.84),
+				Color(subtitle_disabled_back_color.r, subtitle_disabled_back_color.g, subtitle_disabled_back_color.b, 0.84),
 				1.0,
 				1.02
 			)
 		"detail_emphasis":
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE_STRONG,
-				PINK_SUBTITLE_BACK_STRONG,
+				subtitle_outline_strong_color,
+				subtitle_back_strong_color,
 				1.03,
 				1.026
 			)
 		"detail_warning":
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE_STRONG,
-				PINK_SUBTITLE_BACK_STRONG,
+				subtitle_outline_strong_color,
+				subtitle_back_strong_color,
 				1.0,
 				1.024
 			)
 		"hint":
 			return _make_palette(
 				_white_fill(0.95),
-				PINK_SUBTITLE_OUTLINE,
-				PINK_SUBTITLE_BACK,
+				subtitle_outline_color,
+				subtitle_back_color,
 				1.0,
 				1.02
 			)
 		_:
 			return _make_palette(
 				_white_fill(1.0),
-				PINK_SUBTITLE_OUTLINE,
-				PINK_SUBTITLE_BACK,
+				subtitle_outline_color,
+				subtitle_back_color,
 				1.0,
 				1.022
 			)
@@ -823,10 +829,22 @@ func _apply_line_visual_state() -> void:
 		var front_color := pair.get("front_color", Color.WHITE) as Color
 		var front_outline := pair.get("front_outline", Color.BLACK) as Color
 		if selected_pulse > 0.0:
-			back_color = back_color.lerp(Color(1.0, 0.86, 0.93, back_color.a), 0.12 * selected_pulse)
-			back_outline = back_outline.lerp(Color(1.0, 0.30, 0.68, back_outline.a), 0.18 * selected_pulse)
-			front_color = front_color.lerp(Color(1.0, 1.0, 1.0, front_color.a), 0.18 * selected_pulse)
-			front_outline = front_outline.lerp(Color(1.0, 0.26, 0.66, front_outline.a), 0.16 * selected_pulse)
+			back_color = back_color.lerp(
+				Color(selected_pulse_back_tint.r, selected_pulse_back_tint.g, selected_pulse_back_tint.b, back_color.a),
+				0.12 * selected_pulse
+			)
+			back_outline = back_outline.lerp(
+				Color(selected_pulse_outline_tint.r, selected_pulse_outline_tint.g, selected_pulse_outline_tint.b, back_outline.a),
+				0.18 * selected_pulse
+			)
+			front_color = front_color.lerp(
+				Color(selected_pulse_front_tint.r, selected_pulse_front_tint.g, selected_pulse_front_tint.b, front_color.a),
+				0.18 * selected_pulse
+			)
+			front_outline = front_outline.lerp(
+				Color(selected_pulse_front_outline_tint.r, selected_pulse_front_outline_tint.g, selected_pulse_front_outline_tint.b, front_outline.a),
+				0.16 * selected_pulse
+			)
 
 		back.modulate = _with_alpha(back_color, alpha)
 		back.outline_modulate = _with_alpha(back_outline, alpha)

@@ -1,0 +1,27 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://controllers/interaction/world_data_panel_component.gd" id="1_data_panel"]
+[ext_resource type="PackedScene" path="res://controllers/interaction/world_interaction_panel.tscn" id="2_interaction_panel"]
+
+[node name="WorldDataPanel" type="Node3D"]
+script = ExtResource("1_data_panel")
+auto_display_context = false
+follow_camera_rotation = false
+y_offset = 0.0
+
+[node name="WorldInteractionPanel" parent="." instance=ExtResource("2_interaction_panel")]
+subtitle_outline_color = Color(0.16, 0.72, 0.92, 1)
+subtitle_outline_strong_color = Color(0.18, 0.86, 0.98, 1)
+subtitle_back_color = Color(0.08, 0.23, 0.34, 0.9)
+subtitle_back_strong_color = Color(0.11, 0.29, 0.42, 0.96)
+subtitle_disabled_outline_color = Color(0.4, 0.62, 0.72, 1)
+subtitle_disabled_back_color = Color(0.2, 0.3, 0.35, 0.78)
+selected_pulse_back_tint = Color(0.44, 0.9, 1, 1)
+selected_pulse_outline_tint = Color(0.22, 0.88, 1, 1)
+selected_pulse_front_tint = Color(1, 1, 1, 1)
+selected_pulse_front_outline_tint = Color(0.3, 0.86, 1, 1)
+hold_indicator_track_color = Color(0.34, 0.82, 0.98, 0.45)
+hold_indicator_fill_color = Color(0.7, 0.95, 1, 0.95)
+show_hold_indicator = false
+left_column_offset = Vector3(-0.45, 0.0, 0.0)
+right_column_offset = Vector3(0.36, 0.0, 0.0)

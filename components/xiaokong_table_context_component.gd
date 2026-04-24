@@ -3,16 +3,21 @@ extends Node
 class_name XiaokongTableContextComponent
 
 const TABLE_CONTEXT_GROUP: StringName = &"xiaokong_table_context"
+const STAT_DISPLAY_ORDER := ["hunger", "thirst", "mood", "favor"]
+const STAT_DISPLAY_NAME := {
+	"hunger": "饱食",
+	"thirst": "水分",
+	"mood": "心情",
+	"favor": "好感",
+}
 
 @export_category("Scan")
 @export var scan_anchor_path: NodePath = NodePath("../table")
 @export var scan_local_center: Vector3 = Vector3(0.0, 0.78, 0.0)
 @export var scan_half_extents: Vector3 = Vector3(1.8, 0.55, 0.95)
-@export_range(1, 12, 1) var max_detail_food_count: int = 6
 
 @export_category("Display")
 @export var panel_title: String = "餐桌"
-@export_multiline var empty_table_detail_text: String = "把食物拖到餐桌上后，让小空入座，再对小空交互即可开始用餐。"
 
 func _ready() -> void:
 	add_to_group(TABLE_CONTEXT_GROUP)
@@ -36,6 +41,22 @@ func get_total_hunger_recovery() -> float:
 	for entry in get_table_food_entries():
 		total += float(entry.get("hunger_delta", 0.0))
 	return total
+
+func get_total_thirst_recovery() -> float:
+	var total := 0.0
+	for entry in get_table_food_entries():
+		total += float(entry.get("thirst_delta", 0.0))
+	return total
+
+func get_total_consumable_delta() -> Dictionary:
+	var totals := {}
+	for entry in get_table_food_entries():
+		var raw_delta: Dictionary = entry.get("delta", {})
+		_accumulate_delta_totals(totals, raw_delta)
+	return totals
+
+func get_total_stat_lines() -> PackedStringArray:
+	return _build_stat_lines_from_delta(get_total_consumable_delta())
 
 func is_xiaokong_seated_here(xiaokong_root: Node) -> bool:
 	var seat_marker: Marker3D = _resolve_xiaokong_active_seat_marker(xiaokong_root)
@@ -82,54 +103,14 @@ func consume_food_entry_by_path(xiaokong_root: Node, item_path: String, reason: 
 	return result
 
 func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldInteractionPanelModel:
+	var entries := get_table_food_entries()
+	if entries.is_empty():
+		return null
+
 	var model := WorldInteractionPanelModel.new()
 	model.title = panel_title
-
-	var entries := get_table_food_entries()
-	model.summary_lines.append("桌上食物 · %d 份" % entries.size())
-	var total_hunger := 0.0
-	for entry in entries:
-		total_hunger += float(entry.get("hunger_delta", 0.0))
-	if total_hunger > 0.0:
-		model.summary_lines.append("总饱食恢复 · +%d" % int(round(total_hunger)))
-	else:
-		model.summary_lines.append("当前暂无可食用餐品")
-
-	if entries.is_empty():
-		model.options.append(
-			WorldInteractionOption.create(
-				"table_empty",
-				"等待上菜",
-				"餐桌上还没有可供小空食用的物品。",
-				WorldInteractionOption.TRIGGER_TAP,
-				0.0,
-				false,
-				"先把食物拖到餐桌上。"
-			)
-		)
-		model.detail_text = empty_table_detail_text.strip_edges()
-		model.hint_lines = PackedStringArray([
-			"把食物拖到桌面上即可被识别。",
-			"小空入座后，请对小空交互开始用餐。",
-		])
-		return model
-
-	model.options.append(
-		WorldInteractionOption.create(
-			"table_status",
-			"查看餐桌状态",
-			"餐桌负责识别食物，小空入座后可直接对她交互用餐。",
-			WorldInteractionOption.TRIGGER_TAP,
-			0.0,
-			false,
-			"请对已入座的小空交互。"
-		)
-	)
-	model.detail_text = _build_food_detail_text(entries)
-	model.hint_lines = PackedStringArray([
-		"餐桌会自动识别桌面上的可食用物品。",
-		"小空入座后，对小空按 E 开始用餐。",
-	])
+	model.summary_lines = get_total_stat_lines()
+	model.detail_text = ""
 	return model
 
 func execute_world_panel_option(_option_id: String, _helper: Node, _context: Dictionary, _completed_by_hold: bool, _hold_time: float) -> void:
@@ -174,13 +155,15 @@ func _build_food_entry(node: Node3D) -> Dictionary:
 		return {}
 	var delta: Dictionary = item_data.get_consumable_delta()
 	var hunger_delta: float = float(delta.get("hunger", delta.get("ai_hunger", 0.0)))
+	var thirst_delta: float = float(delta.get("thirst", delta.get("ai_thirst", 0.0)))
 	return {
 		"node": node,
 		"item_path": String(node.get_path()),
 		"item_name": _get_item_name(item_data, node),
 		"item_data": item_data,
-		"delta": delta.duplicate(true),
+		"delta": _normalize_delta(delta),
 		"hunger_delta": hunger_delta,
+		"thirst_delta": thirst_delta,
 		"summary_text": _build_delta_summary(delta),
 	}
 
@@ -255,32 +238,62 @@ func _get_item_name(item_data: ItemData, node: Node = null) -> String:
 	return "未知食物"
 
 func _build_delta_summary(delta: Dictionary) -> String:
-	var parts := PackedStringArray()
-	var hunger: float = float(delta.get("hunger", delta.get("ai_hunger", 0.0)))
-	if absf(hunger) > 0.01:
-		parts.append("饱食 %+d" % int(round(hunger)))
-	var thirst: float = float(delta.get("thirst", delta.get("ai_thirst", 0.0)))
-	if absf(thirst) > 0.01:
-		parts.append("口渴 %+d" % int(round(thirst)))
-	var mood: float = float(delta.get("mood", delta.get("ai_mood", 0.0)))
-	if absf(mood) > 0.01:
-		parts.append("心情 %+d" % int(round(mood)))
-	if parts.is_empty():
+	var lines := _build_stat_lines_from_delta(_normalize_delta(delta))
+	if lines.is_empty():
 		return "可食用"
-	return " · ".join(parts)
+	return " · ".join(lines)
 
-func _build_food_detail_text(entries: Array[Dictionary]) -> String:
-	if entries.is_empty():
-		return empty_table_detail_text.strip_edges()
+func _normalize_delta(delta: Dictionary) -> Dictionary:
+	var normalized := {}
+	_accumulate_delta_totals(normalized, delta)
+	return normalized
 
+func _accumulate_delta_totals(target: Dictionary, raw_delta: Dictionary) -> void:
+	for raw_key in raw_delta.keys():
+		var normalized_key: String = _normalize_stat_key(String(raw_key))
+		var value: float = float(raw_delta.get(raw_key, 0.0))
+		if absf(value) <= 0.0001:
+			continue
+		target[normalized_key] = float(target.get(normalized_key, 0.0)) + value
+
+func _normalize_stat_key(raw_key: String) -> String:
+	match raw_key:
+		"ai_hunger":
+			return "hunger"
+		"ai_thirst":
+			return "thirst"
+		"ai_mood":
+			return "mood"
+		_:
+			return raw_key
+
+func _build_stat_lines_from_delta(delta: Dictionary) -> PackedStringArray:
 	var lines := PackedStringArray()
-	var count: int = mini(entries.size(), max_detail_food_count)
-	for index in range(count):
-		var entry: Dictionary = entries[index]
-		lines.append("%s · %s" % [String(entry.get("item_name", "食物")), String(entry.get("summary_text", "可食用"))])
-	if entries.size() > count:
-		lines.append("… 还有 %d 份食物" % (entries.size() - count))
-	return "\n".join(lines)
+	for key in STAT_DISPLAY_ORDER:
+		if not delta.has(key):
+			continue
+		var value: float = float(delta.get(key, 0.0))
+		if absf(value) <= 0.0001:
+			continue
+		lines.append("%s %+d" % [_get_stat_display_name(key), int(round(value))])
+
+	var extra_keys: Array[String] = []
+	for raw_key in delta.keys():
+		var key: String = String(raw_key)
+		if STAT_DISPLAY_ORDER.has(key):
+			continue
+		extra_keys.append(key)
+	extra_keys.sort()
+
+	for key in extra_keys:
+		var value: float = float(delta.get(key, 0.0))
+		if absf(value) <= 0.0001:
+			continue
+		lines.append("%s %+d" % [_get_stat_display_name(key), int(round(value))])
+	return lines
+
+func _get_stat_display_name(key: String) -> String:
+	return String(STAT_DISPLAY_NAME.get(key, key))
 
 func _find_save_component_recursive(root_node: Node) -> Node:
 	if root_node == null:

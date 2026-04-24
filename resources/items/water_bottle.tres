@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://casjryoyf0u0t"]
 
-[ext_resource type="Texture2D" path="res://resources/items/icons/water_bottle_ui.png" id="1_be2vl"]
+[ext_resource type="Texture2D" uid="uid://cnqyitpne58k7" path="res://resources/items/icons/water_bottle_ui.png" id="1_be2vl"]
 [ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_q6k5x"]
 [ext_resource type="Script" uid="uid://fwdycesy23hk" path="res://scripts/xiaokong/resources/xiaokong_stat_modifier.gd" id="2_stat_mod"]
 
