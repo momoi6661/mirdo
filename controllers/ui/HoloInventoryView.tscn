@@ -1,0 +1,174 @@
+[gd_scene format=3 uid="uid://ce4yholo_inventory_view"]
+
+[ext_resource type="Script" path="res://controllers/scripts/holo_inventory_view.gd" id="1_view_script"]
+[ext_resource type="FontFile" uid="uid://bgf5i1l7fr6ww" path="res://fonts/SmileySans-Oblique.ttf" id="2_font"]
+[ext_resource type="PackedScene" path="res://controllers/ui/HoloInventorySlot.tscn" id="3_slot_scene"]
+
+[node name="HoloInventoryView" type="Panel" node_paths=PackedStringArray("slots_root_path", "title_label_path", "drag_icon_path", "drag_count_path")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_view_script")
+slots_root_path = NodePath("SafeArea/Main/Slots/Scroll/Grid")
+title_label_path = NodePath("SafeArea/Main/Header/Title")
+drag_icon_path = NodePath("DragLayer/DragIcon")
+drag_count_path = NodePath("DragLayer/DragCount")
+slot_scene = ExtResource("3_slot_scene")
+
+[node name="Back" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.26, 0.20, 0.40, 0.32)
+
+[node name="ScanLine" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 64.0
+offset_bottom = 66.0
+grow_horizontal = 2
+mouse_filter = 2
+color = Color(1, 0.9, 1, 0.15)
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="Main" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="SafeArea/Main"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="SafeArea/Main/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(1, 0.94, 1, 1)
+theme_override_colors/font_outline_color = Color(0.2, 0.1, 0.28, 0.95)
+theme_override_constants/outline_size = 4
+text = "背包"
+
+[node name="Hint" type="Label" parent="SafeArea/Main/Header"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.9, 0.84, 1, 0.9)
+text = "LMB拖拽  SHIFT半组  CTRL单个"
+
+[node name="Slots" type="PanelContainer" parent="SafeArea/Main"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Scroll" type="ScrollContainer" parent="SafeArea/Main/Slots"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Grid" type="GridContainer" parent="SafeArea/Main/Slots/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 6
+
+[node name="CornerDecoTL" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+offset_right = 52.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(1, 0.9, 1, 0.7)
+
+[node name="CornerDecoTLV" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+offset_right = 3.0
+offset_bottom = 40.0
+mouse_filter = 2
+color = Color(1, 0.9, 1, 0.7)
+
+[node name="CornerDecoBR" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -52.0
+offset_top = -3.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+color = Color(1, 0.9, 1, 0.7)
+
+[node name="CornerDecoBRV" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -3.0
+offset_top = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+color = Color(1, 0.9, 1, 0.7)
+
+[node name="DragLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DragIcon" type="TextureRect" parent="DragLayer"]
+visible = false
+layout_mode = 0
+custom_minimum_size = Vector2(46, 46)
+expand_mode = 1
+stretch_mode = 5
+
+[node name="DragCount" type="Label" parent="DragLayer"]
+visible = false
+layout_mode = 0
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 0.95, 1, 1)
+theme_override_colors/font_outline_color = Color(0.2, 0.1, 0.28, 0.9)
+theme_override_constants/outline_size = 3
+text = "1"

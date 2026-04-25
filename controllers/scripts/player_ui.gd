@@ -3,7 +3,7 @@ extends Control
 @onready var player_controller: Node = $".."
 @onready var speed_label: Label = $DebugPanel/MarginContainer/VBoxContainer/SpeedLabel
 @onready var status_label: Label = $DebugPanel/MarginContainer/VBoxContainer/StatusLabel
-@onready var inventory_ui: Control = $InventoryUi
+@onready var inventory_ui: Control = get_node_or_null("InventoryUi") as Control
 
 @onready var reticle_container: CenterContainer = $CenterContainer
 

@@ -13,7 +13,10 @@ extends CharacterBody3D
 @export var step_handler:StepHandlerComponent
 @export var pickup_handler:PickupHandlerComponent
 @export var standing_collision:CollisionShape3D
-@export var inventory_handler:InventoryHandler
+@export var inventory_handler:InventoryDataService
+@export var inventory_panel_3d: HoloInventoryPanel3D
+@export var dual_inventory_panel: Node
+@export_range(0.5, 10.0, 0.1) var inventory_drop_distance: float = 2.5
 @export var unique_id: String = "player_001"
 
 @export_category("Footstep Audio")
@@ -26,6 +29,12 @@ extends CharacterBody3D
 @export var footstep_pitch_max: float = 1.06
 @export var footstep_clips: Array[AudioStream] = []
 @export_dir var footstep_folder_path: String = "res://Audio/footsteps/concrete"
+
+@export_category("Inventory UI Audio")
+@export var inventory_ui_sfx_player_path: NodePath = NodePath("InventoryUISFXPlayer")
+@export var inventory_open_sfx: AudioStream = preload("res://Audio/pausemenu/rollover1.ogg")
+@export var inventory_close_sfx: AudioStream = preload("res://Audio/pausemenu/rollover2.ogg")
+@export var inventory_ui_sfx_volume_db: float = -7.0
 
 var interact_hold_timer:float=0.0
 var is_interacting:bool=false
@@ -52,6 +61,7 @@ var is_on_crouching:bool=false
 var is_on_stand:bool=false
 var _footstep_player: AudioStreamPlayer3D
 var _footstep_elapsed: float = 0.0
+var _inventory_ui_sfx_player: AudioStreamPlayer
 
 var _mouse_rotation : Vector3
 var _player_rotation : Vector3
@@ -69,8 +79,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 var _drop_timer: float = 0.0
 var _is_holding_drop: bool = false
+var _inventory_mouse_free_mode: bool = false
 
 func _input(event):
+	if event.is_action_pressed("inventory"):
+		_toggle_inventory_panel()
+		get_viewport().set_input_as_handled()
+		return
+
 	if is_ui_text_input_focused():
 		if event.is_action_released("drop_item"):
 			_is_holding_drop = false
@@ -78,7 +94,10 @@ func _input(event):
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ALT:
-		_toggle_mouse_capture_mode()
+		if _is_inventory_panel_open():
+			_toggle_inventory_mouse_mode()
+		else:
+			_toggle_mouse_capture_mode()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -106,6 +125,12 @@ func _toggle_mouse_capture_mode() -> void:
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+func _toggle_inventory_mouse_mode() -> void:
+	_inventory_mouse_free_mode = not _inventory_mouse_free_mode
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _inventory_mouse_free_mode else Input.MOUSE_MODE_CAPTURED
+	_update_inventory_alt_hint()
+
+
 func _process(delta):
 	# 只要按住 T 键，就累加时间
 	if _is_holding_drop:
@@ -116,8 +141,183 @@ func add_to_inventory(item: ItemData) -> bool:
 	if not inventory_handler:
 		print("错误: inventory_handler 未设置")
 		return false
-	
+
 	return inventory_handler.PickupItem(item)
+
+
+func _toggle_inventory_panel() -> void:
+	if _is_dual_inventory_panel_open():
+		_close_dual_inventory_panel()
+		return
+	_set_inventory_panel_open(not _is_inventory_panel_open())
+
+
+func _set_inventory_panel_open(should_open: bool) -> void:
+	var was_open: bool = _is_single_inventory_panel_open()
+	if _is_dual_inventory_panel_open():
+		if not should_open:
+			_close_dual_inventory_panel()
+		return
+
+	if inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		if should_open:
+			inventory_panel_3d.show_panel()
+		else:
+			inventory_panel_3d.hide_panel()
+
+	if inventory_handler and is_instance_valid(inventory_handler):
+		inventory_handler.inventory_visible = should_open
+
+	if should_open:
+		_inventory_mouse_free_mode = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		_inventory_mouse_free_mode = false
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_update_inventory_alt_hint()
+
+	var now_open: bool = _is_single_inventory_panel_open()
+	if was_open != now_open:
+		_play_inventory_ui_sfx(now_open)
+
+
+func _is_inventory_panel_open() -> bool:
+	if _is_dual_inventory_panel_open():
+		return true
+	if inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		return inventory_panel_3d.is_panel_open()
+	if inventory_handler and is_instance_valid(inventory_handler):
+		return inventory_handler.inventory_visible
+	return false
+
+func _is_single_inventory_panel_open() -> bool:
+	if _is_dual_inventory_panel_open():
+		return false
+	if inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		return inventory_panel_3d.is_panel_open()
+	return false
+
+func _update_inventory_alt_hint() -> void:
+	var is_inventory_open: bool = _is_inventory_panel_open()
+	var is_mouse_free_for_inventory: bool = _inventory_mouse_free_mode and is_inventory_open
+
+	if inventory_panel_3d != null and is_instance_valid(inventory_panel_3d):
+		if inventory_panel_3d.has_method("set_alt_hint_state"):
+			inventory_panel_3d.call("set_alt_hint_state", is_mouse_free_for_inventory and _is_single_inventory_panel_open())
+
+	if _has_dual_inventory_panel() and dual_inventory_panel.has_method("set_alt_hint_state"):
+		dual_inventory_panel.call("set_alt_hint_state", is_mouse_free_for_inventory)
+
+
+func open_loot_dual_panel(container: Node) -> void:
+	if inventory_panel_3d and is_instance_valid(inventory_panel_3d) and inventory_panel_3d.is_panel_open():
+		inventory_panel_3d.hide_panel()
+	_inventory_mouse_free_mode = false
+	_update_inventory_alt_hint()
+	_open_dual_inventory_panel(container)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _has_dual_inventory_panel() -> bool:
+	return dual_inventory_panel != null and is_instance_valid(dual_inventory_panel)
+
+
+func _is_dual_inventory_panel_open() -> bool:
+	if not _has_dual_inventory_panel():
+		return false
+	if not dual_inventory_panel.has_method("is_dual_panel_open"):
+		return false
+	return bool(dual_inventory_panel.call("is_dual_panel_open"))
+
+
+func _close_dual_inventory_panel() -> void:
+	if not _has_dual_inventory_panel():
+		return
+	_inventory_mouse_free_mode = false
+	if dual_inventory_panel.has_method("close_dual_panel"):
+		dual_inventory_panel.call("close_dual_panel")
+	_update_inventory_alt_hint()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _open_dual_inventory_panel(container: Node) -> void:
+	if not _has_dual_inventory_panel():
+		return
+	if dual_inventory_panel.has_method("open_for_container"):
+		dual_inventory_panel.call("open_for_container", container)
+
+
+func _on_loot_container_switch_requested(container: Node, player_node: Node) -> void:
+	if player_node != self:
+		return
+	if not _is_dual_inventory_panel_open():
+		return
+	var target_container := container as LootContainerComponent
+	if target_container == null:
+		return
+	if target_container.has_method("get_operate_range_area"):
+		var area := target_container.call("get_operate_range_area") as Area3D
+		if area == null or not area.overlaps_body(self):
+			return
+	if _has_dual_inventory_panel() and dual_inventory_panel.has_method("get_active_container"):
+		var active_container := dual_inventory_panel.call("get_active_container") as LootContainerComponent
+		if active_container == target_container:
+			return
+	_open_dual_inventory_panel(target_container)
+
+
+func _on_inventory_drop_requested(item: ItemData, amount: int) -> void:
+	_spawn_dropped_inventory_item(item, amount)
+
+
+func _spawn_dropped_inventory_item(item: ItemData, amount: int) -> void:
+	if item == null or amount <= 0:
+		return
+
+	var item_scene := item.get_scene()
+	if item_scene == null:
+		return
+
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+
+	var camera := CAMERA_CONTROLLER
+	if camera == null or not is_instance_valid(camera):
+		camera = viewport.get_camera_3d()
+
+	var spawn_pos := global_position + Vector3(0, 0.2, -1.0)
+	if camera != null:
+		var mouse_pos := viewport.get_mouse_position()
+		var ray_from := camera.project_ray_origin(mouse_pos)
+		var ray_to := ray_from + camera.project_ray_normal(mouse_pos) * inventory_drop_distance
+		var world := viewport.get_world_3d()
+		if world != null:
+			var query := PhysicsRayQueryParameters3D.create(ray_from, ray_to, 1)
+			query.exclude = [self]
+			query.collision_mask = 3
+			var result := world.direct_space_state.intersect_ray(query)
+			if not result.is_empty():
+				spawn_pos = result.position + result.normal * 0.08
+			else:
+				spawn_pos = ray_to
+	else:
+		var forward := -global_basis.z.normalized()
+		spawn_pos = global_position + forward * 1.1
+		spawn_pos.y = global_position.y + 0.2
+
+	var spawn_parent := get_parent()
+	if spawn_parent == null:
+		return
+
+	for i in range(amount):
+		var dropped_item := item_scene.instantiate() as Node3D
+		if dropped_item == null:
+			continue
+		spawn_parent.add_child(dropped_item)
+		var spread_x := (float(i) - float(amount - 1) * 0.5) * 0.14
+		var spread_z := float(i % 2) * 0.1
+		dropped_item.global_position = spawn_pos + Vector3(spread_x, 0.0, spread_z)
 
 func _update_camera(delta):
 	_mouse_rotation.x += _tilt_input * delta
@@ -286,6 +486,27 @@ func _play_footstep_audio() -> void:
 	_apply_footstep_volume()
 	_footstep_player.pitch_scale = randf_range(footstep_pitch_min, footstep_pitch_max)
 	_footstep_player.play()
+
+func _resolve_inventory_ui_sfx_player() -> void:
+	_inventory_ui_sfx_player = get_node_or_null(inventory_ui_sfx_player_path) as AudioStreamPlayer
+	if _inventory_ui_sfx_player == null:
+		_inventory_ui_sfx_player = get_node_or_null("InventoryUISFXPlayer") as AudioStreamPlayer
+	if _inventory_ui_sfx_player == null:
+		_inventory_ui_sfx_player = AudioStreamPlayer.new()
+		_inventory_ui_sfx_player.name = "InventoryUISFXPlayer"
+		add_child(_inventory_ui_sfx_player)
+	_inventory_ui_sfx_player.bus = "UI" if AudioServer.get_bus_index("UI") != -1 else "Master"
+	_inventory_ui_sfx_player.volume_db = inventory_ui_sfx_volume_db
+
+func _play_inventory_ui_sfx(is_opening: bool) -> void:
+	if _inventory_ui_sfx_player == null:
+		return
+	var stream: AudioStream = inventory_open_sfx if is_opening else inventory_close_sfx
+	if stream == null:
+		return
+	_inventory_ui_sfx_player.stop()
+	_inventory_ui_sfx_player.stream = stream
+	_inventory_ui_sfx_player.play()
 	
 func handle_rigid_body_collisions():
 	if not has_node("KickArea"):
@@ -327,6 +548,7 @@ func _ready():
 	_resolve_footstep_player()
 	_autoload_footstep_clips()
 	_apply_footstep_volume()
+	_resolve_inventory_ui_sfx_player()
 	shape_cast_3d.add_exception($'.')
 	add_to_group("player")
 	if not is_in_group("Savable"):
@@ -336,6 +558,10 @@ func _ready():
 		
 	shape_cast_3d.position.y=1.7
 	Global.player=self
+	if Global != null and Global.has_signal("loot_container_switch_requested"):
+		var switch_callable := Callable(self, "_on_loot_container_switch_requested")
+		if not Global.is_connected("loot_container_switch_requested", switch_callable):
+			Global.connect("loot_container_switch_requested", switch_callable)
 	
 	print("step_handler: ", step_handler)
 	if !step_handler:
@@ -346,6 +572,27 @@ func _ready():
 	if !pickup_handler:
 		if has_node("Components/PickupHandler"):
 			pickup_handler = $Components/PickupHandler
+
+	if inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		if inventory_handler and is_instance_valid(inventory_handler):
+			inventory_panel_3d.set_inventory_data(inventory_handler)
+		inventory_panel_3d.hide_panel()
+		_update_inventory_alt_hint()
+
+	if _has_dual_inventory_panel():
+		if inventory_handler and is_instance_valid(inventory_handler):
+			if dual_inventory_panel.has_method("bind_player_inventory"):
+				dual_inventory_panel.call("bind_player_inventory", inventory_handler)
+		if dual_inventory_panel.has_signal("world_drop_requested"):
+			var drop_callable := Callable(self, "_on_inventory_drop_requested")
+			if not dual_inventory_panel.is_connected("world_drop_requested", drop_callable):
+				dual_inventory_panel.connect("world_drop_requested", drop_callable)
+	elif inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		if not inventory_panel_3d.drop_requested.is_connected(_on_inventory_drop_requested):
+			inventory_panel_3d.drop_requested.connect(_on_inventory_drop_requested)
+
+	if inventory_handler and is_instance_valid(inventory_handler):
+		inventory_handler.inventory_visible = false
 
 # --- 存档系统自定义接口 ---
 

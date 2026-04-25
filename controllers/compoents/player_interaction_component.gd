@@ -501,8 +501,24 @@ func _execute_world_panel_option(completed_by_hold: bool, hold_time: float) -> v
 	else:
 		return
 
+	if _should_clear_world_target_after_execute():
+		_clear_target()
+		return
+
 	_world_panel_refresh_elapsed = 0.0
 	_refresh_world_panel()
+
+func _should_clear_world_target_after_execute() -> bool:
+	if current_interactable == null:
+		return true
+	if not is_instance_valid(current_interactable):
+		return true
+	if current_interactable.is_queued_for_deletion():
+		return true
+	var target_parent: Node = current_interactable.get_parent()
+	if target_parent != null and is_instance_valid(target_parent) and target_parent.is_queued_for_deletion():
+		return true
+	return false
 
 func _call_world_focus(focused: bool) -> void:
 	if current_interactable == null or not is_instance_valid(current_interactable):
@@ -519,39 +535,54 @@ func _build_legacy_world_panel_model(target: Node) -> WorldInteractionPanelModel
 
 	var model: WorldInteractionPanelModel = WorldInteractionPanelModel.new()
 	model.title = _get_legacy_panel_title(target)
-	model.summary_lines = PackedStringArray([
-		"滚轮切换",
-		"按E选择",
-	])
 
 	var supports_pickup: bool = _legacy_supports_pickup_hand(target)
 	var supports_stash: bool = _legacy_supports_stash_inventory(target)
+	var hold_duration: float = _get_legacy_hold_duration(target)
 
-	if supports_pickup:
+	if supports_pickup and supports_stash:
 		model.options.append(
 			WorldInteractionOption.create(
-				"legacy_pickup_hand",
+				"legacy_pickup_or_stash",
 				"拿起",
-				"拿在手上，便于拖拽放置。",
+				"短按拿起，长按收纳。",
+				WorldInteractionOption.TRIGGER_BOTH,
+				hold_duration
+			)
+		)
+		model.summary_lines = PackedStringArray([
+			"短按：拿起",
+			"长按：收纳",
+		])
+	elif supports_pickup:
+		model.options.append(
+			WorldInteractionOption.create(
+				"legacy_pickup_only",
+				"拿起",
+				"短按拿起。",
 				WorldInteractionOption.TRIGGER_TAP
 			)
 		)
-
-	if supports_stash:
+		model.summary_lines = PackedStringArray([
+			"短按：拿起",
+		])
+	elif supports_stash:
 		var can_stash_now: bool = _legacy_can_stash_now(target)
 		model.options.append(
 			WorldInteractionOption.create(
-				"legacy_stash_inventory",
+				"legacy_stash_only",
 				"收纳",
-				"放入背包。",
-				WorldInteractionOption.TRIGGER_TAP,
-				0.0,
+				"长按收纳。",
+				WorldInteractionOption.TRIGGER_HOLD,
+				hold_duration,
 				can_stash_now,
 				"" if can_stash_now else "背包空间不足"
 			)
 		)
-
-	if model.options.is_empty():
+		model.summary_lines = PackedStringArray([
+			"长按：收纳",
+		])
+	else:
 		model.options.append(
 			WorldInteractionOption.create(
 				"legacy_interact",
@@ -560,27 +591,47 @@ func _build_legacy_world_panel_model(target: Node) -> WorldInteractionPanelModel
 				WorldInteractionOption.TRIGGER_TAP
 			)
 		)
+		model.summary_lines = PackedStringArray([
+			"按E交互",
+		])
 
 	return model
 
-func _execute_legacy_world_panel_option(target: Node, option_id: String, _completed_by_hold: bool, _hold_time: float) -> void:
+func _execute_legacy_world_panel_option(target: Node, option_id: String, completed_by_hold: bool, _hold_time: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	if Global.player == null:
 		return
 
 	match option_id:
-		"legacy_pickup_hand":
+		"legacy_pickup_or_stash":
+			if completed_by_hold:
+				if target.has_method("interact"):
+					target.call("interact", Global.player)
+			elif target.has_method("short_interact"):
+				target.call("short_interact", Global.player)
+			elif target.has_method("interact"):
+				target.call("interact", Global.player)
+		"legacy_pickup_only":
 			if target.has_method("short_interact"):
 				target.call("short_interact", Global.player)
 			elif target.has_method("interact"):
 				target.call("interact", Global.player)
-		"legacy_stash_inventory":
+		"legacy_stash_only":
 			if target.has_method("interact"):
 				target.call("interact", Global.player)
 		_:
 			if target.has_method("interact"):
 				target.call("interact", Global.player)
+
+func _get_legacy_hold_duration(target: Node) -> float:
+	if target == null or not is_instance_valid(target):
+		return world_panel_default_hold_duration_sec
+	if target.has_method("get_interaction_time"):
+		var value: Variant = target.call("get_interaction_time")
+		if value is int or value is float:
+			return maxf(float(value), 0.05)
+	return world_panel_default_hold_duration_sec
 
 func _legacy_supports_pickup_hand(target: Node) -> bool:
 	if target == null or not is_instance_valid(target):

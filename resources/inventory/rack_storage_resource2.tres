@@ -1,0 +1,69 @@
+[gd_resource type="Resource" script_class="InventoryStorageResource" format=3 uid="uid://cib34h0x0ve6g"]
+
+[ext_resource type="Script" uid="uid://bobrl64w5up62" path="res://scripts/Inventory/inventory_storage_resource.gd" id="1_storage_script"]
+[ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
+[ext_resource type="Resource" uid="uid://dp3xsip8d64ax" path="res://resources/items/can_soup.tres" id="3_can_soup"]
+[ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="4_water_bottle"]
+
+[sub_resource type="Resource" id="Resource_slot_01"]
+script = ExtResource("2_slot_script")
+item = ExtResource("4_water_bottle")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_02"]
+script = ExtResource("2_slot_script")
+item = ExtResource("3_can_soup")
+
+[sub_resource type="Resource" id="Resource_slot_03"]
+script = ExtResource("2_slot_script")
+item = ExtResource("3_can_soup")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_04"]
+script = ExtResource("2_slot_script")
+item = ExtResource("4_water_bottle")
+
+[sub_resource type="Resource" id="Resource_slot_05"]
+script = ExtResource("2_slot_script")
+item = ExtResource("4_water_bottle")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_06"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_07"]
+script = ExtResource("2_slot_script")
+item = ExtResource("3_can_soup")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_08"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_09"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_10"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_11"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_12"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_13"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_14"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_15"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_16"]
+script = ExtResource("2_slot_script")
+
+[resource]
+script = ExtResource("1_storage_script")
+slot_count = 16
+slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16")])

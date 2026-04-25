@@ -15,13 +15,16 @@
 [ext_resource type="Script" uid="uid://bk3fwfdlmkwao" path="res://controllers/compoents/step_handler_component.gd" id="12_step"]
 [ext_resource type="Script" uid="uid://76ijpxrm7y33" path="res://controllers/compoents/pickup_handler_component.gd" id="13_pickup"]
 [ext_resource type="Script" uid="uid://uhf2cghy364c" path="res://controllers/compoents/player_interaction_component.gd" id="13_yvtcv"]
-[ext_resource type="PackedScene" uid="uid://dgmyb0374yij2" path="res://controllers/ui/InventoryUI.tscn" id="15_3og01"]
+[ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="15_3og01"]
+[ext_resource type="Script" uid="uid://d4eiyuungt88w" path="res://scripts/Inventory/inventory_data_service.gd" id="16_inv_data"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="17_save_comp"]
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
 [ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
 [ext_resource type="AudioStream" uid="uid://dc3ojh2l6f4oi" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
 [ext_resource type="PackedScene" uid="uid://cih1ba2m6uqc5" path="res://controllers/interaction/world_interaction_panel.tscn" id="23_world_panel"]
+[ext_resource type="Resource" uid="uid://ca22678m80wis" path="res://resources/inventory/player_inventory_storage.tres" id="24_inv_storage"]
+[ext_resource type="Script" uid="uid://crsyy4ppfnwnf" path="res://controllers/interaction/holo_inventory_dual_panel_3d.gd" id="25_dual_inv"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -180,7 +183,7 @@ border_color = Color(0.9, 0.3, 0.05, 1)
 height = 1.0449219
 radius = 0.37548828
 
-[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler")]
+[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler", "inventory_panel_3d", "dual_inventory_panel")]
 collision_layer = 4
 collision_mask = 33
 wall_min_slide_angle = 0.7853982
@@ -190,7 +193,9 @@ CAMERA_CONTROLLER = NodePath("Marker3D/CameraOffset/Camera3D")
 step_handler = NodePath("Components/StepHandler")
 pickup_handler = NodePath("Components/PickupHandler")
 standing_collision = NodePath("CollisionShape3D")
-inventory_handler = NodePath("Control/InventoryUi")
+inventory_handler = NodePath("Components/InventoryDataService")
+inventory_panel_3d = NodePath("HoloInventoryPanel3D")
+dual_inventory_panel = NodePath("HoloInventoryDualPanel3D")
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -252,6 +257,10 @@ arm_end = NodePath("../../Marker3D/CameraOffset/PickUpArm/ArmEnd")
 throw_force = 8.0
 follow_speed = 15.0
 
+[node name="InventoryDataService" type="Node" parent="Components" unique_id=1256058613]
+script = ExtResource("16_inv_data")
+inventory_storage = ExtResource("24_inv_storage")
+
 [node name="PlayerInteractionComponent" type="Node" parent="Components" unique_id=2034430049 node_paths=PackedStringArray("interaction_ray")]
 script = ExtResource("13_yvtcv")
 interaction_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
@@ -306,7 +315,6 @@ option_font_size = 60
 detail_font_size = 48
 hint_font_size = 40
 subtitle_outline_ratio = 0.13
-back_outline_extra_size = 0
 
 [node name="PickUpArm" type="SpringArm3D" parent="Marker3D/CameraOffset" unique_id=1410065400]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0)
@@ -319,6 +327,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2)
 [node name="InteractionPanelArm" type="SpringArm3D" parent="Marker3D/CameraOffset" unique_id=1029475632]
 shape = SubResource("SphereShape3D_panel_arm")
 spring_length = -1.0
+
+[node name="InventoryPanelMark3D" type="Marker3D" parent="." unique_id=1616811236]
+transform = Transform3D(1, 0, 0, 0, 0.9659254, 0.25881892, 0, -0.25881892, 0.9659254, 0, 0.98809254, -0.5110427)
+
+[node name="HoloInventoryPanel3D" parent="." unique_id=1599883766 instance=ExtResource("15_3og01")]
+transform = Transform3D(1, 0, 0, 0, 0.66068214, 0.75066584, 0, -0.75066584, 0.66068214, 0, 0.98809254, -0.5110427)
+camera_path = NodePath("../Marker3D/CameraOffset/Camera3D")
+anchor_mark_path = NodePath("../InventoryPanelMark3D")
+inventory_data_path = NodePath("../Components/InventoryDataService")
+face_camera_when_using_mark = false
+use_anchor_mark_transform_directly = false
+panel_pitch_degrees = -14.0
+auto_place_hint_below_second_row = false
+
+[node name="HoloInventoryDualPanel3D" type="Node" parent="." unique_id=1389069987]
+script = ExtResource("25_dual_inv")
+close_check_interval_sec = 0.12
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1882923, 0)
@@ -370,11 +395,6 @@ width = 3.0
 visible = false
 points = PackedVector2Array(-5, 0, -15, 0)
 width = 3.0
-
-[node name="InventoryUi" parent="Control" unique_id=1812563664 node_paths=PackedStringArray("player") instance=ExtResource("15_3og01")]
-layout_mode = 1
-ItemSlotsCount = 14
-player = NodePath("../..")
 
 [node name="DebugPanel" type="PanelContainer" parent="Control" unique_id=-294967295]
 layout_mode = 1

@@ -54,15 +54,43 @@ func get_save_data() -> Dictionary:
 		
 	# 2. 自动寻找同级组件并保存（无需在父节点写代码即可自动保存 LootContainerComponent！）
 	var sibling_data = {}
+	var inventory_payloads = {}
 	for child in parent.get_children():
 		if child == self: continue
 		if child.has_method("get_container_save_data"):
 			sibling_data["loot"] = child.get_container_save_data()
 		elif child.has_method("_get_custom_save_data"):
 			sibling_data[child.name] = child._get_custom_save_data()
+		if child.has_method("build_inventory_save_payload"):
+			inventory_payloads[child.name] = child.build_inventory_save_payload()
 			
 	if not sibling_data.is_empty():
 		data["siblings"] = sibling_data
+	if not inventory_payloads.is_empty():
+		data["inventory_payloads"] = inventory_payloads
+
+	# 3. 递归记录子树组件（支持像 rack_001/rack_001_col 这样的深层容器）
+	var component_states := {}
+	var descendants: Array = parent.find_children("*", "", true, false)
+	for node_raw in descendants:
+		var node := node_raw as Node
+		if node == null or node == self:
+			continue
+		var state := {}
+		if node.has_method("get_container_save_data"):
+			state["loot"] = node.get_container_save_data()
+		if node.has_method("_get_custom_save_data"):
+			state["custom"] = node._get_custom_save_data()
+		if node.has_method("build_inventory_save_payload"):
+			state["inventory_payload"] = node.build_inventory_save_payload()
+		if state.is_empty():
+			continue
+		var rel_path: NodePath = parent.get_path_to(node)
+		state["path"] = rel_path
+		component_states[String(rel_path)] = state
+
+	if not component_states.is_empty():
+		data["component_states"] = component_states
 		
 	return data
 
@@ -88,3 +116,31 @@ func load_save_data(data: Dictionary) -> void:
 				child.load_container_save_data(sibling_data["loot"])
 			elif child.has_method("_load_custom_save_data") and sibling_data.has(child.name):
 				child._load_custom_save_data(sibling_data[child.name])
+
+	if data.has("inventory_payloads"):
+		var payloads: Dictionary = data["inventory_payloads"]
+		for child in parent.get_children():
+			if child == self:
+				continue
+			if not child.has_method("apply_inventory_save_payload"):
+				continue
+			if payloads.has(child.name):
+				child.apply_inventory_save_payload(payloads[child.name])
+
+	# 3. 恢复递归组件状态（优先深层路径，兼容储物柜）
+	if data.has("component_states"):
+		var component_states: Dictionary = data["component_states"]
+		for key in component_states.keys():
+			var state: Dictionary = component_states.get(key, {}) as Dictionary
+			if state.is_empty():
+				continue
+			var path_str: String = String(state.get("path", key))
+			var target := parent.get_node_or_null(NodePath(path_str))
+			if target == null:
+				continue
+			if state.has("loot") and target.has_method("load_container_save_data"):
+				target.load_container_save_data(state["loot"])
+			if state.has("custom") and target.has_method("_load_custom_save_data"):
+				target._load_custom_save_data(state["custom"])
+			if state.has("inventory_payload") and target.has_method("apply_inventory_save_payload"):
+				target.apply_inventory_save_payload(state["inventory_payload"])

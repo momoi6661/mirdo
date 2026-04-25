@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="980" viewBox="0 0 1680 980">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f2735"/>
+      <stop offset="100%" stop-color="#111723"/>
+    </linearGradient>
+    <linearGradient id="panelA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f2ff33"/>
+      <stop offset="100%" stop-color="#d9d0ff20"/>
+    </linearGradient>
+    <linearGradient id="panelB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2f7ff30"/>
+      <stop offset="100%" stop-color="#cfe0ff1f"/>
+    </linearGradient>
+    <linearGradient id="panelC" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff6ef35"/>
+      <stop offset="100%" stop-color="#ffe2cf20"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ffffff" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1680" height="980" fill="url(#bg)"/>
+  <text x="840" y="64" fill="#f3f7ff" font-size="34" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">背包3D悬浮面板 - 样式决策图（仅X轴倾斜）</text>
+  <text x="840" y="98" fill="#c9d3e8" font-size="18" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei">固定Mark3D位置 · 面向相机 · 不做左右倾斜（Z=0）</text>
+
+  <!-- Column labels -->
+  <text x="280" y="150" fill="#e8efff" font-size="26" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">方案A 软糯紫</text>
+  <text x="840" y="150" fill="#e8efff" font-size="26" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">方案B 清透蓝</text>
+  <text x="1400" y="150" fill="#e8efff" font-size="26" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">方案C 奶油暖白</text>
+
+  <!-- A -->
+  <g transform="translate(70,190)">
+    <g transform="matrix(1,0,0,0.88,0,62)">
+      <rect x="40" y="20" rx="34" ry="34" width="420" height="560" fill="url(#panelA)" stroke="#f0e7ff80" stroke-width="2" filter="url(#shadow)"/>
+      <rect x="52" y="32" rx="28" ry="28" width="396" height="536" fill="none" stroke="#ffffff30" stroke-width="1.2"/>
+      <text x="72" y="86" fill="#f9f2ff" font-size="32" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">背包</text>
+      <text x="430" y="86" fill="#eedfff" font-size="16" text-anchor="end" font-family="Segoe UI, PingFang SC, Microsoft YaHei">12 / 24</text>
+
+      <g transform="translate(72,118)">
+        <rect x="0" y="0" rx="18" ry="18" width="96" height="88" fill="#f6ecff22" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="108" y="0" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="216" y="0" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="324" y="0" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+
+        <rect x="0" y="102" rx="18" ry="18" width="96" height="88" fill="#f6ecff30" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="108" y="102" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="216" y="102" rx="18" ry="18" width="96" height="88" fill="#f6ecff30" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="324" y="102" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+
+        <rect x="0" y="204" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="108" y="204" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="216" y="204" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="324" y="204" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+
+        <rect x="0" y="306" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="108" y="306" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="216" y="306" rx="18" ry="18" width="96" height="88" fill="#f6ecff32" stroke="#f8eeff90" stroke-width="1.5"/>
+        <rect x="324" y="306" rx="18" ry="18" width="96" height="88" fill="#f6ecff20" stroke="#f8eeff90" stroke-width="1.5"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- B -->
+  <g transform="translate(630,190)">
+    <g transform="matrix(1,0,0,0.88,0,62)">
+      <rect x="40" y="20" rx="34" ry="34" width="420" height="560" fill="url(#panelB)" stroke="#dff0ff86" stroke-width="2" filter="url(#shadow)"/>
+      <rect x="52" y="32" rx="28" ry="28" width="396" height="536" fill="none" stroke="#ffffff32" stroke-width="1.2"/>
+      <text x="72" y="86" fill="#eaf5ff" font-size="32" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">背包</text>
+      <text x="430" y="86" fill="#d7ecff" font-size="16" text-anchor="end" font-family="Segoe UI, PingFang SC, Microsoft YaHei">12 / 24</text>
+
+      <g transform="translate(72,118)">
+        <rect x="0" y="0" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="108" y="0" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="216" y="0" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="324" y="0" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+
+        <rect x="0" y="102" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="108" y="102" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="216" y="102" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="324" y="102" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+
+        <rect x="0" y="204" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="108" y="204" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="216" y="204" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="324" y="204" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+
+        <rect x="0" y="306" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="108" y="306" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="216" y="306" rx="18" ry="18" width="96" height="88" fill="#e9f5ff32" stroke="#e8f6ff88" stroke-width="1.5"/>
+        <rect x="324" y="306" rx="18" ry="18" width="96" height="88" fill="#e9f5ff20" stroke="#e8f6ff88" stroke-width="1.5"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- C -->
+  <g transform="translate(1190,190)">
+    <g transform="matrix(1,0,0,0.88,0,62)">
+      <rect x="40" y="20" rx="34" ry="34" width="420" height="560" fill="url(#panelC)" stroke="#ffe8d188" stroke-width="2" filter="url(#shadow)"/>
+      <rect x="52" y="32" rx="28" ry="28" width="396" height="536" fill="none" stroke="#ffffff30" stroke-width="1.2"/>
+      <text x="72" y="86" fill="#fff4ea" font-size="32" font-family="Segoe UI, PingFang SC, Microsoft YaHei" font-weight="700">背包</text>
+      <text x="430" y="86" fill="#ffe6d0" font-size="16" text-anchor="end" font-family="Segoe UI, PingFang SC, Microsoft YaHei">12 / 24</text>
+
+      <g transform="translate(72,118)">
+        <rect x="0" y="0" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="108" y="0" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="216" y="0" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="324" y="0" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+
+        <rect x="0" y="102" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="108" y="102" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="216" y="102" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="324" y="102" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+
+        <rect x="0" y="204" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="108" y="204" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="216" y="204" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="324" y="204" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+
+        <rect x="0" y="306" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="108" y="306" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="216" y="306" rx="18" ry="18" width="96" height="88" fill="#fff3e632" stroke="#ffecd888" stroke-width="1.5"/>
+        <rect x="324" y="306" rx="18" ry="18" width="96" height="88" fill="#fff3e620" stroke="#ffecd888" stroke-width="1.5"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- marker hints -->
+  <g filter="url(#glow)">
+    <circle cx="280" cy="866" r="7" fill="#b7c7ff"/>
+    <circle cx="840" cy="866" r="7" fill="#b7c7ff"/>
+    <circle cx="1400" cy="866" r="7" fill="#b7c7ff"/>
+  </g>
+  <text x="280" y="898" fill="#ced8ef" font-size="14" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei">Mark3D</text>
+  <text x="840" y="898" fill="#ced8ef" font-size="14" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei">Mark3D</text>
+  <text x="1400" y="898" fill="#ced8ef" font-size="14" text-anchor="middle" font-family="Segoe UI, PingFang SC, Microsoft YaHei">Mark3D</text>
+</svg>
