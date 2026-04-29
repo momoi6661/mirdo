@@ -17,6 +17,9 @@ func update(delta: float):
 		player = Global.player
 	if not player:
 		return
+	if player.has_method("is_gameplay_input_blocked") and bool(player.call("is_gameplay_input_blocked")):
+		player._update_camera(delta)
+		return
 	player._update_camera(delta)
 	
 	if Input.is_action_just_pressed("jump") and player.is_on_floor():

@@ -34,7 +34,7 @@ signal model_probe_failed(error_text: String)
 
 var _ai_manager: AIManager
 var _state_component: XiaokongStateComponent
-var _time_component: XiaokongGameTimeComponent
+var _time_component: Node
 var _action_router: XiaokongAIActionRouterComponent
 var _subtitle_target: Node
 
@@ -213,8 +213,8 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 	var day_index := 1
 	var time_minutes := 0
 	if _time_component != null:
-		day_index = _time_component.current_day
-		time_minutes = int(round(_time_component.current_hour * 60.0))
+		day_index = int(_time_component.get("current_day"))
+		time_minutes = int(round(float(_time_component.get("current_hour")) * 60.0))
 
 	var stats := {
 		"hunger": 50,
@@ -625,7 +625,7 @@ func _refresh_refs() -> void:
 	if _state_component == null:
 		_state_component = _find_state_component()
 
-	_time_component = get_node_or_null(time_component_path) as XiaokongGameTimeComponent
+	_time_component = get_node_or_null(time_component_path) as Node
 	if _time_component == null:
 		_time_component = _find_time_component()
 
@@ -657,14 +657,16 @@ func _find_state_component() -> XiaokongStateComponent:
 			return state_component
 	return null
 
-func _find_time_component() -> XiaokongGameTimeComponent:
+func _find_time_component() -> Node:
 	var parent_node = get_parent()
 	if parent_node == null:
 		return null
 	for child in parent_node.get_children():
-		var time_component = child as XiaokongGameTimeComponent
-		if time_component != null:
-			return time_component
+		var node := child as Node
+		if node == null:
+			continue
+		if node.has_method("get_day_time_text") and node.has_method("pass_hours"):
+			return node
 	return null
 
 func _find_action_router() -> XiaokongAIActionRouterComponent:

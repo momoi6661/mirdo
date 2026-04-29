@@ -25,6 +25,8 @@
 [ext_resource type="PackedScene" uid="uid://cih1ba2m6uqc5" path="res://controllers/interaction/world_interaction_panel.tscn" id="23_world_panel"]
 [ext_resource type="Resource" uid="uid://ca22678m80wis" path="res://resources/inventory/player_inventory_storage.tres" id="24_inv_storage"]
 [ext_resource type="Script" uid="uid://crsyy4ppfnwnf" path="res://controllers/interaction/holo_inventory_dual_panel_3d.gd" id="25_dual_inv"]
+[ext_resource type="PackedScene" uid="uid://6fmvbd1hhedb" path="res://controllers/interaction/XiaokongDialogueInputPanel3D.tscn" id="26_xk_dialogue_panel"]
+[ext_resource type="PackedScene" path="res://controllers/ui/TimeHud.tscn" id="27_time_hud"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -183,7 +185,7 @@ border_color = Color(0.9, 0.3, 0.05, 1)
 height = 1.0449219
 radius = 0.37548828
 
-[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler", "inventory_panel_3d", "dual_inventory_panel")]
+[node name="PlayerController" type="CharacterBody3D" unique_id=1610761508 node_paths=PackedStringArray("CAMERA_CONTROLLER", "step_handler", "pickup_handler", "standing_collision", "inventory_handler", "inventory_panel_3d", "dual_inventory_panel", "xiaokong_dialogue_panel")]
 collision_layer = 4
 collision_mask = 33
 wall_min_slide_angle = 0.7853982
@@ -196,6 +198,7 @@ standing_collision = NodePath("CollisionShape3D")
 inventory_handler = NodePath("Components/InventoryDataService")
 inventory_panel_3d = NodePath("HoloInventoryPanel3D")
 dual_inventory_panel = NodePath("HoloInventoryDualPanel3D")
+xiaokong_dialogue_panel = NodePath("XiaokongDialogueInputPanel3D")
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -331,12 +334,18 @@ spring_length = -1.0
 [node name="InventoryPanelMark3D" type="Marker3D" parent="." unique_id=1616811236]
 transform = Transform3D(1, 0, 0, 0, 0.9659254, 0.25881892, 0, -0.25881892, 0.9659254, 0, 0.98809254, -0.5110427)
 
+[node name="XiaokongDialoguePanelMark3D" type="Marker3D" parent="." unique_id=1616811299]
+transform = Transform3D(1, 0, 0, 0, 0.9291326, 0.36974674, 0, -0.36974674, 0.9291326, 0, 1.2342131, -0.66732955)
+
+[node name="XiaokongDialogueInputPanel3D" parent="." unique_id=1622201001 instance=ExtResource("26_xk_dialogue_panel")]
+transform = Transform3D(1, 0, 0, 0, 0.9291326, 0.36974674, 0, -0.36974674, 0.9291326, 0, 1.2342131, -0.66732955)
+anchor_mark_path = NodePath("../XiaokongDialoguePanelMark3D")
+
 [node name="HoloInventoryPanel3D" parent="." unique_id=1599883766 instance=ExtResource("15_3og01")]
-transform = Transform3D(1, 0, 0, 0, 0.66068214, 0.75066584, 0, -0.75066584, 0.66068214, 0, 0.98809254, -0.5110427)
+transform = Transform3D(1, 0, 0, 0, 0.8746197, 0.48480964, 0, -0.48480964, 0.8746197, 0, 0.98809254, -0.5110427)
 camera_path = NodePath("../Marker3D/CameraOffset/Camera3D")
 anchor_mark_path = NodePath("../InventoryPanelMark3D")
 inventory_data_path = NodePath("../Components/InventoryDataService")
-face_camera_when_using_mark = false
 use_anchor_mark_transform_directly = false
 panel_pitch_degrees = -14.0
 auto_place_hint_below_second_row = false
@@ -431,6 +440,17 @@ offset_top = 20.0
 offset_right = -20.0
 offset_bottom = 214.0
 grow_horizontal = 0
+
+[node name="TimeHud" parent="Control" unique_id=1020198872 instance=ExtResource("27_time_hud")]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -138.0
+offset_top = 20.0
+offset_right = 138.0
+offset_bottom = 176.0
+grow_horizontal = 2
 
 [node name="XiaokongControlPanel" type="PanelContainer" parent="Control" unique_id=118273645]
 visible = false

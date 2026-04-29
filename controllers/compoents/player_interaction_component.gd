@@ -43,6 +43,7 @@ var _world_panel_refresh_elapsed: float = 0.0
 var _world_panel_selected_option_id: String = ""
 var _world_panel_hold_executed: bool = false
 var _ignored_held_collision: CollisionObject3D = null
+var _external_ui_blocked: bool = false
 
 func _ready() -> void:
 	set_process_unhandled_input(true)
@@ -52,6 +53,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	var input_state: Dictionary = _poll_interact_input_state()
 	if interaction_ray == null:
+		return
+	if _external_ui_blocked:
+		_clear_target()
 		return
 	_sync_held_object_exception()
 
@@ -99,6 +103,8 @@ func _physics_process(delta: float) -> void:
 	_clear_target()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _external_ui_blocked:
+		return
 	if not _is_world_mode(current_interaction_mode) or current_interactable == null:
 		return
 	if _is_inventory_open():
@@ -823,6 +829,16 @@ func _poll_interact_input_state() -> Dictionary:
 		"just_pressed": just_pressed,
 		"just_released": just_released,
 	}
+
+func set_external_ui_blocked(blocked: bool) -> void:
+	if _external_ui_blocked == blocked:
+		return
+	_external_ui_blocked = blocked
+	if _external_ui_blocked:
+		_clear_target()
+
+func is_external_ui_blocked() -> bool:
+	return _external_ui_blocked
 
 func _is_inventory_open() -> bool:
 	if Global.player == null:

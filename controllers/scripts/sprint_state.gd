@@ -15,6 +15,9 @@ func update(delta: float):
 		player = Global.player
 	if not player:
 		return
+	if player.has_method("is_gameplay_input_blocked") and bool(player.call("is_gameplay_input_blocked")):
+		player._update_camera(delta)
+		return
 	player._update_camera(delta)
 	
 	if not player._is_sprinting:

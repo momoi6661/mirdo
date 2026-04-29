@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://bcttpkk0u6xyf"]
+
+[ext_resource type="Script" uid="uid://di5wqwldioms7" path="res://controllers/scripts/time_hud.gd" id="1_time_hud"]
+[ext_resource type="Script" uid="uid://jslse143x8vv" path="res://controllers/scripts/day_arc_time_view.gd" id="2_arc_time_view"]
+
+[node name="TimeHud" type="Control" unique_id=871132873]
+custom_minimum_size = Vector2(276, 156)
+layout_mode = 3
+anchors_preset = 0
+offset_left = -138.0
+offset_top = 14.0
+offset_right = 138.0
+offset_bottom = 170.0
+script = ExtResource("1_time_hud")
+
+[node name="Margin" type="MarginContainer" parent="." unique_id=216095385]
+layout_mode = 0
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Margin" unique_id=1010265434]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="DayLabel" type="Label" parent="Margin/VBox" unique_id=156614576]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.03, 0.04, 0.07, 0.35)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 30
+text = "Day 1"
+horizontal_alignment = 1
+
+[node name="ArcTimeView" type="Control" parent="Margin/VBox" unique_id=405881495]
+custom_minimum_size = Vector2(248, 98)
+layout_mode = 2
+size_flags_horizontal = 4
+script = ExtResource("2_arc_time_view")
+show_baseline = true

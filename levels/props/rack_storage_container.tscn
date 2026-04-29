@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="1_yh1ol"]
 [ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="2_container_panel"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_save_comp"]
-[ext_resource type="Resource" path="res://resources/inventory/rack_storage_rack_a.tres" id="4_storage_res"]
+[ext_resource type="Resource" path="res://resources/inventory/rack_storage_resource1.tres" id="4_storage_res"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_rmem1"]
 load_path = "res://.godot/imported/light_green.png-b44969d0d43d37e6192da37812362394.s3tc.ctex"

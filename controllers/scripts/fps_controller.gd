@@ -16,6 +16,9 @@ extends CharacterBody3D
 @export var inventory_handler:InventoryDataService
 @export var inventory_panel_3d: HoloInventoryPanel3D
 @export var dual_inventory_panel: Node
+@export var xiaokong_dialogue_panel: Node
+@export var xiaokong_control_component_path: NodePath = NodePath("Components/XiaokongControlComponent")
+@export var player_interaction_component_path: NodePath = NodePath("Components/PlayerInteractionComponent")
 @export_range(0.5, 10.0, 0.1) var inventory_drop_distance: float = 2.5
 @export var unique_id: String = "player_001"
 
@@ -80,8 +83,31 @@ func _unhandled_input(event: InputEvent) -> void:
 var _drop_timer: float = 0.0
 var _is_holding_drop: bool = false
 var _inventory_mouse_free_mode: bool = false
+var _dialogue_mouse_free_mode: bool = false
+var _xiaokong_control_component: Node = null
+var _player_interaction_component: Node = null
 
 func _input(event):
+	if _is_custom_text_input_active():
+		var key_event := event as InputEventKey
+		var is_alt_toggle: bool = key_event != null and key_event.pressed and not key_event.echo and key_event.keycode == KEY_ALT
+		if is_alt_toggle:
+			if _is_dialogue_panel_open():
+				_toggle_dialogue_mouse_mode()
+			elif _is_inventory_panel_open():
+				_toggle_inventory_mouse_mode()
+			else:
+				_toggle_mouse_capture_mode()
+			var vp_alt := get_viewport()
+			if vp_alt != null:
+				vp_alt.set_input_as_handled()
+			return
+		else:
+			if event.is_action_released("drop_item"):
+				_is_holding_drop = false
+				_drop_timer = 0.0
+			return
+
 	if event.is_action_pressed("inventory"):
 		_toggle_inventory_panel()
 		get_viewport().set_input_as_handled()
@@ -94,7 +120,9 @@ func _input(event):
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ALT:
-		if _is_inventory_panel_open():
+		if _is_dialogue_panel_open():
+			_toggle_dialogue_mouse_mode()
+		elif _is_inventory_panel_open():
 			_toggle_inventory_mouse_mode()
 		else:
 			_toggle_mouse_capture_mode()
@@ -129,6 +157,10 @@ func _toggle_inventory_mouse_mode() -> void:
 	_inventory_mouse_free_mode = not _inventory_mouse_free_mode
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _inventory_mouse_free_mode else Input.MOUSE_MODE_CAPTURED
 	_update_inventory_alt_hint()
+
+func _toggle_dialogue_mouse_mode() -> void:
+	_dialogue_mouse_free_mode = not _dialogue_mouse_free_mode
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if _dialogue_mouse_free_mode else Input.MOUSE_MODE_CAPTURED
 
 
 func _process(delta):
@@ -364,7 +396,7 @@ func _update_camera(delta):
 	_tilt_input = 0.0
 
 func get_input_direction():
-	if is_ui_text_input_focused():
+	if is_ui_text_input_focused() or _is_custom_text_input_active():
 		return Vector3.ZERO
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
@@ -392,7 +424,110 @@ func _is_text_input_control(control: Control) -> bool:
 	if control is CodeEdit:
 		return true
 	return false
-	
+
+func _is_custom_text_input_active() -> bool:
+	if xiaokong_dialogue_panel == null or not is_instance_valid(xiaokong_dialogue_panel):
+		return false
+	if xiaokong_dialogue_panel.has_method("is_text_input_active"):
+		return bool(xiaokong_dialogue_panel.call("is_text_input_active"))
+	return false
+
+func _is_dialogue_panel_open() -> bool:
+	if xiaokong_dialogue_panel == null or not is_instance_valid(xiaokong_dialogue_panel):
+		return false
+	if xiaokong_dialogue_panel.has_method("is_panel_open"):
+		return bool(xiaokong_dialogue_panel.call("is_panel_open"))
+	return false
+
+func is_gameplay_input_blocked() -> bool:
+	return _is_custom_text_input_active() or is_ui_text_input_focused()
+
+func _resolve_xiaokong_control_component() -> Node:
+	if _xiaokong_control_component != null and is_instance_valid(_xiaokong_control_component):
+		return _xiaokong_control_component
+	if xiaokong_control_component_path != NodePath():
+		_xiaokong_control_component = get_node_or_null(xiaokong_control_component_path)
+	if _xiaokong_control_component == null:
+		_xiaokong_control_component = get_node_or_null("Components/XiaokongControlComponent")
+	return _xiaokong_control_component
+
+func _resolve_player_interaction_component() -> Node:
+	if _player_interaction_component != null and is_instance_valid(_player_interaction_component):
+		return _player_interaction_component
+	if player_interaction_component_path != NodePath():
+		_player_interaction_component = get_node_or_null(player_interaction_component_path)
+	if _player_interaction_component == null:
+		_player_interaction_component = get_node_or_null("Components/PlayerInteractionComponent")
+	return _player_interaction_component
+
+func _set_world_interaction_blocked(blocked: bool) -> void:
+	var interaction_component := _resolve_player_interaction_component()
+	if interaction_component == null or not is_instance_valid(interaction_component):
+		return
+	if interaction_component.has_method("set_external_ui_blocked"):
+		interaction_component.call("set_external_ui_blocked", blocked)
+
+func _find_dialogue_component_recursive(root_node: Node) -> Node:
+	if root_node == null:
+		return null
+	if root_node.has_method("send_player_text"):
+		return root_node
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_dialogue_component_recursive(child_node)
+		if nested != null:
+			return nested
+	return null
+
+func _send_dialogue_to_xiaokong(text: String, payload: Dictionary) -> bool:
+	var clean_text: String = text.strip_edges()
+	if clean_text.is_empty():
+		return false
+
+	var xiaokong_path: String = String(payload.get("xiaokong_path", "")).strip_edges()
+	var controller_node := _resolve_xiaokong_control_component()
+	if controller_node != null and is_instance_valid(controller_node):
+		if not xiaokong_path.is_empty() and controller_node.has_method("bind_target_by_path"):
+			controller_node.call("bind_target_by_path", xiaokong_path)
+		if controller_node.has_method("send_dialogue_text"):
+			return bool(controller_node.call("send_dialogue_text", clean_text))
+
+	if xiaokong_path.is_empty():
+		return false
+	var xiaokong_root: Node = get_node_or_null(NodePath(xiaokong_path))
+	if xiaokong_root == null:
+		return false
+	var dialogue_component := _find_dialogue_component_recursive(xiaokong_root)
+	if dialogue_component == null:
+		return false
+	var result: Variant = dialogue_component.call("send_player_text", clean_text)
+	if result is Dictionary:
+		return bool((result as Dictionary).get("ok", false))
+	return bool(result)
+
+func _on_global_xiaokong_dialogue_requested(payload: Dictionary) -> void:
+	if xiaokong_dialogue_panel == null or not is_instance_valid(xiaokong_dialogue_panel):
+		return
+	_dialogue_mouse_free_mode = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_set_world_interaction_blocked(true)
+	if xiaokong_dialogue_panel.has_method("open_for_payload"):
+		xiaokong_dialogue_panel.call("open_for_payload", payload)
+	elif xiaokong_dialogue_panel.has_method("open_panel"):
+		xiaokong_dialogue_panel.call("open_panel")
+
+func _on_xiaokong_dialogue_panel_submit(text: String, payload: Dictionary) -> void:
+	_send_dialogue_to_xiaokong(text, payload)
+
+func _on_xiaokong_dialogue_panel_visibility_changed(is_open: bool) -> void:
+	_set_world_interaction_blocked(is_open)
+	if not is_open:
+		_dialogue_mouse_free_mode = false
+		if not _is_inventory_panel_open():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
 func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target: float, delta: float, direction: Vector3 = Vector3.ZERO):
 	if direction == Vector3.ZERO:
 		direction = get_input_direction()
@@ -562,6 +697,10 @@ func _ready():
 		var switch_callable := Callable(self, "_on_loot_container_switch_requested")
 		if not Global.is_connected("loot_container_switch_requested", switch_callable):
 			Global.connect("loot_container_switch_requested", switch_callable)
+	if Global != null and Global.has_signal("xiaokong_dialogue_requested"):
+		var xk_dialogue_callable := Callable(self, "_on_global_xiaokong_dialogue_requested")
+		if not Global.is_connected("xiaokong_dialogue_requested", xk_dialogue_callable):
+			Global.connect("xiaokong_dialogue_requested", xk_dialogue_callable)
 	
 	print("step_handler: ", step_handler)
 	if !step_handler:
@@ -593,6 +732,21 @@ func _ready():
 
 	if inventory_handler and is_instance_valid(inventory_handler):
 		inventory_handler.inventory_visible = false
+
+	_resolve_xiaokong_control_component()
+	_resolve_player_interaction_component()
+	_set_world_interaction_blocked(false)
+	if xiaokong_dialogue_panel != null and is_instance_valid(xiaokong_dialogue_panel):
+		if xiaokong_dialogue_panel.has_method("hide_panel"):
+			xiaokong_dialogue_panel.call("hide_panel")
+		if xiaokong_dialogue_panel.has_signal("dialogue_submit_requested"):
+			var submit_callable := Callable(self, "_on_xiaokong_dialogue_panel_submit")
+			if not xiaokong_dialogue_panel.is_connected("dialogue_submit_requested", submit_callable):
+				xiaokong_dialogue_panel.connect("dialogue_submit_requested", submit_callable)
+		if xiaokong_dialogue_panel.has_signal("panel_visibility_changed"):
+			var visibility_callable := Callable(self, "_on_xiaokong_dialogue_panel_visibility_changed")
+			if not xiaokong_dialogue_panel.is_connected("panel_visibility_changed", visibility_callable):
+				xiaokong_dialogue_panel.connect("panel_visibility_changed", visibility_callable)
 
 # --- 存档系统自定义接口 ---
 

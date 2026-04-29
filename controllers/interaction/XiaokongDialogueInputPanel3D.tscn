@@ -1,0 +1,142 @@
+[gd_scene format=3 uid="uid://6fmvbd1hhedb"]
+
+[ext_resource type="Script" uid="uid://wnhbsqwrikvc" path="res://controllers/interaction/xiaokong_dialogue_input_panel_3d.gd" id="1_script"]
+[ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="2_font"]
+[ext_resource type="Shader" uid="uid://b8v8yaw5u4k5q" path="res://shaders/ui_rounded_rect_3d.gdshader" id="3_yewbp"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_panel"]
+size = Vector2(0.9, 0.6)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yewbp"]
+render_priority = 12
+shader = ExtResource("3_yewbp")
+shader_parameter/fill_color = Color(1, 0.93, 0.96, 0.82)
+shader_parameter/fill_color_2 = Color(1, 0.93, 0.96, 0.82)
+shader_parameter/outline_color = Color(0, 0, 0, 0)
+shader_parameter/glow_color = Color(0, 0, 0, 0)
+shader_parameter/corner_radius = 0.045
+shader_parameter/outline_width = 0.0
+shader_parameter/feather = 0.0016
+shader_parameter/glow_width = 0.0
+shader_parameter/opacity_scale = 1.0
+shader_parameter/vertical_gradient_strength = 0.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_input"]
+size = Vector2(0.72, 0.09)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_input"]
+size = Vector3(0.72, 0.09, 0.03)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_d7wjd"]
+render_priority = 12
+shader = ExtResource("3_yewbp")
+shader_parameter/fill_color = Color(0.97, 0.74, 0.86, 0.78)
+shader_parameter/fill_color_2 = Color(0.97, 0.74, 0.86, 0.78)
+shader_parameter/outline_color = Color(0, 0, 0, 0)
+shader_parameter/glow_color = Color(0, 0, 0, 0)
+shader_parameter/corner_radius = 0.045
+shader_parameter/outline_width = 0.0
+shader_parameter/feather = 0.0016
+shader_parameter/glow_width = 0.0
+shader_parameter/opacity_scale = 1.0
+shader_parameter/vertical_gradient_strength = 0.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_send"]
+size = Vector2(0.13, 0.09)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_send"]
+size = Vector3(0.13, 0.09, 0.03)
+
+[node name="XiaokongDialogueInputPanel3D" type="Node3D" unique_id=467270216]
+top_level = true
+script = ExtResource("1_script")
+preview_options = PackedStringArray("为什么窗外有白光？", "一切看上去都像在做梦", "我什么时候能回家呢？", "可爱的房子，而且很温馨。", "开动啦！")
+
+[node name="Panel" type="MeshInstance3D" parent="." unique_id=2003874840]
+visible = false
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("QuadMesh_panel")
+
+[node name="TitleLabel" type="Label3D" parent="." unique_id=1379401980]
+visible = false
+text = "对话"
+font = ExtResource("2_font")
+font_size = 50
+outline_size = 0
+
+[node name="OptionsRoot" type="Node3D" parent="." unique_id=1609256923]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.36188543, 0.32475418, 0.004)
+
+[node name="InputRoot" type="Node3D" parent="." unique_id=1699087777]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 0.004)
+
+[node name="InputMesh" type="MeshInstance3D" parent="InputRoot" unique_id=1189984767]
+material_override = SubResource("ShaderMaterial_yewbp")
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("QuadMesh_input")
+
+[node name="InputTextLabel" type="Label3D" parent="InputRoot" unique_id=700916505]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, -0.016, 0.0022)
+pixel_size = 0.0009
+no_depth_test = true
+render_priority = 64
+outline_render_priority = 65
+modulate = Color(0.23, 0.1, 0.17, 1)
+outline_modulate = Color(0.18, 0.05, 0.12, 0.75)
+font = ExtResource("2_font")
+font_size = 50
+outline_size = 2
+horizontal_alignment = 0
+autowrap_mode = 1
+width = 733.3334
+
+[node name="PlaceholderLabel" type="Label3D" parent="InputRoot" unique_id=635629162]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, -0.0057387054, 0.0024)
+pixel_size = 0.0009
+no_depth_test = true
+render_priority = 64
+outline_render_priority = 65
+modulate = Color(0.47, 0.27, 0.36, 0.96)
+outline_modulate = Color(0.18, 0.05, 0.12, 0.75)
+text = "输入内容..."
+font = ExtResource("2_font")
+font_size = 50
+outline_size = 2
+horizontal_alignment = 0
+autowrap_mode = 1
+width = 733.3334
+
+[node name="InputArea" type="Area3D" parent="InputRoot" unique_id=1450191866]
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InputRoot/InputArea" unique_id=1185675707]
+shape = SubResource("BoxShape3D_input")
+
+[node name="SendButton" type="MeshInstance3D" parent="InputRoot" unique_id=1133907631]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.435, 0, 0)
+material_override = SubResource("ShaderMaterial_d7wjd")
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("QuadMesh_send")
+
+[node name="SendLabel" type="Label3D" parent="InputRoot/SendButton" unique_id=948899890]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0057387054, 0.0024)
+pixel_size = 0.0009
+no_depth_test = true
+render_priority = 64
+outline_render_priority = 65
+modulate = Color(0.23, 0.1, 0.17, 1)
+outline_modulate = Color(0.18, 0.05, 0.12, 0.75)
+text = "发送"
+font = ExtResource("2_font")
+font_size = 50
+outline_size = 2
+width = 133.33333
+
+[node name="SendArea" type="Area3D" parent="InputRoot/SendButton" unique_id=731986958]
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InputRoot/SendButton/SendArea" unique_id=624965480]
+shape = SubResource("BoxShape3D_send")

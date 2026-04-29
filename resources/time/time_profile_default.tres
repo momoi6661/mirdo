@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TimeFlowProfileResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/xiaokong/resources/time_flow_profile_resource.gd" id="1_profile_script"]
+
+[resource]
+script = ExtResource("1_profile_script")
+start_day = 1
+start_hour = 8
+start_minute = 0
+day_length_hours = 24.0
+auto_tick_enabled = true
+real_seconds_per_day = 600.0
+morning_hour = 8

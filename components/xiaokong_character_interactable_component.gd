@@ -233,4 +233,3 @@ func _pick_consume_item_path(food_entries: Array[Dictionary]) -> String:
 		if picked_path.is_empty() or path < picked_path:
 			picked_path = path
 	return picked_path
-

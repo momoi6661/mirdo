@@ -21,7 +21,7 @@ const OK_COLOR := Color(0.34, 0.86, 0.54, 1.0)
 @onready var _favor_value: Label = $Margin/VBox/FavorRow/FavorValue
 
 var _state_component: XiaokongStateComponent
-var _time_component: XiaokongGameTimeComponent
+var _time_component: Node
 
 func _ready() -> void:
 	_apply_default_ranges()
@@ -80,11 +80,11 @@ func _attempt_bind_time_component() -> void:
 
 	if _time_component != null:
 		var old_hour_cb := Callable(self, "_on_time_hour_changed")
-		if _time_component.hour_changed.is_connected(old_hour_cb):
-			_time_component.hour_changed.disconnect(old_hour_cb)
+		if _time_component.has_signal("hour_changed") and _time_component.is_connected("hour_changed", old_hour_cb):
+			_time_component.disconnect("hour_changed", old_hour_cb)
 		var old_day_cb := Callable(self, "_on_time_day_started")
-		if _time_component.day_started.is_connected(old_day_cb):
-			_time_component.day_started.disconnect(old_day_cb)
+		if _time_component.has_signal("day_started") and _time_component.is_connected("day_started", old_day_cb):
+			_time_component.disconnect("day_started", old_day_cb)
 
 	_time_component = found
 	if _time_component == null:
@@ -92,19 +92,19 @@ func _attempt_bind_time_component() -> void:
 		return
 
 	var hour_cb := Callable(self, "_on_time_hour_changed")
-	if not _time_component.hour_changed.is_connected(hour_cb):
-		_time_component.hour_changed.connect(hour_cb)
+	if _time_component.has_signal("hour_changed") and not _time_component.is_connected("hour_changed", hour_cb):
+		_time_component.connect("hour_changed", hour_cb)
 
 	var day_cb := Callable(self, "_on_time_day_started")
-	if not _time_component.day_started.is_connected(day_cb):
-		_time_component.day_started.connect(day_cb)
+	if _time_component.has_signal("day_started") and not _time_component.is_connected("day_started", day_cb):
+		_time_component.connect("day_started", day_cb)
 
 	_update_time_label()
 
-func _resolve_time_component() -> XiaokongGameTimeComponent:
+func _resolve_time_component() -> Node:
 	if time_component_path != NodePath():
-		var by_path := get_node_or_null(time_component_path) as XiaokongGameTimeComponent
-		if by_path != null:
+		var by_path := get_node_or_null(time_component_path) as Node
+		if by_path != null and by_path.has_method("get_clock_text"):
 			return by_path
 
 	for entry in get_tree().get_nodes_in_group(target_group_name):
@@ -117,16 +117,16 @@ func _resolve_time_component() -> XiaokongGameTimeComponent:
 
 	return null
 
-func _find_time_component_recursive(root_node: Node) -> XiaokongGameTimeComponent:
+func _find_time_component_recursive(root_node: Node) -> Node:
 	if root_node == null:
 		return null
 
-	if root_node is XiaokongGameTimeComponent:
-		return root_node as XiaokongGameTimeComponent
+	if root_node.has_method("get_clock_text"):
+		return root_node
 
 	if root_node.has_node("TimeComponent"):
-		var by_name := root_node.get_node("TimeComponent") as XiaokongGameTimeComponent
-		if by_name != null:
+		var by_name := root_node.get_node("TimeComponent") as Node
+		if by_name != null and by_name.has_method("get_clock_text"):
 			return by_name
 
 	for child in root_node.get_children():
@@ -224,7 +224,7 @@ func _update_time_label() -> void:
 	if _time_component == null:
 		_time_label.text = "Time: --"
 		return
-	_time_label.text = "Time: %s" % _time_component.get_clock_text()
+	_time_label.text = "Time: %s" % String(_time_component.call("get_clock_text"))
 
 func _pick_color(stat_key: StringName, value: float) -> Color:
 	match stat_key:
