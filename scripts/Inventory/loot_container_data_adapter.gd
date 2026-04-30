@@ -2,8 +2,10 @@ extends InventoryDataService
 class_name LootContainerDataAdapter
 
 @export var container_path: NodePath
+const ADAPTER_DEBUG := true
 
 var _container: LootContainerComponent
+var _pending_container_sync: bool = false
 
 
 func _ready() -> void:
@@ -32,7 +34,12 @@ func get_slot_count() -> int:
 
 
 func get_slot_data(slot_index: int) -> Dictionary:
-	var slot := _get_slot(slot_index)
+	var slot := _get_storage_slot(slot_index)
+	if ADAPTER_DEBUG and slot == null:
+		var container := _resolve_container()
+		var container_name: String = container.name if container != null else "null"
+		var runtime_count: int = container.runtime_slots.size() if container != null else -1
+		print("[LootAdapter] get_slot_data slot_null slot=", slot_index, " container=", container_name, " runtime_count=", runtime_count)
 	if slot == null or slot.item == null or slot.amount <= 0:
 		return {"item": null, "amount": 0}
 	return {
@@ -50,7 +57,7 @@ func get_all_slots() -> Array[Dictionary]:
 
 
 func has_item_in_slot(slot_index: int) -> bool:
-	var slot := _get_slot(slot_index)
+	var slot := _get_storage_slot(slot_index)
 	return slot != null and slot.item != null and slot.amount > 0
 
 
@@ -86,7 +93,7 @@ func insert_item(item: ItemData, amount: int = 1) -> int:
 	for i in range(container.container_size):
 		if remaining <= 0:
 			break
-		var slot := _get_slot(i)
+		var slot := _get_storage_slot(i)
 		if slot == null or slot.item != item or slot.amount <= 0:
 			continue
 		var space: int = _available_stack_space(slot)
@@ -100,14 +107,13 @@ func insert_item(item: ItemData, amount: int = 1) -> int:
 	for i in range(container.container_size):
 		if remaining <= 0:
 			break
-		var slot := _get_slot(i)
+		var slot := _get_storage_slot(i)
 		if slot == null:
 			continue
 		if slot.item != null and slot.amount > 0:
 			continue
 		var add_amount: int = mini(_max_stack_size(item), remaining)
-		slot.item = item
-		slot.amount = add_amount
+		slot.set_stack(item, add_amount)
 		remaining -= add_amount
 		changed[i] = true
 
@@ -121,8 +127,8 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 	if from_slot_index == to_slot_index:
 		return 0
 
-	var from_slot := _get_slot(from_slot_index)
-	var to_slot := _get_slot(to_slot_index)
+	var from_slot := _get_storage_slot(from_slot_index)
+	var to_slot := _get_storage_slot(to_slot_index)
 	if from_slot == null or to_slot == null:
 		return 0
 	if from_slot.item == null or from_slot.amount <= 0:
@@ -141,20 +147,17 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 		to_slot.amount += stacked
 		from_slot.amount -= stacked
 		if from_slot.amount <= 0:
-			from_slot.item = null
-			from_slot.amount = 0
+			from_slot.clear()
 		changed[from_slot_index] = true
 		changed[to_slot_index] = true
 		_notify_changed(changed)
 		return stacked
 
 	if to_slot.item == null or to_slot.amount <= 0:
-		to_slot.item = from_slot.item
-		to_slot.amount = move_amount
+		to_slot.set_stack(from_slot.item, move_amount)
 		from_slot.amount -= move_amount
 		if from_slot.amount <= 0:
-			from_slot.item = null
-			from_slot.amount = 0
+			from_slot.clear()
 		changed[from_slot_index] = true
 		changed[to_slot_index] = true
 		_notify_changed(changed)
@@ -165,10 +168,8 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 
 	var temp_item: ItemData = to_slot.item
 	var temp_amount: int = to_slot.amount
-	to_slot.item = from_slot.item
-	to_slot.amount = from_slot.amount
-	from_slot.item = temp_item
-	from_slot.amount = temp_amount
+	to_slot.set_stack(from_slot.item, from_slot.amount)
+	from_slot.set_stack(temp_item, temp_amount)
 	changed[from_slot_index] = true
 	changed[to_slot_index] = true
 	_notify_changed(changed)
@@ -176,7 +177,7 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 
 
 func remove_from_slot(slot_index: int, amount: int = 0) -> Dictionary:
-	var slot := _get_slot(slot_index)
+	var slot := _get_storage_slot(slot_index)
 	if slot == null or slot.item == null or slot.amount <= 0:
 		return {"item": null, "amount": 0}
 
@@ -187,8 +188,7 @@ func remove_from_slot(slot_index: int, amount: int = 0) -> Dictionary:
 	var removed_item: ItemData = slot.item
 	slot.amount -= take_amount
 	if slot.amount <= 0:
-		slot.item = null
-		slot.amount = 0
+		slot.clear()
 
 	_notify_changed({slot_index: true})
 	return {
@@ -198,15 +198,23 @@ func remove_from_slot(slot_index: int, amount: int = 0) -> Dictionary:
 
 
 func set_slot_data(slot_index: int, item: ItemData, amount: int) -> void:
-	var slot := _get_slot(slot_index)
+	var slot := _get_storage_slot(slot_index)
+	if ADAPTER_DEBUG:
+		var container := _resolve_container()
+		var container_name: String = container.name if container != null else "null"
+		var runtime_count: int = container.runtime_slots.size() if container != null else -1
+		var item_path: String = item.resource_path if item != null else "null"
+		print("[LootAdapter] set_slot_data slot=", slot_index, " item=", item_path, " amount=", amount, " slot_null=", slot == null, " container=", container_name, " runtime_count=", runtime_count)
 	if slot == null:
 		return
 	if item == null or amount <= 0:
-		slot.item = null
-		slot.amount = 0
+		slot.clear()
 	else:
-		slot.item = item
-		slot.amount = clampi(amount, 1, _max_stack_size(item))
+		var max_stack: int = _max_stack_size(item)
+		slot.set_stack(item, clampi(amount, 1, max_stack))
+	if ADAPTER_DEBUG:
+		var verify_item_path: String = slot.item.resource_path if slot.item != null else "null"
+		print("[LootAdapter] set_slot_data_applied slot=", slot_index, " verify_item=", verify_item_path, " verify_amount=", slot.amount)
 	_notify_changed({slot_index: true})
 
 
@@ -216,12 +224,11 @@ func clear_inventory() -> void:
 		return
 	var changed := {}
 	for i in range(container.container_size):
-		var slot := _get_slot(i)
+		var slot := _get_storage_slot(i)
 		if slot == null:
 			continue
 		if slot.item != null or slot.amount > 0:
-			slot.item = null
-			slot.amount = 0
+			slot.clear()
 			changed[i] = true
 	_notify_changed(changed)
 
@@ -244,25 +251,11 @@ func _resolve_container() -> LootContainerComponent:
 func _ensure_runtime_slots(container: LootContainerComponent) -> void:
 	if container == null:
 		return
-	var target_count: int = maxi(0, container.container_size)
-	while container.runtime_slots.size() < target_count:
-		var slot := SlotConfig.new()
-		slot.slot_id = container.runtime_slots.size()
-		slot.item = null
-		slot.amount = 0
-		container.runtime_slots.append(slot)
-	if container.runtime_slots.size() > target_count:
-		container.runtime_slots.resize(target_count)
-
-	for i in range(container.runtime_slots.size()):
-		var slot := container.runtime_slots[i] as SlotConfig
-		if slot == null:
-			slot = SlotConfig.new()
-			container.runtime_slots[i] = slot
-		slot.slot_id = i
-		if slot.amount <= 0:
-			slot.amount = 0
-			slot.item = null
+	if container.has_method("_ensure_runtime_storage"):
+		container.call("_ensure_runtime_storage")
+	if container.runtime_slots.size() != maxi(0, container.container_size):
+		if container.has_method("_rebuild_runtime_slots_from_storage"):
+			container.call("_rebuild_runtime_slots_from_storage")
 
 
 func _is_valid_slot(slot_index: int) -> bool:
@@ -272,13 +265,27 @@ func _is_valid_slot(slot_index: int) -> bool:
 	return slot_index >= 0 and slot_index < container.container_size
 
 
-func _get_slot(slot_index: int) -> SlotConfig:
+func _get_storage_slot(slot_index: int) -> InventorySlotStackResource:
 	if not _is_valid_slot(slot_index):
+		if ADAPTER_DEBUG:
+			var container := _resolve_container()
+			var container_name: String = container.name if container != null else "null"
+			var container_size_value: int = container.container_size if container != null else -1
+			print("[LootAdapter] get_slot invalid slot=", slot_index, " container=", container_name, " container_size=", container_size_value)
 		return null
 	var container := _resolve_container()
 	if container == null:
+		if ADAPTER_DEBUG:
+			print("[LootAdapter] get_storage_slot container_null slot=", slot_index)
 		return null
-	return container.runtime_slots[slot_index] as SlotConfig
+	if container.has_method("_ensure_runtime_storage"):
+		container.call("_ensure_runtime_storage")
+	if container.get("_runtime_inventory_storage") == null:
+		return null
+	var storage = container.get("_runtime_inventory_storage") as InventoryStorageResource
+	if storage == null:
+		return null
+	return storage.get_slot(slot_index) as InventorySlotStackResource
 
 
 func _compute_available_space(item: ItemData) -> int:
@@ -289,7 +296,7 @@ func _compute_available_space(item: ItemData) -> int:
 		return 0
 	var total: int = 0
 	for i in range(container.container_size):
-		var slot := _get_slot(i)
+		var slot := _get_storage_slot(i)
 		if slot == null:
 			continue
 		if slot.item == null or slot.amount <= 0:
@@ -308,7 +315,7 @@ func _max_stack_size(item: ItemData) -> int:
 	return maxi(1, item.MaxStackSize)
 
 
-func _available_stack_space(slot: SlotConfig) -> int:
+func _available_stack_space(slot: InventorySlotStackResource) -> int:
 	if slot == null or slot.item == null or slot.amount <= 0:
 		return 0
 	return maxi(0, _max_stack_size(slot.item) - slot.amount)
@@ -317,6 +324,12 @@ func _available_stack_space(slot: SlotConfig) -> int:
 func _notify_changed(changed_slots: Dictionary) -> void:
 	if changed_slots.is_empty():
 		return
+	if _batch_update_depth > 0:
+		for slot_index in changed_slots.keys():
+			_pending_slot_changes[int(slot_index)] = true
+		_pending_inventory_changed = true
+		_pending_container_sync = true
+		return
 	for slot_index in changed_slots.keys():
 		slot_changed.emit(int(slot_index))
 	inventory_changed.emit()
@@ -324,3 +337,22 @@ func _notify_changed(changed_slots: Dictionary) -> void:
 	var container := _resolve_container()
 	if container != null and container.has_method("notify_runtime_slots_changed"):
 		container.notify_runtime_slots_changed()
+
+
+func _flush_pending_notifications() -> void:
+	if not _pending_slot_changes.is_empty():
+		var slot_indexes: Array = _pending_slot_changes.keys()
+		slot_indexes.sort()
+		for slot_index_variant in slot_indexes:
+			slot_changed.emit(int(slot_index_variant))
+	_pending_slot_changes.clear()
+
+	if _pending_inventory_changed:
+		_pending_inventory_changed = false
+		inventory_changed.emit()
+
+	if _pending_container_sync:
+		_pending_container_sync = false
+		var container := _resolve_container()
+		if container != null and container.has_method("notify_runtime_slots_changed"):
+			container.notify_runtime_slots_changed()

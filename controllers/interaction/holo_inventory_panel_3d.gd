@@ -13,6 +13,7 @@ const PANEL_POS_LERP_SPEED := 16.0
 const PANEL_ROT_LERP_SPEED := 14.0
 const UI_TEXT_RENDER_PRIORITY := 120
 const UI_TEXT_OUTLINE_RENDER_PRIORITY := 119
+const INVENTORY_DRAG_DEBUG := true
 
 enum PanelAnchorMode {
 	MARK_ONLY,
@@ -99,7 +100,6 @@ var _drag_count: Label3D
 var _is_open: bool = false
 var _slot_visuals: Array[Dictionary] = []
 var _slot_bounds: Array[Rect2] = []
-var _slot_centers: Array[Vector2] = []
 var _hover_slot_index: int = -1
 
 var _drag_active: bool = false
@@ -109,11 +109,6 @@ var _drag_item: ItemData
 var _panel_transform_initialized: bool = false
 var _hint_mouse_free_mode: bool = false
 var _missing_anchor_warned: bool = false
-var _external_transfer_mode: bool = false
-var _last_pointer_screen_pos: Vector2 = Vector2.ZERO
-var _has_pointer_screen_pos: bool = false
-var _last_valid_hover_slot: int = -1
-var _last_valid_hover_timestamp_msec: int = 0
 
 
 func _ready() -> void:
@@ -158,11 +153,10 @@ func _input(event: InputEvent) -> void:
 		return
 	if not _is_open:
 		return
-	_cache_pointer_from_event(event)
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not _drag_active:
-			var press_hit := _get_mouse_local_hit_info()
+			var press_hit := _get_mouse_local_hit_info(mb.position)
 			if bool(press_hit.get("hit", false)):
 				var press_local: Vector3 = press_hit.get("local", Vector3.ZERO) as Vector3
 				if _is_local_point_inside_panel(press_local):
@@ -171,23 +165,26 @@ func _input(event: InputEvent) -> void:
 						_handle_left_press(press_slot, mb.shift_pressed, mb.ctrl_pressed)
 						get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _drag_active:
-			if _external_transfer_mode:
-				_emit_transfer_from_drag()
-				get_viewport().set_input_as_handled()
-				return
-			var release_hit := _get_mouse_local_hit_info()
+			var release_hit := _get_mouse_local_hit_info(mb.position)
 			if bool(release_hit.get("hit", false)):
 				var release_local: Vector3 = release_hit.get("local", Vector3.ZERO) as Vector3
+				if INVENTORY_DRAG_DEBUG:
+					print("[InvPanelRelease] panel=", name, " mouse=", mb.position, " local=", release_local, " inside=", _is_local_point_inside_panel(release_local))
 				if _is_local_point_inside_panel(release_local):
 					var slot_index := _slot_index_from_local_point(release_local)
+					if INVENTORY_DRAG_DEBUG:
+						print("[InvPanelRelease] inside panel=", name, " slot=", slot_index, " from_slot=", _drag_from_slot, " amount=", _drag_amount)
 					if slot_index >= 0:
 						_resolve_drag_to_slot(slot_index)
 					else:
 						_cancel_drag()
 				else:
-					_release_drag_outside()
+					_release_drag_outside(mb.position)
 			else:
-				_release_drag_outside()
+				_release_drag_outside(mb.position)
+			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and _drag_active:
+			_cancel_drag()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventKey:
 		var key_event := event as InputEventKey
@@ -295,16 +292,15 @@ func set_alt_hint_state(is_mouse_free_mode: bool) -> void:
 		_hint_label_back.visible = true
 
 
-func set_external_transfer_mode(enabled: bool) -> void:
-	_external_transfer_mode = enabled
-
-
 func get_inventory_data_source() -> InventoryDataService:
 	return _inventory_data
 
 
 func is_mouse_over_panel() -> bool:
-	return is_mouse_over_panel_at(get_last_pointer_screen_pos())
+	var viewport := get_viewport()
+	if viewport == null:
+		return false
+	return is_mouse_over_panel_at(viewport.get_mouse_position())
 
 
 func is_mouse_over_panel_at(screen_pos: Vector2) -> bool:
@@ -318,7 +314,10 @@ func is_mouse_over_panel_at(screen_pos: Vector2) -> bool:
 
 
 func get_slot_index_under_mouse() -> int:
-	return get_slot_index_at_screen_position(get_last_pointer_screen_pos())
+	var viewport := get_viewport()
+	if viewport == null:
+		return -1
+	return get_slot_index_at_screen_position(viewport.get_mouse_position())
 
 
 func get_slot_index_at_screen_position(screen_pos: Vector2) -> int:
@@ -328,35 +327,20 @@ func get_slot_index_at_screen_position(screen_pos: Vector2) -> int:
 	if not bool(hit_info.get("hit", false)):
 		return -1
 	var local_point: Vector3 = hit_info.get("local", Vector3.ZERO) as Vector3
-	return _slot_index_from_local_point_with_snap(local_point)
+	return _slot_index_from_local_point(local_point)
 
 
-func get_hovered_slot_index() -> int:
+func get_hit_area() -> Area3D:
+	return _hit_area
+
+
+func get_slot_index_from_world_hit(hit_world_position: Vector3) -> int:
 	if not _is_open:
 		return -1
-	return _hover_slot_index
-
-
-func get_recent_slot_index(max_age_ms: int = 180) -> int:
-	if not _is_open:
+	var local_point: Vector3 = to_local(hit_world_position)
+	if not _is_local_point_inside_panel(local_point):
 		return -1
-	if _hover_slot_index >= 0:
-		return _hover_slot_index
-	if _last_valid_hover_slot < 0:
-		return -1
-	var now_ms: int = Time.get_ticks_msec()
-	if now_ms - _last_valid_hover_timestamp_msec <= maxi(0, max_age_ms):
-		return _last_valid_hover_slot
-	return -1
-
-
-func get_last_pointer_screen_pos() -> Vector2:
-	if _has_pointer_screen_pos:
-		return _last_pointer_screen_pos
-	var viewport := get_viewport()
-	if viewport == null:
-		return Vector2.ZERO
-	return viewport.get_mouse_position()
+	return _slot_index_from_local_point(local_point)
 
 
 func _resolve_nodes() -> void:
@@ -594,7 +578,6 @@ func _rebuild_slot_visuals() -> void:
 		child.queue_free()
 	_slot_visuals.clear()
 	_slot_bounds.clear()
-	_slot_centers.clear()
 	_hover_slot_index = -1
 
 	var slot_count: int = _current_slot_count()
@@ -614,7 +597,6 @@ func _rebuild_slot_visuals() -> void:
 		var slot_pos := Vector3(x, y, 0.008)
 		var slot_bound := Rect2(Vector2(x - slot_size_world * 0.5, y - slot_size_world * 0.5), Vector2(slot_size_world, slot_size_world))
 		_slot_bounds.append(slot_bound)
-		_slot_centers.append(Vector2(x, y))
 		_slot_visuals.append(_create_slot_visual(index, slot_pos))
 
 
@@ -985,7 +967,6 @@ func _on_hit_area_input_event(_camera_node: Node, event: InputEvent, hit_positio
 		return
 	if not _is_open:
 		return
-	_cache_pointer_from_event(event)
 
 	var local_hit := to_local(hit_position)
 	var slot_index := _slot_index_from_local_point(local_hit)
@@ -995,24 +976,6 @@ func _on_hit_area_input_event(_camera_node: Node, event: InputEvent, hit_positio
 		if _drag_active:
 			_update_drag_ghost_position(hit_position, true)
 		return
-
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT:
-			if mb.pressed:
-				_handle_left_press(slot_index, mb.shift_pressed, mb.ctrl_pressed)
-			else:
-				if _drag_active:
-					if _external_transfer_mode:
-						_emit_transfer_from_drag()
-					elif slot_index >= 0:
-						_resolve_drag_to_slot(slot_index)
-					else:
-						_cancel_drag()
-			get_viewport().set_input_as_handled()
-		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and _drag_active:
-			_cancel_drag()
-			get_viewport().set_input_as_handled()
 
 
 func _handle_left_press(slot_index: int, shift_pressed: bool, ctrl_pressed: bool) -> void:
@@ -1063,38 +1026,17 @@ func _resolve_drag_to_slot(target_slot: int) -> void:
 	_end_drag()
 
 
-func _release_drag_outside() -> void:
+func _release_drag_outside(pointer_screen_pos: Vector2) -> void:
 	if not _drag_active:
 		return
 	if _inventory_data == null:
 		_cancel_drag()
 		return
 
-	if _external_transfer_mode:
-		_emit_transfer_from_drag()
-		return
-
-	if _drag_item != null and _drag_amount > 0 and transfer_requested.get_connections().size() > 0:
-		transfer_requested.emit(_drag_from_slot, _drag_item, _drag_amount, _inventory_data, get_last_pointer_screen_pos())
-		_end_drag()
-		return
-
-	var removed := _inventory_data.remove_from_slot(_drag_from_slot, _drag_amount)
-	var item := removed.get("item", null) as ItemData
-	var amount: int = int(removed.get("amount", 0))
-	if item != null and amount > 0:
-		drop_requested.emit(item, amount)
-	_end_drag()
-
-
-func _emit_transfer_from_drag() -> void:
-	if not _drag_active:
-		return
-	if _inventory_data == null:
-		_cancel_drag()
-		return
-	if _drag_item != null and _drag_amount > 0 and transfer_requested.get_connections().size() > 0:
-		transfer_requested.emit(_drag_from_slot, _drag_item, _drag_amount, _inventory_data, get_last_pointer_screen_pos())
+	if INVENTORY_DRAG_DEBUG:
+		print("[InvPanelTransfer] panel=", name, " from_slot=", _drag_from_slot, " amount=", _drag_amount, " mouse=", pointer_screen_pos)
+	if transfer_requested.get_connections().size() > 0:
+		transfer_requested.emit(_drag_from_slot, _drag_item, _drag_amount, _inventory_data, pointer_screen_pos)
 		_end_drag()
 		return
 
@@ -1170,9 +1112,6 @@ func _set_hover_slot(slot_index: int) -> void:
 		return
 	var previous := _hover_slot_index
 	_hover_slot_index = slot_index
-	if _hover_slot_index >= 0:
-		_last_valid_hover_slot = _hover_slot_index
-		_last_valid_hover_timestamp_msec = Time.get_ticks_msec()
 	if previous >= 0:
 		_refresh_single_slot_visual(previous)
 	if _hover_slot_index >= 0:
@@ -1190,7 +1129,7 @@ func _update_hover_from_pointer() -> void:
 	if not _is_local_point_inside_panel(local_point):
 		_set_hover_slot(-1)
 		return
-	_set_hover_slot(_slot_index_from_local_point_with_snap(local_point))
+	_set_hover_slot(_slot_index_from_local_point(local_point))
 
 
 func _slot_index_from_local_point(local_point: Vector3) -> int:
@@ -1198,34 +1137,6 @@ func _slot_index_from_local_point(local_point: Vector3) -> int:
 	for i in range(_slot_bounds.size()):
 		if _slot_bounds[i].has_point(point):
 			return i
-	return -1
-
-
-func _slot_index_from_local_point_with_snap(local_point: Vector3) -> int:
-	var strict_index: int = _slot_index_from_local_point(local_point)
-	if strict_index >= 0:
-		return strict_index
-	if not _is_local_point_inside_panel(local_point):
-		return -1
-	if _slot_centers.is_empty():
-		return -1
-
-	var point := Vector2(local_point.x, local_point.y)
-	var nearest_index: int = -1
-	var nearest_dist_sq: float = INF
-	for i in range(_slot_centers.size()):
-		var center: Vector2 = _slot_centers[i]
-		var dist_sq: float = center.distance_squared_to(point)
-		if dist_sq < nearest_dist_sq:
-			nearest_dist_sq = dist_sq
-			nearest_index = i
-
-	if nearest_index < 0:
-		return -1
-
-	var snap_radius: float = slot_size_world * 0.5 + slot_gap_world * 0.55
-	if nearest_dist_sq <= snap_radius * snap_radius:
-		return nearest_index
 	return -1
 
 
@@ -1259,7 +1170,7 @@ func _get_mouse_local_hit_info(screen_pos_override: Variant = null) -> Dictionar
 	if typeof(screen_pos_override) == TYPE_VECTOR2:
 		mouse_pos = screen_pos_override as Vector2
 	else:
-		mouse_pos = get_last_pointer_screen_pos()
+		mouse_pos = viewport.get_mouse_position()
 	var ray_origin: Vector3 = _camera.project_ray_origin(mouse_pos)
 	var ray_dir: Vector3 = _camera.project_ray_normal(mouse_pos)
 	var plane_normal: Vector3 = global_basis.z.normalized()
@@ -1276,19 +1187,15 @@ func _get_mouse_local_hit_info(screen_pos_override: Variant = null) -> Dictionar
 
 
 func _raycast_panel() -> Dictionary:
-	return _raycast_panel_at_screen_position(get_last_pointer_screen_pos())
-
-
-func _raycast_panel_at_screen_position(screen_pos: Vector2) -> Dictionary:
-	_refresh_camera_ref(true)
 	if _camera == null:
 		return {}
 	var viewport := get_viewport()
 	if viewport == null:
 		return {}
 
-	var from := _camera.project_ray_origin(screen_pos)
-	var to := from + _camera.project_ray_normal(screen_pos) * ray_pick_distance
+	var mouse_pos := viewport.get_mouse_position()
+	var from := _camera.project_ray_origin(mouse_pos)
+	var to := from + _camera.project_ray_normal(mouse_pos) * ray_pick_distance
 	var query := PhysicsRayQueryParameters3D.create(from, to, panel_collision_layer)
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
@@ -1302,15 +1209,6 @@ func _raycast_panel_at_screen_position(screen_pos: Vector2) -> Dictionary:
 	if result.get("collider", null) != _hit_area:
 		return {}
 	return result
-
-
-
-
-func _cache_pointer_from_event(event: InputEvent) -> void:
-	if event is InputEventMouse:
-		var mouse_event := event as InputEventMouse
-		_last_pointer_screen_pos = mouse_event.position
-		_has_pointer_screen_pos = true
 
 
 func _is_mouse_hitting_panel() -> bool:

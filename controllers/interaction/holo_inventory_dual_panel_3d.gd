@@ -5,6 +5,7 @@ signal world_drop_requested(item: ItemData, amount: int)
 
 const LEFT_PANEL_SCENE_DEFAULT: PackedScene = preload("res://controllers/interaction/HoloInventoryPanel3D.tscn")
 const LOOT_ADAPTER_SCRIPT = preload("res://scripts/Inventory/loot_container_data_adapter.gd")
+const INVENTORY_DRAG_DEBUG := true
 
 @export_category("References")
 @export var right_panel_path: NodePath = NodePath("../HoloInventoryPanel3D")
@@ -133,12 +134,10 @@ func open_for_container(container_node: Node) -> void:
 		_right_panel.set_anchor_mark(_right_anchor_mark)
 	_right_panel.set_panel_title("背包")
 	_right_panel.set_inventory_data(_player_inventory)
-	_right_panel.set_external_transfer_mode(true)
 	_right_panel.show_panel()
 
 	_active_left_panel.set_panel_title(left_panel_title)
 	_active_left_panel.set_inventory_data(_left_adapter)
-	_active_left_panel.set_external_transfer_mode(true)
 	_active_left_panel.show_panel()
 
 	_is_dual_open = true
@@ -155,13 +154,11 @@ func close_dual_panel() -> void:
 	_unbind_operate_area()
 
 	if _active_left_panel != null and is_instance_valid(_active_left_panel):
-		_active_left_panel.set_external_transfer_mode(false)
 		_active_left_panel.hide_panel()
 	if _left_adapter != null and is_instance_valid(_left_adapter) and _left_adapter.has_method("unbind_container"):
 		_left_adapter.call("unbind_container")
 	_set_active_left_panel(null)
 	if _right_panel != null:
-		_right_panel.set_external_transfer_mode(false)
 		_right_panel.hide_panel()
 	if _player_inventory != null:
 		_set_inventory_visible(false)
@@ -326,9 +323,14 @@ func _set_inventory_visible(is_visible: bool) -> void:
 func _on_right_panel_drop_requested(item: ItemData, amount: int) -> void:
 	if item == null or amount <= 0:
 		return
-	if _is_dual_open:
-		return
+	world_drop_requested.emit(item, amount)
 
+
+func _on_left_panel_drop_requested(item: ItemData, amount: int) -> void:
+	if item == null or amount <= 0:
+		return
+	if not allow_world_drop_from_left_panel:
+		return
 	world_drop_requested.emit(item, amount)
 
 
@@ -339,62 +341,18 @@ func _on_right_panel_transfer_requested(
 	source_storage: Object,
 	pointer_screen_pos: Vector2
 ) -> void:
-	if item == null or amount <= 0:
-		return
-	var source_inventory: Object = source_storage
-	if source_inventory == null:
-		source_inventory = _player_inventory
-	if source_inventory == null:
-		return
-	if not _is_dual_open:
-		_drop_from_source_to_world(source_inventory, from_slot, amount)
-		return
-
-	var target_slot: int = _get_slot_under_mouse(_active_left_panel, pointer_screen_pos)
-	var target_panel_hit: bool = target_slot >= 0 or _is_pointer_over_target_panel(_active_left_panel, pointer_screen_pos)
-	if not target_panel_hit:
-		var self_slot: int = _get_slot_under_mouse(_right_panel, pointer_screen_pos)
-		if self_slot >= 0 and source_inventory.has_method("move_item_between_slots"):
-			source_inventory.call("move_item_between_slots", from_slot, self_slot, amount)
-			return
-		_drop_from_source_to_world(source_inventory, from_slot, amount)
-		return
-
-	var to_container: Object = _left_adapter
-	if to_container == null:
-		return
-	if target_slot < 0:
-		return
-	var moved: int = 0
-	if _try_swap_between_slots(source_inventory, to_container, from_slot, target_slot, amount):
-		return
-	moved = _insert_into_storage_slot(to_container, item, amount, target_slot)
-	if moved <= 0:
-		return
-
-	if not source_inventory.has_method("remove_from_slot"):
-		_remove_amount_from_storage(to_container, item, moved)
-		return
-	var removed_variant: Variant = source_inventory.call("remove_from_slot", from_slot, moved)
-	if typeof(removed_variant) != TYPE_DICTIONARY:
-		_remove_amount_from_storage(to_container, item, moved)
-		return
-	var removed: Dictionary = removed_variant
-	var removed_amount: int = int(removed.get("amount", 0))
-	if removed_amount < moved:
-		var rollback: int = moved - removed_amount
-		if rollback > 0:
-			_force_insert_into_storage(source_inventory, item, rollback)
-			_remove_amount_from_storage(to_container, item, rollback)
-
-
-func _on_left_panel_drop_requested(item: ItemData, amount: int) -> void:
-	if item == null or amount <= 0:
-		return
-	if _is_dual_open:
-		return
-	if allow_world_drop_from_left_panel:
-		world_drop_requested.emit(item, amount)
+	_resolve_external_transfer(
+		_right_panel,
+		_player_inventory,
+		_active_left_panel,
+		_left_adapter,
+		from_slot,
+		item,
+		amount,
+		source_storage,
+		pointer_screen_pos,
+		true
+	)
 
 
 func _on_left_panel_transfer_requested(
@@ -404,373 +362,161 @@ func _on_left_panel_transfer_requested(
 	source_storage: Object,
 	pointer_screen_pos: Vector2
 ) -> void:
+	_resolve_external_transfer(
+		_active_left_panel,
+		_left_adapter,
+		_right_panel,
+		_player_inventory,
+		from_slot,
+		item,
+		amount,
+		source_storage,
+		pointer_screen_pos,
+		allow_world_drop_from_left_panel
+	)
+
+
+func _resolve_external_transfer(
+	source_panel: HoloInventoryPanel3D,
+	default_source_storage: Object,
+	target_panel: HoloInventoryPanel3D,
+	target_storage: Object,
+	from_slot: int,
+	item: ItemData,
+	amount: int,
+	source_storage: Object,
+	pointer_screen_pos: Vector2,
+	allow_world_drop: bool
+) -> void:
 	if item == null or amount <= 0:
 		return
-	if _player_inventory == null:
-		return
-	var source_inventory: Object = source_storage
-	if source_inventory == null:
-		source_inventory = _left_adapter
-	if source_inventory == null:
-		return
-	var target_slot: int = _get_slot_under_mouse(_right_panel, pointer_screen_pos)
-	var target_panel_hit: bool = target_slot >= 0 or _is_pointer_over_target_panel(_right_panel, pointer_screen_pos)
-	if _is_dual_open and not target_panel_hit:
-		var self_slot: int = _get_slot_under_mouse(_active_left_panel, pointer_screen_pos)
-		if self_slot >= 0 and source_inventory.has_method("move_item_between_slots"):
-			source_inventory.call("move_item_between_slots", from_slot, self_slot, amount)
-			return
-		_drop_from_source_to_world(source_inventory, from_slot, amount)
+	if from_slot < 0:
 		return
 
-	var to_inventory: Object = _player_inventory
-	if to_inventory == null:
+	var resolved_source_storage: Object = source_storage
+	if resolved_source_storage == null:
+		resolved_source_storage = default_source_storage
+	if resolved_source_storage == null:
 		return
-	if target_slot < 0:
-		return
+
+	var release_target: Dictionary = _resolve_release_target(pointer_screen_pos, source_panel)
+	var hit_panel: HoloInventoryPanel3D = release_target.get("panel", null) as HoloInventoryPanel3D
+	var target_slot: int = int(release_target.get("slot", -1))
+	var over_target: bool = hit_panel == target_panel
 	var moved: int = 0
-	if _try_swap_between_slots(source_inventory, to_inventory, from_slot, target_slot, amount):
-		return
-	moved = _insert_into_storage_slot(to_inventory, item, amount, target_slot)
-	if moved <= 0:
+	if INVENTORY_DRAG_DEBUG:
+		var source_panel_name: String = source_panel.name if source_panel != null else "null"
+		var target_panel_name: String = target_panel.name if target_panel != null else "null"
+		var hit_panel_name: String = hit_panel.name if hit_panel != null else "null"
+		print(
+			"[InvDualTransfer] source_panel=", source_panel_name,
+			" target_panel=", target_panel_name,
+			" hit_panel=", hit_panel_name,
+			" from_slot=", from_slot,
+			" amount=", amount,
+			" mouse=", pointer_screen_pos,
+			" target_slot=", target_slot,
+			" over_target=", over_target
+		)
+	if target_slot >= 0:
+		moved = InventoryTransferService.transfer_between_storages(resolved_source_storage, from_slot, target_storage, target_slot, amount)
+	elif over_target:
+		moved = InventoryTransferService.transfer_to_first_available(resolved_source_storage, from_slot, target_storage, amount)
+	if INVENTORY_DRAG_DEBUG:
+		print("[InvDualTransfer] moved=", moved, " allow_world_drop=", allow_world_drop)
+
+	if moved > 0:
 		return
 
-	if not source_inventory.has_method("remove_from_slot"):
-		_remove_amount_from_storage(to_inventory, item, moved)
-		return
-	var removed_variant: Variant = source_inventory.call("remove_from_slot", from_slot, moved)
-	if typeof(removed_variant) != TYPE_DICTIONARY:
-		_remove_amount_from_storage(to_inventory, item, moved)
-		return
-	var removed: Dictionary = removed_variant
+	if allow_world_drop:
+		if INVENTORY_DRAG_DEBUG:
+			print("[InvDualTransfer] fallback=world_drop from_slot=", from_slot, " amount=", amount)
+		_drop_from_source_to_world(resolved_source_storage, from_slot, amount)
+
+
+func _resolve_release_target(screen_pos: Vector2, source_panel: HoloInventoryPanel3D = null) -> Dictionary:
+	var camera: Camera3D = _resolve_release_camera()
+	if camera == null:
+		return {"panel": null, "slot": -1}
+
+	var from: Vector3 = camera.project_ray_origin(screen_pos)
+	var to: Vector3 = from + camera.project_ray_normal(screen_pos) * 8.0
+	var collision_mask: int = _get_panel_collision_mask()
+	if collision_mask == 0:
+		return {"panel": null, "slot": -1}
+
+	var query := PhysicsRayQueryParameters3D.create(from, to, collision_mask)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var exclude_rids: Array[RID] = []
+	if source_panel != null and is_instance_valid(source_panel):
+		var source_hit_area: Area3D = source_panel.get_hit_area()
+		if source_hit_area != null and is_instance_valid(source_hit_area):
+			exclude_rids.append(source_hit_area.get_rid())
+	if not exclude_rids.is_empty():
+		query.exclude = exclude_rids
+	var space_state := camera.get_world_3d().direct_space_state
+	var hit: Dictionary = space_state.intersect_ray(query)
+	if hit.is_empty():
+		return {"panel": null, "slot": -1}
+
+	var collider: Object = hit.get("collider", null) as Object
+	var hit_position: Vector3 = hit.get("position", Vector3.ZERO) as Vector3
+	if _matches_panel_collider(_active_left_panel, collider):
+		return {
+			"panel": _active_left_panel,
+			"slot": _active_left_panel.get_slot_index_from_world_hit(hit_position),
+		}
+	if _matches_panel_collider(_right_panel, collider):
+		return {
+			"panel": _right_panel,
+			"slot": _right_panel.get_slot_index_from_world_hit(hit_position),
+		}
+	return {"panel": null, "slot": -1}
+
+
+func _matches_panel_collider(panel: HoloInventoryPanel3D, collider: Object) -> bool:
+	if panel == null or not is_instance_valid(panel):
+		return false
+	var hit_area: Area3D = panel.get_hit_area()
+	if hit_area == null or not is_instance_valid(hit_area):
+		return false
+	return collider == hit_area
+
+
+func _resolve_release_camera() -> Camera3D:
+	if _right_panel != null and is_instance_valid(_right_panel):
+		var viewport := _right_panel.get_viewport()
+		if viewport != null:
+			var viewport_camera := viewport.get_camera_3d()
+			if viewport_camera != null and is_instance_valid(viewport_camera):
+				return viewport_camera
+	if _player_node != null and is_instance_valid(_player_node):
+		var player_viewport := _player_node.get_viewport()
+		if player_viewport != null:
+			var player_camera := player_viewport.get_camera_3d()
+			if player_camera != null and is_instance_valid(player_camera):
+				return player_camera
+	return null
+
+
+func _get_panel_collision_mask() -> int:
+	var mask: int = 0
+	if _right_panel != null and is_instance_valid(_right_panel):
+		var right_hit_area: Area3D = _right_panel.get_hit_area()
+		if right_hit_area != null and is_instance_valid(right_hit_area):
+			mask |= right_hit_area.collision_layer
+	if _active_left_panel != null and is_instance_valid(_active_left_panel):
+		var left_hit_area: Area3D = _active_left_panel.get_hit_area()
+		if left_hit_area != null and is_instance_valid(left_hit_area):
+			mask |= left_hit_area.collision_layer
+	return mask
+
+
+func _drop_from_source_to_world(source_storage: Object, from_slot: int, requested_amount: int) -> void:
+	var removed: Dictionary = InventoryTransferService.drop_from_source(source_storage, from_slot, requested_amount)
+	var removed_item: ItemData = removed.get("item", null) as ItemData
 	var removed_amount: int = int(removed.get("amount", 0))
-	if removed_amount < moved:
-		var rollback: int = moved - removed_amount
-		if rollback > 0:
-			_force_insert_into_storage(source_inventory, item, rollback)
-			_remove_amount_from_storage(to_inventory, item, rollback)
-
-
-func _drop_from_source_to_world(source_inventory: Object, from_slot: int, amount: int) -> void:
-	if source_inventory == null or amount <= 0:
+	if removed_item == null or removed_amount <= 0:
 		return
-	if not source_inventory.has_method("remove_from_slot"):
-		return
-	var removed_world_variant: Variant = source_inventory.call("remove_from_slot", from_slot, amount)
-	if typeof(removed_world_variant) != TYPE_DICTIONARY:
-		return
-	var removed_world: Dictionary = removed_world_variant
-	var removed_item_world := removed_world.get("item", null) as ItemData
-	var removed_amount_world: int = int(removed_world.get("amount", 0))
-	if removed_item_world != null and removed_amount_world > 0:
-		world_drop_requested.emit(removed_item_world, removed_amount_world)
-
-
-func _is_pointer_over_target_panel(panel: HoloInventoryPanel3D, pointer_screen_pos: Vector2) -> bool:
-	if panel == null or not is_instance_valid(panel):
-		return false
-	if panel.has_method("is_mouse_over_panel_at"):
-		return bool(panel.call("is_mouse_over_panel_at", pointer_screen_pos))
-	if panel.has_method("is_mouse_over_panel"):
-		return bool(panel.call("is_mouse_over_panel"))
-	if panel.has_method("get_slot_index_under_mouse"):
-		return int(panel.call("get_slot_index_under_mouse")) >= 0
-	return false
-
-
-func _get_slot_under_mouse(panel: HoloInventoryPanel3D, pointer_screen_pos: Vector2) -> int:
-	if panel == null or not is_instance_valid(panel):
-		return -1
-	if panel.has_method("get_slot_index_at_screen_position"):
-		var pos_index: int = int(panel.call("get_slot_index_at_screen_position", pointer_screen_pos))
-		if pos_index >= 0:
-			return pos_index
-	if panel.has_method("get_hovered_slot_index"):
-		var hovered_index: int = int(panel.call("get_hovered_slot_index"))
-		if hovered_index >= 0:
-			return hovered_index
-	if panel.has_method("get_recent_slot_index"):
-		var recent_slot_index: int = int(panel.call("get_recent_slot_index", 220))
-		if recent_slot_index >= 0:
-			return recent_slot_index
-	if panel.has_method("get_slot_index_under_mouse"):
-		var direct_index: int = int(panel.call("get_slot_index_under_mouse"))
-		if direct_index >= 0:
-			return direct_index
-	return -1
-
-
-func _insert_into_storage_slot(storage: Object, item: ItemData, amount: int, slot_index: int) -> int:
-	if storage == null or item == null or amount <= 0:
-		return 0
-	if not storage.has_method("get_slot_count"):
-		return 0
-	if not storage.has_method("get_slot_data"):
-		return 0
-	if not storage.has_method("set_slot_data"):
-		return 0
-
-	var slot_count: int = int(storage.call("get_slot_count"))
-	if slot_index < 0 or slot_index >= slot_count:
-		return 0
-
-	var slot_data_variant: Variant = storage.call("get_slot_data", slot_index)
-	if typeof(slot_data_variant) != TYPE_DICTIONARY:
-		return 0
-	var slot_data: Dictionary = slot_data_variant
-	var slot_item := slot_data.get("item", null) as ItemData
-	var slot_amount: int = int(slot_data.get("amount", 0))
-
-	if slot_item != null and slot_item != item and slot_amount > 0:
-		return 0
-
-	var max_stack: int = _get_storage_max_stack_for_item(storage, item)
-	var existing_amount: int = maxi(slot_amount, 0)
-	if slot_item == null or slot_amount <= 0:
-		existing_amount = 0
-	var available: int = max_stack - existing_amount
-	if available <= 0:
-		return 0
-
-	var moved: int = mini(amount, available)
-	var final_amount: int = existing_amount + moved
-	storage.call("set_slot_data", slot_index, item, final_amount)
-	var verify_variant: Variant = storage.call("get_slot_data", slot_index)
-	if typeof(verify_variant) != TYPE_DICTIONARY:
-		return 0
-	var verify_data: Dictionary = verify_variant
-	var verify_item := verify_data.get("item", null) as ItemData
-	var verify_amount: int = int(verify_data.get("amount", 0))
-	if verify_item != item:
-		return 0
-	var actual_moved: int = maxi(0, verify_amount - existing_amount)
-	return mini(moved, actual_moved)
-
-
-func _get_storage_max_stack_for_item(storage: Object, item: ItemData) -> int:
-	if item == null:
-		return 1
-	if storage == null:
-		return 1
-
-	if storage is LootContainerDataAdapter:
-		var adapter := storage as LootContainerDataAdapter
-		var container := adapter.get_bound_container()
-		if container != null and not container.enable_item_stacking:
-			return 1
-
-	if storage is InventoryDataService:
-		var inventory := storage as InventoryDataService
-		if not inventory.enable_item_stacking:
-			return 1
-
-	return maxi(1, item.MaxStackSize)
-
-
-func _insert_into_storage(storage: Object, item: ItemData, amount: int) -> int:
-	if storage == null or item == null or amount <= 0:
-		return 0
-
-	if storage.has_method("insert_item"):
-		var inserted: int = int(storage.call("insert_item", item, amount))
-		return clampi(inserted, 0, amount)
-
-	var inserted_count: int = 0
-	for _i in range(amount):
-		var can_insert: bool = true
-		if storage.has_method("CanPickupItem"):
-			can_insert = bool(storage.call("CanPickupItem", item, 1))
-		elif storage.has_method("can_pickup_item"):
-			can_insert = bool(storage.call("can_pickup_item", item, 1))
-		if not can_insert:
-			break
-
-		var pickup_ok: bool = false
-		if storage.has_method("PickupItem"):
-			pickup_ok = bool(storage.call("PickupItem", item, 1))
-		elif storage.has_method("pickup_item"):
-			pickup_ok = bool(storage.call("pickup_item", item, 1))
-
-		if not pickup_ok:
-			break
-		inserted_count += 1
-
-	return inserted_count
-
-
-func _force_insert_into_storage(storage: Object, item: ItemData, amount: int) -> int:
-	if storage == null or item == null or amount <= 0:
-		return 0
-	if not storage.has_method("get_slot_count"):
-		return 0
-	if not storage.has_method("get_slot_data"):
-		return 0
-	if not storage.has_method("set_slot_data"):
-		return 0
-
-	var remaining: int = amount
-	var slot_count: int = int(storage.call("get_slot_count"))
-	if slot_count <= 0:
-		return 0
-
-	for i in range(slot_count):
-		if remaining <= 0:
-			break
-		var slot_data_variant: Variant = storage.call("get_slot_data", i)
-		if typeof(slot_data_variant) != TYPE_DICTIONARY:
-			continue
-		var slot_data: Dictionary = slot_data_variant
-		var slot_item := slot_data.get("item", null) as ItemData
-		var slot_amount: int = int(slot_data.get("amount", 0))
-		if slot_item != item or slot_amount <= 0:
-			continue
-		var max_stack: int = _get_storage_max_stack_for_item(storage, item)
-		var available: int = maxi(0, max_stack - slot_amount)
-		if available <= 0:
-			continue
-		var add_amount: int = mini(available, remaining)
-		storage.call("set_slot_data", i, item, slot_amount + add_amount)
-		var verify_stack_variant: Variant = storage.call("get_slot_data", i)
-		if typeof(verify_stack_variant) != TYPE_DICTIONARY:
-			continue
-		var verify_stack_data: Dictionary = verify_stack_variant
-		var verify_stack_item := verify_stack_data.get("item", null) as ItemData
-		var verify_stack_amount: int = int(verify_stack_data.get("amount", 0))
-		if verify_stack_item != item:
-			continue
-		var actual_added_stack: int = maxi(0, verify_stack_amount - slot_amount)
-		if actual_added_stack <= 0:
-			continue
-		remaining -= mini(add_amount, actual_added_stack)
-
-	for i in range(slot_count):
-		if remaining <= 0:
-			break
-		var slot_data_variant: Variant = storage.call("get_slot_data", i)
-		if typeof(slot_data_variant) != TYPE_DICTIONARY:
-			continue
-		var slot_data: Dictionary = slot_data_variant
-		var slot_item := slot_data.get("item", null) as ItemData
-		var slot_amount: int = int(slot_data.get("amount", 0))
-		if slot_item != null and slot_amount > 0:
-			continue
-		var max_stack: int = _get_storage_max_stack_for_item(storage, item)
-		var add_amount: int = mini(max_stack, remaining)
-		if add_amount <= 0:
-			continue
-		storage.call("set_slot_data", i, item, add_amount)
-		var verify_empty_variant: Variant = storage.call("get_slot_data", i)
-		if typeof(verify_empty_variant) != TYPE_DICTIONARY:
-			continue
-		var verify_empty_data: Dictionary = verify_empty_variant
-		var verify_empty_item := verify_empty_data.get("item", null) as ItemData
-		var verify_empty_amount: int = int(verify_empty_data.get("amount", 0))
-		if verify_empty_item != item:
-			continue
-		var actual_added_empty: int = maxi(0, verify_empty_amount)
-		if actual_added_empty <= 0:
-			continue
-		remaining -= mini(add_amount, actual_added_empty)
-
-	return amount - remaining
-
-
-func _remove_amount_from_storage(storage: Object, item: ItemData, amount: int) -> int:
-	if storage == null or item == null or amount <= 0:
-		return 0
-	if not storage.has_method("get_slot_count"):
-		return 0
-	if not storage.has_method("get_slot_data"):
-		return 0
-	if not storage.has_method("set_slot_data"):
-		return 0
-
-	var remaining: int = amount
-	var slot_count: int = int(storage.call("get_slot_count"))
-	for i in range(slot_count):
-		if remaining <= 0:
-			break
-		var slot_data_variant: Variant = storage.call("get_slot_data", i)
-		if typeof(slot_data_variant) != TYPE_DICTIONARY:
-			continue
-		var slot_data: Dictionary = slot_data_variant
-		var slot_item := slot_data.get("item", null) as ItemData
-		var slot_amount: int = int(slot_data.get("amount", 0))
-		if slot_item != item or slot_amount <= 0:
-			continue
-		var take_amount: int = mini(slot_amount, remaining)
-		var next_amount: int = slot_amount - take_amount
-		if next_amount > 0:
-			storage.call("set_slot_data", i, item, next_amount)
-		else:
-			storage.call("set_slot_data", i, null, 0)
-		remaining -= take_amount
-	return amount - remaining
-
-
-func _try_swap_between_slots(
-	source_storage: Object,
-	target_storage: Object,
-	source_slot: int,
-	target_slot: int,
-	requested_amount: int
-) -> bool:
-	if source_storage == null or target_storage == null:
-		return false
-	if source_slot < 0 or target_slot < 0:
-		return false
-	if not source_storage.has_method("get_slot_data") or not source_storage.has_method("set_slot_data"):
-		return false
-	if not target_storage.has_method("get_slot_data") or not target_storage.has_method("set_slot_data"):
-		return false
-
-	var source_data_variant: Variant = source_storage.call("get_slot_data", source_slot)
-	var target_data_variant: Variant = target_storage.call("get_slot_data", target_slot)
-	if typeof(source_data_variant) != TYPE_DICTIONARY or typeof(target_data_variant) != TYPE_DICTIONARY:
-		return false
-
-	var source_data: Dictionary = source_data_variant
-	var target_data: Dictionary = target_data_variant
-	var source_item := source_data.get("item", null) as ItemData
-	var source_amount: int = int(source_data.get("amount", 0))
-	var target_item := target_data.get("item", null) as ItemData
-	var target_amount: int = int(target_data.get("amount", 0))
-
-	if source_item == null or source_amount <= 0:
-		return false
-	if target_item == null or target_amount <= 0:
-		return false
-	if source_item == target_item:
-		return false
-	if requested_amount != source_amount:
-		return false
-
-	var source_capacity_for_target: int = _get_storage_max_stack_for_item(source_storage, target_item)
-	var target_capacity_for_source: int = _get_storage_max_stack_for_item(target_storage, source_item)
-	if target_amount > source_capacity_for_target:
-		return false
-	if source_amount > target_capacity_for_source:
-		return false
-
-	source_storage.call("set_slot_data", source_slot, target_item, target_amount)
-	target_storage.call("set_slot_data", target_slot, source_item, source_amount)
-
-	var source_verify_variant: Variant = source_storage.call("get_slot_data", source_slot)
-	var target_verify_variant: Variant = target_storage.call("get_slot_data", target_slot)
-	var source_ok: bool = _is_slot_data_equal_to_stack(source_verify_variant, target_item, target_amount)
-	var target_ok: bool = _is_slot_data_equal_to_stack(target_verify_variant, source_item, source_amount)
-	if source_ok and target_ok:
-		return true
-
-	source_storage.call("set_slot_data", source_slot, source_item, source_amount)
-	target_storage.call("set_slot_data", target_slot, target_item, target_amount)
-	return false
-
-
-func _is_slot_data_equal_to_stack(slot_data_variant: Variant, item: ItemData, amount: int) -> bool:
-	if typeof(slot_data_variant) != TYPE_DICTIONARY:
-		return false
-	var slot_data: Dictionary = slot_data_variant
-	var slot_item := slot_data.get("item", null) as ItemData
-	var slot_amount: int = int(slot_data.get("amount", 0))
-	return slot_item == item and slot_amount == amount
+	world_drop_requested.emit(removed_item, removed_amount)

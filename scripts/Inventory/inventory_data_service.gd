@@ -14,6 +14,9 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 
 var inventory_visible: bool = false
 var _storage_runtime_initialized: bool = false
+var _batch_update_depth: int = 0
+var _pending_inventory_changed: bool = false
+var _pending_slot_changes: Dictionary = {}
 
 
 func _ready() -> void:
@@ -272,6 +275,18 @@ func apply_inventory_storage_resource(storage: InventoryStorageResource) -> void
 	_emit_inventory_changed()
 
 
+func begin_batch_update() -> void:
+	_batch_update_depth += 1
+
+
+func end_batch_update() -> void:
+	if _batch_update_depth <= 0:
+		return
+	_batch_update_depth -= 1
+	if _batch_update_depth == 0:
+		_flush_pending_notifications()
+
+
 func _load_slot_array_data(slots_data: Array) -> void:
 	for slot_data_raw in slots_data:
 		if not (slot_data_raw is Dictionary):
@@ -347,8 +362,27 @@ func _make_empty_slot_data() -> Dictionary:
 
 
 func _emit_slot_changed(slot_index: int) -> void:
+	if _batch_update_depth > 0:
+		_pending_slot_changes[slot_index] = true
+		return
 	slot_changed.emit(slot_index)
 
 
 func _emit_inventory_changed() -> void:
+	if _batch_update_depth > 0:
+		_pending_inventory_changed = true
+		return
 	inventory_changed.emit()
+
+
+func _flush_pending_notifications() -> void:
+	if not _pending_slot_changes.is_empty():
+		var slot_indexes: Array = _pending_slot_changes.keys()
+		slot_indexes.sort()
+		for slot_index_variant in slot_indexes:
+			slot_changed.emit(int(slot_index_variant))
+	_pending_slot_changes.clear()
+
+	if _pending_inventory_changed:
+		_pending_inventory_changed = false
+		inventory_changed.emit()

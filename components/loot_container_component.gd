@@ -53,7 +53,7 @@ func interact(_player: Node) -> void:
 	Global.open_loot_ui.emit(self)
 
 func notify_runtime_slots_changed() -> void:
-	_sync_runtime_storage_from_runtime_slots()
+	_rebuild_runtime_slots_from_storage()
 	_refresh_world_display()
 
 # ==========================================
