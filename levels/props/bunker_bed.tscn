@@ -1,8 +1,6 @@
 [gd_scene format=4 uid="uid://bik7y2k4qp3rd"]
 
-[ext_resource type="Script" uid="uid://b5nd4cfjqgr2r" path="res://components/xiaokong_ladder_component.gd" id="1_qwc8n"]
-[ext_resource type="Resource" uid="uid://bfb52in242xih" path="res://levels/props/bunker_bed_ladder_layout.tres" id="2_50x3j"]
-[ext_resource type="PackedScene" path="res://scenes/interactables/xiaokong_bunk_bed_interactable.tscn" id="3_bunk"]
+[ext_resource type="PackedScene" path="res://scenes/interactables/bed_sleep_interactable.tscn" id="3_bunk"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_hx2lj"]
 load_path = "res://.godot/imported/workbench.png-e211cc8f42b96c4c41cebac01f42168f.s3tc.ctex"
@@ -165,107 +163,5 @@ metadata/extras = {
 [node name="CollisionShape3D" type="CollisionShape3D" parent="mattress_2/mattress_2_col" unique_id=1268831106]
 shape = SubResource("ConcavePolygonShape3D_1q645")
 
-[node name="LadderRungs" type="Node3D" parent="." unique_id=593114438]
-
-[node name="Layer00_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1282605540]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.46197778, 0.9467268)
-
-[node name="Layer00_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1270097224]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.46197778, 0.66666687)
-
-[node name="Layer01_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=833784522]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.6658835, 0.9467268)
-
-[node name="Layer01_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1128150794]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.6658835, 0.66666687)
-
-[node name="Layer02_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1234128834]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.87832886, 0.9467268)
-
-[node name="Layer02_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=2135770988]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 0.87832886, 0.66666687)
-
-[node name="Layer03_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1793707644]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.0864282, 0.9467268)
-
-[node name="Layer03_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1427296571]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.0864282, 0.66666687)
-
-[node name="Layer04_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=975599682]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.2959282, 0.9467268)
-
-[node name="Layer04_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1401141150]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.2959282, 0.66666687)
-
-[node name="Layer05_Right_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=1772321141]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.4104773, 0.9467268)
-
-[node name="Layer05_Left_Mark3D" type="Marker3D" parent="LadderRungs" unique_id=819986116]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.8165665, 1.4104773, 0.66666687)
-
-[node name="Ladder" type="Node3D" parent="." unique_id=1635084557]
-script = ExtResource("1_qwc8n")
-layout_resource = ExtResource("2_50x3j")
-
-[node name="BottomAttach_Mark3D" type="Marker3D" parent="Ladder" unique_id=745753728]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9065665, 0.46197778, 0.80669683)
-
-[node name="BottomEntry_Mark3D" type="Marker3D" parent="Ladder" unique_id=1858086508]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.237, 0, 0.807)
-
-[node name="BottomExit_Mark3D" type="Marker3D" parent="Ladder" unique_id=1429446484]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.237, 0, 0.807)
-
-[node name="TopAttach_Mark3D" type="Marker3D" parent="Ladder" unique_id=150858511]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9065665, 1.4104773, 0.80669683)
-
-[node name="TopEntry_Mark3D" type="Marker3D" parent="Ladder" unique_id=2054172941]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.49656653, 1.4104773, 0.80669683)
-
-[node name="TopExit_Mark3D" type="Marker3D" parent="Ladder" unique_id=744523631]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.49656653, 1.4104773, 0.80669683)
-
-[node name="BodyAnchor_Mark3D" type="Marker3D" parent="Ladder" unique_id=817001099]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0265665, 0.46197778, 0.80669683)
-
-[node name="LowerApproach_Mark3D" type="Marker3D" parent="." unique_id=203410101]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 1.237, 0, 0.807)
-
-[node name="LowerStand_Mark3D" type="Marker3D" parent="." unique_id=203410102]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.237, 0, 0.807)
-
-[node name="LowerSit_Mark3D" type="Marker3D" parent="." unique_id=203410103]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.27443898, 0.5, 0.05)
-
-[node name="UpperApproach_Mark3D" type="Marker3D" parent="." unique_id=203410104]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.49656653, 1.4104773, 0.80669683)
-
-[node name="UpperStand_Mark3D" type="Marker3D" parent="." unique_id=203410105]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.49656653, 1.4104773, 0.80669683)
-
-[node name="UpperSit_Mark3D" type="Marker3D" parent="." unique_id=203410106]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0.05)
-
-[node name="LowerBedInteractArea" parent="." unique_id=1285720193 instance=ExtResource("3_bunk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
-prompt_text = "让小空去下铺坐下"
-sit_marker_path = NodePath("../LowerSit_Mark3D")
-approach_marker_path = NodePath("../LowerApproach_Mark3D")
-stand_marker_path = NodePath("../LowerStand_Mark3D")
-ladder_path = NodePath("../Ladder")
-ladder_entry_marker_path = NodePath("../Ladder/TopEntry_Mark3D")
-opposite_level_marker_path = NodePath("../UpperSit_Mark3D")
-opposite_ladder_entry_marker_path = NodePath("../Ladder/TopEntry_Mark3D")
-
-[node name="UpperBedInteractArea" parent="." unique_id=109370678 instance=ExtResource("3_bunk")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.42, 0)
-prompt_text = "让小空去上铺躺下"
-bed_level = 1
-seat_action = "Laying"
-sit_marker_path = NodePath("../UpperSit_Mark3D")
-approach_marker_path = NodePath("../UpperApproach_Mark3D")
-stand_marker_path = NodePath("../UpperStand_Mark3D")
-ladder_path = NodePath("../Ladder")
-ladder_entry_marker_path = NodePath("../Ladder/BottomEntry_Mark3D")
-opposite_level_marker_path = NodePath("../LowerSit_Mark3D")
-opposite_ladder_entry_marker_path = NodePath("../Ladder/BottomEntry_Mark3D")
+[node name="SleepInteractArea" parent="." unique_id=1285720193 instance=ExtResource("3_bunk")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)

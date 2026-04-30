@@ -78,7 +78,7 @@ gi_mode = 0
 mesh = SubResource("QuadMesh_input")
 
 [node name="InputTextLabel" type="Label3D" parent="InputRoot" unique_id=700916505]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, -0.016, 0.0022)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, -0.0034294128, 0.0022)
 pixel_size = 0.0009
 no_depth_test = true
 render_priority = 64

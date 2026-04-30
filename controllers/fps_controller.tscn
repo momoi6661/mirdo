@@ -26,7 +26,7 @@
 [ext_resource type="Resource" uid="uid://ca22678m80wis" path="res://resources/inventory/player_inventory_storage.tres" id="24_inv_storage"]
 [ext_resource type="Script" uid="uid://crsyy4ppfnwnf" path="res://controllers/interaction/holo_inventory_dual_panel_3d.gd" id="25_dual_inv"]
 [ext_resource type="PackedScene" uid="uid://6fmvbd1hhedb" path="res://controllers/interaction/XiaokongDialogueInputPanel3D.tscn" id="26_xk_dialogue_panel"]
-[ext_resource type="PackedScene" path="res://controllers/ui/TimeHud.tscn" id="27_time_hud"]
+[ext_resource type="PackedScene" uid="uid://bcttpkk0u6xyf" path="res://controllers/ui/TimeHud.tscn" id="27_time_hud"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -446,9 +446,7 @@ layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -138.0
 offset_top = 20.0
-offset_right = 138.0
 offset_bottom = 176.0
 grow_horizontal = 2
 

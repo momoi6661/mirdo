@@ -35,6 +35,8 @@ var current_interaction_mode: StringName = MODE_NONE
 var is_interacting: bool = false
 var interact_timer: float = 0.0
 var _last_interact_pressed: bool = false
+var _locked_interactable: Node = null
+var _locked_interaction_mode: StringName = MODE_NONE
 
 var _world_panel: WorldInteractionPanelComponent
 var _world_panel_anchor: Node3D
@@ -60,6 +62,18 @@ func _physics_process(delta: float) -> void:
 	_sync_held_object_exception()
 
 	if _is_inventory_open():
+		_clear_target()
+		return
+
+	if _should_use_locked_interaction_target(input_state):
+		if _locked_interactable == null or not is_instance_valid(_locked_interactable):
+			_clear_target()
+			return
+		current_interactable = _locked_interactable
+		current_interaction_mode = _locked_interaction_mode
+		if _is_world_mode(current_interaction_mode):
+			_handle_world_interaction(delta, input_state)
+			return
 		_clear_target()
 		return
 
@@ -335,12 +349,17 @@ func _handle_world_interaction(delta: float, input_state: Dictionary) -> void:
 		_refresh_world_panel()
 
 	var is_pressing: bool = bool(input_state.get("pressed", false))
+	var just_pressed: bool = bool(input_state.get("just_pressed", false))
 	var option: WorldInteractionOption = _get_selected_world_option()
 	if is_pressing:
 		if not is_interacting:
+			if not just_pressed:
+				return
 			is_interacting = true
 			interact_timer = 0.0
 			_world_panel_hold_executed = false
+			_locked_interactable = current_interactable
+			_locked_interaction_mode = current_interaction_mode
 		interact_timer += delta
 
 		if option != null and option.enabled and option.supports_hold():
@@ -383,8 +402,20 @@ func _clear_target() -> void:
 	interact_timer = 0.0
 	_world_panel_hold_executed = false
 	_world_panel_refresh_elapsed = 0.0
+	_locked_interactable = null
+	_locked_interaction_mode = MODE_NONE
 	current_interactable = null
 	current_interaction_mode = MODE_NONE
+
+
+func _should_use_locked_interaction_target(input_state: Dictionary) -> bool:
+	if not is_interacting:
+		return false
+	if _locked_interactable == null or not is_instance_valid(_locked_interactable):
+		return false
+	var pressed: bool = bool(input_state.get("pressed", false))
+	var just_released: bool = bool(input_state.get("just_released", false))
+	return pressed or just_released
 
 func _refresh_world_panel() -> void:
 	if not _is_world_mode(current_interaction_mode):

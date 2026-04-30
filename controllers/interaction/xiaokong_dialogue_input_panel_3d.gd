@@ -76,12 +76,19 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var option_hover_color: Color = Color(0.98, 0.72, 0.84, 0.18)
 @export var option_pressed_color: Color = Color(0.95, 0.62, 0.78, 0.34)
 @export var input_bg_color: Color = Color(1.0, 0.93, 0.96, 0.82)
+@export var input_hover_color: Color = Color(1.0, 0.95, 0.98, 0.88)
 @export var input_focus_color: Color = Color(1.0, 0.97, 0.99, 0.92)
+@export var input_pressed_color: Color = Color(0.98, 0.84, 0.90, 0.96)
 @export var input_text_color: Color = Color(0.23, 0.10, 0.17, 1.0)
 @export var placeholder_color: Color = Color(0.47, 0.27, 0.36, 0.96)
 @export var send_bg_color: Color = Color(0.97, 0.74, 0.86, 0.78)
 @export var send_hover_color: Color = Color(0.98, 0.79, 0.89, 0.86)
 @export var send_pressed_color: Color = Color(0.93, 0.62, 0.78, 0.92)
+@export var send_text_hover_color: Color = Color(0.20, 0.08, 0.16, 1.0)
+@export var send_text_pressed_color: Color = Color(0.16, 0.05, 0.12, 1.0)
+@export var option_hover_text_color: Color = Color(1.0, 0.98, 1.0, 1.0)
+@export var option_pressed_text_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var caret_color: Color = Color(0.98, 0.30, 0.66, 1.0)
 @export var panel_corner_radius: float = 0.045
 @export var row_corner_radius: float = 0.06
 @export var input_corner_radius: float = 0.045
@@ -91,6 +98,13 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var panel_render_priority: int = 8
 @export var ui_render_priority: int = 12
 @export var text_render_priority: int = 64
+@export_range(0.10, 2.0, 0.01) var caret_blink_interval: float = 0.46
+@export_range(0.004, 0.04, 0.001) var caret_height_world: float = 0.038
+@export_range(0.0006, 0.01, 0.0001) var caret_width_world: float = 0.0048
+@export_range(0.01, 0.08, 0.001) var caret_line_step_world: float = 0.032
+@export_range(0.0, 0.03, 0.0005) var caret_gap_world: float = 0.008
+@export_range(1.0, 1.08, 0.001) var hover_scale_multiplier: float = 1.01
+@export_range(0.90, 1.0, 0.001) var pressed_scale_multiplier: float = 0.985
 
 var _panel_mesh: MeshInstance3D
 var _title_label: Label3D
@@ -100,6 +114,7 @@ var _input_mesh: MeshInstance3D
 var _input_text_label: Label3D
 var _placeholder_label: Label3D
 var _input_pick_area: Area3D
+var _input_caret: MeshInstance3D
 var _send_mesh: MeshInstance3D
 var _send_label: Label3D
 var _send_pick_area: Area3D
@@ -113,6 +128,8 @@ var _input_focused: bool = false
 var _option_rows: Array[Dictionary] = []
 var _last_option_text: String = ""
 var _last_option_click_ms: int = -1
+var _caret_blink_timer: float = 0.0
+var _caret_visible: bool = true
 
 func _ready() -> void:
 	top_level = true
@@ -134,10 +151,12 @@ func _process(delta: float) -> void:
 	_resolve_nodes()
 	if Engine.is_editor_hint():
 		_setup_visuals()
+		_update_caret_visual(delta)
 		_update_follow_transform(delta)
 		return
 	if not _is_open:
 		return
+	_update_caret_visual(delta)
 	_update_follow_transform(delta)
 
 func _input(event: InputEvent) -> void:
@@ -247,6 +266,12 @@ func _resolve_nodes() -> void:
 	_send_label = get_node_or_null(send_button_label_path) as Label3D
 	_send_pick_area = get_node_or_null(send_pick_area_path) as Area3D
 	_anchor_mark = get_node_or_null(anchor_mark_path) as Node3D
+	if _input_root != null:
+		_input_caret = _input_root.get_node_or_null("InputCaret") as MeshInstance3D
+		if _input_caret == null:
+			_input_caret = MeshInstance3D.new()
+			_input_caret.name = "InputCaret"
+			_input_root.add_child(_input_caret)
 
 func _setup_visuals() -> void:
 	if _panel_mesh != null:
@@ -319,7 +344,19 @@ func _setup_visuals() -> void:
 		_send_label.text = "发送"
 		if use_auto_layout_offsets:
 			_send_label.position = send_text_offset
+	if _input_caret != null:
+		var caret_quad := _input_caret.mesh as QuadMesh
+		if caret_quad == null:
+			caret_quad = QuadMesh.new()
+			_input_caret.mesh = caret_quad
+		caret_quad.size = Vector2(caret_width_world, caret_height_world)
+		_input_caret.material_override = _make_caret_material()
+		_input_caret.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_input_caret.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		_input_caret.visible = false
 	_ensure_text_surface_depth()
+	_apply_input_visual_state()
+	_apply_send_visual_state(send_bg_color, input_text_color, 1.0)
 
 func _style_label(label: Label3D, color: Color, align: HorizontalAlignment) -> void:
 	label.font = PANEL_FONT
@@ -360,33 +397,61 @@ func _update_area_box_shape(area: Area3D, width: float, height: float, depth: fl
 
 func _bind_fixed_events() -> void:
 	if _input_pick_area != null:
+		var input_enter := func() -> void:
+			_input_pick_area.set_meta("hovered", true)
+			_apply_input_visual_state()
+		var input_exit := func() -> void:
+			_input_pick_area.set_meta("hovered", false)
+			_apply_input_visual_state()
 		var input_click := func(_camera_node: Node, event: InputEvent, _event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 			if not _is_open:
 				return
 			if event is InputEventMouseButton:
 				var mouse_event := event as InputEventMouseButton
-				if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-					_set_input_focus(true)
+				if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+					if mouse_event.pressed:
+						_input_pick_area.set_meta("pressed", true)
+						_apply_input_visual_state()
+					else:
+						var was_pressed: bool = bool(_input_pick_area.get_meta("pressed", false))
+						_input_pick_area.set_meta("pressed", false)
+						if was_pressed and bool(_input_pick_area.get_meta("hovered", false)):
+							_set_input_focus(true)
+						_apply_input_visual_state()
 					var vp := get_viewport()
 					if vp != null:
 						vp.set_input_as_handled()
+		if not _input_pick_area.mouse_entered.is_connected(input_enter):
+			_input_pick_area.mouse_entered.connect(input_enter)
+		if not _input_pick_area.mouse_exited.is_connected(input_exit):
+			_input_pick_area.mouse_exited.connect(input_exit)
 		if not _input_pick_area.input_event.is_connected(input_click):
 			_input_pick_area.input_event.connect(input_click)
 
 	if _send_pick_area != null:
 		var send_enter := func() -> void:
-			_set_send_color(send_hover_color)
+			_send_pick_area.set_meta("hovered", true)
+			_apply_send_hover_state()
 		var send_exit := func() -> void:
-			_set_send_color(send_bg_color)
+			_send_pick_area.set_meta("hovered", false)
+			_apply_send_idle_state()
 		var send_click := func(_camera_node: Node, event: InputEvent, _event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 			if not _is_open:
 				return
 			if event is InputEventMouseButton:
 				var mouse_event := event as InputEventMouseButton
-				if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-					_set_send_color(send_pressed_color)
-					_submit_input_text()
-					_set_send_color(send_hover_color)
+				if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+					if mouse_event.pressed:
+						_send_pick_area.set_meta("pressed", true)
+						_apply_send_pressed_state()
+					else:
+						var send_was_pressed: bool = bool(_send_pick_area.get_meta("pressed", false))
+						_send_pick_area.set_meta("pressed", false)
+						if send_was_pressed and bool(_send_pick_area.get_meta("hovered", false)):
+							_submit_input_text()
+							_apply_send_hover_state()
+						else:
+							_apply_send_idle_state()
 					var vp := get_viewport()
 					if vp != null:
 						vp.set_input_as_handled()
@@ -488,17 +553,28 @@ func _create_option_row(index: int, option_data: Dictionary) -> Dictionary:
 	root.add_child(label)
 
 	var hover_enter := func() -> void:
-		_set_row_highlight(highlight, option_hover_color)
+		area.set_meta("hovered", true)
+		_apply_option_visual_state(highlight, label, option_hover_color, option_hover_text_color, hover_scale_multiplier)
 	var hover_exit := func() -> void:
-		_set_row_highlight(highlight, Color(1.0, 1.0, 1.0, 0.0))
+		area.set_meta("hovered", false)
+		_apply_option_visual_state(highlight, label, Color(1.0, 1.0, 1.0, 0.0), option_text_color, 1.0)
 	var click_cb := func(_camera_node: Node, event: InputEvent, _event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 		if not _is_open:
 			return
 		if event is InputEventMouseButton:
 			var mouse_event := event as InputEventMouseButton
-			if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-				_set_row_highlight(highlight, option_pressed_color)
-				_handle_option_click(index, option_data, line_text)
+			if mouse_event.button_index == MOUSE_BUTTON_LEFT:
+				if mouse_event.pressed:
+					area.set_meta("pressed", true)
+					_apply_option_visual_state(highlight, label, option_pressed_color, option_pressed_text_color, pressed_scale_multiplier)
+				else:
+					var option_was_pressed: bool = bool(area.get_meta("pressed", false))
+					area.set_meta("pressed", false)
+					if option_was_pressed and bool(area.get_meta("hovered", false)):
+						_apply_option_visual_state(highlight, label, option_hover_color, option_hover_text_color, hover_scale_multiplier)
+						_handle_option_click(index, option_data, line_text)
+					else:
+						_apply_option_visual_state(highlight, label, Color(1.0, 1.0, 1.0, 0.0), option_text_color, 1.0)
 				var vp := get_viewport()
 				if vp != null:
 					vp.set_input_as_handled()
@@ -517,6 +593,14 @@ func _set_row_highlight(mesh: MeshInstance3D, color: Color) -> void:
 		return
 	mat.set_shader_parameter("fill_color", color)
 	mat.set_shader_parameter("fill_color_2", color)
+
+func _apply_option_visual_state(mesh: MeshInstance3D, label: Label3D, fill: Color, text_color: Color, scale_value: float) -> void:
+	_set_row_highlight(mesh, fill)
+	if label != null:
+		label.modulate = text_color
+	var parent_node: Node3D = mesh.get_parent() as Node3D
+	if parent_node != null:
+		parent_node.scale = Vector3.ONE * scale_value
 
 func _handle_option_click(index: int, option_data: Dictionary, option_text: String) -> void:
 	_set_input_focus(false)
@@ -562,14 +646,10 @@ func _handle_option_click(index: int, option_data: Dictionary, option_text: Stri
 func _set_input_focus(focused: bool) -> void:
 	_input_focused = focused
 	_set_ime_active(focused)
-	if _input_mesh == null:
-		return
-	var mat := _input_mesh.material_override as ShaderMaterial
-	if mat == null:
-		return
-	var c: Color = input_focus_color if focused else input_bg_color
-	mat.set_shader_parameter("fill_color", c)
-	mat.set_shader_parameter("fill_color_2", c)
+	_caret_blink_timer = 0.0
+	_caret_visible = true
+	_apply_input_visual_state()
+	_update_caret_visual(0.0)
 
 func _set_send_color(c: Color) -> void:
 	if _send_mesh == null:
@@ -579,6 +659,51 @@ func _set_send_color(c: Color) -> void:
 		return
 	mat.set_shader_parameter("fill_color", c)
 	mat.set_shader_parameter("fill_color_2", c)
+
+func _apply_input_visual_state() -> void:
+	if _input_mesh == null:
+		return
+	var mat := _input_mesh.material_override as ShaderMaterial
+	if mat == null:
+		return
+	var hovered: bool = false
+	var pressed: bool = false
+	if _input_pick_area != null:
+		hovered = bool(_input_pick_area.get_meta("hovered", false))
+		pressed = bool(_input_pick_area.get_meta("pressed", false))
+	var fill: Color = input_bg_color
+	var scale_value: float = 1.0
+	if pressed:
+		fill = input_pressed_color
+		scale_value = pressed_scale_multiplier
+	elif _input_focused:
+		fill = input_focus_color
+		scale_value = hover_scale_multiplier
+	elif hovered:
+		fill = input_hover_color
+		scale_value = hover_scale_multiplier
+	mat.set_shader_parameter("fill_color", fill)
+	mat.set_shader_parameter("fill_color_2", fill)
+	_input_mesh.scale = Vector3.ONE * scale_value
+
+func _apply_send_visual_state(fill: Color, text_color: Color, scale_value: float) -> void:
+	_set_send_color(fill)
+	if _send_label != null:
+		_send_label.modulate = text_color
+	if _send_mesh != null:
+		_send_mesh.scale = Vector3.ONE * scale_value
+
+func _apply_send_idle_state() -> void:
+	if bool(_send_pick_area.get_meta("hovered", false)):
+		_apply_send_hover_state()
+		return
+	_apply_send_visual_state(send_bg_color, input_text_color, 1.0)
+
+func _apply_send_hover_state() -> void:
+	_apply_send_visual_state(send_hover_color, send_text_hover_color, hover_scale_multiplier)
+
+func _apply_send_pressed_state() -> void:
+	_apply_send_visual_state(send_pressed_color, send_text_pressed_color, pressed_scale_multiplier)
 
 func _refresh_input_text_visual() -> void:
 	if _input_text_label != null:
@@ -590,6 +715,7 @@ func _refresh_input_text_visual() -> void:
 		input_text_offset.x = offset_x
 		placeholder_text_offset.x = offset_x
 	_apply_input_dynamic_height()
+	_update_caret_visual(0.0)
 
 func _submit_input_text() -> void:
 	var clean: String = _input_text.strip_edges()
@@ -639,6 +765,36 @@ func _estimate_wrapped_line_count(text: String) -> int:
 			total_lines += int(ceil(float(para_len) / float(chars_per_line)))
 	return maxi(1, total_lines)
 
+func _get_chars_per_line() -> int:
+	var usable_width: float = maxf(0.04, input_size.x - input_text_padding_world * 2.0)
+	var approx_char_width: float = maxf(0.005, text_pixel_size * 38.0)
+	return maxi(1, int(floor(usable_width / approx_char_width)))
+
+func _wrap_text_for_layout(text: String) -> PackedStringArray:
+	var wrapped: PackedStringArray = PackedStringArray()
+	var source_text: String = text
+	if source_text.is_empty():
+		wrapped.append("")
+		return wrapped
+	var chars_per_line: int = _get_chars_per_line()
+	var paragraphs: PackedStringArray = source_text.split("\n", false)
+	if paragraphs.is_empty():
+		wrapped.append("")
+		return wrapped
+	for para in paragraphs:
+		if not enable_multiline_wrap:
+			wrapped.append(para)
+			continue
+		if para.is_empty():
+			wrapped.append("")
+			continue
+		var start: int = 0
+		while start < para.length():
+			var take: int = mini(chars_per_line, para.length() - start)
+			wrapped.append(para.substr(start, take))
+			start += take
+	return wrapped
+
 func _apply_input_dynamic_height() -> void:
 	if _input_mesh != null:
 		var iq := _input_mesh.mesh as QuadMesh
@@ -662,6 +818,15 @@ func _make_fill_material(fill: Color, corner: float, priority: int) -> ShaderMat
 	m.set_shader_parameter("vertical_gradient_strength", 0.0)
 	m.render_priority = priority
 	return m
+
+func _make_caret_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = caret_color
+	material.no_depth_test = true
+	material.render_priority = text_render_priority + 2
+	return material
 
 func _update_follow_transform(delta: float) -> void:
 	if not follow_anchor_mark:
@@ -690,6 +855,34 @@ func _ensure_text_surface_depth() -> void:
 		_placeholder_label.position.z = text_surface_depth + 0.0002
 	if _send_label != null:
 		_send_label.position.z = text_surface_depth + 0.0002
+	if _input_caret != null:
+		_input_caret.position.z = text_surface_depth + 0.0003
+
+func _update_caret_visual(delta: float) -> void:
+	if _input_caret == null:
+		return
+	if not _is_open and not Engine.is_editor_hint():
+		_input_caret.visible = false
+		return
+	if _input_focused:
+		_caret_blink_timer += maxf(delta, 0.0)
+		if _caret_blink_timer >= caret_blink_interval:
+			_caret_blink_timer = 0.0
+			_caret_visible = not _caret_visible
+	else:
+		_caret_visible = false
+		_caret_blink_timer = 0.0
+
+	var display_text: String = _input_text
+	var lines: PackedStringArray = _wrap_text_for_layout(display_text)
+	var line_count: int = maxi(1, lines.size())
+	var line_index: int = maxi(0, line_count - 1)
+	var last_line: String = lines[line_index] if not lines.is_empty() else ""
+	var approx_char_width: float = maxf(0.005, text_pixel_size * 38.0)
+	var local_x: float = input_text_offset.x + float(last_line.length()) * approx_char_width + caret_gap_world
+	var local_y: float = input_text_offset.y + 0.003 - (float(line_count - 1) * caret_line_step_world * 0.5) - float(line_index) * caret_line_step_world
+	_input_caret.position = Vector3(local_x, local_y, text_surface_depth + 0.0003)
+	_input_caret.visible = _input_focused and _caret_visible
 
 func _set_ime_active(active: bool) -> void:
 	if not DisplayServer.has_feature(DisplayServer.FEATURE_IME):
