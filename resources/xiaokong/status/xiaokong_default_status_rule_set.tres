@@ -2,144 +2,123 @@
 
 [ext_resource type="Script" uid="uid://bly436yy6av3x" path="res://scripts/xiaokong/resources/xiaokong_status_rule_set_resource.gd" id="1_rule_set"]
 [ext_resource type="Script" uid="uid://dcqn1f52m7bho" path="res://scripts/xiaokong/resources/xiaokong_status_rule_resource.gd" id="2_rule"]
-[ext_resource type="Script" path="res://scripts/xiaokong/resources/xiaokong_status_value_state_resource.gd" id="3_value_state"]
+[ext_resource type="Script" uid="uid://drgv6dovn8mqr" path="res://scripts/xiaokong/resources/xiaokong_status_value_state_resource.gd" id="3_value_state"]
 
-[sub_resource type="Resource" id="Current_HungerHungry"]
+[sub_resource type="Resource" id="Resource_a1a8j"]
 script = ExtResource("3_value_state")
-id = &"hunger_hungry"
-stat_key = "hunger"
-label_text = "饱食"
+id = &"hunger_very_hungry"
+label_text = "很饿"
 display_text = "很饿"
 threshold_value = 25.0
 
-[sub_resource type="Resource" id="Current_HungerLow"]
+[sub_resource type="Resource" id="Resource_x0a02"]
 script = ExtResource("3_value_state")
-id = &"hunger_low"
-stat_key = "hunger"
-label_text = "饱食"
+id = &"hunger_hungry"
+label_text = "有点饿"
 display_text = "有点饿"
 threshold_value = 55.0
 
-[sub_resource type="Resource" id="Current_HungerDefault"]
+[sub_resource type="Resource" id="Resource_q4r4y"]
 script = ExtResource("3_value_state")
-id = &"hunger_default"
-stat_key = "hunger"
-label_text = "饱食"
+id = &"hunger_normal"
+label_text = "正常"
 display_text = "正常"
 is_default = true
 
-[sub_resource type="Resource" id="Current_ThirstBad"]
+[sub_resource type="Resource" id="Resource_k4v4k"]
 script = ExtResource("3_value_state")
-id = &"thirst_bad"
+id = &"thirst_very_thirsty"
 stat_key = "thirst"
-label_text = "水分"
+label_text = "口渴"
 display_text = "口渴"
 threshold_value = 30.0
 
-[sub_resource type="Resource" id="Current_ThirstLow"]
+[sub_resource type="Resource" id="Resource_wmiou"]
 script = ExtResource("3_value_state")
-id = &"thirst_low"
+id = &"thirst_thirsty"
 stat_key = "thirst"
-label_text = "水分"
+label_text = "有点渴"
 display_text = "有点渴"
 threshold_value = 55.0
 
-[sub_resource type="Resource" id="Current_ThirstDefault"]
+[sub_resource type="Resource" id="Resource_3yalu"]
 script = ExtResource("3_value_state")
-id = &"thirst_default"
+id = &"thirst_normal"
 stat_key = "thirst"
-label_text = "水分"
+label_text = "正常"
 display_text = "正常"
 is_default = true
 
-[sub_resource type="Resource" id="Current_MoodGreat"]
+[sub_resource type="Resource" id="Resource_cmlqf"]
 script = ExtResource("3_value_state")
-id = &"mood_great"
+id = &"mood_good"
 stat_key = "mood"
-label_text = "心情"
+label_text = "心情不错"
 display_text = "心情不错"
 compare = 1
 threshold_value = 70.0
 
-[sub_resource type="Resource" id="Current_MoodLow"]
+[sub_resource type="Resource" id="Resource_go0bq"]
 script = ExtResource("3_value_state")
 id = &"mood_low"
 stat_key = "mood"
-label_text = "心情"
+label_text = "有些低落"
 display_text = "有些低落"
 threshold_value = 35.0
 
-[sub_resource type="Resource" id="Current_MoodDefault"]
+[sub_resource type="Resource" id="Resource_1gkom"]
 script = ExtResource("3_value_state")
-id = &"mood_default"
+id = &"mood_neutral"
 stat_key = "mood"
-label_text = "心情"
+label_text = "平静"
 display_text = "平静"
 is_default = true
 
-[sub_resource type="Resource" id="Current_FavorClose"]
+[sub_resource type="Resource" id="Resource_cggow"]
 script = ExtResource("3_value_state")
 id = &"favor_close"
 stat_key = "favor"
-label_text = "好感"
+label_text = "愿意亲近你"
 display_text = "愿意亲近你"
 compare = 1
 threshold_value = 55.0
 
-[sub_resource type="Resource" id="Current_FavorLow"]
+[sub_resource type="Resource" id="Resource_gjqrr"]
 script = ExtResource("3_value_state")
-id = &"favor_low"
+id = &"favor_distant"
 stat_key = "favor"
-label_text = "好感"
+label_text = "有些疏远"
 display_text = "有些疏远"
 threshold_value = 20.0
 
-[sub_resource type="Resource" id="Current_FavorDefault"]
+[sub_resource type="Resource" id="Resource_u0lx5"]
 script = ExtResource("3_value_state")
-id = &"favor_default"
+id = &"favor_neutral"
 stat_key = "favor"
-label_text = "好感"
+label_text = "普通"
 display_text = "普通"
 is_default = true
 
-[sub_resource type="Resource" id="Rule_hungry"]
+[sub_resource type="Resource" id="Resource_r0we6"]
 script = ExtResource("2_rule")
-id = &"hungry"
-display_text = "很饿"
-hunger_enabled = true
-hunger_value = 25.0
-
-[sub_resource type="Resource" id="Rule_thirsty"]
-script = ExtResource("2_rule")
-id = &"thirsty"
-display_text = "口渴"
-thirst_enabled = true
-thirst_value = 30.0
-
-[sub_resource type="Resource" id="Rule_good_mood"]
-script = ExtResource("2_rule")
-id = &"good_mood"
-display_text = "心情不错"
-mood_enabled = true
-mood_value = 70.0
-
-[sub_resource type="Resource" id="Rule_close_to_you"]
-script = ExtResource("2_rule")
-id = &"close_to_you"
-display_text = "愿意亲近你"
-favor_enabled = true
-favor_value = 55.0
-
-[sub_resource type="Resource" id="Rule_bad_condition"]
-script = ExtResource("2_rule")
-id = &"bad_condition"
+id = &"status_poor"
 display_text = "状态欠佳"
 hunger_enabled = true
 hunger_value = 35.0
 thirst_enabled = true
 thirst_value = 35.0
 
+[sub_resource type="Resource" id="Resource_ia3p3"]
+script = ExtResource("2_rule")
+id = &"status_happy_close"
+display_text = "愿意依赖你"
+mood_enabled = true
+mood_value = 75.0
+favor_enabled = true
+favor_value = 65.0
+
 [resource]
 script = ExtResource("1_rule_set")
-current_states = Array[ExtResource("3_value_state")]([SubResource("Current_HungerHungry"), SubResource("Current_HungerLow"), SubResource("Current_HungerDefault"), SubResource("Current_ThirstBad"), SubResource("Current_ThirstLow"), SubResource("Current_ThirstDefault"), SubResource("Current_MoodGreat"), SubResource("Current_MoodLow"), SubResource("Current_MoodDefault"), SubResource("Current_FavorClose"), SubResource("Current_FavorLow"), SubResource("Current_FavorDefault")])
-rules = Array[ExtResource("2_rule")]([SubResource("Rule_hungry"), SubResource("Rule_thirsty"), SubResource("Rule_good_mood"), SubResource("Rule_close_to_you"), SubResource("Rule_bad_condition")])
+entries = Array[Resource]([SubResource("Resource_a1a8j"), SubResource("Resource_x0a02"), SubResource("Resource_q4r4y"), SubResource("Resource_k4v4k"), SubResource("Resource_wmiou"), SubResource("Resource_3yalu"), SubResource("Resource_cmlqf"), SubResource("Resource_go0bq"), SubResource("Resource_1gkom"), SubResource("Resource_cggow"), SubResource("Resource_gjqrr"), SubResource("Resource_u0lx5"), SubResource("Resource_r0we6"), SubResource("Resource_ia3p3")])
+current_states = Array[Resource]([SubResource("Resource_a1a8j"), SubResource("Resource_x0a02"), SubResource("Resource_q4r4y"), SubResource("Resource_k4v4k"), SubResource("Resource_wmiou"), SubResource("Resource_3yalu"), SubResource("Resource_cmlqf"), SubResource("Resource_go0bq"), SubResource("Resource_1gkom"), SubResource("Resource_cggow"), SubResource("Resource_gjqrr"), SubResource("Resource_u0lx5")])
+rules = Array[Resource]([SubResource("Resource_r0we6"), SubResource("Resource_ia3p3")])

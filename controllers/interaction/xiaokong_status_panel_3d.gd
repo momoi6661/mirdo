@@ -12,12 +12,14 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 @export var anchor_mark_path: NodePath
 @export var state_component_path: NodePath
 @export var rule_set: Resource
+@export var close_range_area_path: NodePath = NodePath("CloseRangeArea")
 
 @export_category("Follow")
 @export var auto_follow_anchor: bool = true
 @export var face_camera_to_viewport: bool = true
 @export var orbit_around_owner_toward_camera: bool = true
 @export var flip_face_toward_camera: bool = true
+@export var auto_close_with_area: bool = true
 @export var auto_close_when_far: bool = false
 @export_range(0.0, 40.0, 0.1) var follow_position_lerp_speed: float = 12.0
 @export_range(0.0, 40.0, 0.1) var follow_rotation_lerp_speed: float = 10.0
@@ -43,6 +45,7 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 @onready var _viewport: SubViewport = $Viewport
 @onready var _animation_player: AnimationPlayer = $AnimationPlayer
 @onready var _status_text_resolver: XiaokongStatusTextResolver = $StatusTextResolver
+@onready var _close_range_area: Area3D = get_node_or_null(close_range_area_path) as Area3D
 @onready var _background: Panel = $Viewport/CanvasRoot/Background
 @onready var _status_text_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatusList/StatusText
 @onready var _hunger_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow/Label
@@ -60,6 +63,7 @@ var _anchor_mark: Node3D
 var _target_root: Node3D
 var _current_payload: Dictionary = {}
 var _is_open: bool = false
+var _player_inside_close_area: bool = false
 var _transform_initialized: bool = false
 var _preview_labels: Array[Node] = []
 var _panel_alpha: float = 1.0
@@ -78,6 +82,7 @@ func _ready() -> void:
 	_configure_panel_quad()
 	_rebuild_visibility_animations()
 	_apply_ui_style()
+	_bind_close_range_area()
 	set_process(true)
 	set_process_input(true)
 
@@ -110,6 +115,9 @@ func _process(delta: float) -> void:
 		return
 
 	_update_follow_transform(delta)
+	if auto_close_with_area and _is_using_close_area() and not _player_inside_close_area:
+		hide_panel()
+		return
 	if auto_close_when_far and not _is_runtime_target_valid():
 		hide_panel()
 
@@ -142,6 +150,7 @@ func open_for_payload(payload: Dictionary) -> void:
 		_set_panel_open(true)
 		return
 	_bind_state_component()
+	_refresh_player_in_close_area()
 	_render_current_snapshot()
 	_set_panel_open(true)
 
@@ -200,6 +209,65 @@ func _cache_preview_labels() -> void:
 	_preview_labels.clear()
 	if _status_text_label != null:
 		_preview_labels.append(_status_text_label)
+
+func _bind_close_range_area() -> void:
+	if _close_range_area == null or not is_instance_valid(_close_range_area):
+		return
+	_close_range_area.monitoring = true
+	var entered_callable := Callable(self, "_on_close_range_body_entered")
+	if not _close_range_area.body_entered.is_connected(entered_callable):
+		_close_range_area.body_entered.connect(entered_callable)
+	var exited_callable := Callable(self, "_on_close_range_body_exited")
+	if not _close_range_area.body_exited.is_connected(exited_callable):
+		_close_range_area.body_exited.connect(exited_callable)
+
+func _is_using_close_area() -> bool:
+	return _close_range_area != null and is_instance_valid(_close_range_area)
+
+func _refresh_player_in_close_area() -> void:
+	if not _is_using_close_area():
+		_player_inside_close_area = false
+		return
+	var player_node := _resolve_player_node()
+	if player_node == null:
+		_player_inside_close_area = false
+		return
+	_player_inside_close_area = _close_range_area.overlaps_body(player_node)
+
+func _resolve_player_node() -> Node3D:
+	var global_node := get_node_or_null(GLOBAL_PATH)
+	if global_node != null:
+		var player_node := global_node.get("player") as Node3D
+		if player_node != null and is_instance_valid(player_node):
+			return player_node
+	var tree := get_tree()
+	if tree != null:
+		var players := tree.get_nodes_in_group("Player")
+		for entry in players:
+			var player_3d := entry as Node3D
+			if player_3d != null and is_instance_valid(player_3d):
+				return player_3d
+	return null
+
+func _on_close_range_body_entered(body: Node) -> void:
+	if not _is_player_body(body):
+		return
+	_player_inside_close_area = true
+
+func _on_close_range_body_exited(body: Node) -> void:
+	if not _is_player_body(body):
+		return
+	_player_inside_close_area = false
+	if _is_open and auto_close_with_area:
+		hide_panel()
+
+func _is_player_body(body: Node) -> bool:
+	if body == null or not is_instance_valid(body):
+		return false
+	var player_node := _resolve_player_node()
+	if player_node != null and body == player_node:
+		return true
+	return body.is_in_group("Player")
 
 
 func _configure_viewport() -> void:
