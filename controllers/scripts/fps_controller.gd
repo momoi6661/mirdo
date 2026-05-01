@@ -17,6 +17,7 @@ extends CharacterBody3D
 @export var inventory_panel_3d: HoloInventoryPanel3D
 @export var dual_inventory_panel: Node
 @export var xiaokong_dialogue_panel: Node
+@export var xiaokong_status_panel: Node
 @export var xiaokong_control_component_path: NodePath = NodePath("Components/XiaokongControlComponent")
 @export var player_interaction_component_path: NodePath = NodePath("Components/PlayerInteractionComponent")
 @export_range(0.5, 10.0, 0.1) var inventory_drop_distance: float = 2.5
@@ -439,6 +440,40 @@ func _is_dialogue_panel_open() -> bool:
 		return bool(xiaokong_dialogue_panel.call("is_panel_open"))
 	return false
 
+func _resolve_xiaokong_status_panel(payload: Dictionary = {}) -> Node:
+	if xiaokong_status_panel != null and is_instance_valid(xiaokong_status_panel):
+		return xiaokong_status_panel
+
+	var xiaokong_path: String = String(payload.get("xiaokong_path", "")).strip_edges()
+	if not xiaokong_path.is_empty():
+		var xiaokong_root: Node = get_node_or_null(NodePath(xiaokong_path))
+		if xiaokong_root != null:
+			var by_payload: Node = xiaokong_root.get_node_or_null("StatusPanel")
+			if by_payload != null and is_instance_valid(by_payload):
+				xiaokong_status_panel = by_payload
+				return xiaokong_status_panel
+
+	var tree: SceneTree = get_tree()
+	if tree != null:
+		for entry in tree.get_nodes_in_group("Xiaokong"):
+			var xiaokong_node := entry as Node
+			if xiaokong_node == null or not is_instance_valid(xiaokong_node):
+				continue
+			var by_group: Node = xiaokong_node.get_node_or_null("StatusPanel")
+			if by_group != null and is_instance_valid(by_group):
+				xiaokong_status_panel = by_group
+				return xiaokong_status_panel
+
+	return null
+
+func _is_status_panel_open() -> bool:
+	var status_panel := _resolve_xiaokong_status_panel()
+	if status_panel == null or not is_instance_valid(status_panel):
+		return false
+	if status_panel.has_method("is_panel_open"):
+		return bool(status_panel.call("is_panel_open"))
+	return false
+
 func is_gameplay_input_blocked() -> bool:
 	return _is_custom_text_input_active() or is_ui_text_input_focused()
 
@@ -510,6 +545,10 @@ func _send_dialogue_to_xiaokong(text: String, payload: Dictionary) -> bool:
 func _on_global_xiaokong_dialogue_requested(payload: Dictionary) -> void:
 	if xiaokong_dialogue_panel == null or not is_instance_valid(xiaokong_dialogue_panel):
 		return
+	var status_panel := _resolve_xiaokong_status_panel(payload)
+	if _is_status_panel_open() and status_panel != null and is_instance_valid(status_panel):
+		if status_panel.has_method("hide_panel"):
+			status_panel.call("hide_panel")
 	_dialogue_mouse_free_mode = false
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_set_world_interaction_blocked(true)
@@ -527,6 +566,28 @@ func _on_xiaokong_dialogue_panel_visibility_changed(is_open: bool) -> void:
 		_dialogue_mouse_free_mode = false
 		if not _is_inventory_panel_open():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _on_global_xiaokong_status_requested(payload: Dictionary) -> void:
+	var status_panel := _resolve_xiaokong_status_panel(payload)
+	if status_panel == null or not is_instance_valid(status_panel):
+		return
+	if _is_dialogue_panel_open() and xiaokong_dialogue_panel != null and is_instance_valid(xiaokong_dialogue_panel):
+		if xiaokong_dialogue_panel.has_method("hide_panel"):
+			xiaokong_dialogue_panel.call("hide_panel")
+	_set_world_interaction_blocked(true)
+	if status_panel.has_method("open_for_payload"):
+		status_panel.call("open_for_payload", payload)
+	elif status_panel.has_method("open_panel"):
+		status_panel.call("open_panel")
+
+func _on_xiaokong_status_panel_visibility_changed(is_open: bool) -> void:
+	if is_open:
+		_set_world_interaction_blocked(true)
+		return
+	if not _is_dialogue_panel_open():
+		_set_world_interaction_blocked(false)
+	if not _is_dialogue_panel_open() and not _is_inventory_panel_open():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target: float, delta: float, direction: Vector3 = Vector3.ZERO):
 	if direction == Vector3.ZERO:
@@ -701,6 +762,10 @@ func _ready():
 		var xk_dialogue_callable := Callable(self, "_on_global_xiaokong_dialogue_requested")
 		if not Global.is_connected("xiaokong_dialogue_requested", xk_dialogue_callable):
 			Global.connect("xiaokong_dialogue_requested", xk_dialogue_callable)
+	if Global != null and Global.has_signal("xiaokong_status_requested"):
+		var xk_status_callable := Callable(self, "_on_global_xiaokong_status_requested")
+		if not Global.is_connected("xiaokong_status_requested", xk_status_callable):
+			Global.connect("xiaokong_status_requested", xk_status_callable)
 	
 	print("step_handler: ", step_handler)
 	if !step_handler:
@@ -747,6 +812,15 @@ func _ready():
 			var visibility_callable := Callable(self, "_on_xiaokong_dialogue_panel_visibility_changed")
 			if not xiaokong_dialogue_panel.is_connected("panel_visibility_changed", visibility_callable):
 				xiaokong_dialogue_panel.connect("panel_visibility_changed", visibility_callable)
+	var status_panel := _resolve_xiaokong_status_panel()
+	if status_panel != null and is_instance_valid(status_panel):
+		xiaokong_status_panel = status_panel
+		if status_panel.has_method("hide_panel"):
+			status_panel.call("hide_panel")
+		if status_panel.has_signal("panel_visibility_changed"):
+			var status_visibility_callable := Callable(self, "_on_xiaokong_status_panel_visibility_changed")
+			if not status_panel.is_connected("panel_visibility_changed", status_visibility_callable):
+				status_panel.connect("panel_visibility_changed", status_visibility_callable)
 
 # --- 存档系统自定义接口 ---
 

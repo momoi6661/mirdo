@@ -552,6 +552,13 @@ func _should_clear_world_target_after_execute() -> bool:
 		return true
 	if current_interactable.is_queued_for_deletion():
 		return true
+	if current_interactable.has_method("should_clear_world_panel_after_execute"):
+		var should_clear: Variant = current_interactable.call(
+			"should_clear_world_panel_after_execute",
+			_world_panel_selected_option_id
+		)
+		if bool(should_clear):
+			return true
 	var target_parent: Node = current_interactable.get_parent()
 	if target_parent != null and is_instance_valid(target_parent) and target_parent.is_queued_for_deletion():
 		return true

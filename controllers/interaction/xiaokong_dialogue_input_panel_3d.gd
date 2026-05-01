@@ -44,6 +44,9 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export_range(8, 240, 1) var input_max_chars: int = 80
 @export var input_placeholder_text: String = "输入内容..."
 @export_range(1, 12, 1) var max_option_rows: int = 6
+@export_range(0.01, 1.0, 0.01) var fade_duration: float = 0.18
+@export_range(0.0, 0.25, 0.005) var fade_offset_y: float = 0.035
+@export_range(0.85, 1.0, 0.005) var fade_start_scale: float = 0.96
 @export var preview_options: PackedStringArray = PackedStringArray([
 	"为什么窗外有白光？",
 	"一切看上去都像在做梦",
@@ -119,6 +122,7 @@ var _send_mesh: MeshInstance3D
 var _send_label: Label3D
 var _send_pick_area: Area3D
 var _anchor_mark: Node3D
+var _animation_player: AnimationPlayer
 
 var _is_open: bool = false
 var _transform_initialized: bool = false
@@ -130,11 +134,18 @@ var _last_option_text: String = ""
 var _last_option_click_ms: int = -1
 var _caret_blink_timer: float = 0.0
 var _caret_visible: bool = true
+var _panel_alpha: float = 1.0
+var panel_alpha_anim: float = 1.0:
+	set(value):
+		_set_panel_alpha(value)
+	get:
+		return _panel_alpha
 
 func _ready() -> void:
 	top_level = true
 	_resolve_nodes()
 	_setup_visuals()
+	_rebuild_visibility_animations()
 	_bind_fixed_events()
 	set_process(true)
 	set_process_input(true)
@@ -143,8 +154,10 @@ func _ready() -> void:
 		visible = true
 		_rebuild_options(_build_preview_options())
 		_refresh_input_text_visual()
+		_set_panel_alpha(1.0)
 		_update_follow_transform(0.0)
 	else:
+		_set_panel_alpha(0.0)
 		visible = false
 
 func _process(delta: float) -> void:
@@ -242,16 +255,35 @@ func is_text_input_active() -> bool:
 	return _is_open and _input_focused
 
 func _set_panel_open(value: bool) -> void:
-	if _is_open == value and visible == value:
+	if _is_open == value and ((value and visible) or (not value and not visible)):
 		return
+
 	_is_open = value
-	visible = value
 	_transform_initialized = false
-	if not value:
-		_set_input_focus(false)
-		_input_text = ""
-		_refresh_input_text_visual()
-	panel_visibility_changed.emit(_is_open)
+
+	if value:
+		visible = true
+		_set_panel_alpha(0.0 if not Engine.is_editor_hint() else 1.0)
+		panel_visibility_changed.emit(true)
+		if Engine.is_editor_hint():
+			return
+		if _animation_player != null:
+			_animation_player.play("visibility/fade_in")
+		return
+
+	_set_input_focus(false)
+	_input_text = ""
+	_refresh_input_text_visual()
+	panel_visibility_changed.emit(false)
+	if Engine.is_editor_hint():
+		_set_panel_alpha(0.0)
+		visible = false
+		return
+	if _animation_player != null:
+		_animation_player.play("visibility/fade_out")
+	else:
+		_set_panel_alpha(0.0)
+		visible = false
 
 func _resolve_nodes() -> void:
 	_panel_mesh = get_node_or_null(panel_mesh_path) as MeshInstance3D
@@ -266,6 +298,7 @@ func _resolve_nodes() -> void:
 	_send_label = get_node_or_null(send_button_label_path) as Label3D
 	_send_pick_area = get_node_or_null(send_pick_area_path) as Area3D
 	_anchor_mark = get_node_or_null(anchor_mark_path) as Node3D
+	_animation_player = get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if _input_root != null:
 		_input_caret = _input_root.get_node_or_null("InputCaret") as MeshInstance3D
 		if _input_caret == null:
@@ -370,7 +403,7 @@ func _style_label(label: Label3D, color: Color, align: HorizontalAlignment) -> v
 	label.shaded = false
 	label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	label.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
-	label.modulate = color
+	label.modulate = _with_panel_alpha(color)
 	label.horizontal_alignment = align
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -591,13 +624,12 @@ func _set_row_highlight(mesh: MeshInstance3D, color: Color) -> void:
 	var mat := mesh.material_override as ShaderMaterial
 	if mat == null:
 		return
-	mat.set_shader_parameter("fill_color", color)
-	mat.set_shader_parameter("fill_color_2", color)
+	_apply_fill_to_material(mat, color)
 
 func _apply_option_visual_state(mesh: MeshInstance3D, label: Label3D, fill: Color, text_color: Color, scale_value: float) -> void:
 	_set_row_highlight(mesh, fill)
 	if label != null:
-		label.modulate = text_color
+		label.modulate = _with_panel_alpha(text_color)
 	var parent_node: Node3D = mesh.get_parent() as Node3D
 	if parent_node != null:
 		parent_node.scale = Vector3.ONE * scale_value
@@ -657,8 +689,7 @@ func _set_send_color(c: Color) -> void:
 	var mat := _send_mesh.material_override as ShaderMaterial
 	if mat == null:
 		return
-	mat.set_shader_parameter("fill_color", c)
-	mat.set_shader_parameter("fill_color_2", c)
+	_apply_fill_to_material(mat, c)
 
 func _apply_input_visual_state() -> void:
 	if _input_mesh == null:
@@ -682,14 +713,13 @@ func _apply_input_visual_state() -> void:
 	elif hovered:
 		fill = input_hover_color
 		scale_value = hover_scale_multiplier
-	mat.set_shader_parameter("fill_color", fill)
-	mat.set_shader_parameter("fill_color_2", fill)
+	_apply_fill_to_material(mat, fill)
 	_input_mesh.scale = Vector3.ONE * scale_value
 
 func _apply_send_visual_state(fill: Color, text_color: Color, scale_value: float) -> void:
 	_set_send_color(fill)
 	if _send_label != null:
-		_send_label.modulate = text_color
+		_send_label.modulate = _with_panel_alpha(text_color)
 	if _send_mesh != null:
 		_send_mesh.scale = Vector3.ONE * scale_value
 
@@ -814,7 +844,7 @@ func _make_fill_material(fill: Color, corner: float, priority: int) -> ShaderMat
 	m.set_shader_parameter("outline_width", 0.0)
 	m.set_shader_parameter("feather", 0.0016)
 	m.set_shader_parameter("glow_width", 0.0)
-	m.set_shader_parameter("opacity_scale", 1.0)
+	m.set_shader_parameter("opacity_scale", _panel_alpha)
 	m.set_shader_parameter("vertical_gradient_strength", 0.0)
 	m.render_priority = priority
 	return m
@@ -823,7 +853,7 @@ func _make_caret_material() -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = caret_color
+	material.albedo_color = _with_panel_alpha(caret_color)
 	material.no_depth_test = true
 	material.render_priority = text_render_priority + 2
 	return material
@@ -833,13 +863,14 @@ func _update_follow_transform(delta: float) -> void:
 		return
 	if _anchor_mark == null:
 		return
-	var target_pos: Vector3 = _anchor_mark.global_position
+	var target_pos: Vector3 = _anchor_mark.global_position + _anchor_mark.global_basis.y * ((1.0 - _panel_alpha) * fade_offset_y)
 	var target_basis: Basis = _anchor_mark.global_basis if use_anchor_mark_basis else global_basis
 	target_basis = target_basis.orthonormalized()
 
 	if Engine.is_editor_hint() or delta <= 0.0 or not _transform_initialized:
 		global_position = target_pos
 		global_basis = target_basis
+		scale = Vector3.ONE * lerpf(fade_start_scale, 1.0, _panel_alpha)
 		_transform_initialized = true
 		return
 
@@ -847,6 +878,7 @@ func _update_follow_transform(delta: float) -> void:
 	var ra: float = clampf(delta * follow_rotation_lerp_speed, 0.0, 1.0)
 	global_position = global_position.lerp(target_pos, pa)
 	global_basis = global_basis.orthonormalized().slerp(target_basis, ra).orthonormalized()
+	scale = scale.lerp(Vector3.ONE * lerpf(fade_start_scale, 1.0, _panel_alpha), pa)
 
 func _ensure_text_surface_depth() -> void:
 	if _input_text_label != null:
@@ -882,9 +914,95 @@ func _update_caret_visual(delta: float) -> void:
 	var local_x: float = input_text_offset.x + float(last_line.length()) * approx_char_width + caret_gap_world
 	var local_y: float = input_text_offset.y + 0.003 - (float(line_count - 1) * caret_line_step_world * 0.5) - float(line_index) * caret_line_step_world
 	_input_caret.position = Vector3(local_x, local_y, text_surface_depth + 0.0003)
-	_input_caret.visible = _input_focused and _caret_visible
+	_input_caret.visible = _input_focused and _caret_visible and _panel_alpha > 0.01
 
 func _set_ime_active(active: bool) -> void:
 	if not DisplayServer.has_feature(DisplayServer.FEATURE_IME):
 		return
 	DisplayServer.window_set_ime_active(active)
+
+func _with_panel_alpha(color: Color) -> Color:
+	var tinted := color
+	tinted.a *= _panel_alpha
+	return tinted
+
+func _apply_fill_to_material(material: ShaderMaterial, color: Color) -> void:
+	if material == null:
+		return
+	material.set_shader_parameter("fill_color", color)
+	material.set_shader_parameter("fill_color_2", color)
+	material.set_shader_parameter("opacity_scale", _panel_alpha)
+
+func _set_panel_alpha(value: float) -> void:
+	_panel_alpha = clampf(value, 0.0, 1.0)
+	_refresh_panel_alpha_visuals()
+
+func _refresh_panel_alpha_visuals() -> void:
+	if _panel_mesh != null:
+		var panel_material := _panel_mesh.material_override as ShaderMaterial
+		_apply_fill_to_material(panel_material, panel_color)
+
+	if _input_mesh != null:
+		var input_material := _input_mesh.material_override as ShaderMaterial
+		if input_material != null:
+			input_material.set_shader_parameter("opacity_scale", _panel_alpha)
+	_apply_input_visual_state()
+	_apply_send_idle_state()
+	_refresh_input_text_visual()
+
+	if _title_label != null:
+		_title_label.modulate = _with_panel_alpha(Color.WHITE)
+
+	for row in _option_rows:
+		var row_mesh := row.get("highlight", null) as MeshInstance3D
+		var row_label := row.get("label", null) as Label3D
+		var row_area := row.get("area", null) as Area3D
+		var hovered := row_area != null and bool(row_area.get_meta("hovered", false))
+		var pressed := row_area != null and bool(row_area.get_meta("pressed", false))
+		if pressed:
+			_apply_option_visual_state(row_mesh, row_label, option_pressed_color, option_pressed_text_color, pressed_scale_multiplier)
+		elif hovered:
+			_apply_option_visual_state(row_mesh, row_label, option_hover_color, option_hover_text_color, hover_scale_multiplier)
+		else:
+			_apply_option_visual_state(row_mesh, row_label, Color(1.0, 1.0, 1.0, 0.0), option_text_color, 1.0)
+
+	if _input_text_label != null:
+		_input_text_label.modulate = _with_panel_alpha(input_text_color)
+	if _placeholder_label != null:
+		_placeholder_label.modulate = _with_panel_alpha(placeholder_color)
+	if _input_caret != null:
+		var caret_material := _input_caret.material_override as StandardMaterial3D
+		if caret_material != null:
+			caret_material.albedo_color = _with_panel_alpha(caret_color)
+
+func _rebuild_visibility_animations() -> void:
+	if _animation_player == null:
+		return
+	var fade_in := Animation.new()
+	fade_in.length = fade_duration
+	var fade_in_track := fade_in.add_track(Animation.TYPE_VALUE)
+	fade_in.track_set_path(fade_in_track, NodePath(".:panel_alpha_anim"))
+	fade_in.track_insert_key(fade_in_track, 0.0, 0.0)
+	fade_in.track_insert_key(fade_in_track, fade_duration, 1.0)
+
+	var fade_out := Animation.new()
+	fade_out.length = fade_duration
+	var fade_out_track := fade_out.add_track(Animation.TYPE_VALUE)
+	fade_out.track_set_path(fade_out_track, NodePath(".:panel_alpha_anim"))
+	fade_out.track_insert_key(fade_out_track, 0.0, 1.0)
+	fade_out.track_insert_key(fade_out_track, fade_duration, 0.0)
+
+	var library_name := &"visibility"
+	if _animation_player.has_animation_library(library_name):
+		_animation_player.remove_animation_library(library_name)
+	var library := AnimationLibrary.new()
+	library.add_animation("fade_in", fade_in)
+	library.add_animation("fade_out", fade_out)
+	_animation_player.add_animation_library(library_name, library)
+	var finish_callable := Callable(self, "_on_visibility_animation_finished")
+	if not _animation_player.animation_finished.is_connected(finish_callable):
+		_animation_player.animation_finished.connect(finish_callable)
+
+func _on_visibility_animation_finished(anim_name: StringName) -> void:
+	if anim_name == &"visibility/fade_out" and not _is_open:
+		visible = false

@@ -52,6 +52,8 @@ top_level = true
 script = ExtResource("1_script")
 preview_options = PackedStringArray("为什么窗外有白光？", "一切看上去都像在做梦", "我什么时候能回家呢？", "可爱的房子，而且很温馨。", "开动啦！")
 
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+
 [node name="Panel" type="MeshInstance3D" parent="." unique_id=2003874840]
 visible = false
 cast_shadow = 0
@@ -78,7 +80,7 @@ gi_mode = 0
 mesh = SubResource("QuadMesh_input")
 
 [node name="InputTextLabel" type="Label3D" parent="InputRoot" unique_id=700916505]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, -0.0034294128, 0.0022)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.33, 0.004112944, 0.0022)
 pixel_size = 0.0009
 no_depth_test = true
 render_priority = 64

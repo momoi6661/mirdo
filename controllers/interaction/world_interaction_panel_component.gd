@@ -27,9 +27,9 @@ const MIN_BACK_LAYER_SCALE := 1.018
 @export var subtitle_back_strong_color: Color = Color(0.80, 0.18, 0.50, 0.95)
 @export var subtitle_disabled_outline_color: Color = Color(0.76, 0.54, 0.67, 1.0)
 @export var subtitle_disabled_back_color: Color = Color(0.54, 0.38, 0.47, 0.72)
-@export var selected_pulse_back_tint: Color = Color(1.0, 0.86, 0.93, 1.0)
+@export var selected_pulse_back_tint: Color = Color(0.92, 0.78, 0.88, 1.0)
 @export var selected_pulse_outline_tint: Color = Color(1.0, 0.30, 0.68, 1.0)
-@export var selected_pulse_front_tint: Color = Color(1.0, 1.0, 1.0, 1.0)
+@export var selected_pulse_front_tint: Color = Color(1.0, 0.98, 1.0, 1.0)
 @export var selected_pulse_front_outline_tint: Color = Color(1.0, 0.26, 0.66, 1.0)
 
 @export_category("Animation")
@@ -79,8 +79,8 @@ var _preview_alpha_internal: float = 0.0
 @export_range(8, 64, 1) var detail_wrap_chars: int = 14
 @export_range(8, 64, 1) var hint_wrap_chars: int = 12
 @export_range(0.0, 12.0, 0.1) var selected_option_pulse_speed: float = 4.8
-@export_range(0.0, 0.2, 0.005) var selected_option_scale_boost: float = 0.055
-@export_range(0.0, 0.05, 0.002) var selected_option_lift_boost: float = 0.014
+@export_range(0.0, 0.2, 0.005) var selected_option_scale_boost: float = 0.11
+@export_range(0.0, 0.05, 0.002) var selected_option_lift_boost: float = 0.026
 
 @export_category("Hold Indicator")
 @export var show_hold_indicator: bool = true
@@ -276,7 +276,8 @@ func _build_option_specs(model: WorldInteractionPanelModel) -> Array[Dictionary]
 			category = "option_disabled_selected" if index == model.selected_index else "option_disabled"
 
 		var display_text := _build_option_display_text(label_text, index == model.selected_index)
-		_append_wrapped_specs(specs, display_text, category, option_font_size, option_wrap_chars)
+		var resolved_font_size := option_font_size + 12 if index == model.selected_index else option_font_size
+		_append_wrapped_specs(specs, display_text, category, resolved_font_size, option_wrap_chars)
 	return specs
 
 func _build_detail_lines(model: WorldInteractionPanelModel) -> Array[Dictionary]:

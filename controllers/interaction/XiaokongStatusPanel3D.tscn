@@ -1,0 +1,135 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://controllers/interaction/xiaokong_status_panel_3d.gd" id="1_script"]
+[ext_resource type="Script" path="res://controllers/interaction/xiaokong_status_text_resolver.gd" id="2_resolver"]
+
+[node name="XiaokongStatusPanel3D" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="StatusTextResolver" type="Node" parent="."]
+script = ExtResource("2_resolver")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+
+[node name="Pivot" type="Node3D" parent="."]
+
+[node name="PanelQuad" type="MeshInstance3D" parent="Pivot"]
+
+[node name="Viewport" type="SubViewport" parent="."]
+size = Vector2i(720, 460)
+transparent_bg = true
+handle_input_locally = false
+render_target_update_mode = 4
+
+[node name="CanvasRoot" type="Control" parent="Viewport"]
+custom_minimum_size = Vector2(720, 460)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Background" type="Panel" parent="Viewport/CanvasRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="Viewport/CanvasRoot/Background"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = 28.0
+offset_right = -34.0
+offset_bottom = -28.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+mouse_filter = 2
+
+[node name="StatRows" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 12
+mouse_filter = 2
+
+[node name="HungerRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "饱食度"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+value = 45.0
+
+[node name="ThirstRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "水分"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+value = 40.0
+
+[node name="MoodRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "心情"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+value = 68.0
+
+[node name="FavorRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/FavorRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "好感度"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/FavorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+show_percentage = false
+value = 28.0
+
+[node name="StatusList" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="StatusText" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatusList"]
+layout_mode = 2
+autowrap_mode = 3
+text = "有点饿、口渴、心情不错、愿意亲近你"

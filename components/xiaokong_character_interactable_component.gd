@@ -88,13 +88,29 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 
 	match option_id:
 		OPTION_ID_DIALOGUE:
-			_emit_global_interaction_request(SIGNAL_XIAOKONG_DIALOGUE_REQUESTED, "dialogue", xiaokong_root)
+			_emit_global_interaction_request(SIGNAL_XIAOKONG_DIALOGUE_REQUESTED, OPTION_ID_DIALOGUE, xiaokong_root)
 		OPTION_ID_VIEW_STATUS:
-			_emit_global_interaction_request(SIGNAL_XIAOKONG_STATUS_REQUESTED, "view_status", xiaokong_root)
+			_open_status_panel_direct(xiaokong_root)
 		OPTION_ID_EAT:
 			_execute_eat_option(xiaokong_root)
 		_:
 			return
+
+func should_clear_world_panel_after_execute(option_id: String) -> bool:
+	return option_id == OPTION_ID_DIALOGUE or option_id == OPTION_ID_VIEW_STATUS
+
+func _open_status_panel_direct(xiaokong_root: Node) -> void:
+	if xiaokong_root == null:
+		return
+	var status_panel: Node = xiaokong_root.get_node_or_null("StatusPanel")
+	if status_panel == null or not is_instance_valid(status_panel):
+		_emit_global_interaction_request(SIGNAL_XIAOKONG_STATUS_REQUESTED, OPTION_ID_VIEW_STATUS, xiaokong_root)
+		return
+	var payload: Dictionary = _build_interaction_payload(OPTION_ID_VIEW_STATUS, xiaokong_root)
+	if status_panel.has_method("open_for_payload"):
+		status_panel.call("open_for_payload", payload)
+	elif status_panel.has_method("open_panel"):
+		status_panel.call("open_panel")
 
 func _execute_eat_option(xiaokong_root: Node) -> void:
 	if not _can_show_eat_option(xiaokong_root):
@@ -191,12 +207,15 @@ func _emit_global_interaction_request(signal_name: StringName, request_type: Str
 		_global_node = get_node_or_null(GLOBAL_PATH)
 	if _global_node == null or not _global_node.has_signal(signal_name):
 		return
-	_global_node.emit_signal(signal_name, {
+	_global_node.emit_signal(signal_name, _build_interaction_payload(request_type, xiaokong_root))
+
+func _build_interaction_payload(request_type: String, xiaokong_root: Node) -> Dictionary:
+	return {
 		"type": request_type,
 		"xiaokong_path": String(xiaokong_root.get_path()),
 		"seat_marker_path": _seat_signal_marker_path,
 		"source_path": String(get_path()),
-	})
+	}
 
 func _resolve_current_table_context() -> XiaokongTableContextComponent:
 	var tree: SceneTree = get_tree()

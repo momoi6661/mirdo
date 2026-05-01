@@ -20,7 +20,6 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="17_save_comp"]
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
-[ext_resource type="PackedScene" path="res://controllers/ui/XiaokongStatusPanel.tscn" id="21_xk_status"]
 [ext_resource type="AudioStream" uid="uid://dc3ojh2l6f4oi" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
 [ext_resource type="PackedScene" uid="uid://cih1ba2m6uqc5" path="res://controllers/interaction/world_interaction_panel.tscn" id="23_world_panel"]
 [ext_resource type="Resource" uid="uid://ca22678m80wis" path="res://resources/inventory/player_inventory_storage.tres" id="24_inv_storage"]
@@ -429,17 +428,6 @@ text = "State: Idle"
 [node name="SpeedLabel" type="Label" parent="Control/DebugPanel/MarginContainer/VBoxContainer" unique_id=-1294967294]
 layout_mode = 2
 text = "Speed: 0.0"
-
-[node name="XiaokongStatusPanel" parent="Control" unique_id=1020198871 instance=ExtResource("21_xk_status")]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -332.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 214.0
-grow_horizontal = 0
 
 [node name="TimeHud" parent="Control" unique_id=1020198872 instance=ExtResource("27_time_hud")]
 layout_mode = 1

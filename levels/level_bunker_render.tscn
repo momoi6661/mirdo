@@ -195,6 +195,7 @@ affect_navigation_mesh = true
 
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
+xiaokong_status_panel = NodePath("../Xiaokong1/xiaokong/StatusPanel")
 
 [node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5113752, 0.0219687, -0.6291559)
