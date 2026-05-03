@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="OutingUnlockLinkResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_unlock_link_resource.gd" id="1_link"]
+[resource]
+script = ExtResource("1_link")
+from_location_id = &"residential"
+to_location_id = &"school"
+unlock_key = &"residential_school_bus_route"
+required_success_count = 1
+discovery_text = "从住宅区校车路线发现废弃小学。"
+ai_discovery_rule = "当 residential 探索成功时，AI 可以用环境线索把视野沿道路向外推进到 school。这是路线发现，不是地点直连显示，也不是新庇护所。"

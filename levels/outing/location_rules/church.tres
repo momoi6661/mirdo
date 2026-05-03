@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"church"
+display_name = "老教堂"
+description = "西南方向的老教堂，避难痕迹很多，但现在只适合搜集蜡烛、布料和记录。"
+map_position = Vector2(-1420, 820)
+icon_text = "✣"
+threat_level = 3
+travel_minutes = 300
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("蜡烛", "布料", "记录")
+recommended_auxiliary_tools = PackedStringArray("手电", "口罩", "医疗包")
+detail_notes = PackedStringArray("西南外缘建筑", "有避难痕迹但不可作为庇护所", "可能找到旧记录")
+ai_exploration_rule = "AI 可以描写旧避难痕迹和记录，但必须明确这里不能成为玩家庇护所。收益偏蜡烛、布料、记录。"

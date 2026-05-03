@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"taxi_depot"
+display_name = "废弃出租车站"
+description = "被遗弃的出租车调度点。车辆残骸里可能有燃料、地图册和车载工具。"
+map_position = Vector2(-280, -80)
+icon_text = "◆"
+threat_level = 2
+travel_minutes = 110
+discoverable = true
+start_unlocked = true
+neighbor_location_ids = PackedStringArray("garage", "gas_station")
+loot_bias_tags = PackedStringArray("燃料", "零件", "地图线索")
+recommended_auxiliary_tools = PackedStringArray("手电", "近战武器")
+detail_notes = PackedStringArray("空旷区域视野好", "车辆残骸可快速搜刮", "可能沿西侧道路发现更远地点")
+ai_exploration_rule = "AI 应把这里描述为开阔出租车调度点和车辆残骸搜索。重点生成燃料、工具、路线图线索；风险来自空旷地带的游荡者和车辆警报。成功时沿西侧道路向外发现 garage 或 gas_station 路线。禁止生成可定居地点。"

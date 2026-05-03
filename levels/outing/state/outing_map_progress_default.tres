@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="OutingMapProgressResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_map_progress_resource.gd" id="1_progress"]
+[resource]
+script = ExtResource("1_progress")
+unlocked_location_ids = PackedStringArray("bunker", "taxi_depot", "sport_supply", "residential", "supermarket")
+discovered_unlock_keys = PackedStringArray()
+successful_explore_counts = {}

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"garage"
+display_name = "高架桥维修车库"
+description = "高架桥下的维修车库，被路障和废车包围。可能产出高价值工具，但需要更强辅助装备。"
+map_position = Vector2(820, -130)
+icon_text = "⚙"
+threat_level = 4
+travel_minutes = 240
+discoverable = true
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("高级零件", "燃料", "工具")
+recommended_auxiliary_tools = PackedStringArray("手枪", "撬棍", "医疗包")
+detail_notes = PackedStringArray("外缘工业方向", "需要先发现路线", "建议携带防身装备")
+ai_exploration_rule = "AI 应强调高架桥阴影、废车掩体、锁住的工具柜和高威胁遭遇。携带手枪可降低高威胁叙事惩罚；撬棍可打开工具柜；医疗包可缓解事故。该地点只能产生资源和路线线索，不能成为庇护所。"

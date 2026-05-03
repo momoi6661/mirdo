@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"police_checkpoint"
+display_name = "临时警戒点"
+description = "街口残留的临时警戒点，有废弃警车、路障和临检帐篷。"
+map_position = Vector2(1760, -520)
+icon_text = "⚠"
+threat_level = 5
+travel_minutes = 230
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("弹药", "防具", "通讯零件")
+recommended_auxiliary_tools = PackedStringArray("手枪", "医疗包", "撬棍")
+detail_notes = PackedStringArray("最高威胁区域", "可能有防具或弹药", "建议准备充分后再去")
+ai_exploration_rule = "AI 应生成高压警戒点、废弃警车、路障、帐篷和高威胁遭遇。携带手枪和医疗包会显著改善叙事结果；收益偏弹药、防具、通讯零件。绝不能生成占领警戒点作为新庇护所。"

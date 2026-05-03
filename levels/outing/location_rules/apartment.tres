@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"apartment"
+display_name = "破旧公寓楼"
+description = "住宅区外侧的多层公寓，房间密集，生活物资多但搜索时间很长。"
+map_position = Vector2(420, 1020)
+icon_text = "▦"
+threat_level = 3
+travel_minutes = 290
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("食物", "水", "布料")
+recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "折叠背包")
+detail_notes = PackedStringArray("房间密集", "搜索时间长", "收益偏生活物资")
+ai_exploration_rule = "AI 应生成公寓走廊、住户房间、储物间和楼梯间探索。收益偏食物、水、布料；不能生成可入住据点。"

@@ -1561,3 +1561,47 @@ GET http://localhost:5302/api/executors
 - See Also: ERR-20260420-001
 
 ---
+## [ERR-20260503-001] git-restore-argument-typo
+
+**Logged**: 2026-05-03T23:28:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Typed `git restore --project.godot` instead of separating `--` from the path.
+
+### Details
+The command failed with `unknown option project.godot`. Corrected immediately with `git restore -- project.godot`, restoring the unrelated line-ending-only project file change.
+
+### Suggested Action
+When using `git restore` with a path after option separator, always include a space: `git restore -- <path>`.
+
+### Metadata
+- Source: error
+- Related Files: project.godot
+- Tags: git, powershell, typo
+
+---
+## [ERR-20260503-002] godot-command-not-in-path
+
+**Logged**: 2026-05-03T23:45:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: tests
+
+### Summary
+`godot --headless` failed because Godot is not on PATH.
+
+### Details
+PowerShell reported `The term 'godot' is not recognized`. The running editor process path showed `D:\aaaGodot\Godot_v4.6.2-stable_win64.exe`, which was then used directly for headless tests.
+
+### Suggested Action
+Use `D:\aaaGodot\Godot_v4.6.2-stable_win64.exe --headless --path <project> -s <script>` in this workspace unless PATH is updated.
+
+### Metadata
+- Source: error
+- Related Files: tests/outing/test_outing_map_scene_structure.gd
+- Tags: godot, tests, powershell
+
+---

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"bunker"
+display_name = "地下庇护所"
+description = "小空当前唯一固定庇护所。外出从这里出发，完成后也只回到这里。"
+map_position = Vector2(0, 110)
+icon_text = "⌂"
+threat_level = 0
+travel_minutes = 0
+discoverable = false
+start_unlocked = true
+neighbor_location_ids = PackedStringArray("taxi_depot", "sport_supply", "residential", "supermarket")
+loot_bias_tags = PackedStringArray("整理背包", "出发准备")
+recommended_auxiliary_tools = PackedStringArray("水", "食物", "手电")
+detail_notes = PackedStringArray("单一庇护所，不做分基地", "地图中心返回点", "从这里沿道路向外探索")
+ai_exploration_rule = "这是唯一庇护所，只能作为出发和返回节点。AI 不应生成迁移、占领、建立分基地或潜在庇护所剧情；只允许生成整理物资、确认路线、出发前检查。"

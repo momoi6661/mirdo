@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"pharmacy"
+display_name = "转角药房"
+description = "住宅区外侧的转角药房，柜台后方可能还有药品和消毒物。"
+map_position = Vector2(-620, 760)
+icon_text = "+"
+threat_level = 3
+travel_minutes = 210
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("药品", "绷带", "消毒物")
+recommended_auxiliary_tools = PackedStringArray("撬棍", "手电", "口罩")
+detail_notes = PackedStringArray("住宅区外缘医疗点", "柜台后方可能被锁", "适合补医疗物资")
+ai_exploration_rule = "AI 应生成药房柜台、药柜、破碎玻璃和粉尘风险。收益偏医疗物资；禁止庇护所相关展开。"

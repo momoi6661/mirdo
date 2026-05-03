@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"school"
+display_name = "废弃小学"
+description = "学校操场空旷，教学楼里可能有医药箱、文具、电池和临时避难遗留物。"
+map_position = Vector2(-720, 1020)
+icon_text = "✎"
+threat_level = 2
+travel_minutes = 220
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("电池", "药品", "杂物")
+recommended_auxiliary_tools = PackedStringArray("手电", "口罩", "医疗包")
+detail_notes = PackedStringArray("房间多，搜索时间长", "粉尘较重", "收益偏杂项和电池")
+ai_exploration_rule = "AI 应生成操场、教室、医务室和储物柜搜索。口罩降低粉尘风险，手电减少遗漏。可发现临时避难痕迹但不能成为玩家新庇护所。收益偏电池、药品、杂物。"

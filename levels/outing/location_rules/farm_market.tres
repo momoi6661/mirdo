@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="OutingLocationRuleResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_location_rule_resource.gd" id="1_rule"]
+[resource]
+script = ExtResource("1_rule")
+location_id = &"farm_market"
+display_name = "郊边农贸棚"
+description = "东南外缘的农贸棚和装卸区，可能有干粮、种子和简易工具。"
+map_position = Vector2(1500, 760)
+icon_text = "◌"
+threat_level = 2
+travel_minutes = 260
+discoverable = false
+start_unlocked = false
+neighbor_location_ids = PackedStringArray()
+loot_bias_tags = PackedStringArray("食物", "种子", "工具")
+recommended_auxiliary_tools = PackedStringArray("折叠背包", "近战武器", "手电")
+detail_notes = PackedStringArray("东南外缘补给点", "收益偏食物和种子", "空旷但撤退路线长")
+ai_exploration_rule = "AI 应生成郊边市场、装卸棚、塑料箱和食物残留。强调路程远和搬运限制；不能生成新庇护所。"

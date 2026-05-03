@@ -1,0 +1,377 @@
+[gd_scene format=3 uid="uid://c6hr4pgbbhywt"]
+
+[ext_resource type="Script" uid="uid://eruxegbfl6k0" path="res://levels/outing/outing_map_level_v3.gd" id="1_level"]
+[ext_resource type="Script" uid="uid://rsn1snfet7tx" path="res://levels/outing/components/outing_infinite_map_background.gd" id="2_bg"]
+
+[sub_resource type="StyleBoxFlat" id="PanelDark"]
+bg_color = Color(0.055, 0.048, 0.044, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.35, 0.32, 0.28, 0.72)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+
+[sub_resource type="StyleBoxFlat" id="GreenStrip"]
+bg_color = Color(0.17, 0.45, 0.23, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="ButtonDark"]
+bg_color = Color(0.09, 0.08, 0.07, 0.72)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.86, 0.82, 0.68, 0.72)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="PanelModal"]
+bg_color = Color(0.06, 0.055, 0.052, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.78, 0.69, 0.44, 0.9)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+
+[node name="OutingMapRoot" type="Control" unique_id=1022625567]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_level")
+
+[node name="MapViewport" type="Control" parent="." unique_id=1073546331]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="InfiniteMapBackground" type="Control" parent="MapViewport" unique_id=290132702]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_bg")
+
+[node name="MarkerLayer" type="Control" parent="MapViewport" unique_id=17151749]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RightPanel" type="PanelContainer" parent="." unique_id=60247862]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -464.0
+offset_top = 62.0
+offset_right = -54.0
+offset_bottom = -118.0
+theme_override_styles/panel = SubResource("PanelDark")
+
+[node name="RightPanelMargin" type="MarginContainer" parent="RightPanel" unique_id=464804184]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="RightPanelBox" type="VBoxContainer" parent="RightPanel/RightPanelMargin" unique_id=1670299268]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="PreviewStrip" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=472097265]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PreviewA" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=188767843]
+custom_minimum_size = Vector2(105, 86)
+layout_mode = 2
+color = Color(0.58, 0.5, 0.38, 1)
+
+[node name="PreviewB" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=211549362]
+custom_minimum_size = Vector2(105, 86)
+layout_mode = 2
+color = Color(0.33, 0.47, 0.47, 1)
+
+[node name="PreviewC" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=1317980221]
+custom_minimum_size = Vector2(105, 86)
+layout_mode = 2
+color = Color(0.56, 0.38, 0.25, 1)
+
+[node name="TitleLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1292356424]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.67, 0.12, 1)
+theme_override_font_sizes/font_size = 31
+text = "地点"
+horizontal_alignment = 1
+
+[node name="DescriptionLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=171861867]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.84, 0.79, 0.69, 1)
+theme_override_font_sizes/font_size = 15
+text = "地点描述"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Divider" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1990886255]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.52, 0.48, 0.38, 0.42)
+
+[node name="ThreatRow" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1792884322]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ThreatLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=1375951934]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(95, 30)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.84, 0.78, 1)
+theme_override_font_sizes/font_size = 17
+text = "Threat"
+
+[node name="ThreatBar" type="ProgressBar" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=433247180]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 18)
+layout_mode = 2
+max_value = 5.0
+show_percentage = false
+
+[node name="DiscoverLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1198683998]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.76, 0.08, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="BaseStrip" type="PanelContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1639110115]
+layout_mode = 2
+theme_override_styles/panel = SubResource("GreenStrip")
+
+[node name="BaseLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/BaseStrip" unique_id=624272410]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.98, 0.89, 1)
+theme_override_font_sizes/font_size = 17
+text = "  固定返回点：地下庇护所"
+
+[node name="DetailList" type="VBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1755904518]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrepareButton" type="Button" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1889439683]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.89, 0.78, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("ButtonDark")
+disabled = true
+text = "准备外出"
+
+[node name="HintLabel" type="Label" parent="." unique_id=1481446567]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = -54.0
+offset_right = 420.0
+offset_bottom = -24.0
+theme_override_colors/font_color = Color(0.86, 0.83, 0.67, 0.58)
+theme_override_font_sizes/font_size = 16
+text = "左键拖动大地图 · 点击地点展开详情 · 探索会沿道路向外发现新区域"
+horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="." unique_id=855384938]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = -84.0
+offset_right = -82.0
+offset_bottom = -36.0
+theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("ButtonDark")
+text = "Close"
+
+[node name="PrepareOverlay" type="ColorRect" parent="." unique_id=1932651507]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.58)
+
+[node name="PreparePanel" type="PanelContainer" parent="PrepareOverlay" unique_id=1080736788]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -370.0
+offset_top = -295.0
+offset_right = 370.0
+offset_bottom = 295.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("PanelModal")
+
+[node name="PrepareMargin" type="MarginContainer" parent="PrepareOverlay/PreparePanel" unique_id=342275092]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="PrepareBox" type="VBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin" unique_id=1792414209]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="PrepareTitleLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1278404520]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.72, 0.14, 1)
+theme_override_font_sizes/font_size = 28
+
+[node name="PrepareIntroLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1381354817]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.84, 0.8, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = "选择本次携带的辅助道具。当前还没有正式道具 res，下方是后续武器/工具资源的可交互占位。"
+autowrap_mode = 3
+
+[node name="BaseCarryLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=224318291]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.88, 0.82, 1)
+theme_override_font_sizes/font_size = 17
+text = "基础携带：水 x1 / 罐头 x1（后续从背包读取）"
+
+[node name="ToolScroll" type="ScrollContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1377450962]
+custom_minimum_size = Vector2(0, 300)
+layout_mode = 2
+
+[node name="ToolList" type="VBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/ToolScroll" unique_id=360825336]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="CapacityLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1252811174]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.91, 0.78, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="PrepareButtonRow" type="HBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=762774442]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PrepareConfirmButton" type="Button" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/PrepareButtonRow" unique_id=527014460]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(250, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 1, 0.9, 1)
+theme_override_styles/normal = SubResource("ButtonDark")
+text = "确认外出（演示结算）"
+
+[node name="PrepareCancelButton" type="Button" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/PrepareButtonRow" unique_id=690731047]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 52)
+layout_mode = 2
+text = "取消"
+
+[node name="ResultOverlay" type="ColorRect" parent="." unique_id=163593689]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.62)
+
+[node name="ResultPanel" type="PanelContainer" parent="ResultOverlay" unique_id=1844850762]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -260.0
+offset_right = 360.0
+offset_bottom = 260.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("PanelModal")
+
+[node name="ResultMargin" type="MarginContainer" parent="ResultOverlay/ResultPanel" unique_id=1373282983]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 26
+
+[node name="ResultBox" type="VBoxContainer" parent="ResultOverlay/ResultPanel/ResultMargin" unique_id=1325065390]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ResultLabel" type="RichTextLabel" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox" unique_id=299446946]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(640, 330)
+layout_mode = 2
+theme_override_colors/default_color = Color(0.88, 0.85, 0.76, 1)
+theme_override_font_sizes/normal_font_size = 18
+bbcode_enabled = true
+fit_content = true
+
+[node name="ResultReturnButton" type="Button" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox" unique_id=1147305639]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+text = "返回地图"

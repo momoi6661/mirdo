@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="OutingUnlockLinkResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_unlock_link_resource.gd" id="1_link"]
+[resource]
+script = ExtResource("1_link")
+from_location_id = &"gas_station"
+to_location_id = &"warehouse"
+unlock_key = &"gas_station_freight_note"
+required_success_count = 1
+discovery_text = "从加油站货运单据发现河岸仓库。"
+ai_discovery_rule = "当 gas_station 探索成功时，AI 可以用环境线索把视野沿道路向外推进到 warehouse。这是路线发现，不是地点直连显示，也不是新庇护所。"

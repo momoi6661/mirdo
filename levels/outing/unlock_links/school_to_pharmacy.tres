@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="OutingUnlockLinkResource" format=3]
+[ext_resource type="Script" path="res://levels/outing/resources/outing_unlock_link_resource.gd" id="1_link"]
+[resource]
+script = ExtResource("1_link")
+from_location_id = &"school"
+to_location_id = &"pharmacy"
+unlock_key = &"school_nurse_note"
+required_success_count = 1
+discovery_text = "从学校医务室记录发现转角药房。"
+ai_discovery_rule = "当 school 探索成功时，AI 可以用环境线索把视野沿道路向外推进到 pharmacy。这是路线发现，不是地点直连显示，也不是新庇护所。"
