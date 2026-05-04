@@ -26,6 +26,8 @@ func _init() -> void:
 	_require(right_panel.offset_bottom == target_bottom, "right panel slide-in should keep vertical layout")
 	_require(right_panel.scale == Vector2.ONE, "right panel slide-in should not use scale/vertical motion")
 	_require(root.call("get_selected_location_id") == "sport_supply", "selected location should update")
+	var ornament := root.get_node("RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament")
+	_require(ornament.get_child_count() >= 3, "detail card should keep a decorative ornament")
 	root.call("_open_prepare_panel")
 	var tool_list := root.get_node("PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/ToolScroll/ToolList")
 	_require(tool_list.get_child_count() > 0, "prepare panel should build tool buttons")

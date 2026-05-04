@@ -280,24 +280,44 @@ theme_override_constants/margin_bottom = 20
 layout_mode = 2
 theme_override_constants/separation = 11
 
-[node name="PreviewStrip" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=472097265]
+[node name="DetailOrnament" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=472097265]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 10
+alignment = 1
 
-[node name="PreviewA" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=188767843]
-custom_minimum_size = Vector2(92, 70)
+[node name="LeftRule" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
+custom_minimum_size = Vector2(84, 2)
 layout_mode = 2
-color = Color(0.58, 0.5, 0.38, 1)
+size_flags_vertical = 4
+color = Color(0.86, 0.66, 0.22, 0.42)
 
-[node name="PreviewB" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=211549362]
-custom_minimum_size = Vector2(92, 70)
+[node name="LeftDot" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
+custom_minimum_size = Vector2(5, 5)
 layout_mode = 2
-color = Color(0.33, 0.47, 0.47, 1)
+size_flags_vertical = 4
+color = Color(1, 0.68, 0.12, 0.72)
 
-[node name="PreviewC" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=1317980221]
-custom_minimum_size = Vector2(92, 70)
+[node name="CenterMark" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
 layout_mode = 2
-color = Color(0.56, 0.38, 0.25, 1)
+theme_override_colors/font_color = Color(1, 0.68, 0.12, 0.82)
+theme_override_font_sizes/font_size = 16
+text = "◆"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightDot" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
+custom_minimum_size = Vector2(5, 5)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(1, 0.68, 0.12, 0.72)
+
+[node name="RightRule" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
+custom_minimum_size = Vector2(84, 2)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.86, 0.66, 0.22, 0.42)
 
 [node name="TitleLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1292356424]
 unique_name_in_owner = true
