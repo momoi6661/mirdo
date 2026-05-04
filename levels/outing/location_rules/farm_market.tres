@@ -6,6 +6,7 @@ location_id = &"farm_market"
 display_name = "郊边农贸棚"
 description = "东南外缘的农贸棚和装卸区，可能有干粮、种子和简易工具。"
 map_position = Vector2(1500, 760)
+route_hint = "沿东南外环道路抵达，空旷安全感高但撤退距离长。"
 icon_text = "◌"
 threat_level = 2
 travel_minutes = 260

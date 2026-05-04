@@ -6,6 +6,7 @@ location_id = &"water_plant"
 display_name = "小型净水站"
 description = "河岸更深处的小型净水站，设备间可能有滤芯、管线和水处理用品。"
 map_position = Vector2(-1870, -120)
+route_hint = "沿河岸深处设施路进入，水处理收益高但返程最慢。"
 icon_text = "≈"
 threat_level = 4
 travel_minutes = 330

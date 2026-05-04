@@ -6,6 +6,7 @@ location_id = &"gas_station"
 display_name = "锈蚀加油站"
 description = "主干道旁的旧加油站，地下油罐和便利店后仓都值得检查。"
 map_position = Vector2(-980, -420)
+route_hint = "沿西北主干道抵达，油罐区禁止明火，可继续外推河岸路线。"
 icon_text = "♦"
 threat_level = 3
 travel_minutes = 150

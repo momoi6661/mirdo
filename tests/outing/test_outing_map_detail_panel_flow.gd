@@ -26,6 +26,17 @@ func _init() -> void:
 	_require(right_panel.offset_bottom == target_bottom, "right panel slide-in should keep vertical layout")
 	_require(right_panel.scale == Vector2.ONE, "right panel slide-in should not use scale/vertical motion")
 	_require(root.call("get_selected_location_id") == "sport_supply", "selected location should update")
+	root.call("_open_prepare_panel")
+	var tool_list := root.get_node("PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/ToolScroll/ToolList")
+	_require(tool_list.get_child_count() > 0, "prepare panel should build tool buttons")
+	for child in tool_list.get_children():
+		if child is Button:
+			var button := child as Button
+			_require(button.has_theme_stylebox_override("normal"), "tool button should override normal style")
+			_require(button.has_theme_stylebox_override("hover"), "tool button should override hover style")
+			_require(button.has_theme_stylebox_override("pressed"), "tool button should override pressed style")
+			_require(button.has_theme_stylebox_override("focus"), "tool button should override focus style")
+	root.get_node("PrepareOverlay").visible = false
 
 	root.call("clear_location_selection")
 	_require(not right_panel.visible, "right panel should hide after clearing selection")

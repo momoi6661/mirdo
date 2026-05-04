@@ -12,12 +12,14 @@ func _init() -> void:
 	_require(root.has_method("get_route_segment_count"), "map should expose route segment count")
 	_require(int(root.call("get_route_segment_count")) == 0, "location-to-location route lines should be disabled")
 
-	var background := root.get_node("MapViewport/InfiniteMapBackground")
+	var background := root.get_node("MapViewport/MapWorld/InfiniteMapBackground")
 	_require(background.has_method("get_map_rect"), "background should expose fixed map rect")
 	var map_rect: Rect2 = background.call("get_map_rect")
 	var viewport := root.get_node("MapViewport") as Control
+	var map_world := root.get_node("MapViewport/MapWorld") as Control
 	_require(map_rect.size.x > viewport.size.x, "fixed map should be wider than the screen")
 	_require(map_rect.size.y > viewport.size.y, "fixed map should be taller than the screen")
+	_require(map_world.size == map_rect.size, "fixed map should be represented by a real large Control")
 
 	root.queue_free()
 	print("PASS: outing map drag-only large map")

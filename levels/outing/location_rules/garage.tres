@@ -6,6 +6,7 @@ location_id = &"garage"
 display_name = "高架桥维修车库"
 description = "高架桥下的维修车库，被路障和废车包围。可能产出高价值工具，但需要更强辅助装备。"
 map_position = Vector2(820, -130)
+route_hint = "沿东侧高架维修线进入，撤离路线短但遭遇强度高。"
 icon_text = "⚙"
 threat_level = 4
 travel_minutes = 240

@@ -6,6 +6,7 @@ location_id = &"police_checkpoint"
 display_name = "临时警戒点"
 description = "街口残留的临时警戒点，有废弃警车、路障和临检帐篷。"
 map_position = Vector2(1760, -520)
+route_hint = "沿城市外环抵达，高威胁拦截点，建议装备齐全后再行动。"
 icon_text = "⚠"
 threat_level = 5
 travel_minutes = 230

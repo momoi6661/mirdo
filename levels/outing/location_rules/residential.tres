@@ -6,6 +6,7 @@ location_id = &"residential"
 display_name = "格林黑文住宅区"
 description = "低层住宅区。风险不高，但房间多、搜索时间长，适合补充基础生活物资。"
 map_position = Vector2(-120, 330)
+route_hint = "沿南向住宅支路搜索，适合低风险补给但耗时偏长。"
 icon_text = "◼"
 threat_level = 2
 travel_minutes = 190

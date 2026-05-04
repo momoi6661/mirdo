@@ -13,6 +13,14 @@ var location_id := ""
 var unlocked := true
 var selected := false
 var editor_preview_locked := false
+@export var location_rule: Resource:
+	set(value):
+		_location_rule = value
+		if _location_rule != null:
+			_apply_rule_resource(_location_rule)
+	get:
+		return _location_rule
+var _location_rule: Resource
 var _rule: Resource
 var _icon_text := "◇"
 var _pulse_scale := 0.0
@@ -30,16 +38,16 @@ func _ready() -> void:
 	if icon_label != null:
 		icon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pressed_connect_safe()
+	if location_rule != null:
+		_apply_rule_resource(location_rule)
 	_apply_label()
 	queue_redraw()
 
 
 func setup(data, is_selected: bool, is_unlocked: bool) -> void:
 	if data is Resource:
-		_rule = data
-		location_id = String(_rule.get("location_id"))
-		_icon_text = String(_rule.get("icon_text"))
-		tooltip_text = String(_rule.get("display_name"))
+		location_rule = data
+		_apply_rule_resource(data)
 	elif data is Dictionary:
 		_rule = null
 		location_id = String(data.get("id", ""))
@@ -54,6 +62,10 @@ func setup(data, is_selected: bool, is_unlocked: bool) -> void:
 
 func get_rule() -> Resource:
 	return _rule
+
+
+func get_anchor_position() -> Vector2:
+	return position + ANCHOR
 
 
 func play_click_feedback() -> void:
@@ -74,6 +86,8 @@ func play_click_feedback() -> void:
 
 
 func pressed_connect_safe() -> void:
+	if gui_input.is_connected(_on_gui_input):
+		return
 	gui_input.connect(_on_gui_input)
 
 
@@ -149,6 +163,17 @@ func _apply_label() -> void:
 		return
 	icon_label.text = _icon_text
 	icon_label.add_theme_color_override("font_color", _palette().font)
+
+
+func _apply_rule_resource(rule: Resource) -> void:
+	_rule = rule
+	location_id = String(_rule.get("location_id"))
+	_icon_text = String(_rule.get("icon_text"))
+	tooltip_text = String(_rule.get("display_name"))
+	if Engine.is_editor_hint() and not bool(_rule.get("start_unlocked")):
+		editor_preview_locked = true
+	_apply_label()
+	queue_redraw()
 
 
 func _play_click_tone() -> void:

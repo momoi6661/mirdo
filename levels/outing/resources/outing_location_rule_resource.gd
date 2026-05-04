@@ -1,3 +1,4 @@
+@tool
 extends Resource
 class_name OutingLocationRuleResource
 
@@ -6,6 +7,7 @@ class_name OutingLocationRuleResource
 @export_multiline var description: String = ""
 @export var map_position: Vector2 = Vector2.ZERO
 @export var icon_text: String = "LOC"
+@export_multiline var route_hint: String = ""
 @export_range(0, 5, 1) var threat_level: int = 1
 @export var travel_minutes: int = 120
 @export var discoverable: bool = false
@@ -24,6 +26,7 @@ func to_location_dictionary() -> Dictionary:
 		"description": description,
 		"position": map_position,
 		"icon": icon_text,
+		"route_hint": route_hint,
 		"threat": threat_level,
 		"duration": _format_duration(),
 		"loot": " / ".join(Array(loot_bias_tags)),

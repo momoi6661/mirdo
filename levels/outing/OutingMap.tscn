@@ -2,6 +2,25 @@
 
 [ext_resource type="Script" uid="uid://eruxegbfl6k0" path="res://levels/outing/outing_map_level_v3.gd" id="1_level"]
 [ext_resource type="Script" uid="uid://rsn1snfet7tx" path="res://levels/outing/components/outing_infinite_map_background.gd" id="2_bg"]
+[ext_resource type="PackedScene" path="res://levels/outing/components/OutingLocationMarker.tscn" id="3_marker"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/apartment.tres" id="rule_apartment"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/water_plant.tres" id="rule_water_plant"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/church.tres" id="rule_church"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/farm_market.tres" id="rule_farm_market"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/pharmacy.tres" id="rule_pharmacy"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/radio_tower.tres" id="rule_radio_tower"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/warehouse.tres" id="rule_warehouse"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/school.tres" id="rule_school"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/police_checkpoint.tres" id="rule_police_checkpoint"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/supermarket.tres" id="rule_supermarket"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/hardware_store.tres" id="rule_hardware_store"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/gas_station.tres" id="rule_gas_station"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/clinic.tres" id="rule_clinic"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/garage.tres" id="rule_garage"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/residential.tres" id="rule_residential"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/taxi_depot.tres" id="rule_taxi_depot"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/sport_supply.tres" id="rule_sport_supply"]
+[ext_resource type="Resource" path="res://levels/outing/location_rules/bunker.tres" id="rule_bunker"]
 
 [sub_resource type="StyleBoxFlat" id="PanelDark"]
 bg_color = Color(0.055, 0.048, 0.044, 0.94)
@@ -16,7 +35,16 @@ corner_radius_bottom_right = 24
 corner_radius_bottom_left = 24
 
 [sub_resource type="StyleBoxFlat" id="GreenStrip"]
-bg_color = Color(0.17, 0.45, 0.23, 0.95)
+bg_color = Color(0.135, 0.105, 0.075, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.76, 0.64, 0.39, 0.34)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="ButtonDark"]
 bg_color = Color(0.09, 0.08, 0.07, 0.72)
@@ -25,6 +53,30 @@ border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.86, 0.82, 0.68, 0.72)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="ButtonHover"]
+bg_color = Color(0.15, 0.12, 0.085, 0.88)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.76, 0.18, 0.92)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="ButtonPressed"]
+bg_color = Color(0.23, 0.17, 0.09, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.63, 0.08, 1)
 corner_radius_top_left = 18
 corner_radius_top_right = 18
 corner_radius_bottom_right = 18
@@ -54,7 +106,7 @@ script = ExtResource("1_level")
 
 [node name="MapViewport" type="Control" parent="." unique_id=1073546331]
 unique_name_in_owner = true
-clip_contents = true
+clip_contents = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -62,7 +114,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="InfiniteMapBackground" type="Control" parent="MapViewport" unique_id=290132702]
+[node name="MapWorld" type="Control" parent="MapViewport" unique_id=238910771]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(4400, 2700)
+layout_mode = 1
+anchors_preset = -1
+offset_left = -1740.0
+offset_top = -1092.0
+offset_right = 2660.0
+offset_bottom = 1608.0
+mouse_filter = 2
+
+[node name="InfiniteMapBackground" type="Control" parent="MapViewport/MapWorld" unique_id=290132702]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -73,7 +136,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_bg")
 
-[node name="MarkerLayer" type="Control" parent="MapViewport" unique_id=17151749]
+[node name="MarkerLayer" type="Control" parent="MapViewport/MapWorld" unique_id=17151749]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -83,6 +146,115 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="Location_Bunker" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2144.0, 1362.0)
+location_rule = ExtResource("rule_bunker")
+
+[node name="Location_SportSupply" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2404.0, 1132.0)
+location_rule = ExtResource("rule_sport_supply")
+
+[node name="Location_TaxiDepot" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(1864.0, 1172.0)
+location_rule = ExtResource("rule_taxi_depot")
+
+[node name="Location_Residential" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2024.0, 1582.0)
+location_rule = ExtResource("rule_residential")
+
+[node name="Location_Garage" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2964.0, 1122.0)
+location_rule = ExtResource("rule_garage")
+
+[node name="Location_Clinic" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2784.0, 802.0)
+location_rule = ExtResource("rule_clinic")
+
+[node name="Location_GasStation" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(1164.0, 832.0)
+location_rule = ExtResource("rule_gas_station")
+
+[node name="Location_HardwareStore" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(3224.0, 892.0)
+location_rule = ExtResource("rule_hardware_store")
+
+[node name="Location_Supermarket" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2324.0, 1552.0)
+location_rule = ExtResource("rule_supermarket")
+
+[node name="Location_PoliceCheckpoint" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(3904.0, 732.0)
+location_rule = ExtResource("rule_police_checkpoint")
+
+[node name="Location_School" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(1424.0, 2272.0)
+location_rule = ExtResource("rule_school")
+
+[node name="Location_Warehouse" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(364.0, 342.0)
+location_rule = ExtResource("rule_warehouse")
+
+[node name="Location_RadioTower" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(3684.0, 222.0)
+location_rule = ExtResource("rule_radio_tower")
+
+[node name="Location_Pharmacy" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(1524.0, 2012.0)
+location_rule = ExtResource("rule_pharmacy")
+
+[node name="Location_FarmMarket" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(3644.0, 2012.0)
+location_rule = ExtResource("rule_farm_market")
+
+[node name="Location_Church" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(724.0, 2072.0)
+location_rule = ExtResource("rule_church")
+
+[node name="Location_WaterPlant" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(274.0, 1132.0)
+location_rule = ExtResource("rule_water_plant")
+
+[node name="Location_Apartment" parent="MapViewport/MapWorld/MarkerLayer" instance=ExtResource("3_marker")]
+position = Vector2(2564.0, 2272.0)
+location_rule = ExtResource("rule_apartment")
+
+[node name="MapHudHeader" type="Control" parent="." unique_id=1902847129]
+layout_mode = 1
+anchors_preset = -1
+offset_left = 28.0
+offset_top = 18.0
+offset_right = 392.0
+offset_bottom = 80.0
+mouse_filter = 2
+
+[node name="HeaderMargin" type="MarginContainer" parent="MapHudHeader"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 8
+
+[node name="HeaderBox" type="VBoxContainer" parent="MapHudHeader/HeaderMargin"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="HeaderTitle" type="Label" parent="MapHudHeader/HeaderMargin/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.68, 0.12, 0.95)
+theme_override_font_sizes/font_size = 20
+text = "外出地图"
+
+[node name="HeaderHint" type="Label" parent="MapHudHeader/HeaderMargin/HeaderBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.82, 0.68, 0.72)
+theme_override_font_sizes/font_size = 13
+text = "拖动地图 · 点击地点查看详情 · 探索向外发现区域"
+
 [node name="RightPanel" type="PanelContainer" parent="." unique_id=60247862]
 unique_name_in_owner = true
 visible = false
@@ -91,39 +263,39 @@ anchors_preset = -1
 anchor_left = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -464.0
-offset_top = 62.0
-offset_right = -54.0
-offset_bottom = -118.0
+offset_left = -540.0
+offset_top = 48.0
+offset_right = -28.0
+offset_bottom = -54.0
 theme_override_styles/panel = SubResource("PanelDark")
 
 [node name="RightPanelMargin" type="MarginContainer" parent="RightPanel" unique_id=464804184]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 22
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 22
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 20
 
 [node name="RightPanelBox" type="VBoxContainer" parent="RightPanel/RightPanelMargin" unique_id=1670299268]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 11
 
 [node name="PreviewStrip" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=472097265]
 layout_mode = 2
 theme_override_constants/separation = 4
 
 [node name="PreviewA" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=188767843]
-custom_minimum_size = Vector2(105, 86)
+custom_minimum_size = Vector2(92, 70)
 layout_mode = 2
 color = Color(0.58, 0.5, 0.38, 1)
 
 [node name="PreviewB" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=211549362]
-custom_minimum_size = Vector2(105, 86)
+custom_minimum_size = Vector2(92, 70)
 layout_mode = 2
 color = Color(0.33, 0.47, 0.47, 1)
 
 [node name="PreviewC" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/PreviewStrip" unique_id=1317980221]
-custom_minimum_size = Vector2(105, 86)
+custom_minimum_size = Vector2(92, 70)
 layout_mode = 2
 color = Color(0.56, 0.38, 0.25, 1)
 
@@ -131,7 +303,7 @@ color = Color(0.56, 0.38, 0.25, 1)
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.67, 0.12, 1)
-theme_override_font_sizes/font_size = 31
+theme_override_font_sizes/font_size = 29
 text = "地点"
 horizontal_alignment = 1
 
@@ -155,18 +327,17 @@ theme_override_constants/separation = 12
 
 [node name="ThreatLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=1375951934]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(95, 30)
+custom_minimum_size = Vector2(88, 28)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.84, 0.78, 1)
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 16
 text = "Threat"
 
-[node name="ThreatBar" type="ProgressBar" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=433247180]
+[node name="ThreatSegments" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=433247180]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(160, 18)
+custom_minimum_size = Vector2(150, 18)
 layout_mode = 2
-max_value = 5.0
-show_percentage = false
+theme_override_constants/separation = 5
 
 [node name="DiscoverLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1198683998]
 unique_name_in_owner = true
@@ -181,8 +352,10 @@ theme_override_styles/panel = SubResource("GreenStrip")
 [node name="BaseLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/BaseStrip" unique_id=624272410]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.91, 0.98, 0.89, 1)
-theme_override_font_sizes/font_size = 17
-text = "  固定返回点：地下庇护所"
+theme_override_font_sizes/font_size = 15
+text = "探索重点  ·  物资优先，按携带道具调整风险"
+autowrap_mode = 3
+clip_text = true
 
 [node name="DetailList" type="VBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1755904518]
 unique_name_in_owner = true
@@ -191,11 +364,14 @@ theme_override_constants/separation = 8
 
 [node name="PrepareButton" type="Button" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1889439683]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 58)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.89, 0.78, 1)
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("ButtonDark")
+theme_override_styles/focus = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonPressed")
+theme_override_styles/hover = SubResource("ButtonHover")
 disabled = true
 text = "准备外出"
 
@@ -221,17 +397,18 @@ unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 1.0
-anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -220.0
-offset_top = -84.0
-offset_right = -82.0
-offset_bottom = -36.0
+offset_left = -190.0
+offset_top = 10.0
+offset_right = -28.0
+offset_bottom = 42.0
 theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 15
 theme_override_styles/normal = SubResource("ButtonDark")
-text = "Close"
+theme_override_styles/hover = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonPressed")
+theme_override_styles/focus = SubResource("ButtonHover")
+text = "返回庇护所"
 
 [node name="PrepareOverlay" type="ColorRect" parent="." unique_id=1932651507]
 unique_name_in_owner = true
@@ -269,7 +446,7 @@ theme_override_constants/margin_bottom = 24
 
 [node name="PrepareBox" type="VBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin" unique_id=1792414209]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 11
 
 [node name="PrepareTitleLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1278404520]
 unique_name_in_owner = true
@@ -316,12 +493,20 @@ custom_minimum_size = Vector2(250, 52)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 1, 0.9, 1)
 theme_override_styles/normal = SubResource("ButtonDark")
+theme_override_styles/focus = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonPressed")
+theme_override_styles/hover = SubResource("ButtonHover")
 text = "确认外出（演示结算）"
 
 [node name="PrepareCancelButton" type="Button" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/PrepareButtonRow" unique_id=690731047]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 52)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_styles/normal = SubResource("ButtonDark")
+theme_override_styles/focus = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonPressed")
+theme_override_styles/hover = SubResource("ButtonHover")
 text = "取消"
 
 [node name="ResultOverlay" type="ColorRect" parent="." unique_id=163593689]
@@ -374,4 +559,9 @@ fit_content = true
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_styles/normal = SubResource("ButtonDark")
+theme_override_styles/focus = SubResource("ButtonHover")
+theme_override_styles/pressed = SubResource("ButtonPressed")
+theme_override_styles/hover = SubResource("ButtonHover")
 text = "返回地图"

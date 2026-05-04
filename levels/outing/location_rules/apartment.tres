@@ -6,6 +6,7 @@ location_id = &"apartment"
 display_name = "破旧公寓楼"
 description = "住宅区外侧的多层公寓，房间密集，生活物资多但搜索时间很长。"
 map_position = Vector2(420, 1020)
+route_hint = "沿南侧公寓支路逐层搜索，房间密集且噪声容易累积。"
 icon_text = "▦"
 threat_level = 3
 travel_minutes = 290

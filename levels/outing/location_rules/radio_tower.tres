@@ -6,6 +6,7 @@ location_id = &"radio_tower"
 display_name = "旧广播塔"
 description = "城市北侧的旧广播塔，塔下机房可能有通讯零件和远距路线情报。"
 map_position = Vector2(1540, -1030)
+route_hint = "沿北侧外环高点进入，适合获取更远的地图情报。"
 icon_text = "⌁"
 threat_level = 4
 travel_minutes = 280

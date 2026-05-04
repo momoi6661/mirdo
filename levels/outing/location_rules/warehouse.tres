@@ -6,6 +6,7 @@ location_id = &"warehouse"
 display_name = "河岸仓库"
 description = "河岸边的小型仓库，卷门锁死，里面可能有成箱物资和大型零件。"
 map_position = Vector2(-1780, -910)
+route_hint = "沿河岸货运路进入，卷门锁死，搬运收益高但撤退慢。"
 icon_text = "▣"
 threat_level = 4
 travel_minutes = 260

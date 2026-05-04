@@ -6,6 +6,7 @@ location_id = &"clinic"
 display_name = "街区诊所"
 description = "小型诊所入口被杂物挡住。药柜可能尚未被完全搬空。"
 map_position = Vector2(640, -450)
+route_hint = "沿东北街区小路进入，入口狭窄，适合携带撬棍和口罩。"
 icon_text = "+"
 threat_level = 3
 travel_minutes = 210

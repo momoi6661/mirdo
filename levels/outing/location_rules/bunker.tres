@@ -4,8 +4,9 @@
 script = ExtResource("1_rule")
 location_id = &"bunker"
 display_name = "地下庇护所"
-description = "小空当前唯一固定庇护所。外出从这里出发，完成后也只回到这里。"
+description = "小空当前唯一安全据点。外出从这里规划路线，结算后回到这里整理物资。"
 map_position = Vector2(0, 110)
+route_hint = "中心出发点；查看周边道路情报后再选择目标。"
 icon_text = "⌂"
 threat_level = 0
 travel_minutes = 0
@@ -14,5 +15,5 @@ start_unlocked = true
 neighbor_location_ids = PackedStringArray("taxi_depot", "sport_supply", "residential", "supermarket")
 loot_bias_tags = PackedStringArray("整理背包", "出发准备")
 recommended_auxiliary_tools = PackedStringArray("水", "食物", "手电")
-detail_notes = PackedStringArray("单一庇护所，不做分基地", "地图中心返回点", "从这里沿道路向外探索")
+detail_notes = PackedStringArray("唯一安全据点", "用于整理携带物资", "从这里沿道路向外探索")
 ai_exploration_rule = "这是唯一庇护所，只能作为出发和返回节点。AI 不应生成迁移、占领、建立分基地或潜在庇护所剧情；只允许生成整理物资、确认路线、出发前检查。"

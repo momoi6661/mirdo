@@ -6,6 +6,7 @@ location_id = &"sport_supply"
 display_name = "德州运动用品店"
 description = "街角的旧运动用品店，可能残留护具、维修工具、弩箭或可改装武器零件。"
 map_position = Vector2(260, -120)
+route_hint = "沿中心商业街东段进入，成功后可外推车库、诊所、五金店线索。"
 icon_text = "⚒"
 threat_level = 3
 travel_minutes = 160

@@ -6,6 +6,7 @@ location_id = &"taxi_depot"
 display_name = "废弃出租车站"
 description = "被遗弃的出租车调度点。车辆残骸里可能有燃料、地图册和车载工具。"
 map_position = Vector2(-280, -80)
+route_hint = "沿西侧主路抵达，车辆残骸适合快速搜刮并发现燃料线索。"
 icon_text = "◆"
 threat_level = 2
 travel_minutes = 110

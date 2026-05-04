@@ -6,6 +6,7 @@ location_id = &"hardware_store"
 display_name = "五金工具店"
 description = "街边五金店卷帘门半塌，里面可能有紧固件、胶带、电线和手动工具。"
 map_position = Vector2(1080, -360)
+route_hint = "沿东侧商铺街推进，卷帘门和库房会消耗工具耐久。"
 icon_text = "⚒"
 threat_level = 2
 travel_minutes = 170

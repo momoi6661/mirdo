@@ -6,6 +6,7 @@ location_id = &"pharmacy"
 display_name = "转角药房"
 description = "住宅区外侧的转角药房，柜台后方可能还有药品和消毒物。"
 map_position = Vector2(-620, 760)
+route_hint = "沿住宅外侧转角路进入，柜台后方可能上锁。"
 icon_text = "+"
 threat_level = 3
 travel_minutes = 210

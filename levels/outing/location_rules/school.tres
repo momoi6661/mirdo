@@ -6,6 +6,7 @@ location_id = &"school"
 display_name = "废弃小学"
 description = "学校操场空旷，教学楼里可能有医药箱、文具、电池和临时避难遗留物。"
 map_position = Vector2(-720, 1020)
+route_hint = "沿南侧学校路进入，房间多但路线清晰，适合搜电池和药箱。"
 icon_text = "✎"
 threat_level = 2
 travel_minutes = 220
