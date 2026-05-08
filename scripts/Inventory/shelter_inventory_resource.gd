@@ -84,11 +84,76 @@ func add_one_to_entry(entry_key: String, item: ItemData) -> bool:
 	return true
 
 
+func add_items_to_return_bag(item: ItemData, amount: int) -> int:
+	if item == null or amount <= 0:
+		return 0
+	var source := _get_source_by_id("temporary_return_bag")
+	if source == null:
+		source = _get_first_source_for_item(item)
+	if source == null or source.get("storage") == null:
+		return 0
+	var storage := source.get("storage") as InventoryStorageResource
+	storage.ensure_capacity()
+	var remaining := amount
+	var max_stack := _get_max_stack_size(item)
+
+	for slot_index in range(storage.slot_count):
+		if remaining <= 0:
+			break
+		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
+		if slot == null or slot.is_empty() or slot.item != item:
+			continue
+		var room := maxi(0, max_stack - int(slot.amount))
+		if room <= 0:
+			continue
+		var add_amount := mini(room, remaining)
+		slot.amount += add_amount
+		remaining -= add_amount
+
+	for slot_index in range(storage.slot_count):
+		if remaining <= 0:
+			break
+		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
+		if slot == null or not slot.is_empty():
+			continue
+		var add_amount := mini(max_stack, remaining)
+		slot.set_stack(item, add_amount)
+		remaining -= add_amount
+	return amount - remaining
+
+
 func count_total_outing_items() -> int:
 	var total := 0
 	for entry in get_available_outing_entries():
 		total += int(entry.get("amount", 0))
 	return total
+
+
+func _get_first_source_for_item(item: ItemData) -> Resource:
+	var preferred_kind := _preferred_source_kind_for_item(item)
+	for source in storage_sources:
+		if source == null or source.get("storage") == null:
+			continue
+		if String(source.get("source_kind")) == preferred_kind:
+			return source
+	for source in storage_sources:
+		if source != null and source.get("storage") != null:
+			return source
+	return null
+
+
+func _preferred_source_kind_for_item(item: ItemData) -> String:
+	if item == null:
+		return "temporary"
+	match item.outing_category:
+		"food":
+			return "food"
+		"medical":
+			return "medical"
+		"weapon", "tool", "special":
+			return "equipment"
+		_:
+			return "material"
 
 
 func _get_source_by_id(source_id: String) -> Resource:

@@ -156,8 +156,25 @@ func _input(event: InputEvent) -> void:
 			emit_signal("continue_requested")
 			hide_menu()
 		else:
+			if _close_world_panel_before_pause():
+				get_viewport().set_input_as_handled()
+				return
 			# 允许在测试时按 ESC 呼出菜单
 			show_menu()
+
+func _close_world_panel_before_pause() -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for node in tree.get_nodes_in_group("local_inventory_panel_host"):
+		if node == null or not is_instance_valid(node):
+			continue
+		if not node.has_method("is_local_panel_open") or not bool(node.call("is_local_panel_open")):
+			continue
+		if node.has_method("close_local_panel"):
+			node.call("close_local_panel")
+			return true
+	return false
 
 func _is_ui_text_input_focused() -> bool:
 	var viewport := get_viewport()

@@ -14,6 +14,10 @@ const PANEL_ROT_LERP_SPEED := 14.0
 const UI_TEXT_RENDER_PRIORITY := 120
 const UI_TEXT_OUTLINE_RENDER_PRIORITY := 119
 const INVENTORY_DRAG_DEBUG := false
+const HINT_LABEL_SIDE_PADDING_WORLD := 0.035
+const HINT_LABEL_BOTTOM_PADDING_WORLD := 0.028
+const HINT_OVERRIDE_EXTRA_HEIGHT_WORLD := 0.18
+const HINT_OVERRIDE_GRID_GAP_WORLD := 0.072
 
 enum PanelAnchorMode {
 	MARK_ONLY,
@@ -484,12 +488,18 @@ func _setup_hint_label_style() -> void:
 	var hint_pos := _get_hint_anchor_position() if auto_place_hint_below_second_row else (
 		_hint_label.position if has_front else (_hint_label_back.position + Vector3(0.0, 0.0, 0.0004))
 	)
+	var hint_width_pixels := _get_hint_label_width_pixels()
+	var hint_font_size := 34 if not _get_hint_text_override().is_empty() else 40
 
 	if has_back:
 		_hint_label_back.font = SLOT_FONT
-		_hint_label_back.font_size = 40
+		_hint_label_back.font_size = hint_font_size
 		_hint_label_back.pixel_size = 0.00095
 		_hint_label_back.outline_size = 10
+		_hint_label_back.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_hint_label_back.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		_hint_label_back.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_hint_label_back.width = hint_width_pixels
 		_hint_label_back.modulate = Color(0.22, 0.28, 0.38, 0.86)
 		_hint_label_back.outline_modulate = Color(0.02, 0.03, 0.05, 0.90)
 		_hint_label_back.render_priority = UI_TEXT_RENDER_PRIORITY - 1
@@ -500,9 +510,13 @@ func _setup_hint_label_style() -> void:
 
 	if has_front:
 		_hint_label.font = SLOT_FONT
-		_hint_label.font_size = 40
+		_hint_label.font_size = hint_font_size
 		_hint_label.pixel_size = 0.00095
 		_hint_label.outline_size = 8
+		_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_hint_label.width = hint_width_pixels
 		_hint_label.modulate = Color(0.88, 0.92, 0.98, 0.92)
 		_hint_label.outline_modulate = Color(0.04, 0.07, 0.12, 0.92)
 		_hint_label.render_priority = UI_TEXT_RENDER_PRIORITY
@@ -873,7 +887,13 @@ func _get_hint_anchor_position() -> Vector3:
 	var row_step: float = slot_size_world + slot_gap_world
 
 	if not _get_hint_text_override().is_empty():
-		return Vector3(-grid.x * 0.5 + slots_offset.x, -grid.y * 0.5 + slots_offset.y - slot_size_world * 0.42, 0.022)
+		return _clamp_hint_position_inside_panel(
+			Vector3(
+				-grid.x * 0.5 + slots_offset.x,
+				-grid.y * 0.5 + slots_offset.y - HINT_OVERRIDE_GRID_GAP_WORLD,
+				0.022
+			)
+		)
 
 	var second_row_y: float = grid.y * 0.5 - slot_size_world * 0.5 + slots_offset.y
 	if rows >= 2:
@@ -881,7 +901,24 @@ func _get_hint_anchor_position() -> Vector3:
 
 	var hint_y: float = second_row_y - slot_size_world * 0.86
 	var hint_x: float = -grid.x * 0.5 + slots_offset.x
-	return Vector3(hint_x, hint_y, 0.022)
+	return _clamp_hint_position_inside_panel(Vector3(hint_x, hint_y, 0.022))
+
+
+func _clamp_hint_position_inside_panel(raw_position: Vector3) -> Vector3:
+	var effective_size: Vector2 = _get_effective_panel_size()
+	var min_x := -effective_size.x * 0.5 + HINT_LABEL_SIDE_PADDING_WORLD
+	var min_y := -effective_size.y * 0.5 + HINT_LABEL_BOTTOM_PADDING_WORLD
+	return Vector3(
+		maxf(raw_position.x, min_x),
+		maxf(raw_position.y, min_y),
+		raw_position.z
+	)
+
+
+func _get_hint_label_width_pixels() -> float:
+	var effective_size: Vector2 = _get_effective_panel_size()
+	var width_world := maxf(0.1, effective_size.x - HINT_LABEL_SIDE_PADDING_WORLD * 2.0)
+	return width_world / 0.00095
 
 
 func _get_effective_panel_size() -> Vector2:
@@ -892,7 +929,8 @@ func _get_effective_panel_size() -> Vector2:
 	if slot_count <= 0:
 		slot_count = 12
 	var grid_size: Vector2 = _calculate_grid_size(slot_count)
-	return Vector2(grid_size.x + 0.09, grid_size.y + 0.09)
+	var extra_height := HINT_OVERRIDE_EXTRA_HEIGHT_WORLD if not _get_hint_text_override().is_empty() else 0.0
+	return Vector2(grid_size.x + 0.09, grid_size.y + 0.09 + extra_height)
 
 
 func _calculate_grid_size(slot_count: int) -> Vector2:

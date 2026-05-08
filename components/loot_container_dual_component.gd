@@ -32,10 +32,21 @@ var _local_panel_close_elapsed: float = 0.0
 func _ready() -> void:
 	super._ready()
 	add_to_group("loot_container_dual")
+	add_to_group("local_inventory_panel_host")
 	_ensure_local_panel_adapter()
 	_resolve_local_panel()
 	call_deferred("_connect_operate_area_signal")
 	set_process(true)
+
+
+func _input(event: InputEvent) -> void:
+	if not _local_panel_open:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		_close_local_panel()
+		var viewport := get_viewport()
+		if viewport != null:
+			viewport.set_input_as_handled()
 
 
 func _process(delta: float) -> void:
@@ -166,8 +177,15 @@ func _open_local_container_panel(player_node: Node) -> bool:
 	_local_panel_player_body = player_node as PhysicsBody3D
 	_local_panel_close_elapsed = 0.0
 	_local_panel_open = true
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	return true
+
+
+func is_local_panel_open() -> bool:
+	return _local_panel_open and _local_panel != null and is_instance_valid(_local_panel) and _local_panel.is_panel_open()
+
+
+func close_local_panel() -> void:
+	_close_local_panel()
 
 
 func _close_local_panel() -> void:
@@ -176,8 +194,6 @@ func _close_local_panel() -> void:
 	_reset_local_panel_runtime()
 	if _local_panel_adapter != null and is_instance_valid(_local_panel_adapter):
 		_local_panel_adapter.unbind_container()
-	if Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _reset_local_panel_runtime() -> void:

@@ -6,8 +6,9 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 const OUTING_MAP_SCENE_PATH := "res://levels/outing/OutingMap.tscn"
 const OUTING_RETURN_FALLBACK_SCENE_PATH := "res://levels/bunker_local_pbr.tscn"
 const TRANSITION_UI_SCENE_PATH := "res://controllers/ui/transition_screen.tscn"
-const OUTING_TRANSITION_PRESET := "a"
-const OUTING_TRANSITION_HOLD_SEC := 0.18
+const OUTING_TRANSITION_PRESET := "b"
+const OUTING_TRANSITION_HOLD_SEC := 0.48
+const OUTING_TRANSITION_WAIT_FRAMES := 3
 
 var player
 var outing_return_scene_path: String = ""
@@ -93,6 +94,22 @@ func notify_shelter_inventory_changed() -> void:
 	shelter_inventory_changed.emit()
 
 
+func build_global_save_payload() -> Dictionary:
+	return {
+		"version": 1,
+		"outing_return_scene_path": outing_return_scene_path,
+		"shelter_inventory": _build_shelter_inventory_save_payload(),
+	}
+
+
+func apply_global_save_payload(payload: Dictionary) -> void:
+	if payload.is_empty():
+		return
+	outing_return_scene_path = String(payload.get("outing_return_scene_path", "")).strip_edges()
+	if payload.has("shelter_inventory") and payload["shelter_inventory"] is Dictionary:
+		_apply_shelter_inventory_save_payload(payload["shelter_inventory"])
+
+
 func go_to_outing_map_from_current_scene() -> void:
 	if _outing_transition_busy:
 		return
@@ -107,7 +124,7 @@ func go_to_outing_map_from_current_scene() -> void:
 		outing_return_scene_path = current_path
 	elif outing_return_scene_path.strip_edges().is_empty():
 		outing_return_scene_path = OUTING_RETURN_FALLBACK_SCENE_PATH
-	await _change_scene_with_transition(OUTING_MAP_SCENE_PATH)
+	await _change_scene_with_transition(OUTING_MAP_SCENE_PATH, true)
 
 
 func return_from_outing_map() -> void:
@@ -116,12 +133,12 @@ func return_from_outing_map() -> void:
 	var target_path := outing_return_scene_path.strip_edges()
 	if target_path.is_empty() or not ResourceLoader.exists(target_path):
 		target_path = OUTING_RETURN_FALLBACK_SCENE_PATH
-	await _change_scene_with_transition(target_path)
+	await _change_scene_with_transition(target_path, false)
 	if _last_scene_change_error == OK:
 		outing_return_scene_path = ""
 
 
-func _change_scene_with_transition(scene_path: String) -> void:
+func _change_scene_with_transition(scene_path: String, release_mouse_after_load: bool = false) -> void:
 	var safe_scene_path := scene_path.strip_edges()
 	if safe_scene_path.is_empty() or not ResourceLoader.exists(safe_scene_path):
 		push_warning("Outing scene transition target not found: " + safe_scene_path)
@@ -129,14 +146,26 @@ func _change_scene_with_transition(scene_path: String) -> void:
 	_outing_transition_busy = true
 	_last_scene_change_error = OK
 	var transition_ui := _ensure_transition_ui()
-	if transition_ui != null and transition_ui.has_method("play_action_transition"):
+	if transition_ui != null and transition_ui.has_method("play_scene_transition"):
+		await transition_ui.play_scene_transition(
+			Callable(self, "_apply_pending_scene_change").bind(safe_scene_path),
+			OUTING_TRANSITION_PRESET,
+			OUTING_TRANSITION_HOLD_SEC,
+			OUTING_TRANSITION_WAIT_FRAMES,
+			Callable(self, "_after_outing_scene_change_ready").bind(release_mouse_after_load)
+		)
+	elif transition_ui != null and transition_ui.has_method("play_action_transition"):
 		await transition_ui.play_action_transition(
 			Callable(self, "_apply_pending_scene_change").bind(safe_scene_path),
 			OUTING_TRANSITION_PRESET,
 			OUTING_TRANSITION_HOLD_SEC
 		)
+		await _wait_scene_change_frames()
+		_after_outing_scene_change_ready(release_mouse_after_load)
 	else:
 		_apply_pending_scene_change(safe_scene_path)
+		await _wait_scene_change_frames()
+		_after_outing_scene_change_ready(release_mouse_after_load)
 	_outing_transition_busy = false
 
 
@@ -150,6 +179,18 @@ func _apply_pending_scene_change(scene_path: String) -> void:
 	_last_scene_change_error = tree.change_scene_to_file(_pending_scene_change_path)
 	if _last_scene_change_error != OK:
 		push_warning("Outing scene transition failed: %s (%d)" % [_pending_scene_change_path, _last_scene_change_error])
+
+
+func _after_outing_scene_change_ready(release_mouse_after_load: bool) -> void:
+	if _last_scene_change_error != OK:
+		return
+	if release_mouse_after_load:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _wait_scene_change_frames() -> void:
+	for _i in range(OUTING_TRANSITION_WAIT_FRAMES):
+		await get_tree().process_frame
 
 
 func _ensure_transition_ui() -> Node:
@@ -167,6 +208,117 @@ func _ensure_transition_ui() -> Node:
 	instance.name = "TransitionUI"
 	tree.root.add_child(instance)
 	return instance
+
+
+func _build_shelter_inventory_save_payload() -> Dictionary:
+	var inventory := get_shelter_inventory_runtime()
+	var source_payloads: Array[Dictionary] = []
+	if inventory == null:
+		return {"version": 1, "sources": source_payloads}
+	var sources: Array = inventory.get("storage_sources")
+	for source_raw in sources:
+		var source := source_raw as Resource
+		if source == null:
+			continue
+		var source_id := String(source.get("source_id")).strip_edges()
+		if source_id.is_empty():
+			continue
+		var storage := source.get("storage") as InventoryStorageResource
+		source_payloads.append({
+			"source_id": source_id,
+			"display_name": String(source.get("display_name")),
+			"source_kind": String(source.get("source_kind")),
+			"include_in_outing_pool": bool(source.get("include_in_outing_pool")),
+			"storage": _build_storage_save_payload(storage),
+		})
+	return {
+		"version": 1,
+		"sources": source_payloads,
+	}
+
+
+func _apply_shelter_inventory_save_payload(payload: Dictionary) -> void:
+	var inventory := get_shelter_inventory_runtime()
+	if inventory == null:
+		return
+	var sources_payload: Array = payload.get("sources", [])
+	for source_payload_raw in sources_payload:
+		var source_payload := source_payload_raw as Dictionary
+		if source_payload.is_empty():
+			continue
+		var source_id := String(source_payload.get("source_id", "")).strip_edges()
+		if source_id.is_empty():
+			continue
+		var source := _get_shelter_source_by_id(source_id)
+		if source == null:
+			continue
+		var storage_payload := source_payload.get("storage", {}) as Dictionary
+		var template_storage := source.get("storage") as InventoryStorageResource
+		var slot_count := int(storage_payload.get("slot_count", 0))
+		var runtime_storage := get_or_create_shelter_storage_runtime(source_id, template_storage, slot_count)
+		_apply_storage_save_payload(runtime_storage, storage_payload)
+		source.set("storage", runtime_storage)
+	shelter_inventory_changed.emit()
+
+
+func _build_storage_save_payload(storage: InventoryStorageResource) -> Dictionary:
+	var slots_payload: Array[Dictionary] = []
+	if storage == null:
+		return {"slot_count": 0, "slots": slots_payload}
+	storage.ensure_capacity()
+	for slot_index in range(storage.slot_count):
+		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
+		if slot == null or slot.is_empty() or slot.item == null:
+			continue
+		slots_payload.append({
+			"slot_id": slot_index,
+			"item_path": String(slot.item.resource_path),
+			"amount": int(slot.amount),
+		})
+	return {
+		"slot_count": int(storage.slot_count),
+		"slots": slots_payload,
+	}
+
+
+func _apply_storage_save_payload(storage: InventoryStorageResource, payload: Dictionary) -> void:
+	if storage == null:
+		return
+	var slot_count := int(payload.get("slot_count", storage.slot_count))
+	if slot_count > 0:
+		storage.slot_count = slot_count
+	storage.ensure_capacity()
+	storage.clear_all()
+	var slots_payload: Array = payload.get("slots", [])
+	for slot_payload_raw in slots_payload:
+		var slot_payload := slot_payload_raw as Dictionary
+		if slot_payload.is_empty():
+			continue
+		var slot_id := int(slot_payload.get("slot_id", -1))
+		var item_path := String(slot_payload.get("item_path", "")).strip_edges()
+		var amount := int(slot_payload.get("amount", 0))
+		if slot_id < 0 or slot_id >= storage.slot_count or item_path.is_empty() or amount <= 0:
+			continue
+		var item := load(item_path) as ItemData
+		if item == null:
+			continue
+		var slot := storage.get_slot(slot_id) as InventorySlotStackResource
+		if slot != null:
+			slot.set_stack(item, amount)
+
+
+func _get_shelter_source_by_id(source_id: String) -> Resource:
+	var inventory := get_shelter_inventory_runtime()
+	if inventory == null:
+		return null
+	var sources: Array = inventory.get("storage_sources")
+	for source_raw in sources:
+		var source := source_raw as Resource
+		if source == null:
+			continue
+		if String(source.get("source_id")).strip_edges() == source_id:
+			return source
+	return null
 
 
 func _bind_shelter_inventory_sources_to_runtime() -> void:

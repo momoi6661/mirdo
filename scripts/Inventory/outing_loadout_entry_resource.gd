@@ -55,3 +55,12 @@ func add_one_to_stack() -> bool:
 		return false
 	amount += 1
 	return true
+
+
+func remove_one_from_stack() -> bool:
+	if is_empty():
+		return false
+	amount -= 1
+	if amount <= 0:
+		clear()
+	return true

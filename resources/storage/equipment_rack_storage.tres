@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="InventoryStorageResource" format=3]
+[gd_resource type="Resource" script_class="InventoryStorageResource" format=3 uid="uid://60470e85b8p7"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/inventory_storage_resource.gd" id="1_storage_script"]
-[ext_resource type="Script" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
+[ext_resource type="Script" uid="uid://bobrl64w5up62" path="res://scripts/Inventory/inventory_storage_resource.gd" id="1_storage_script"]
+[ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
 [ext_resource type="Resource" path="res://resources/items/crowbar.tres" id="3_crowbar"]
 [ext_resource type="Resource" path="res://resources/items/flashlight.tres" id="4_flashlight"]
 [ext_resource type="Resource" path="res://resources/items/knife.tres" id="5_knife"]

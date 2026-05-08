@@ -109,6 +109,46 @@ func play_action_transition(action: Callable, preset: String = "a", hold_sec: fl
 	_set_progress(0.0)
 	transition_finished.emit()
 
+func play_scene_transition(
+	action: Callable,
+	preset: String = "a",
+	hold_sec: float = -1.0,
+	wait_frames_after_action: int = 2,
+	after_scene_ready: Callable = Callable()
+) -> void:
+	var safe_hold: float = default_hold_time if hold_sec < 0.0 else hold_sec
+	_apply_preset(preset)
+	visible = true
+	_start_time = Time.get_ticks_msec() / 1000.0
+	_is_transitioning = true
+	_is_covered = false
+
+	_play_animation("cover_in")
+	await animation_player.animation_finished
+	_is_covered = true
+	cover_reached.emit()
+
+	if action.is_valid():
+		action.call()
+
+	var frame_count := maxi(0, wait_frames_after_action)
+	for _i in range(frame_count):
+		await get_tree().process_frame
+
+	if after_scene_ready.is_valid():
+		after_scene_ready.call()
+
+	if safe_hold > 0.0:
+		await get_tree().create_timer(safe_hold).timeout
+
+	_play_animation("cover_out")
+	await animation_player.animation_finished
+	_is_transitioning = false
+	_is_covered = false
+	visible = false
+	_set_progress(0.0)
+	transition_finished.emit()
+
 func is_transitioning() -> bool:
 	return _is_transitioning
 

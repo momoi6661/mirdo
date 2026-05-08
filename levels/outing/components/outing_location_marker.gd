@@ -177,8 +177,9 @@ func _apply_rule_resource(rule: Resource) -> void:
 
 
 func _play_click_tone() -> void:
-	if click_audio == null or click_audio.stream == null or click_audio.playing:
+	if click_audio == null or click_audio.stream == null:
 		return
+	click_audio.stop()
 	click_audio.play()
 	var playback := click_audio.get_stream_playback() as AudioStreamGeneratorPlayback
 	if playback == null:

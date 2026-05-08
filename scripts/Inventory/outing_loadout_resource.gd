@@ -87,6 +87,29 @@ func remove_at(slot_index: int) -> void:
 		entry.clear()
 
 
+func remove_one_at(slot_index: int) -> void:
+	ensure_capacity()
+	if slot_index < 0 or slot_index >= entries.size():
+		return
+	var entry := entries[slot_index] as Resource
+	if entry == null:
+		return
+	if entry.has_method("remove_one_from_stack"):
+		entry.call("remove_one_from_stack")
+	else:
+		entry.clear()
+
+
+func get_total_item_count() -> int:
+	ensure_capacity()
+	var total := 0
+	for entry in entries:
+		if entry == null or entry.is_empty():
+			continue
+		total += int(entry.amount)
+	return total
+
+
 func get_selected_names() -> String:
 	ensure_capacity()
 	var names: Array[String] = []
