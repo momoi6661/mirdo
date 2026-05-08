@@ -122,6 +122,20 @@ func add_items_to_return_bag(item: ItemData, amount: int) -> int:
 	return amount - remaining
 
 
+func add_items_to_best_storage(item: ItemData, amount: int) -> int:
+	if item == null or amount <= 0:
+		return 0
+	var preferred_sources := _get_preferred_sources_for_item(item)
+	var remaining := amount
+	for source in preferred_sources:
+		if remaining <= 0:
+			break
+		remaining -= _insert_into_source_storage(source, item, remaining)
+	if remaining > 0:
+		remaining -= add_items_to_return_bag(item, remaining)
+	return amount - remaining
+
+
 func count_total_outing_items() -> int:
 	var total := 0
 	for entry in get_available_outing_entries():
@@ -140,6 +154,90 @@ func _get_first_source_for_item(item: ItemData) -> Resource:
 		if source != null and source.get("storage") != null:
 			return source
 	return null
+
+
+func _get_preferred_sources_for_item(item: ItemData) -> Array[Resource]:
+	var result: Array[Resource] = []
+	if item == null:
+		return result
+	var preferred_kinds := _preferred_source_kinds_for_item(item)
+	for source in storage_sources:
+		if source == null or source.get("storage") == null:
+			continue
+		if not preferred_kinds.has(String(source.get("source_kind"))):
+			continue
+		if _source_can_accept_item(source, item):
+			result.append(source)
+	return result
+
+
+func _preferred_source_kinds_for_item(item: ItemData) -> Array[String]:
+	if item == null:
+		return ["temporary"]
+	match item.outing_category:
+		"food":
+			return ["food"]
+		"medical":
+			return ["medical"]
+		"material":
+			return ["medical", "equipment"]
+		"weapon", "tool", "special":
+			return ["equipment"]
+		_:
+			return ["temporary"]
+
+
+func _source_can_accept_item(source: Resource, item: ItemData) -> bool:
+	if source == null or item == null:
+		return false
+	var source_id := String(source.get("source_id"))
+	var kind := String(source.get("source_kind"))
+	match kind:
+		"food":
+			return item.outing_category == "food" and item.inventory_tags.has("食品柜")
+		"medical":
+			return item.outing_category in ["medical", "material"]
+		"equipment":
+			return item.outing_category in ["weapon", "tool", "special", "material"]
+		"temporary":
+			return source_id == "temporary_return_bag"
+		_:
+			return item.outing_category == kind
+
+
+func _insert_into_source_storage(source: Resource, item: ItemData, amount: int) -> int:
+	if source == null or item == null or amount <= 0 or source.get("storage") == null:
+		return 0
+	var storage := source.get("storage") as InventoryStorageResource
+	if storage == null:
+		return 0
+	storage.ensure_capacity()
+	var remaining := amount
+	var max_stack := _get_max_stack_size(item)
+
+	for slot_index in range(storage.slot_count):
+		if remaining <= 0:
+			break
+		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
+		if slot == null or slot.is_empty() or slot.item != item:
+			continue
+		var room := maxi(0, max_stack - int(slot.amount))
+		if room <= 0:
+			continue
+		var add_amount := mini(room, remaining)
+		slot.amount += add_amount
+		remaining -= add_amount
+
+	for slot_index in range(storage.slot_count):
+		if remaining <= 0:
+			break
+		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
+		if slot == null or not slot.is_empty():
+			continue
+		var add_amount := mini(max_stack, remaining)
+		slot.set_stack(item, add_amount)
+		remaining -= add_amount
+	return amount - remaining
 
 
 func _preferred_source_kind_for_item(item: ItemData) -> String:

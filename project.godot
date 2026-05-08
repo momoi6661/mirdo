@@ -14,9 +14,10 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Basic Setup"
+config/name="24h"
 run/main_scene="uid://bghpt4tcal3g3"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
+boot_splash/bg_color=Color(0.6413866, 0.7178594, 0.8959854, 1)
 config/icon="res://icon.svg"
 
 [autoload]
@@ -33,7 +34,7 @@ window/size/always_on_top=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/hasturoperationgd/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg", "res://addons/hasturoperationgd/plugin.cfg")
 
 [input]
 
@@ -114,6 +115,7 @@ common/physics_interpolation=true
 [rendering]
 
 textures/default_filters/anisotropic_filtering_level=4
+viewport/hdr_2d=true
 anti_aliasing/quality/msaa_3d=3
 textures/default_filters/texture_mipmap_bias=-1.0
 anti_aliasing/quality/screen_space_aa=1

@@ -929,6 +929,7 @@ func _commit_loadout_to_shelter_inventory() -> Dictionary:
 			_increment_dict_count(summary["consumed_names"], item.ItemName, 1)
 	if int(summary["committed"]) > 0:
 		_notify_shelter_inventory_changed()
+		_save_after_expedition_inventory_change()
 	return summary
 
 
@@ -1020,7 +1021,7 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	var time_info := payload.get("time", {}) as Dictionary
 	var unlocked: Array = payload.get("unlocked", [])
 	var text := "[center][color=#ffb529][font_size=29]外出行动报告[/font_size][/color][/center]\n"
-	text += "[center][color=#8f8674]本次结果已写入庇护所库存，带回物资暂存在“外出带回包”。[/color][/center]\n\n"
+	text += "[center][color=#8f8674]本次结果已写入庇护所库存，并触发自动保存。[/color][/center]\n\n"
 	text += _bb_section("行动概览")
 	text += "[color=#d8c790]地点[/color]  %s    [color=#d8c790]威胁[/color]  %d/5\n" % [String(rule.get("display_name")), int(rule.get("threat_level"))]
 	text += "[color=#d8c790]耗时[/color]  总计%s（路程%s / 搜索%s）\n" % [
@@ -1046,7 +1047,7 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	if lost_count > 0:
 		text += "[color=#ff765d]外出带回包空间不足，丢失%d件。[/color]\n" % lost_count
 	else:
-		text += "[color=#9bd887]带回物资已全部放入外出带回包，回庇护所后再整理。[/color]\n"
+		text += "[color=#9bd887]带回物资已优先放入对应柜子，放不下的才进入外出带回包。[/color]\n"
 	text += "\n"
 
 	text += _bb_section("地图进展")
@@ -1130,7 +1131,9 @@ func _deposit_loot_entries(entries: Array[Dictionary]) -> Dictionary:
 		var item := entry.get("item", null) as ItemData
 		var amount := int(entry.get("amount", 0))
 		var added := 0
-		if item != null and _shelter_inventory.has_method("add_items_to_return_bag"):
+		if item != null and _shelter_inventory.has_method("add_items_to_best_storage"):
+			added = int(_shelter_inventory.call("add_items_to_best_storage", item, amount))
+		elif item != null and _shelter_inventory.has_method("add_items_to_return_bag"):
 			added = int(_shelter_inventory.call("add_items_to_return_bag", item, amount))
 		entry["added"] = added
 		entries[i] = entry
@@ -1138,7 +1141,15 @@ func _deposit_loot_entries(entries: Array[Dictionary]) -> Dictionary:
 		summary["lost"] = int(summary["lost"]) + maxi(0, amount - added)
 	if int(summary["added"]) > 0:
 		_notify_shelter_inventory_changed()
+		_save_after_expedition_inventory_change()
 	return summary
+
+
+func _save_after_expedition_inventory_change() -> void:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager == null or not save_manager.has_method("save_game"):
+		return
+	save_manager.call_deferred("save_game")
 
 
 func _format_loot_entries(entries: Array) -> String:
