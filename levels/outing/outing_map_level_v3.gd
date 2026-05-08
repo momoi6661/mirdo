@@ -42,6 +42,9 @@ const MAX_ROUND_TRIP_MINUTES := 360
 const MIN_SEARCH_MINUTES := 25
 const MAX_SEARCH_MINUTES := 120
 const UI_CLICK_AUDIO_PATH := "res://Audio/pausemenu/click2.ogg"
+const UI_HOVER_AUDIO_PATH := "res://Audio/pausemenu/hover.ogg"
+const MODAL_SHOW_TIME := 0.22
+const MODAL_HIDE_TIME := 0.14
 const LOOT_ITEM_PATHS := {
 	"default": ["res://resources/items/can_soup.tres", "res://resources/items/water_bottle.tres", "res://resources/items/duct_tape.tres"],
 	"食物": ["res://resources/items/can_soup.tres", "res://resources/items/energy_bar.tres"],
@@ -93,6 +96,7 @@ const LOOT_ITEM_PATHS := {
 @onready var close_button: Button = %CloseButton
 @onready var hint_label: Label = %HintLabel
 @onready var prepare_overlay: ColorRect = %PrepareOverlay
+@onready var prepare_panel: Control = %PreparePanel
 @onready var prepare_title_label: Label = %PrepareTitleLabel
 @onready var prepare_intro_label: Label = %PrepareIntroLabel
 @onready var base_carry_label: Label = %BaseCarryLabel
@@ -100,6 +104,7 @@ const LOOT_ITEM_PATHS := {
 @onready var loadout_grid: GridContainer = %LoadoutGrid
 @onready var capacity_label: Label = %CapacityLabel
 @onready var result_overlay: ColorRect = %ResultOverlay
+@onready var result_panel: Control = %ResultPanel
 @onready var result_label: RichTextLabel = %ResultLabel
 @onready var result_return_button: Button = %ResultReturnButton
 
@@ -121,6 +126,8 @@ var _detail_panel_tween: Tween
 var _detail_panel_base_offsets := Vector4.ZERO
 var _detail_panel_layout_captured := false
 var _ui_click_audio: AudioStreamPlayer
+var _ui_hover_audio: AudioStreamPlayer
+var _modal_tweens: Dictionary = {}
 var _expedition_resolving := false
 
 
@@ -140,6 +147,20 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_inside_tree() and map_viewport != null:
 		_sync_map()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if prepare_overlay != null and prepare_overlay.visible and not _expedition_resolving:
+			_play_ui_click()
+			_close_prepare_panel()
+			get_viewport().set_input_as_handled()
+			return
+		if result_overlay != null and result_overlay.visible and not _expedition_resolving:
+			_play_ui_click()
+			_close_result_panel()
+			get_viewport().set_input_as_handled()
+			return
 
 
 func get_location_count() -> int:
@@ -225,19 +246,35 @@ func _wire_ui() -> void:
 
 
 func _ensure_ui_click_audio() -> void:
-	if _ui_click_audio != null:
-		return
-	_ui_click_audio = AudioStreamPlayer.new()
-	_ui_click_audio.name = "OutingUIClickAudio"
-	var stream := load(UI_CLICK_AUDIO_PATH) as AudioStream
-	if stream != null:
-		_ui_click_audio.stream = stream
-	add_child(_ui_click_audio)
+	if _ui_click_audio == null:
+		_ui_click_audio = AudioStreamPlayer.new()
+		_ui_click_audio.name = "OutingUIClickAudio"
+		var click_stream := load(UI_CLICK_AUDIO_PATH) as AudioStream
+		if click_stream != null:
+			_ui_click_audio.stream = click_stream
+		add_child(_ui_click_audio)
+	if _ui_hover_audio == null:
+		_ui_hover_audio = AudioStreamPlayer.new()
+		_ui_hover_audio.name = "OutingUIHoverAudio"
+		var hover_stream := load(UI_HOVER_AUDIO_PATH) as AudioStream
+		if hover_stream != null:
+			_ui_hover_audio.stream = hover_stream
+		add_child(_ui_hover_audio)
 
 
 func _connect_button_click(button: Button, action: Callable) -> void:
 	if button == null:
 		return
+	if not bool(button.get_meta("outing_audio_feedback_connected", false)):
+		button.mouse_entered.connect(func() -> void:
+			if not button.disabled:
+				_play_ui_hover()
+		)
+		button.button_down.connect(func() -> void:
+			if not button.disabled:
+				_play_button_press_pulse(button)
+		)
+		button.set_meta("outing_audio_feedback_connected", true)
 	button.pressed.connect(func() -> void:
 		_play_ui_click()
 		action.call()
@@ -251,16 +288,84 @@ func _play_ui_click() -> void:
 	_ui_click_audio.play()
 
 
+func _play_ui_hover() -> void:
+	if _ui_hover_audio == null or _ui_hover_audio.stream == null:
+		return
+	_ui_hover_audio.stop()
+	_ui_hover_audio.play()
+
+
+func _play_button_press_pulse(button: Button) -> void:
+	if button == null or not button.is_inside_tree():
+		return
+	button.pivot_offset = button.size * 0.5
+	button.scale = Vector2.ONE
+	var tween := button.create_tween()
+	tween.tween_property(button, "scale", Vector2(0.975, 0.975), 0.045).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
 func _close_prepare_panel() -> void:
 	if _expedition_resolving:
 		return
-	prepare_overlay.visible = false
+	_hide_modal_overlay(prepare_overlay, prepare_panel)
 
 
 func _close_result_panel() -> void:
 	if _expedition_resolving:
 		return
-	result_overlay.visible = false
+	_hide_modal_overlay(result_overlay, result_panel)
+
+
+func _show_modal_overlay(overlay: CanvasItem, panel: Control) -> void:
+	if overlay == null:
+		return
+	_kill_modal_tween(overlay)
+	overlay.visible = true
+	overlay.modulate.a = 0.0
+	if panel != null:
+		panel.pivot_offset = panel.size * 0.5
+		panel.scale = Vector2(0.94, 0.94)
+		panel.modulate.a = 0.0
+	var tween := create_tween()
+	_modal_tweens[overlay] = tween
+	tween.set_parallel(true)
+	tween.tween_property(overlay, "modulate:a", 1.0, MODAL_SHOW_TIME).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if panel != null:
+		tween.tween_property(panel, "scale", Vector2.ONE, MODAL_SHOW_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(panel, "modulate:a", 1.0, MODAL_SHOW_TIME * 0.82).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+func _hide_modal_overlay(overlay: CanvasItem, panel: Control, duration: float = MODAL_HIDE_TIME) -> void:
+	if overlay == null:
+		return
+	_kill_modal_tween(overlay)
+	if not overlay.visible:
+		return
+	var tween := create_tween()
+	_modal_tweens[overlay] = tween
+	tween.set_parallel(true)
+	tween.tween_property(overlay, "modulate:a", 0.0, duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	if panel != null:
+		panel.pivot_offset = panel.size * 0.5
+		tween.tween_property(panel, "scale", Vector2(0.965, 0.965), duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tween.tween_property(panel, "modulate:a", 0.0, duration).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void:
+		overlay.visible = false
+		overlay.modulate.a = 1.0
+		if panel != null:
+			panel.scale = Vector2.ONE
+			panel.modulate.a = 1.0
+	)
+
+
+func _kill_modal_tween(overlay: CanvasItem) -> void:
+	if overlay == null or not _modal_tweens.has(overlay):
+		return
+	var tween := _modal_tweens[overlay] as Tween
+	if tween != null and tween.is_valid():
+		tween.kill()
+	_modal_tweens.erase(overlay)
 
 
 func _capture_detail_panel_layout() -> void:
@@ -592,7 +697,7 @@ func _open_prepare_panel() -> void:
 	_loadout.call("clear_all")
 	_rebuild_tool_list()
 	_update_capacity_label()
-	prepare_overlay.visible = true
+	_show_modal_overlay(prepare_overlay, prepare_panel)
 	prepare_overlay.move_to_front()
 
 
@@ -845,7 +950,7 @@ func _confirm_expedition() -> void:
 		return
 
 	_expedition_resolving = true
-	prepare_overlay.visible = false
+	_hide_modal_overlay(prepare_overlay, prepare_panel, 0.10)
 	_show_expedition_stage(rule, "出发", "正在离开庇护所，按地图路线确认往返距离……", 0.18)
 	await get_tree().create_timer(0.22).timeout
 	_show_expedition_stage(rule, "搜索", "进入目标区域，按地点规则检查高概率物资与风险事件……", 0.52)
@@ -871,6 +976,8 @@ func _confirm_expedition() -> void:
 		},
 	}
 	result_label.text = _build_expedition_result_report(payload)
+	if result_label.has_method("scroll_to_line"):
+		result_label.call("scroll_to_line", 0)
 	_loadout.call("clear_all")
 	_rebuild_tool_list()
 	_update_capacity_label()
@@ -884,7 +991,8 @@ func _confirm_expedition() -> void:
 func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: String, progress: float) -> void:
 	if result_overlay == null or result_label == null:
 		return
-	result_overlay.visible = true
+	if not result_overlay.visible:
+		_show_modal_overlay(result_overlay, result_panel)
 	result_overlay.move_to_front()
 	if result_return_button != null:
 		result_return_button.disabled = true
