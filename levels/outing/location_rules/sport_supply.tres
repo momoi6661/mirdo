@@ -14,6 +14,6 @@ discoverable = true
 start_unlocked = true
 neighbor_location_ids = PackedStringArray("garage", "clinic", "hardware_store")
 loot_bias_tags = PackedStringArray("工具", "武器零件", "罐头")
-recommended_auxiliary_tools = PackedStringArray("撬棍", "近战武器", "折叠背包")
+recommended_auxiliary_tools = PackedStringArray("撬棍", "近战武器", "地图册")
 detail_notes = PackedStringArray("入口噪声风险中等", "撬棍可提高库房收益", "可能发现更外缘的车库、诊所或五金店路线")
 ai_exploration_rule = "AI 探索叙事应围绕运动用品店、破损橱窗、货架、后仓和武器/工具零件展开。携带撬棍时允许描写打开后仓并提高工具类收益；携带近战武器时降低遭遇损伤描写。禁止生成新庇护所。成功时沿主路向外发现 garage、clinic 或 hardware_store 的路线线索。"

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShelterStorageSourceResource" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/shelter_storage_source_resource.gd" id="1_source_script"]
+[ext_resource type="Resource" path="res://resources/storage/medical_cabinet_storage.tres" id="2_storage"]
+
+[resource]
+script = ExtResource("1_source_script")
+source_id = &"medical_cabinet"
+display_name = "医疗/杂物柜"
+source_kind = "medical"
+storage = ExtResource("2_storage")
+include_in_outing_pool = true
+notes = "保留24格实体柜子，用于药品、电池、胶带等生活杂物；外出准备界面只读取库存，不允许从外出界面反向存入。"

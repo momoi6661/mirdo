@@ -7,6 +7,10 @@ class_name ItemData
 @export var ItemModelScenePath:String
 @export var MaxStackSize:int=1
 @export var consumable_effect: XiaokongStatModifier
+@export_enum("food", "medical", "material", "tool", "weapon", "special") var outing_category: String = "material"
+@export var can_take_outing: bool = false
+@export var inventory_tags: PackedStringArray = []
+@export_multiline var ai_rule_hint: String = ""
 
 var _cached_scene:PackedScene
 

@@ -23,7 +23,7 @@ config/icon="res://icon.svg"
 
 Global="*uid://dnn16irn681c1"
 SaveManager="*uid://bjtoaitqpqh4d"
-TransitionUI="*uid://dlknl2ih32w1p"
+TransitionUI="*res://controllers/ui/transition_screen.tscn"
 
 [display]
 

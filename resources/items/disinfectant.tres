@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/disinfectant_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "消毒药"
+Description = "刺鼻的消毒药水，处理脏伤口时很有用。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/disinfectant_model.tscn"
+MaxStackSize = 3
+outing_category = "medical"
+can_take_outing = true
+inventory_tags = PackedStringArray("医疗", "消毒")
+ai_rule_hint = "污水区、诊所、破旧住宅等地点受伤时可降低感染叙事风险。"

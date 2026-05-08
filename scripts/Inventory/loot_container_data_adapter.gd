@@ -76,6 +76,8 @@ func CanPickupItem(item: ItemData, amount: int = 1) -> bool:
 func can_pickup_item(item: ItemData, amount: int = 1) -> bool:
 	if item == null or amount <= 0:
 		return false
+	if not _container_can_accept_item(item):
+		return false
 	var available: int = _compute_available_space(item)
 	return available >= amount
 
@@ -85,6 +87,8 @@ func insert_item(item: ItemData, amount: int = 1) -> int:
 		return 0
 	var container := _resolve_container()
 	if container == null:
+		return 0
+	if not _container_can_accept_item(item):
 		return 0
 
 	var changed := {}
@@ -132,6 +136,8 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 	if from_slot == null or to_slot == null:
 		return 0
 	if from_slot.item == null or from_slot.amount <= 0:
+		return 0
+	if not _container_can_accept_item(from_slot.item):
 		return 0
 
 	var move_amount: int = from_slot.amount
@@ -210,6 +216,8 @@ func set_slot_data(slot_index: int, item: ItemData, amount: int) -> void:
 	if item == null or amount <= 0:
 		slot.clear()
 	else:
+		if not _container_can_accept_item(item):
+			return
 		var max_stack: int = _max_stack_size(item)
 		slot.set_stack(item, clampi(amount, 1, max_stack))
 	if ADAPTER_DEBUG:
@@ -294,6 +302,8 @@ func _compute_available_space(item: ItemData) -> int:
 	var container := _resolve_container()
 	if container == null:
 		return 0
+	if not _container_can_accept_item(item):
+		return 0
 	var total: int = 0
 	for i in range(container.container_size):
 		var slot := _get_storage_slot(i)
@@ -309,6 +319,8 @@ func _compute_available_space(item: ItemData) -> int:
 func _max_stack_size(item: ItemData) -> int:
 	if item == null:
 		return 1
+	if item.outing_category == "weapon":
+		return 1
 	var container := _resolve_container()
 	if container != null and not container.enable_item_stacking:
 		return 1
@@ -319,6 +331,15 @@ func _available_stack_space(slot: InventorySlotStackResource) -> int:
 	if slot == null or slot.item == null or slot.amount <= 0:
 		return 0
 	return maxi(0, _max_stack_size(slot.item) - slot.amount)
+
+
+func _container_can_accept_item(item: ItemData) -> bool:
+	var container := _resolve_container()
+	if container == null:
+		return false
+	if container.has_method("can_accept_item"):
+		return bool(container.call("can_accept_item", item))
+	return true
 
 
 func _notify_changed(changed_slots: Dictionary) -> void:

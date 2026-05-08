@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/knife_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "小刀"
+Description = "短刀，轻便安静，适合割绳、开包和最低限度防身。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/kenney/knife.glb"
+MaxStackSize = 1
+outing_category = "weapon"
+can_take_outing = true
+inventory_tags = PackedStringArray("武器", "轻量")
+ai_rule_hint = "低威胁遭遇时提供防身选择，也可处理绳索、包装、布料。"

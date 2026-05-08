@@ -1,7 +1,7 @@
 extends StaticBody3D
 class_name BedSleepInteractableComponent
 
-const TRANSITION_UI_SCENE: PackedScene = preload("res://controllers/ui/transition_screen.tscn")
+const TRANSITION_UI_SCENE_PATH: String = "res://controllers/ui/transition_screen.tscn"
 
 @export_category("Interaction")
 @export var interaction_enabled: bool = true
@@ -93,7 +93,11 @@ func _ensure_transition_ui() -> Node:
 	var existing: Node = tree.root.get_node_or_null("TransitionUI")
 	if existing != null:
 		return existing
-	var instance: Node = TRANSITION_UI_SCENE.instantiate()
+	var transition_scene := load(TRANSITION_UI_SCENE_PATH) as PackedScene
+	if transition_scene == null:
+		push_error("BedSleepInteractable failed to load TransitionUI scene: " + TRANSITION_UI_SCENE_PATH)
+		return null
+	var instance: Node = transition_scene.instantiate()
 	instance.name = "TransitionUI"
 	tree.root.add_child(instance)
 	return instance

@@ -10,6 +10,7 @@ class_name XiaokongFaceAnimationComponent
 @export var face_talk_blend_duration: float = 0.12
 @export_range(0.0, 1.0, 0.01) var face_expression_transition_duration: float = 0.16
 @export_range(0.05, 2.0, 0.01) var face_setup_retry_interval: float = 0.2
+@export_range(0.0, 10.0, 0.1) var face_setup_warning_delay: float = 3.0
 
 @onready var face_animation_player: AnimationPlayer = _resolve_face_animation_player()
 @onready var face_animation_tree: AnimationTree = _resolve_face_animation_tree()
@@ -55,17 +56,21 @@ var _face_talk_blend_elapsed: float = 0.0
 var _face_talk_blend_duration_runtime: float = 0.0
 var _face_setup_pending := true
 var _face_setup_retry_cooldown: float = 0.0
+var _face_setup_wait_elapsed: float = 0.0
 var _face_setup_last_issue := ""
+var _face_setup_last_issue_warned := false
 
 func _ready() -> void:
 	if face_animation_tree != null:
 		face_animation_tree.active = false
+	_face_setup_wait_elapsed = 0.0
 	_face_setup_pending = not _setup_face_animation()
 	_face_setup_retry_cooldown = 0.0
 	set_process(true)
 
 func _process(delta: float) -> void:
 	if _face_setup_pending:
+		_face_setup_wait_elapsed += delta
 		_face_setup_retry_cooldown -= delta
 		if _face_setup_retry_cooldown <= 0.0:
 			_face_setup_pending = not _setup_face_animation()
@@ -134,7 +139,10 @@ func _setup_face_animation() -> bool:
 		_report_face_setup_issue("Missing facial blink animation: %s" % String(face_blink_animation))
 		return false
 	if not _are_face_blend_shape_targets_ready():
-		_report_face_setup_issue("FaceAnimationTree is waiting for face mesh blend shapes to finish loading.")
+		_report_face_setup_issue(
+			"FaceAnimationTree is waiting for face mesh blend shapes to finish loading.",
+			_face_setup_wait_elapsed >= face_setup_warning_delay
+		)
 		return false
 
 	_current_face_expression = _resolve_initial_face_expression()
@@ -184,14 +192,21 @@ func _clear_face_runtime_links() -> void:
 	_face_talk_node = null
 	_face_blink_node = null
 
-func _report_face_setup_issue(issue: String) -> void:
+func _report_face_setup_issue(issue: String, warn: bool = true) -> void:
 	if issue.is_empty():
 		_face_setup_last_issue = ""
+		_face_setup_last_issue_warned = false
 		return
 	if issue == _face_setup_last_issue:
+		if warn and not _face_setup_last_issue_warned:
+			_face_setup_last_issue_warned = true
+			push_warning(issue)
 		return
 	_face_setup_last_issue = issue
-	push_warning(issue)
+	_face_setup_last_issue_warned = false
+	if warn:
+		_face_setup_last_issue_warned = true
+		push_warning(issue)
 
 func _are_face_blend_shape_targets_ready() -> bool:
 	if face_animation_player == null:

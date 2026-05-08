@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/bandage_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "绷带"
+Description = "干净的卷装绷带，可处理擦伤、割伤和轻度出血。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/bandage_model.tscn"
+MaxStackSize = 5
+outing_category = "medical"
+can_take_outing = true
+inventory_tags = PackedStringArray("医疗", "止血")
+ai_rule_hint = "遭遇擦伤、破窗、攀爬失败等轻伤时可用于降低后果。"

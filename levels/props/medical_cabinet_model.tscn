@@ -1,0 +1,95 @@
+[gd_scene format=3 uid="uid://cdwy1tsmmj6bi"]
+
+[sub_resource type="BoxMesh" id="Mesh_body"]
+size = Vector3(0.92, 0.82, 0.24)
+
+[sub_resource type="StandardMaterial3D" id="Mat_white"]
+albedo_color = Color(0.82, 0.87, 0.84, 1)
+metallic = 0.05
+roughness = 0.72
+
+[sub_resource type="BoxMesh" id="Mesh_door"]
+size = Vector3(0.78, 0.64, 0.045)
+
+[sub_resource type="StandardMaterial3D" id="Mat_glass"]
+transparency = 1
+albedo_color = Color(0.58, 0.82, 0.78, 0.34)
+roughness = 0.38
+
+[sub_resource type="BoxMesh" id="Mesh_trim_h"]
+size = Vector3(0.96, 0.055, 0.28)
+
+[sub_resource type="StandardMaterial3D" id="Mat_green"]
+albedo_color = Color(0.18, 0.36, 0.28, 1)
+metallic = 0.08
+roughness = 0.8
+
+[sub_resource type="BoxMesh" id="Mesh_trim_v"]
+size = Vector3(0.055, 0.82, 0.28)
+
+[sub_resource type="BoxMesh" id="Mesh_handle"]
+size = Vector3(0.055, 0.22, 0.045)
+
+[sub_resource type="BoxMesh" id="Mesh_cross_v"]
+size = Vector3(0.075, 0.28, 0.03)
+
+[sub_resource type="StandardMaterial3D" id="Mat_red"]
+albedo_color = Color(0.9, 0.05, 0.04, 1)
+emission_enabled = true
+emission = Color(0.65, 0.02, 0.02, 1)
+emission_energy_multiplier = 0.18
+
+[sub_resource type="BoxMesh" id="Mesh_cross_h"]
+size = Vector3(0.24, 0.075, 0.03)
+
+[node name="MedicalCabinetModel" type="Node3D" unique_id=1949948822]
+transform = Transform3D(0.6, 0, 0, 0, 0.6, 0, 0, 0, 0.6, 0, 0, 0)
+metadata/asset_source = "Project-authored primitive wall cabinet proxy; stable centered origin."
+metadata/asset_url = ""
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1030495916]
+mesh = SubResource("Mesh_body")
+surface_material_override/0 = SubResource("Mat_white")
+
+[node name="DoorGlass" type="MeshInstance3D" parent="." unique_id=1826290565]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.145)
+mesh = SubResource("Mesh_door")
+surface_material_override/0 = SubResource("Mat_glass")
+
+[node name="TrimTop" type="MeshInstance3D" parent="." unique_id=1359150762]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.437, -0.012)
+mesh = SubResource("Mesh_trim_h")
+surface_material_override/0 = SubResource("Mat_green")
+
+[node name="TrimBottom" type="MeshInstance3D" parent="." unique_id=1095849685]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.437, -0.012)
+mesh = SubResource("Mesh_trim_h")
+surface_material_override/0 = SubResource("Mat_green")
+
+[node name="TrimLeft" type="MeshInstance3D" parent="." unique_id=456877837]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.485, 0, -0.012)
+mesh = SubResource("Mesh_trim_v")
+surface_material_override/0 = SubResource("Mat_green")
+
+[node name="TrimRight" type="MeshInstance3D" parent="." unique_id=332259047]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 0, -0.012)
+mesh = SubResource("Mesh_trim_v")
+surface_material_override/0 = SubResource("Mat_green")
+
+[node name="Handle" type="MeshInstance3D" parent="." unique_id=2147121050]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.34, 0, -0.18)
+mesh = SubResource("Mesh_handle")
+surface_material_override/0 = SubResource("Mat_green")
+
+[node name="CrossV" type="MeshInstance3D" parent="." unique_id=1214015282]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, 0, -0.181)
+mesh = SubResource("Mesh_cross_v")
+surface_material_override/0 = SubResource("Mat_red")
+
+[node name="CrossH" type="MeshInstance3D" parent="." unique_id=1792336171]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.24, 0, -0.182)
+mesh = SubResource("Mesh_cross_h")
+surface_material_override/0 = SubResource("Mat_red")
+
+[node name="PanelAnchor" type="Marker3D" parent="." unique_id=28514744]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, -0.58)

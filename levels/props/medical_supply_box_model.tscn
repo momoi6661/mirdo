@@ -1,0 +1,70 @@
+[gd_scene load_steps=9 format=3 uid="uid://diirnt3xwmi57"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_case"]
+albedo_color = Color(0.18, 0.36, 0.24, 1)
+roughness = 0.82
+metallic = 0.08
+
+[sub_resource type="StandardMaterial3D" id="Mat_edge"]
+albedo_color = Color(0.08, 0.12, 0.09, 1)
+roughness = 0.78
+metallic = 0.12
+
+[sub_resource type="StandardMaterial3D" id="Mat_cross"]
+albedo_color = Color(0.92, 0.08, 0.06, 1)
+emission_enabled = true
+emission = Color(0.55, 0.02, 0.02, 1)
+emission_energy_multiplier = 0.2
+
+[sub_resource type="BoxMesh" id="Mesh_body"]
+size = Vector3(0.62, 0.32, 0.46)
+
+[sub_resource type="BoxMesh" id="Mesh_lid"]
+size = Vector3(0.64, 0.08, 0.48)
+
+[sub_resource type="BoxMesh" id="Mesh_handle"]
+size = Vector3(0.34, 0.08, 0.07)
+
+[sub_resource type="BoxMesh" id="Mesh_cross_v"]
+size = Vector3(0.08, 0.19, 0.018)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.66, 0.42, 0.5)
+
+[node name="MedicalSupplyBoxModel" type="Node3D" unique_id=624115412]
+metadata/asset_source = "Project-authored primitive proxy; replaces oversized tactical kit for stable origin."
+metadata/asset_url = ""
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0)
+mesh = SubResource("Mesh_body")
+surface_material_override/0 = SubResource("Mat_case")
+
+[node name="Lid" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.36, 0)
+mesh = SubResource("Mesh_lid")
+surface_material_override/0 = SubResource("Mat_edge")
+
+[node name="Handle" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.48, -0.02)
+mesh = SubResource("Mesh_handle")
+surface_material_override/0 = SubResource("Mat_edge")
+
+[node name="CrossV" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.24)
+mesh = SubResource("Mesh_cross_v")
+surface_material_override/0 = SubResource("Mat_cross")
+
+[node name="CrossH" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0.2, -0.245)
+mesh = SubResource("Mesh_cross_v")
+surface_material_override/0 = SubResource("Mat_cross")
+
+[node name="CarryAnchor" type="Marker3D" parent="." unique_id=1012221840]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52, 0)
+
+[node name="PreviewCollision" type="StaticBody3D" parent="." unique_id=1498613591]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PreviewCollision" unique_id=1955485129]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, 0)
+shape = SubResource("BoxShape3D_body")

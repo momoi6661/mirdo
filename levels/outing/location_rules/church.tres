@@ -14,6 +14,6 @@ discoverable = false
 start_unlocked = false
 neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("蜡烛", "布料", "记录")
-recommended_auxiliary_tools = PackedStringArray("手电", "口罩", "医疗包")
+recommended_auxiliary_tools = PackedStringArray("手电", "消毒药", "医疗包")
 detail_notes = PackedStringArray("西南外缘建筑", "只记录旧避难痕迹，不开放为据点", "可能找到旧记录")
 ai_exploration_rule = "AI 可以描写旧避难痕迹和记录，但必须明确这里不能成为玩家庇护所。收益偏蜡烛、布料、记录。"

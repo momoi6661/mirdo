@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/metal_pipe_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "铁管"
+Description = "一截结实铁管，笨重但威慑力不错。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/kenney/metal_pipe_proxy.glb"
+MaxStackSize = 1
+outing_category = "weapon"
+can_take_outing = true
+inventory_tags = PackedStringArray("武器", "近战")
+ai_rule_hint = "中低威胁遭遇中降低伤害概率，但会增加噪声和负重感。"

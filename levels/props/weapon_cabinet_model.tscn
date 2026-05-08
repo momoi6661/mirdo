@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://levels/props/sketchfab/weapon_cabinet_selected/weapon_locker.glb" id="1_locker"]
+
+[node name="WeaponCabinetModel" type="Node3D"]
+metadata/asset_source = "Sketchfab: Weapon Locker by Michael D. Theodore H., CC-BY-4.0"
+metadata/asset_url = "https://sketchfab.com/3d-models/weapon-locker-b394608a16714ca58799bf1cb291651e"
+
+[node name="SketchfabWeaponLocker" parent="." instance=ExtResource("1_locker")]
+transform = Transform3D(-8.2, 0, -7.168668e-07, 0, 8.2, 0, 7.168668e-07, 0, -8.2, 0, -1.025, 0)
+
+[node name="PanelAnchor" type="Marker3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 0.9659258, 0.25881904, 8.742278e-08, 0.25881904, -0.9659258, 0, 0.45, -0.62)
+

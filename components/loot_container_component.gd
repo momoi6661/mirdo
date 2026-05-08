@@ -10,6 +10,13 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 @export var initial_loot: Array[SlotConfig] = [] 
 @export var enable_item_stacking: bool = false
 @export var inventory_storage: InventoryStorageResource
+@export var allowed_item_categories: PackedStringArray = PackedStringArray()
+@export var reject_disallowed_items: bool = true
+@export var allow_incoming_items: bool = true
+
+@export_category("Shelter Inventory")
+@export var use_shelter_inventory_runtime: bool = false
+@export var shelter_source_id: StringName = &""
 
 @export_category("World Display")
 @export var world_display_enabled: bool = false
@@ -50,11 +57,26 @@ func get_prompt_text() -> String:
 	return "搜索: " + container_name
 
 func interact(_player: Node) -> void:
-	Global.open_loot_ui.emit(self)
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_signal("open_loot_ui"):
+		global_node.emit_signal("open_loot_ui", self)
 
 func notify_runtime_slots_changed() -> void:
 	_rebuild_runtime_slots_from_storage()
 	_refresh_world_display()
+	_notify_shelter_runtime_changed()
+
+
+func can_accept_item(item: ItemData) -> bool:
+	if item == null:
+		return false
+	if not allow_incoming_items:
+		return false
+	if not reject_disallowed_items:
+		return true
+	if allowed_item_categories.is_empty():
+		return true
+	return allowed_item_categories.has(item.outing_category)
 
 # ==========================================
 # 存档系统接口
@@ -106,7 +128,11 @@ func build_inventory_storage_resource() -> InventoryStorageResource:
 func apply_inventory_storage_resource(storage: InventoryStorageResource) -> void:
 	if storage == null:
 		return
-	_runtime_inventory_storage = storage.duplicate(true)
+	if _uses_shelter_runtime_storage():
+		_ensure_runtime_storage()
+		_copy_storage_contents(storage, _runtime_inventory_storage)
+	else:
+		_runtime_inventory_storage = storage.duplicate(true)
 	container_size = maxi(1, _runtime_inventory_storage.slot_count)
 	_runtime_inventory_storage.slot_count = container_size
 	_runtime_inventory_storage.ensure_capacity()
@@ -141,6 +167,14 @@ func load_container_save_data(saved_slots: Array) -> void:
 
 
 func _ensure_runtime_storage() -> void:
+	if _uses_shelter_runtime_storage():
+		var shelter_storage := _get_or_create_shelter_runtime_storage()
+		if shelter_storage != null:
+			_runtime_inventory_storage = shelter_storage
+			_runtime_inventory_storage.slot_count = maxi(1, maxi(container_size, _runtime_inventory_storage.slot_count))
+			_runtime_inventory_storage.ensure_capacity()
+			return
+
 	if _runtime_inventory_storage != null and is_instance_valid(_runtime_inventory_storage):
 		_runtime_inventory_storage.slot_count = maxi(1, container_size)
 		_runtime_inventory_storage.ensure_capacity()
@@ -189,14 +223,58 @@ func _sync_runtime_storage_from_runtime_slots() -> void:
 			stack.clear()
 			continue
 		stack.set_stack(slot.item, _normalize_slot_amount(slot.item, slot.amount))
+	_notify_shelter_runtime_changed()
 
 
 func _normalize_slot_amount(item: ItemData, amount: int) -> int:
 	if item == null or amount <= 0:
 		return 0
+	if item.outing_category == "weapon":
+		return 1
 	if not enable_item_stacking:
 		return 1
 	return clampi(amount, 1, maxi(1, item.MaxStackSize))
+
+
+func _uses_shelter_runtime_storage() -> bool:
+	return use_shelter_inventory_runtime and not String(shelter_source_id).strip_edges().is_empty()
+
+
+func _get_or_create_shelter_runtime_storage() -> InventoryStorageResource:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_method("get_or_create_shelter_storage_runtime"):
+		return null
+	return global_node.call(
+		"get_or_create_shelter_storage_runtime",
+		shelter_source_id,
+		inventory_storage,
+		container_size
+	) as InventoryStorageResource
+
+
+func _copy_storage_contents(source: InventoryStorageResource, target: InventoryStorageResource) -> void:
+	if source == null or target == null:
+		return
+	source.ensure_capacity()
+	target.slot_count = maxi(1, source.slot_count)
+	target.ensure_capacity()
+	for i in range(target.slot_count):
+		var source_slot := source.get_slot(i) as InventorySlotStackResource
+		var target_slot := target.get_slot(i) as InventorySlotStackResource
+		if target_slot == null:
+			continue
+		if source_slot == null or source_slot.is_empty():
+			target_slot.clear()
+		else:
+			target_slot.set_stack(source_slot.item, _normalize_slot_amount(source_slot.item, source_slot.amount))
+
+
+func _notify_shelter_runtime_changed() -> void:
+	if not _uses_shelter_runtime_storage():
+		return
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_method("notify_shelter_inventory_changed"):
+		global_node.call("notify_shelter_inventory_changed")
 
 func _refresh_world_display() -> void:
 	if not world_display_enabled:

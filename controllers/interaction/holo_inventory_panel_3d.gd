@@ -13,7 +13,7 @@ const PANEL_POS_LERP_SPEED := 16.0
 const PANEL_ROT_LERP_SPEED := 14.0
 const UI_TEXT_RENDER_PRIORITY := 120
 const UI_TEXT_OUTLINE_RENDER_PRIORITY := 119
-const INVENTORY_DRAG_DEBUG := true
+const INVENTORY_DRAG_DEBUG := false
 
 enum PanelAnchorMode {
 	MARK_ONLY,
@@ -72,8 +72,11 @@ enum PanelAnchorMode {
 @export var show_slot_usage_in_title: bool = false
 @export var show_title_label: bool = false
 @export var show_alt_hint_label: bool = true
+@export_multiline var hint_text_override: String = ""
 @export var auto_place_hint_below_second_row: bool = false
 @export var slots_only_mode: bool = true
+@export var allow_item_dragging: bool = true
+@export var allow_release_outside_panel: bool = true
 
 @export_category("Editor Preview")
 @export var editor_preview_enabled: bool = true
@@ -155,7 +158,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not _drag_active:
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not _drag_active and allow_item_dragging:
 			var press_hit := _get_mouse_local_hit_info(mb.position)
 			if bool(press_hit.get("hit", false)):
 				var press_local: Vector3 = press_hit.get("local", Vector3.ZERO) as Vector3
@@ -848,7 +851,16 @@ func _set_hint_text(text: String) -> void:
 
 
 func _build_hint_text() -> String:
+	var override_text := _get_hint_text_override()
+	if not override_text.is_empty():
+		return override_text
 	return "Alt: 锁定视角" if _hint_mouse_free_mode else "Alt: 自由鼠标"
+
+
+func _get_hint_text_override() -> String:
+	if hint_text_override == null:
+		return ""
+	return String(hint_text_override).strip_edges()
 
 
 func _get_hint_anchor_position() -> Vector3:
@@ -859,6 +871,9 @@ func _get_hint_anchor_position() -> Vector3:
 	var rows: int = int(ceil(float(slot_count) / float(columns)))
 	var grid: Vector2 = _calculate_grid_size(slot_count)
 	var row_step: float = slot_size_world + slot_gap_world
+
+	if not _get_hint_text_override().is_empty():
+		return Vector3(-grid.x * 0.5 + slots_offset.x, -grid.y * 0.5 + slots_offset.y - slot_size_world * 0.42, 0.022)
 
 	var second_row_y: float = grid.y * 0.5 - slot_size_world * 0.5 + slots_offset.y
 	if rows >= 2:
@@ -979,6 +994,8 @@ func _on_hit_area_input_event(_camera_node: Node, event: InputEvent, hit_positio
 
 
 func _handle_left_press(slot_index: int, shift_pressed: bool, ctrl_pressed: bool) -> void:
+	if not allow_item_dragging:
+		return
 	if _drag_active:
 		return
 	if _inventory_data == null:
@@ -1030,6 +1047,9 @@ func _release_drag_outside(pointer_screen_pos: Vector2) -> void:
 	if not _drag_active:
 		return
 	if _inventory_data == null:
+		_cancel_drag()
+		return
+	if not allow_release_outside_panel:
 		_cancel_drag()
 		return
 

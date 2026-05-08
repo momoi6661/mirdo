@@ -51,7 +51,7 @@
 extends Node
 
 const BED_SCENE := preload("res://levels/props/bunker_bed.tscn")
-const ACTOR_SCENE := preload("res://models/xiaokong/xiaokong1.tscn")
+const ACTOR_SCENE := preload("res://characters/xiaokong/xiaokong1.tscn")
 const EPSILON := 0.05
 
 var _failures: Array[String] = []
@@ -104,7 +104,7 @@ func _finish() -> void:
 extends Node
 
 const BED_SCENE := preload("res://levels/props/bunker_bed.tscn")
-const ACTOR_SCENE := preload("res://models/xiaokong/xiaokong1.tscn")
+const ACTOR_SCENE := preload("res://characters/xiaokong/xiaokong1.tscn")
 
 var _bed: Node
 var _actor: Node

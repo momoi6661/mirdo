@@ -1,0 +1,90 @@
+[gd_scene format=3 uid="uid://bwp2le0tn64sr"]
+
+[ext_resource type="PackedScene" path="res://levels/props/medical_cabinet_model.tscn" id="1_model"]
+[ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
+[ext_resource type="Resource" uid="uid://b18o68xbleb1v" path="res://resources/storage/medical_cabinet_storage.tres" id="3_storage"]
+[ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="4_panel"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="5_save"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_interact"]
+size = Vector3(1.05, 0.92, 0.34)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_operate"]
+size = Vector3(2.15, 2.4, 1.75)
+
+[sub_resource type="BoxMesh" id="Mesh_label_back"]
+size = Vector3(0.54, 0.16, 0.016)
+
+[sub_resource type="StandardMaterial3D" id="Mat_label_back"]
+transparency = 1
+albedo_color = Color(0.06, 0.11, 0.09, 0.86)
+roughness = 0.78
+
+[node name="MedicalCabinetContainer" type="Node3D" unique_id=1960761740 groups=["nav_source_bunker"]]
+
+[node name="SaveComponent" type="Node" parent="." unique_id=1656511133]
+script = ExtResource("5_save")
+
+[node name="MedicalCabinetModel" parent="." unique_id=938728664 instance=ExtResource("1_model")]
+
+[node name="InteractBody" type="StaticBody3D" parent="." unique_id=1029319306]
+script = ExtResource("2_loot_dual")
+open_option_label = "打开医疗柜"
+show_player_inventory_panel = false
+container_panel_title = "医疗柜"
+local_panel_path = NodePath("../ContainerPanel3D")
+local_panel_anchor_mark_path = NodePath("../ContainerPanelMark3D")
+operate_range_area_path = NodePath("../LootOperateArea3D")
+container_name = "医疗柜"
+container_size = 24
+interaction_time = 0.45
+enable_item_stacking = true
+inventory_storage = ExtResource("3_storage")
+allowed_item_categories = PackedStringArray("medical", "material")
+allow_incoming_items = false
+use_shelter_inventory_runtime = true
+shelter_source_id = &"medical_cabinet"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractBody" unique_id=1710191977]
+shape = SubResource("BoxShape3D_interact")
+
+[node name="ContainerPanelMark3D" type="Marker3D" parent="." unique_id=1137141726]
+transform = Transform3D(-1, 2.2626677e-08, -8.444391e-08, 0, 0.96592575, 0.258819, 8.742278e-08, 0.258819, -0.96592575, 0, 0.02, -0.62)
+
+[node name="ContainerPanel3D" parent="." unique_id=1646109924 instance=ExtResource("4_panel")]
+transform = Transform3D(-1, 3.9689112e-08, -7.789426e-08, 0, 0.8910065, 0.45399052, 8.742278e-08, 0.45399052, -0.8910065, 0, 0.02, -0.62)
+anchor_mark_path = NodePath("../ContainerPanelMark3D")
+use_anchor_mark_transform_directly = false
+panel_pitch_degrees = -12.0
+slot_columns = 6
+panel_title_text = "医疗柜"
+show_alt_hint_label = true
+hint_text_override = "只读库存：外出准备会读取这里，不能从背包拖入。"
+auto_place_hint_below_second_row = true
+allow_item_dragging = false
+allow_release_outside_panel = false
+
+[node name="LootOperateArea3D" type="Area3D" parent="." unique_id=218919176]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LootOperateArea3D" unique_id=339880647]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, -0.45)
+shape = SubResource("BoxShape3D_operate")
+
+[node name="LabelBack" type="MeshInstance3D" parent="." unique_id=1854243540]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.53, -0.19)
+visible = false
+mesh = SubResource("Mesh_label_back")
+surface_material_override/0 = SubResource("Mat_label_back")
+
+[node name="CabinetLabel3D" type="Label3D" parent="." unique_id=1460060837]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0.53, -0.205)
+billboard = 1
+no_depth_test = true
+modulate = Color(0.9, 1, 0.92, 1)
+outline_modulate = Color(0.03, 0.15, 0.08, 1)
+text = "医疗柜"
+font_size = 40
+outline_size = 7

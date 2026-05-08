@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ShelterStorageSourceResource" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/shelter_storage_source_resource.gd" id="1_source_script"]
+[ext_resource type="Resource" path="res://resources/storage/food_cabinet_storage.tres" id="2_storage"]
+
+[resource]
+script = ExtResource("1_source_script")
+source_id = &"food_cabinet"
+display_name = "食品柜"
+source_kind = "food"
+storage = ExtResource("2_storage")
+include_in_outing_pool = true
+notes = "保留16格实体柜子，用于3D空间内管理水、罐头和轻便食物。"

@@ -90,12 +90,17 @@ func execute_world_panel_option(option_id: String, _helper: Node, context: Dicti
 
 	var player_node := context.get("player", null) as Node
 
+	if not show_player_inventory_panel:
+		_open_local_container_panel(player_node)
+		return
+
 	if player_node != null and player_node.has_method("open_loot_dual_panel"):
 		player_node.call("open_loot_dual_panel", self)
 		return
 
-	if Global != null and Global.has_signal("open_loot_ui"):
-		Global.open_loot_ui.emit(self)
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_signal("open_loot_ui"):
+		global_node.emit_signal("open_loot_ui", self)
 
 
 func get_operate_range_area() -> Area3D:
@@ -130,9 +135,12 @@ func _on_operate_area_body_entered(body: Node) -> void:
 		return
 	if not body.is_in_group("Player"):
 		return
-	if Global == null or not Global.has_signal("loot_container_switch_requested"):
+	if not show_player_inventory_panel:
 		return
-	Global.emit_signal("loot_container_switch_requested", self, body)
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_signal("loot_container_switch_requested"):
+		return
+	global_node.emit_signal("loot_container_switch_requested", self, body)
 
 
 func _open_local_container_panel(player_node: Node) -> bool:

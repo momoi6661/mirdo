@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/duct_tape_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "胶带"
+Description = "宽胶带，能临时固定破损工具、封住裂缝或做简易捆扎。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/duct_tape_model.tscn"
+MaxStackSize = 4
+outing_category = "material"
+can_take_outing = true
+inventory_tags = PackedStringArray("维修", "工具辅助")
+ai_rule_hint = "可用于临时修补工具、固定物品或处理噪声来源。"

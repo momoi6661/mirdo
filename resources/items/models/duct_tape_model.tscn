@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_1"]
+albedo_color = Color(0.48, 0.48, 0.46, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_1"]
+top_radius = 0.34
+bottom_radius = 0.34
+height = 0.18
+radial_segments = 24
+
+[sub_resource type="StandardMaterial3D" id="Mat_2"]
+albedo_color = Color(0.12, 0.11, 0.1, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_2"]
+top_radius = 0.18
+bottom_radius = 0.18
+height = 0.19
+radial_segments = 24
+
+[node name="duct_tape_model" type="Node3D"]
+
+[node name="Part1" type="MeshInstance3D" parent="."]
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_1")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="Part2" type="MeshInstance3D" parent="."]
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_2")
+surface_material_override/0 = SubResource("Mat_2")

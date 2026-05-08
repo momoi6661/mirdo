@@ -29,6 +29,8 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 		return
 	if not completed_by_hold:
 		return
+	if _request_outing_map_transition():
+		return
 	outside_requested.emit()
 
 func is_interaction_enabled() -> bool:
@@ -42,6 +44,13 @@ func _resolve_target() -> Node:
 	if target == null or not is_instance_valid(target):
 		return null
 	return target
+
+func _request_outing_map_transition() -> bool:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_method("go_to_outing_map_from_current_scene"):
+		return false
+	global_node.call_deferred("go_to_outing_map_from_current_scene")
+	return true
 
 func _build_fallback_world_panel_model() -> WorldInteractionPanelModel:
 	var model := WorldInteractionPanelModel.new()

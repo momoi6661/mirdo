@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/fire_axe_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "消防斧"
+Description = "庇护所里找到的消防斧。比普通铁管更可靠，既能破拆木门，也能作为重型近战武器。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/fire_axe_model.tscn"
+MaxStackSize = 1
+outing_category = "weapon"
+can_take_outing = true
+inventory_tags = PackedStringArray("武器", "近战", "破拆", "工具")
+ai_rule_hint = "遇到木门、薄隔板、被困住的柜体或中等威胁遭遇时，消防斧可提供破拆和威慑分支；代价是噪声更高、动作更显眼。"

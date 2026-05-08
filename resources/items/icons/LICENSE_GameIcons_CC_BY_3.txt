@@ -1,0 +1,29 @@
+# Item icon source attribution
+
+The white silhouette item icons in `resources/items/icons/*.png` were rendered from the Game-icons.net SVG library, matching the existing water bottle / can icon style.
+
+Source repository: https://github.com/game-icons/icons
+Website: https://game-icons.net/
+License: CC BY 3.0 unless otherwise specified by Game-icons.net.
+
+Used icon SVGs:
+
+- `bandage_ui.png` <- `bandage-roll` by `lorc` from Game-icons.net.
+- `battery_ui.png` <- `battery-100` by `priorblue` from Game-icons.net.
+- `can_soup_ui.png` <- `soda-can` by `guard13007` from Game-icons.net.
+- `crowbar_ui.png` <- `crowbar` by `delapouite` from Game-icons.net.
+- `disinfectant_ui.png` <- `spray` by `lorc` from Game-icons.net.
+- `duct_tape_ui.png` <- `measure-tape` by `delapouite` from Game-icons.net.
+- `energy_bar_ui.png` <- `chocolate-bar` by `rihlsul` from Game-icons.net.
+- `fire_axe_ui.png` <- `fire-axe` by `lorc` from Game-icons.net.
+- `flashlight_ui.png` <- `flashlight` by `delapouite` from Game-icons.net.
+- `fuel_canister_ui.png` <- `jerrycan` by `delapouite` from Game-icons.net.
+- `knife_ui.png` <- `bowie-knife` by `lorc` from Game-icons.net.
+- `map_atlas_ui.png` <- `treasure-map` by `lorc` from Game-icons.net.
+- `medical_kit_ui.png` <- `first-aid-kit` by `delapouite` from Game-icons.net.
+- `medkit_ui.png` <- `first-aid-kit` by `delapouite` from Game-icons.net.
+- `metal_pipe_ui.png` <- `lead-pipe` by `delapouite` from Game-icons.net.
+- `painkiller_ui.png` <- `medicine-pills` by `delapouite` from Game-icons.net.
+- `portable_generator_ui.png` <- `power-generator` by `delapouite` from Game-icons.net.
+- `power_cell_ui.png` <- `energy-tank` by `delapouite` from Game-icons.net.
+- `water_bottle_ui.png` <- `water-bottle` by `delapouite` from Game-icons.net.

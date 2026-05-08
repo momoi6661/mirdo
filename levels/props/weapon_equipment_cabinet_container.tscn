@@ -1,0 +1,100 @@
+[gd_scene format=3 uid="uid://ixvh01dpgx8j"]
+
+[ext_resource type="PackedScene" path="res://levels/props/weapon_cabinet_model.tscn" id="1_model"]
+[ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
+[ext_resource type="Resource" uid="uid://c6gf1skfo2fbn" path="res://resources/storage/equipment_rack_storage.tres" id="3_storage"]
+[ext_resource type="PackedScene" uid="uid://g06rmnf0pul8" path="res://levels/props/sketchfab/weapon_cabinet_selected/weapon_locker.glb" id="3_tlubi"]
+[ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="4_panel"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="5_save"]
+[ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="11_68gf8"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tlubi"]
+size = Vector3(0.6483344, 2.05, 0.4016068)
+
+[sub_resource type="QuadMesh" id="QuadMesh_2llap"]
+size = Vector2(0.84799993, 0.344)
+
+[sub_resource type="QuadMesh" id="QuadMesh_oag48"]
+size = Vector2(0.82799995, 0.324)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_smoup"]
+size = Vector3(1.6, 2.1169922, 1.4692872)
+
+[sub_resource type="BoxMesh" id="Mesh_label_back"]
+size = Vector3(0.78, 0.18, 0.018)
+
+[sub_resource type="StandardMaterial3D" id="Mat_label_back"]
+transparency = 1
+albedo_color = Color(0.08, 0.09, 0.1, 0.88)
+roughness = 0.76
+
+[node name="WeaponEquipmentCabinetContainer" type="Node3D" unique_id=896453549 groups=["nav_source_bunker"]]
+
+[node name="SaveComponent" type="Node" parent="." unique_id=424049987]
+script = ExtResource("5_save")
+
+[node name="WeaponCabinetModel" parent="." unique_id=1956248290 instance=ExtResource("1_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0005171299, 1.0370661, 0.0016155243)
+
+[node name="InteractBody" type="StaticBody3D" parent="." unique_id=1004558451]
+script = ExtResource("2_loot_dual")
+open_option_label = "打开武器/装备柜"
+show_player_inventory_panel = false
+container_panel_title = "武器/装备柜"
+local_panel_path = NodePath("../ContainerPanel3D")
+local_panel_anchor_mark_path = NodePath("../ContainerPanelMark3D")
+operate_range_area_path = NodePath("../LootOperateArea3D")
+container_name = "武器/装备柜"
+container_size = 24
+interaction_time = 0.45
+enable_item_stacking = true
+inventory_storage = ExtResource("3_storage")
+allowed_item_categories = PackedStringArray("tool", "weapon", "special", "material")
+allow_incoming_items = false
+use_shelter_inventory_runtime = true
+shelter_source_id = &"equipment_rack"
+
+[node name="AutoModelCollision_Bounds" type="CollisionShape3D" parent="InteractBody" unique_id=130240371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0005171597, 1.0370661, -0.10739103)
+shape = SubResource("BoxShape3D_tlubi")
+metadata/auto_generated_model_collision = true
+
+[node name="ContainerPanelMark3D" type="Marker3D" parent="." unique_id=87030386]
+transform = Transform3D(-1, 1.5180804e-08, -8.609462e-08, 0, 0.98480767, 0.17364818, 8.742278e-08, 0.17364816, -0.9848077, 0, 1.18, -0.5)
+
+[node name="ContainerPanel3D" parent="." unique_id=521261169 instance=ExtResource("4_panel")]
+transform = Transform3D(-1, 1.5180806e-08, -8.609463e-08, 0, 0.9848078, 0.17364818, 8.742278e-08, 0.17364818, -0.9848078, 0, 1.18, -0.5)
+anchor_mark_path = NodePath("../ContainerPanelMark3D")
+panel_pitch_degrees = 0.0
+slot_columns = 6
+panel_title_text = "装备柜"
+show_alt_hint_label = true
+hint_text_override = "只读库存：外出准备会读取这里，不能从背包拖入。"
+auto_place_hint_below_second_row = true
+allow_item_dragging = false
+allow_release_outside_panel = false
+
+[node name="LootOperateArea3D" type="Area3D" parent="." unique_id=1363270931]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LootOperateArea3D" unique_id=1915422499]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0665039, -0.6363525)
+shape = SubResource("BoxShape3D_smoup")
+
+[node name="LabelBack" type="MeshInstance3D" parent="." unique_id=961292293]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, -0.31)
+visible = false
+mesh = SubResource("Mesh_label_back")
+surface_material_override/0 = SubResource("Mat_label_back")
+
+[node name="CabinetLabel3D" type="Label3D" parent="." unique_id=182150300]
+transform = Transform3D(0.62, 0, 0, 0, 0.62, 0, 0, 0, 0.62, 0, 2.2, -0.325)
+billboard = 1
+no_depth_test = true
+modulate = Color(1, 0.95, 0.82, 1)
+outline_modulate = Color(0.18, 0.09, 0.02, 1)
+text = "装备柜"
+font_size = 42
+outline_size = 7

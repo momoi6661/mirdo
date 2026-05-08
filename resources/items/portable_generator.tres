@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/portable_generator_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "便携发电机"
+Description = "小型应急发电机，能为外出据点、照明或电动工具提供临时电力。体积大，一般只带一台。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/energy/portable_generator_model.tscn"
+MaxStackSize = 1
+outing_category = "tool"
+can_take_outing = true
+inventory_tags = PackedStringArray("能源", "发电机", "电力", "工具")
+ai_rule_hint = "AI规则提示：作为外出辅助物资评估；根据地点是否缺电、需要照明、医疗或能源启动来决定价值。"

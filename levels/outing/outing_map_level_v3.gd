@@ -31,6 +31,16 @@ const LOCATION_RULE_PATHS := [
 ]
 const UNLOCK_LINK_DIR := "res://levels/outing/unlock_links"
 const DEFAULT_PROGRESS_PATH := "res://levels/outing/state/outing_map_progress_default.tres"
+const SHELTER_INVENTORY_PATH := "res://resources/storage/shelter_inventory_default.tres"
+const OUTING_LOADOUT_PATH := "res://resources/storage/outing_loadout_default.tres"
+const OUTING_LOADOUT_CAPACITY := 12
+const SHELTER_INVENTORY_SCRIPT := preload("res://scripts/Inventory/shelter_inventory_resource.gd")
+const OUTING_LOADOUT_SCRIPT := preload("res://scripts/Inventory/outing_loadout_resource.gd")
+const TRAVEL_MAP_UNITS_PER_MINUTE := 5.0
+const MIN_ROUND_TRIP_MINUTES := 30
+const MAX_ROUND_TRIP_MINUTES := 360
+const MIN_SEARCH_MINUTES := 25
+const MAX_SEARCH_MINUTES := 120
 
 @onready var map_viewport: Control = %MapViewport
 @onready var map_world: Control = %MapWorld
@@ -49,7 +59,10 @@ const DEFAULT_PROGRESS_PATH := "res://levels/outing/state/outing_map_progress_de
 @onready var hint_label: Label = %HintLabel
 @onready var prepare_overlay: ColorRect = %PrepareOverlay
 @onready var prepare_title_label: Label = %PrepareTitleLabel
+@onready var prepare_intro_label: Label = %PrepareIntroLabel
+@onready var base_carry_label: Label = %BaseCarryLabel
 @onready var tool_list: VBoxContainer = %ToolList
+@onready var loadout_grid: GridContainer = %LoadoutGrid
 @onready var capacity_label: Label = %CapacityLabel
 @onready var result_overlay: ColorRect = %ResultOverlay
 @onready var result_label: RichTextLabel = %ResultLabel
@@ -64,8 +77,9 @@ var _unlock_links: Array[Resource] = []
 var _progress: Resource
 var _unlocked_ids: Dictionary = {}
 var _marker_nodes: Dictionary = {}
-var _tools: Array[Dictionary] = []
-var _selected_tools: Dictionary = {}
+var _shelter_inventory: Resource
+var _loadout: Resource
+var _available_entries: Array[Dictionary] = []
 var _ui_wired := false
 var _detail_panel_tween: Tween
 var _detail_panel_base_offsets := Vector4.ZERO
@@ -76,7 +90,7 @@ func _ready() -> void:
 	_load_location_rules()
 	_load_unlock_links()
 	_load_progress_state()
-	_seed_tools()
+	_load_shelter_inventory()
 	_wire_ui()
 	_capture_detail_panel_layout()
 	_rebuild_markers()
@@ -279,17 +293,24 @@ func _load_progress_state() -> void:
 			_unlocked_ids[String(rule.get("location_id"))] = true
 
 
-func _seed_tools() -> void:
-	_tools = [
-		{"id": "crowbar", "name": "撬棍", "kind": "tool", "cost": 2, "effect": "打开卷帘门、库房和车库箱体"},
-		{"id": "flashlight", "name": "手电", "kind": "tool", "cost": 1, "effect": "降低室内搜索遗漏"},
-		{"id": "knife", "name": "小刀", "kind": "weapon", "cost": 1, "effect": "轻量防身"},
-		{"id": "melee_weapon", "name": "近战武器", "kind": "weapon", "cost": 2, "effect": "降低中低威胁伤害"},
-		{"id": "sidearm", "name": "手枪", "kind": "weapon", "cost": 3, "effect": "高威胁威慑；后续接弹药资源"},
-		{"id": "medkit", "name": "医疗包", "kind": "support", "cost": 2, "effect": "事故容错"},
-		{"id": "field_bag", "name": "折叠背包", "kind": "support", "cost": 1, "effect": "后续提高携回上限"},
-		{"id": "mask", "name": "口罩", "kind": "support", "cost": 1, "effect": "降低粉尘/感染风险"},
-	]
+func _load_shelter_inventory() -> void:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_method("get_shelter_inventory_runtime"):
+		_shelter_inventory = global_node.call("get_shelter_inventory_runtime") as Resource
+	var shelter: Resource = load(SHELTER_INVENTORY_PATH) as Resource
+	if _shelter_inventory == null and shelter != null:
+		_shelter_inventory = shelter.duplicate(true) as Resource
+	if _shelter_inventory == null:
+		_shelter_inventory = SHELTER_INVENTORY_SCRIPT.new() as Resource
+
+	var loadout_resource: Resource = load(OUTING_LOADOUT_PATH) as Resource
+	if loadout_resource != null:
+		_loadout = loadout_resource.duplicate(true) as Resource
+	if _loadout == null:
+		_loadout = OUTING_LOADOUT_SCRIPT.new() as Resource
+	_loadout.set("slot_count", OUTING_LOADOUT_CAPACITY)
+	_loadout.call("ensure_capacity")
+	_loadout.call("clear_all")
 
 
 func _center_on_bunker() -> void:
@@ -409,7 +430,10 @@ func _update_detail_card() -> void:
 	focus_label.text = "探索重点  ·  %s" % _get_focus_summary(rule)
 	for child in detail_list.get_children():
 		child.queue_free()
-	_add_detail("预计耗时", _format_duration(rule.get("travel_minutes")))
+	_add_detail("距离", _format_distance(_get_location_distance_from_bunker(rule)))
+	_add_detail("往返路程", _format_duration(_get_round_trip_minutes(rule)))
+	_add_detail("现场搜索", _format_duration(_get_search_minutes(rule)))
+	_add_detail("预计总耗时", _format_duration(_get_total_expedition_minutes(rule)))
 	_add_detail("高概率收获", " / ".join(Array(rule.get("loot_bias_tags"))))
 	_add_detail("推荐辅助", " / ".join(Array(rule.get("recommended_auxiliary_tools"))))
 	for note in rule.get("detail_notes"):
@@ -473,7 +497,16 @@ func _open_prepare_panel() -> void:
 	if rule == null or String(rule.get("location_id")) == "bunker":
 		return
 	prepare_title_label.text = "准备外出：" + rule.get("display_name")
-	_selected_tools.clear()
+	if prepare_intro_label != null:
+		prepare_intro_label.text = "从庇护所统一物资里挑选本次装备。左侧是可携带物资，带★的是该地点推荐；中间12格是本次出发栏。"
+	if base_carry_label != null:
+		base_carry_label.text = "推荐：%s    预计：路程%s + 搜索%s = 总计%s" % [
+			_format_recommended_tools(rule),
+			_format_duration(_get_round_trip_minutes(rule)),
+			_format_duration(_get_search_minutes(rule)),
+			_format_duration(_get_total_expedition_minutes(rule)),
+		]
+	_loadout.call("clear_all")
 	_rebuild_tool_list()
 	_update_capacity_label()
 	prepare_overlay.visible = true
@@ -483,64 +516,204 @@ func _open_prepare_panel() -> void:
 func _rebuild_tool_list() -> void:
 	for child in tool_list.get_children():
 		child.queue_free()
-	var recommended := Array(_get_selected_rule().get("recommended_auxiliary_tools"))
-	for tool in _tools:
+	_available_entries = _shelter_inventory.call("get_available_outing_entries") if _shelter_inventory != null else []
+	var recommended := Array(_get_selected_rule().get("recommended_auxiliary_tools")) if _get_selected_rule() != null else []
+	for entry in _available_entries:
+		var item := entry.get("item", null) as ItemData
+		if item == null:
+			continue
+		var entry_key := String(entry.get("key", ""))
+		var remaining: int = int(entry.get("amount", 0)) - int(_loadout.call("get_selected_count_for_source_key", entry_key))
 		var row := Button.new()
-		var tool_id := String(tool.get("id", ""))
-		var prefix := "★ " if recommended.has(String(tool.get("name", ""))) else "  "
-		row.text = "%s%s  [%s / %d格]  %s" % [prefix, tool.get("name", ""), tool.get("kind", "tool"), int(tool.get("cost", 1)), tool.get("effect", "")]
-		row.toggle_mode = true
-		row.custom_minimum_size = Vector2(0, 44)
+		var prefix := "★ " if _is_recommended_item(item, recommended) else "＋ "
+		row.text = "%s%s x%d\n%s · %s" % [
+			prefix,
+			item.ItemName,
+			maxi(0, remaining),
+			_category_label(item.outing_category),
+			String(entry.get("source_name", "储物点"))
+		]
+		row.icon = item.Icon
+		row.expand_icon = true
+		row.disabled = remaining <= 0 or int(_loadout.call("get_used_slots")) >= OUTING_LOADOUT_CAPACITY
+		row.custom_minimum_size = Vector2(0, 56)
 		row.add_theme_stylebox_override("normal", _style(Color(0.10, 0.095, 0.08, 0.94), Color(0.30, 0.28, 0.22), 8, 1))
 		row.add_theme_stylebox_override("hover", _style(Color(0.16, 0.13, 0.085, 0.98), Color(1.0, 0.70, 0.14), 8, 2))
 		row.add_theme_stylebox_override("pressed", _style(Color(0.26, 0.18, 0.07, 0.98), Color(1.0, 0.75, 0.14), 8, 2))
 		row.add_theme_stylebox_override("focus", _style(Color(0.16, 0.13, 0.085, 0.98), Color(1.0, 0.70, 0.14), 8, 2))
 		row.add_theme_color_override("font_color", Color(0.91, 0.87, 0.78))
-		row.pressed.connect(_toggle_tool.bind(tool_id, row))
+		row.pressed.connect(_add_loadout_entry.bind(entry_key))
 		tool_list.add_child(row)
+	_rebuild_loadout_grid()
 
 
-func _toggle_tool(tool_id: String, button: Button) -> void:
-	if button.button_pressed:
-		_selected_tools[tool_id] = true
-	else:
-		_selected_tools.erase(tool_id)
-	if _get_capacity_used() > 8:
-		_selected_tools.erase(tool_id)
-		button.button_pressed = false
+func _add_loadout_entry(entry_key: String) -> void:
+	if _loadout == null or _shelter_inventory == null:
+		return
+	if int(_loadout.call("get_used_slots")) >= OUTING_LOADOUT_CAPACITY:
+		return
+	var entry: Dictionary = _shelter_inventory.call("get_entry_by_key", entry_key)
+	if entry.is_empty():
+		return
+	var remaining: int = int(entry.get("amount", 0)) - int(_loadout.call("get_selected_count_for_source_key", entry_key))
+	if remaining <= 0:
+		return
+	_loadout.call("add_from_entry", entry)
+	_rebuild_tool_list()
 	_update_capacity_label()
 
 
+func _remove_loadout_slot(slot_index: int) -> void:
+	if _loadout == null:
+		return
+	_loadout.call("remove_at", slot_index)
+	_rebuild_tool_list()
+	_update_capacity_label()
+
+
+func _rebuild_loadout_grid() -> void:
+	if loadout_grid == null or _loadout == null:
+		return
+	for child in loadout_grid.get_children():
+		child.queue_free()
+	_loadout.call("ensure_capacity")
+	var entries: Array = _loadout.get("entries")
+	var slot_count: int = int(_loadout.get("slot_count"))
+	for i in range(slot_count):
+		var entry := entries[i] as Resource
+		var slot_button := Button.new()
+		slot_button.custom_minimum_size = Vector2(118, 58)
+		slot_button.add_theme_stylebox_override("normal", _style(Color(0.075, 0.070, 0.062, 0.96), Color(0.38, 0.34, 0.26), 10, 1))
+		slot_button.add_theme_stylebox_override("hover", _style(Color(0.16, 0.12, 0.08, 0.98), Color(1.0, 0.70, 0.16), 10, 2))
+		slot_button.add_theme_stylebox_override("pressed", _style(Color(0.24, 0.16, 0.07, 1.0), Color(1.0, 0.74, 0.14), 10, 2))
+		slot_button.add_theme_stylebox_override("focus", _style(Color(0.16, 0.12, 0.08, 0.98), Color(1.0, 0.70, 0.16), 10, 2))
+		slot_button.add_theme_color_override("font_color", Color(0.90, 0.86, 0.76))
+		if entry == null or entry.is_empty():
+			slot_button.text = "%02d\n空" % [i + 1]
+			slot_button.disabled = true
+		else:
+			var entry_item := entry.get("item") as ItemData
+			var amount_text := " x%d" % int(entry.amount) if int(entry.amount) > 1 else ""
+			slot_button.text = "%02d\n%s%s" % [i + 1, entry_item.ItemName, amount_text]
+			slot_button.icon = entry_item.Icon
+			slot_button.expand_icon = true
+			slot_button.tooltip_text = "来自：%s；数量：%d；点击移除整格" % [entry.source_name, int(entry.amount)]
+			slot_button.pressed.connect(_remove_loadout_slot.bind(i))
+		loadout_grid.add_child(slot_button)
+
+
 func _get_capacity_used() -> int:
-	var used := 2
-	for tool in _tools:
-		if _selected_tools.has(String(tool.get("id", ""))):
-			used += int(tool.get("cost", 1))
-	return used
+	if _loadout == null:
+		return 0
+	return int(_loadout.call("get_used_slots"))
 
 
 func _update_capacity_label() -> void:
-	capacity_label.text = "携带容量：%d / 8    已选辅助：%s" % [_get_capacity_used(), _get_selected_tool_names()]
+	var available_count: int = int(_shelter_inventory.call("count_total_outing_items")) if _shelter_inventory != null else 0
+	capacity_label.text = "携带栏：%d / %d    庇护所可携带物资：%d    已选：%s" % [_get_capacity_used(), OUTING_LOADOUT_CAPACITY, available_count, _get_selected_tool_names()]
 
 
 func _get_selected_tool_names() -> String:
-	var names: Array[String] = []
-	for tool in _tools:
-		if _selected_tools.has(String(tool.get("id", ""))):
-			names.append(String(tool.get("name", "")))
-	return "无" if names.is_empty() else " / ".join(names)
+	return "无" if _loadout == null else String(_loadout.call("get_selected_names"))
+
+
+func _is_recommended_item(item: ItemData, recommended: Array) -> bool:
+	if item == null:
+		return false
+	if recommended.has(item.ItemName):
+		return true
+	for tag in item.inventory_tags:
+		if recommended.has(String(tag)):
+			return true
+	if item.outing_category == "tool" and recommended.has("工具"):
+		return true
+	if item.outing_category == "weapon" and recommended.has("近战武器"):
+		return true
+	if item.outing_category == "medical" and recommended.has("医疗包"):
+		return true
+	return false
+
+
+func _category_label(category: String) -> String:
+	match category:
+		"food":
+			return "补给"
+		"medical":
+			return "医疗"
+		"material":
+			return "材料"
+		"tool":
+			return "工具"
+		"weapon":
+			return "武器"
+		"special":
+			return "特殊"
+		_:
+			return "物资"
+
+
+func _commit_loadout_to_shelter_inventory() -> Dictionary:
+	var summary := {
+		"committed": 0,
+		"returned": 0,
+		"consumed": 0,
+	}
+	if _loadout == null or _shelter_inventory == null:
+		return summary
+	var commit_entries: Array = _loadout.call("get_commit_entries")
+	for commit_entry_raw in commit_entries:
+		var commit_entry := commit_entry_raw as Dictionary
+		var source_key := String(commit_entry.get("source_key", ""))
+		var item := commit_entry.get("item", null) as ItemData
+		if source_key.is_empty() or item == null:
+			continue
+		if not bool(_shelter_inventory.call("remove_one_from_entry", source_key)):
+			continue
+		summary["committed"] = int(summary["committed"]) + 1
+		if _should_return_carried_item(item):
+			if bool(_shelter_inventory.call("add_one_to_entry", source_key, item)):
+				summary["returned"] = int(summary["returned"]) + 1
+			else:
+				summary["consumed"] = int(summary["consumed"]) + 1
+		else:
+			summary["consumed"] = int(summary["consumed"]) + 1
+	if int(summary["committed"]) > 0:
+		var global_node := get_node_or_null("/root/Global")
+		if global_node != null and global_node.has_method("notify_shelter_inventory_changed"):
+			global_node.call("notify_shelter_inventory_changed")
+	return summary
+
+
+func _should_return_carried_item(item: ItemData) -> bool:
+	if item == null:
+		return false
+	return item.outing_category in ["weapon", "tool", "special"]
 
 
 func _confirm_expedition() -> void:
 	var rule := _get_selected_rule()
 	prepare_overlay.visible = false
+	var carried_items := _get_selected_tool_names()
+	var commit_summary := _commit_loadout_to_shelter_inventory()
 	var unlocked_text := _unlock_neighbors(rule) if rule.get("discoverable") else ""
 	result_label.text = "[center][color=#ffb529][font_size=28]外出结算[/font_size][/color][/center]\n\n"
-	result_label.text += "地点：%s\n耗时：%s\n携带辅助：%s\n\n" % [rule.get("display_name"), _format_duration(rule.get("travel_minutes")), _get_selected_tool_names()]
-	result_label.text += "AI规则摘要：%s\n\n" % _shorten(rule.get("ai_exploration_rule"), 126)
+	result_label.text += "地点：%s\n耗时：%s（路程%s / 搜索%s）\n携带物资：%s\n" % [
+		rule.get("display_name"),
+		_format_duration(_get_total_expedition_minutes(rule)),
+		_format_duration(_get_round_trip_minutes(rule)),
+		_format_duration(_get_search_minutes(rule)),
+		carried_items,
+	]
+	result_label.text += "从庇护所库存取出：%d 件；返程归还：%d 件；本次消耗：%d 件\n" % [
+		int(commit_summary.get("committed", 0)),
+		int(commit_summary.get("returned", 0)),
+		int(commit_summary.get("consumed", 0)),
+	]
+	result_label.text += "规则：武器/工具/特殊装备默认归还，食品/医疗/材料按本次外出消耗。\n\n"
 	result_label.text += "获得：%s\n" % _mock_loot_for_location(rule)
 	result_label.text += "外缘发现：暂无\n" if unlocked_text.is_empty() else "[color=#ffd447]沿道路向外发现：%s[/color]\n" % unlocked_text
 	result_label.text += "\n结算完成后仍返回唯一庇护所：地下庇护所。"
+	_loadout.call("clear_all")
 	_sync_map()
 	result_overlay.visible = true
 	result_overlay.move_to_front()
@@ -583,6 +756,10 @@ func _mock_loot_for_location(rule: Resource) -> String:
 
 
 func _return_to_bunker() -> void:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_method("return_from_outing_map"):
+		global_node.call_deferred("return_from_outing_map")
+		return
 	if ResourceLoader.exists(BUNKER_SCENE_PATH):
 		get_tree().change_scene_to_file(BUNKER_SCENE_PATH)
 
@@ -615,6 +792,56 @@ func _is_location_unlocked(location_id: String) -> bool:
 
 func _format_duration(minutes_total: int) -> String:
 	return "%02d:%02d" % [minutes_total / 60, minutes_total % 60]
+
+
+func _get_location_distance_from_bunker(rule: Resource) -> float:
+	if rule == null:
+		return 0.0
+	var bunker_position := _get_location_map_position("bunker")
+	var location_position: Vector2 = rule.get("map_position")
+	if String(rule.get("location_id")) == "bunker":
+		return 0.0
+	if location_position == Vector2.ZERO:
+		location_position = _get_location_map_position(String(rule.get("location_id")))
+	return bunker_position.distance_to(location_position)
+
+
+func _get_round_trip_minutes(rule: Resource) -> int:
+	var distance := _get_location_distance_from_bunker(rule)
+	if distance <= 0.0:
+		return 0
+	var minutes := int(round((distance / TRAVEL_MAP_UNITS_PER_MINUTE) * 2.0))
+	return clampi(minutes, MIN_ROUND_TRIP_MINUTES, MAX_ROUND_TRIP_MINUTES)
+
+
+func _get_search_minutes(rule: Resource) -> int:
+	if rule == null:
+		return 0
+	var base_minutes := int(rule.get("travel_minutes"))
+	var threat_bonus := int(rule.get("threat_level")) * 5
+	var search_minutes := int(round(float(base_minutes) * 0.28)) + threat_bonus
+	return clampi(search_minutes, MIN_SEARCH_MINUTES, MAX_SEARCH_MINUTES)
+
+
+func _get_total_expedition_minutes(rule: Resource) -> int:
+	return _get_round_trip_minutes(rule) + _get_search_minutes(rule)
+
+
+func _format_distance(distance: float) -> String:
+	if distance <= 0.0:
+		return "庇护所"
+	if distance < 350.0:
+		return "近距离 · %.0f 地图单位" % distance
+	if distance < 800.0:
+		return "中距离 · %.0f 地图单位" % distance
+	return "远距离 · %.0f 地图单位" % distance
+
+
+func _format_recommended_tools(rule: Resource) -> String:
+	if rule == null:
+		return "无"
+	var recommended := Array(rule.get("recommended_auxiliary_tools"))
+	return "无" if recommended.is_empty() else " / ".join(recommended)
 
 
 func _shorten(text: String, max_length: int) -> String:

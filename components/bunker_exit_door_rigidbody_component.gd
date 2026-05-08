@@ -37,4 +37,13 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 		return
 	if not completed_by_hold:
 		return
+	if _request_outing_map_transition():
+		return
 	outside_requested.emit()
+
+func _request_outing_map_transition() -> bool:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_method("go_to_outing_map_from_current_scene"):
+		return false
+	global_node.call_deferred("go_to_outing_map_from_current_scene")
+	return true

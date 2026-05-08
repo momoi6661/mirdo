@@ -38,6 +38,8 @@ static func transfer_between_storages(
 	var target_amount: int = int(target_before.get("amount", 0))
 	if source_item == null or source_amount <= 0:
 		return 0
+	if not storage_can_accept_item(target_storage, source_item):
+		return 0
 
 	var move_amount: int = mini(requested_amount, source_amount)
 	var moved: int = 0
@@ -60,6 +62,8 @@ static func transfer_between_storages(
 		target_after = _make_slot_dict(source_item, target_amount + moved)
 	else:
 		if move_amount < source_amount:
+			return 0
+		if not storage_can_accept_item(source_storage, target_item):
 			return 0
 		if target_amount > get_storage_max_stack_for_item(source_storage, target_item):
 			return 0
@@ -166,6 +170,8 @@ static func drop_from_source(source_storage: Object, from_slot: int, requested_a
 static func get_storage_max_stack_for_item(storage: Object, item: ItemData) -> int:
 	if item == null:
 		return 1
+	if item.outing_category == "weapon":
+		return 1
 	if storage == null:
 		return 1
 
@@ -181,6 +187,24 @@ static func get_storage_max_stack_for_item(storage: Object, item: ItemData) -> i
 			return 1
 
 	return maxi(1, item.MaxStackSize)
+
+
+static func storage_can_accept_item(storage: Object, item: ItemData) -> bool:
+	if item == null:
+		return false
+	if storage == null:
+		return false
+
+	if storage.has_method("can_accept_item"):
+		return bool(storage.call("can_accept_item", item))
+
+	if storage is LootContainerDataAdapter:
+		var adapter := storage as LootContainerDataAdapter
+		var container := adapter.get_bound_container()
+		if container != null and container.has_method("can_accept_item"):
+			return bool(container.call("can_accept_item", item))
+
+	return true
 
 
 static func _supports_slot_access(storage: Object) -> bool:

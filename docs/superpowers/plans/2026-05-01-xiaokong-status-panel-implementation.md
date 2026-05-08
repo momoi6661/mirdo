@@ -283,7 +283,7 @@ xiaokong_status_panel = NodePath("../xiaokong/StatusPanel")
 
 - [ ] **Step 4: 运行场景检查跟随与位置可调**
 
-Run: 打开 `res://models/xiaokong/xiaokong1.tscn` 和主场景，拖动 `StatusAnchor` 位置。
+Run: 打开 `res://characters/xiaokong/xiaokong1.tscn` 和主场景，拖动 `StatusAnchor` 位置。
 Expected: 面板出现位置跟着 `StatusAnchor` 变化，不需要改脚本常量。
 
 - [ ] **Step 5: Commit**

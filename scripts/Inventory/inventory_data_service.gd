@@ -346,6 +346,8 @@ func _is_valid_slot(slot_index: int) -> bool:
 func _max_stack_size(item: ItemData) -> int:
 	if item == null:
 		return 1
+	if item.outing_category == "weapon":
+		return 1
 	if not enable_item_stacking:
 		return 1
 	return maxi(1, item.MaxStackSize)

@@ -2,8 +2,7 @@ extends CanvasLayer
 
 const MIN_TIME: float = 0.35
 const DEFAULT_HOLD_TIME: float = 0.18
-
-const TRANSITION_SCENE: PackedScene = preload("res://controllers/ui/transition_screen.tscn")
+const TRANSITION_SCENE_PATH: String = "res://controllers/ui/transition_screen.tscn"
 
 signal cover_reached
 signal transition_finished
@@ -32,7 +31,11 @@ static func ensure_global_instance() -> Node:
 	var existing: Node = tree.root.get_node_or_null("TransitionUI")
 	if existing != null:
 		return existing
-	var instance: Node = TRANSITION_SCENE.instantiate()
+	var transition_scene := load(TRANSITION_SCENE_PATH) as PackedScene
+	if transition_scene == null:
+		push_error("TransitionUI scene load failed: " + TRANSITION_SCENE_PATH)
+		return null
+	var instance: Node = transition_scene.instantiate()
 	instance.name = "TransitionUI"
 	tree.root.add_child(instance)
 	return instance

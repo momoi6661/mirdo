@@ -14,6 +14,6 @@ discoverable = false
 start_unlocked = false
 neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("食物", "种子", "工具")
-recommended_auxiliary_tools = PackedStringArray("折叠背包", "近战武器", "手电")
+recommended_auxiliary_tools = PackedStringArray("地图册", "近战武器", "手电")
 detail_notes = PackedStringArray("东南外缘补给点", "收益偏食物和种子", "空旷但撤退路线长")
 ai_exploration_rule = "AI 应生成郊边市场、装卸棚、塑料箱和食物残留。强调路程远和搬运限制；不能生成新庇护所。"

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemData" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" path="res://resources/items/icons/painkiller_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "止痛药"
+Description = "少量止痛药片，能让伤痛不至于立刻拖垮行动。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://resources/items/models/painkiller_model.tscn"
+MaxStackSize = 3
+outing_category = "medical"
+can_take_outing = true
+inventory_tags = PackedStringArray("医疗", "疼痛控制")
+ai_rule_hint = "受伤后仍需完成撤离时可降低行动惩罚，但不能替代正式治疗。"

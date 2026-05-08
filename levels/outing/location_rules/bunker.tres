@@ -13,7 +13,8 @@ travel_minutes = 0
 discoverable = false
 start_unlocked = true
 neighbor_location_ids = PackedStringArray("taxi_depot", "sport_supply", "residential", "supermarket")
-loot_bias_tags = PackedStringArray("整理背包", "出发准备")
+loot_bias_tags = PackedStringArray("整理外出物资", "出发准备")
 recommended_auxiliary_tools = PackedStringArray("水", "食物", "手电")
 detail_notes = PackedStringArray("唯一安全据点", "用于整理携带物资", "从这里沿道路向外探索")
 ai_exploration_rule = "这是唯一庇护所，只能作为出发和返回节点。AI 不应生成迁移、占领、建立分基地或潜在庇护所剧情；只允许生成整理物资、确认路线、出发前检查。"
+

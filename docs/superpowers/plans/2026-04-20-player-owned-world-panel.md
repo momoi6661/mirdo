@@ -552,7 +552,7 @@ const SCENES := [
 	"res://levels/props/lockerdoor_interactive.tscn",
 	"res://levels/props/beach.tscn",
 	"res://levels/bunker_local_pbr.tscn",
-	"res://models/xiaokong/xiaokong1.tscn",
+	"res://characters/xiaokong/xiaokong1.tscn",
 	"res://scenes/interactables/xiaokong_seat_interactable.tscn",
 ]
 

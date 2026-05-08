@@ -14,6 +14,6 @@ discoverable = false
 start_unlocked = false
 neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("食物", "水", "布料")
-recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "折叠背包")
+recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "地图册")
 detail_notes = PackedStringArray("房间密集", "搜索时间长", "收益偏生活物资")
 ai_exploration_rule = "AI 应生成公寓走廊、住户房间、储物间和楼梯间探索。收益偏食物、水、布料；不能生成可入住据点。"

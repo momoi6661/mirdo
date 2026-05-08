@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ShelterInventoryResource" format=3]
+
+[ext_resource type="Script" path="res://scripts/Inventory/shelter_inventory_resource.gd" id="1_shelter_script"]
+[ext_resource type="Script" path="res://scripts/Inventory/shelter_storage_source_resource.gd" id="6_source_script"]
+[ext_resource type="Resource" path="res://resources/storage/sources/food_cabinet_source.tres" id="2_food_source"]
+[ext_resource type="Resource" path="res://resources/storage/sources/medical_cabinet_source.tres" id="3_medical_source"]
+[ext_resource type="Resource" path="res://resources/storage/sources/equipment_rack_source.tres" id="4_equipment_source"]
+[ext_resource type="Resource" path="res://resources/storage/sources/temporary_return_bag_source.tres" id="5_return_source"]
+
+[resource]
+script = ExtResource("1_shelter_script")
+storage_sources = Array[ExtResource("6_source_script")]([ExtResource("2_food_source"), ExtResource("3_medical_source"), ExtResource("4_equipment_source"), ExtResource("5_return_source")])
+
+
+

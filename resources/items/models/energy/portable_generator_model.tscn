@@ -1,0 +1,30 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://resources/items/models/energy/kenney_machine_fortified.glb" id="1_machine"]
+[ext_resource type="PackedScene" path="res://resources/items/models/energy/kenney_screen_panel_small.glb" id="2_screen"]
+[ext_resource type="PackedScene" path="res://resources/items/models/energy/kenney_pipe_large_valve.glb" id="3_valve"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_energy"]
+albedo_color = Color(1, 0.67, 0.12, 1)
+emission_enabled = true
+emission = Color(0.9, 0.42, 0.02, 1)
+emission_energy_multiplier = 0.25
+
+[sub_resource type="BoxMesh" id="Mesh_warning"]
+size = Vector3(0.42, 0.08, 0.03)
+
+[node name="PortableGeneratorModel" type="Node3D"]
+
+[node name="Machine" parent="." instance=ExtResource("1_machine")]
+transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0, 0, 0)
+
+[node name="Screen" parent="." instance=ExtResource("2_screen")]
+transform = Transform3D(0.36, 0, 0, 0, 0.36, 0, 0, 0, 0.36, 0.0, 0.36, -0.52)
+
+[node name="Valve" parent="." instance=ExtResource("3_valve")]
+transform = Transform3D(0, 0, 0.32, 0, 0.32, 0, -0.32, 0, 0, 0.55, 0.12, 0.0)
+
+[node name="WarningPlate" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.54)
+mesh = SubResource("Mesh_warning")
+surface_material_override/0 = SubResource("Mat_energy")

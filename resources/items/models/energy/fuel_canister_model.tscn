@@ -1,0 +1,28 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" path="res://resources/items/models/energy/kenney_barrel.glb" id="1_barrel"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_fuel"]
+albedo_color = Color(0.72, 0.09, 0.04, 1)
+roughness = 0.6
+
+[sub_resource type="BoxMesh" id="Mesh_handle"]
+size = Vector3(0.52, 0.11, 0.12)
+
+[sub_resource type="BoxMesh" id="Mesh_label"]
+size = Vector3(0.38, 0.16, 0.025)
+
+[node name="FuelCanisterModel" type="Node3D"]
+
+[node name="Canister" parent="." instance=ExtResource("1_barrel")]
+transform = Transform3D(0.46, 0, 0, 0, 0.7, 0, 0, 0, 0.46, 0, 0, 0)
+
+[node name="Handle" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+mesh = SubResource("Mesh_handle")
+surface_material_override/0 = SubResource("Mat_fuel")
+
+[node name="FuelLabel" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -0.24)
+mesh = SubResource("Mesh_label")
+surface_material_override/0 = SubResource("Mat_fuel")

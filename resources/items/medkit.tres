@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://dl0yqa4r3fbo6"]
+
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" uid="uid://ew0d0hb6pgpr" path="res://resources/items/icons/medkit_ui.png" id="2_icon"]
+
+[resource]
+script = ExtResource("1_item_script")
+ItemName = "急救箱"
+Description = "完整急救包，包含绷带、止痛药和消毒用品。外出时能显著提高受伤后的处理能力。"
+Icon = ExtResource("2_icon")
+ItemModelScenePath = "res://levels/props/medical_supply_box_model.tscn"
+outing_category = "medical"
+can_take_outing = true
+ai_rule_hint = "AI规则提示：作为外出辅助物资评估；根据地点是否缺电、需要照明、医疗或能源启动来决定价值。"

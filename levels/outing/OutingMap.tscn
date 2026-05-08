@@ -449,10 +449,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -370.0
-offset_top = -295.0
-offset_right = 370.0
-offset_bottom = 295.0
+offset_left = -460.0
+offset_top = -340.0
+offset_right = 460.0
+offset_bottom = 340.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("PanelModal")
@@ -475,6 +475,7 @@ theme_override_colors/font_color = Color(1, 0.72, 0.14, 1)
 theme_override_font_sizes/font_size = 28
 
 [node name="PrepareIntroLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1381354817]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.84, 0.8, 0.7, 1)
 theme_override_font_sizes/font_size = 16
@@ -482,13 +483,14 @@ text = "选择本次携带的辅助道具。当前还没有正式道具 res，�
 autowrap_mode = 3
 
 [node name="BaseCarryLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=224318291]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.88, 0.82, 1)
 theme_override_font_sizes/font_size = 17
 text = "基础携带：水 x1 / 罐头 x1（后续从背包读取）"
 
 [node name="ToolScroll" type="ScrollContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1377450962]
-custom_minimum_size = Vector2(0, 300)
+custom_minimum_size = Vector2(0, 205)
 layout_mode = 2
 
 [node name="ToolList" type="VBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox/ToolScroll" unique_id=360825336]
@@ -496,6 +498,19 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
+
+[node name="LoadoutTitleLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.72, 0.14, 0.95)
+theme_override_font_sizes/font_size = 18
+text = "本次外出携带栏（点击已选格子可移除）"
+
+[node name="LoadoutGrid" type="GridContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=157223837]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 4
 
 [node name="CapacityLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1252811174]
 unique_name_in_owner = true
