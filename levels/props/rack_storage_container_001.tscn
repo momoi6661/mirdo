@@ -86,6 +86,7 @@ interaction_time = 0.45
 enable_item_stacking = true
 inventory_storage = ExtResource("4_storage_res")
 allowed_item_categories = PackedStringArray("food")
+allowed_item_tags = PackedStringArray("食品柜")
 use_shelter_inventory_runtime = true
 shelter_source_id = &"food_cabinet"
 world_display_enabled = true

@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
 [ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="3_water"]
 [ext_resource type="Resource" uid="uid://dp3xsip8d64ax" path="res://resources/items/can_soup.tres" id="4_can"]
-[ext_resource type="Resource" path="res://resources/items/energy_bar.tres" id="5_energy"]
 
 [sub_resource type="Resource" id="Resource_slot_01"]
 script = ExtResource("2_slot_script")
@@ -18,8 +17,6 @@ amount = 3
 
 [sub_resource type="Resource" id="Resource_slot_03"]
 script = ExtResource("2_slot_script")
-item = ExtResource("5_energy")
-amount = 3
 
 [sub_resource type="Resource" id="Resource_slot_04"]
 script = ExtResource("2_slot_script")

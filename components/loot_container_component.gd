@@ -11,6 +11,7 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 @export var enable_item_stacking: bool = false
 @export var inventory_storage: InventoryStorageResource
 @export var allowed_item_categories: PackedStringArray = PackedStringArray()
+@export var allowed_item_tags: PackedStringArray = PackedStringArray()
 @export var reject_disallowed_items: bool = true
 @export var allow_incoming_items: bool = true
 
@@ -43,6 +44,7 @@ const DISPLAY_EPSILON := 0.00001
 
 func _ready() -> void:
 	_ensure_runtime_storage()
+	_sanitize_runtime_storage_items()
 	_rebuild_runtime_slots_from_storage()
 	_sync_runtime_storage_from_runtime_slots()
 	_refresh_world_display()
@@ -74,9 +76,20 @@ func can_accept_item(item: ItemData) -> bool:
 		return false
 	if not reject_disallowed_items:
 		return true
-	if allowed_item_categories.is_empty():
-		return true
-	return allowed_item_categories.has(item.outing_category)
+	return _is_item_allowed_by_filters(item)
+
+
+func _is_item_allowed_by_filters(item: ItemData) -> bool:
+	if item == null:
+		return false
+	if not allowed_item_categories.is_empty() and not allowed_item_categories.has(item.outing_category):
+		return false
+	if not allowed_item_tags.is_empty():
+		for tag in item.inventory_tags:
+			if allowed_item_tags.has(tag):
+				return true
+		return false
+	return true
 
 # ==========================================
 # 存档系统接口
@@ -138,6 +151,8 @@ func apply_inventory_storage_resource(storage: InventoryStorageResource) -> void
 	_runtime_inventory_storage.ensure_capacity()
 	_rebuild_runtime_slots_from_storage()
 	_sync_runtime_storage_from_runtime_slots()
+	_sanitize_runtime_storage_items()
+	_rebuild_runtime_slots_from_storage()
 	_refresh_world_display()
 
 # 2. 读取数据
@@ -163,6 +178,8 @@ func load_container_save_data(saved_slots: Array) -> void:
 					runtime_slots[slot_id].item = item
 					runtime_slots[slot_id].amount = _normalize_slot_amount(item, amount)
 	_sync_runtime_storage_from_runtime_slots()
+	_sanitize_runtime_storage_items()
+	_rebuild_runtime_slots_from_storage()
 	_refresh_world_display()
 
 
@@ -189,6 +206,22 @@ func _ensure_runtime_storage() -> void:
 		_runtime_inventory_storage = INVENTORY_STORAGE_SCRIPT.new()
 	_runtime_inventory_storage.slot_count = maxi(1, container_size)
 	_runtime_inventory_storage.ensure_capacity()
+
+
+func _sanitize_runtime_storage_items() -> void:
+	if _runtime_inventory_storage == null:
+		return
+	if not reject_disallowed_items:
+		return
+	if allowed_item_categories.is_empty() and allowed_item_tags.is_empty():
+		return
+	_runtime_inventory_storage.ensure_capacity()
+	for i in range(_runtime_inventory_storage.slot_count):
+		var stack := _runtime_inventory_storage.get_slot(i) as InventorySlotStackResource
+		if stack == null or stack.is_empty():
+			continue
+		if not _is_item_allowed_by_filters(stack.item):
+			stack.clear()
 
 
 func _rebuild_runtime_slots_from_storage() -> void:

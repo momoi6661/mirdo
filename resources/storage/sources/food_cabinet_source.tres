@@ -10,4 +10,4 @@ display_name = "食品柜"
 source_kind = "food"
 storage = ExtResource("2_storage")
 include_in_outing_pool = true
-notes = "保留16格实体柜子，用于3D空间内管理水、罐头和轻便食物。"
+notes = "保留16格实体食品柜，只接收带“食品柜”标签的水和罐头类补给；不混放医疗、材料、武器或工具。"
