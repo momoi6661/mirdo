@@ -1,0 +1,45 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.18, 0.18, 0.19, 1)
+roughness = 0.72
+metallic = 0.6
+
+[sub_resource type="StandardMaterial3D" id="Mat_tip"]
+albedo_color = Color(0.55, 0.08, 0.06, 1)
+roughness = 0.6
+metallic = 0.45
+
+[sub_resource type="BoxMesh" id="Mesh_bar"]
+size = Vector3(0.08, 0.08, 0.95)
+
+[sub_resource type="BoxMesh" id="Mesh_hook"]
+size = Vector3(0.08, 0.08, 0.28)
+
+[sub_resource type="BoxMesh" id="Mesh_claw"]
+size = Vector3(0.05, 0.055, 0.2)
+
+[node name="crowbar_model" type="Node3D"]
+
+[node name="MainBar" type="MeshInstance3D" parent="."]
+rotation = Vector3(0, 0, 0.1)
+mesh = SubResource("Mesh_bar")
+surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="Hook" type="MeshInstance3D" parent="."]
+position = Vector3(0.08, 0, -0.44)
+rotation = Vector3(0, 0.65, 0.1)
+mesh = SubResource("Mesh_hook")
+surface_material_override/0 = SubResource("Mat_tip")
+
+[node name="ClawA" type="MeshInstance3D" parent="."]
+position = Vector3(-0.035, 0.04, 0.48)
+rotation = Vector3(0.0, 0.35, 0.1)
+mesh = SubResource("Mesh_claw")
+surface_material_override/0 = SubResource("Mat_tip")
+
+[node name="ClawB" type="MeshInstance3D" parent="."]
+position = Vector3(0.035, -0.04, 0.48)
+rotation = Vector3(0.0, -0.35, 0.1)
+mesh = SubResource("Mesh_claw")
+surface_material_override/0 = SubResource("Mat_tip")

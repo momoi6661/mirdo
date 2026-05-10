@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_pipe"]
+albedo_color = Color(0.38, 0.39, 0.4, 1)
+roughness = 0.5
+metallic = 0.75
+
+[sub_resource type="CylinderMesh" id="Mesh_pipe"]
+top_radius = 0.055
+bottom_radius = 0.055
+height = 1.05
+radial_segments = 24
+
+[sub_resource type="CylinderMesh" id="Mesh_rim"]
+top_radius = 0.065
+bottom_radius = 0.065
+height = 0.035
+radial_segments = 24
+
+[node name="metal_pipe_model" type="Node3D"]
+
+[node name="Pipe" type="MeshInstance3D" parent="."]
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_pipe")
+surface_material_override/0 = SubResource("Mat_pipe")
+
+[node name="RimA" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, -0.54)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_rim")
+surface_material_override/0 = SubResource("Mat_pipe")
+
+[node name="RimB" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0, 0.54)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_rim")
+surface_material_override/0 = SubResource("Mat_pipe")

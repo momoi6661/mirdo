@@ -25,6 +25,7 @@ config/icon="res://icon.svg"
 Global="*uid://dnn16irn681c1"
 SaveManager="*uid://bjtoaitqpqh4d"
 TransitionUI="*res://controllers/ui/transition_screen.tscn"
+DevtoolRuntime="*res://addons/godot_devtool/runtime_bridge.gd"
 
 [display]
 
@@ -34,7 +35,7 @@ window/size/always_on_top=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg", "res://addons/hasturoperationgd/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg")
 
 [input]
 

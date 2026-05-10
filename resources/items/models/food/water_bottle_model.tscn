@@ -6,13 +6,13 @@
 [ext_resource type="PackedScene" uid="uid://dy0rmghg0jw4n" path="res://3DModel/water/water_bottle.glb" id="4_model"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_bottle"]
-height = 0.465
-radius = 0.076
+height = 0.40
+radius = 0.065
 
 [node name="water_bottle" type="RigidBody3D"]
 collision_layer = 2
 collision_mask = 3
-mass = 2.0
+mass = 0.8
 continuous_cd = true
 linear_damp = 0.5
 angular_damp = 4.434
@@ -25,11 +25,11 @@ outline_width = 0.1
 script = ExtResource("3_save")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7, 0, 0.161, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 shape = SubResource("CylinderShape3D_bottle")
 
 [node name="WaterBottleModel" parent="." instance=ExtResource("4_model")]
-transform = Transform3D(0.07, 0, 0, 0, 0.07, 0, 0, 0, 0.07, 0, 0, 0)
+transform = Transform3D(0.058, 0, 0, 0, 0.058, 0, 0, 0, 0.058, 0, 0, 0)
 
 [node name="PickupPoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)

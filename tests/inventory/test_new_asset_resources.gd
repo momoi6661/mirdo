@@ -75,7 +75,7 @@ func _check_shelter_outing_source(source_id: String, expected_storage_slots: int
 			continue
 		if not bool(source.get("include_in_outing_pool")):
 			failures.append("SHELTER_SOURCE_NOT_INCLUDED: " + source_id)
-		var storage := source.get("storage") as InventoryStorageResource
+		var storage := source as InventoryStorageResource
 		if storage == null:
 			failures.append("SHELTER_SOURCE_STORAGE_MISSING: " + source_id)
 			return

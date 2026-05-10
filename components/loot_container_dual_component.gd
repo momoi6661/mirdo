@@ -9,6 +9,9 @@ const LOOT_ADAPTER_SCRIPT = preload("res://scripts/Inventory/loot_container_data
 @export var panel_title: String = ""
 @export var open_option_label: String = OPTION_LABEL_OPEN_CONTAINER
 
+@export_category("Focus Outline")
+@export var focus_outline_path: NodePath = NodePath("../FocusOutline")
+
 @export_category("Container Panel")
 @export var show_player_inventory_panel: bool = true
 @export var container_panel_title: String = "箱子"
@@ -27,6 +30,7 @@ var _local_panel_adapter
 var _local_panel_open: bool = false
 var _local_panel_player_body: PhysicsBody3D
 var _local_panel_close_elapsed: float = 0.0
+var _focus_outline: Node
 
 
 func _ready() -> void:
@@ -35,6 +39,7 @@ func _ready() -> void:
 	add_to_group("local_inventory_panel_host")
 	_ensure_local_panel_adapter()
 	_resolve_local_panel()
+	_resolve_focus_outline()
 	call_deferred("_connect_operate_area_signal")
 	set_process(true)
 
@@ -114,6 +119,16 @@ func execute_world_panel_option(option_id: String, _helper: Node, context: Dicti
 		global_node.emit_signal("open_loot_ui", self)
 
 
+func should_clear_world_panel_after_execute(option_id: String) -> bool:
+	return option_id == OPTION_ID_OPEN_CONTAINER
+
+
+func set_world_panel_focused(focused: bool) -> void:
+	var outline := _resolve_focus_outline()
+	if outline != null and outline.has_method("set_outline_focused"):
+		outline.call("set_outline_focused", focused)
+
+
 func get_operate_range_area() -> Area3D:
 	if operate_range_area_path != NodePath():
 		var by_path := get_node_or_null(operate_range_area_path) as Area3D
@@ -166,6 +181,7 @@ func _open_local_container_panel(player_node: Node) -> bool:
 	if _local_panel_adapter == null:
 		return false
 
+	_close_other_local_panels()
 	_local_panel_adapter.bind_container(self)
 	var anchor_mark := _resolve_local_panel_anchor_mark()
 	if anchor_mark != null:
@@ -178,6 +194,18 @@ func _open_local_container_panel(player_node: Node) -> bool:
 	_local_panel_close_elapsed = 0.0
 	_local_panel_open = true
 	return true
+
+
+func _close_other_local_panels() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for entry in tree.get_nodes_in_group(&"local_inventory_panel_host"):
+		var host := entry as Node
+		if host == null or host == self or not is_instance_valid(host):
+			continue
+		if host.has_method("close_local_panel"):
+			host.call("close_local_panel")
 
 
 func is_local_panel_open() -> bool:
@@ -229,6 +257,27 @@ func _find_local_panel_anchor_fallback() -> Node3D:
 		var marker := current.get_node_or_null("ContainerPanelMark3D") as Node3D
 		if marker != null:
 			return marker
+		current = current.get_parent()
+	return null
+
+
+func _resolve_focus_outline() -> Node:
+	if _focus_outline != null and is_instance_valid(_focus_outline):
+		return _focus_outline
+	if focus_outline_path != NodePath():
+		_focus_outline = get_node_or_null(focus_outline_path)
+	if _focus_outline != null and is_instance_valid(_focus_outline):
+		return _focus_outline
+	_focus_outline = _find_focus_outline_fallback()
+	return _focus_outline
+
+
+func _find_focus_outline_fallback() -> Node:
+	var current: Node = get_parent()
+	while current != null:
+		var outline := current.get_node_or_null("FocusOutline")
+		if outline != null:
+			return outline
 		current = current.get_parent()
 	return null
 

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://levels/props/sketchfab/utility_storage_box/old_tool_box.glb" id="1_toolbox"]
+
+[node name="UtilityStorageBoxModel" type="Node3D"]
+
+[node name="OldToolBox" parent="." instance=ExtResource("1_toolbox")]
+transform = Transform3D(0.008, 0, 0, 0, 0.008, 0, 0, 0, 0.008, 0, 0.103, 0)

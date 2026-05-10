@@ -1,0 +1,98 @@
+[gd_resource type="Resource" script_class="InventoryStorageResource" format=3 uid="uid://bhp4vyrh2w8u3"]
+
+[ext_resource type="Script" uid="uid://bobrl64w5up62" path="res://scripts/Inventory/inventory_storage_resource.gd" id="1_storage_script"]
+[ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
+[ext_resource type="Resource" path="res://resources/items/battery.tres" id="3_battery"]
+[ext_resource type="Resource" path="res://resources/items/duct_tape.tres" id="4_tape"]
+[ext_resource type="Resource" path="res://resources/items/fuel_canister.tres" id="5_fuel"]
+[ext_resource type="Resource" path="res://resources/items/power_cell.tres" id="6_power_cell"]
+
+[sub_resource type="Resource" id="Resource_slot_01"]
+script = ExtResource("2_slot_script")
+item = ExtResource("3_battery")
+amount = 2
+
+[sub_resource type="Resource" id="Resource_slot_02"]
+script = ExtResource("2_slot_script")
+item = ExtResource("4_tape")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_03"]
+script = ExtResource("2_slot_script")
+item = ExtResource("5_fuel")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_04"]
+script = ExtResource("2_slot_script")
+item = ExtResource("6_power_cell")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_slot_05"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_06"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_07"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_08"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_09"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_10"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_11"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_12"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_13"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_14"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_15"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_16"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_17"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_18"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_19"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_20"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_21"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_22"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_23"]
+script = ExtResource("2_slot_script")
+
+[sub_resource type="Resource" id="Resource_slot_24"]
+script = ExtResource("2_slot_script")
+
+[resource]
+script = ExtResource("1_storage_script")
+source_id = &"utility_storage_box"
+display_name = "杂物物资箱"
+source_kind = "material"
+include_in_outing_pool = true
+notes = "杂物/能源物资箱，存放电池、胶带、燃料罐、电力芯等材料；这些资源未来用于发电机和设施供能，不放入武器柜。"
+slot_count = 24
+slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16"), SubResource("Resource_slot_17"), SubResource("Resource_slot_18"), SubResource("Resource_slot_19"), SubResource("Resource_slot_20"), SubResource("Resource_slot_21"), SubResource("Resource_slot_22"), SubResource("Resource_slot_23"), SubResource("Resource_slot_24")])

@@ -18,5 +18,5 @@ MaxStackSize = 5
 consumable_effect = SubResource("Resource_5xh6h")
 outing_category = "food"
 can_take_outing = true
-inventory_tags = PackedStringArray("食物", "罐头", "食品柜")
+inventory_tags = PackedStringArray("食品柜", "补给", "食物")
 ai_rule_hint = "适合中长距离探索前携带，可作为稳定饱食补给。"

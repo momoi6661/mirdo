@@ -1,0 +1,130 @@
+[gd_scene format=3 uid="uid://daq8s05qc8is7"]
+
+[ext_resource type="PackedScene" path="res://levels/props/utility_storage_box_model.tscn" id="1_model"]
+[ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
+[ext_resource type="Resource" path="res://resources/storage/utility_storage_box_storage.tres" id="3_storage"]
+[ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="4_panel"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="5_save"]
+[ext_resource type="Script" path="res://components/stencil_focus_outline_component.gd" id="99_focus_outline"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_interact"]
+size = Vector3(0.78, 0.32, 0.40)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_operate"]
+size = Vector3(1.32, 0.98, 1.12)
+
+[sub_resource type="BoxMesh" id="Mesh_label_back"]
+size = Vector3(0.66, 0.14, 0.012)
+
+[sub_resource type="StandardMaterial3D" id="Mat_label_back"]
+transparency = 1
+albedo_color = Color(0.06, 0.08, 0.08, 0.88)
+roughness = 0.78
+
+[node name="UtilityStorageBoxContainer" type="Node3D" unique_id=300082504 groups=["nav_source_bunker"]]
+
+[node name="SaveComponent" type="Node" parent="." unique_id=570965631]
+script = ExtResource("5_save")
+
+[node name="UtilityStorageBoxModel" parent="." unique_id=1350924293 instance=ExtResource("1_model")]
+
+[node name="FocusOutline" type="Node3D" parent="."]
+script = ExtResource("99_focus_outline")
+outline_root_path = NodePath("../UtilityStorageBoxModel")
+outline_color = Color(1, 0.78, 0.22, 0.95)
+outline_width = 3.0
+use_flat_outline_normals = false
+attach_copies_as_siblings = true
+[node name="InteractBody" type="StaticBody3D" parent="." unique_id=633240452]
+script = ExtResource("2_loot_dual")
+open_option_label = "打开杂物物资箱"
+show_player_inventory_panel = false
+container_panel_title = "杂物物资箱"
+local_panel_path = NodePath("../ContainerPanel3D")
+local_panel_anchor_mark_path = NodePath("../ContainerPanelMark3D")
+operate_range_area_path = NodePath("../LootOperateArea3D")
+container_name = "杂物物资箱"
+container_size = 24
+interaction_time = 0.45
+enable_item_stacking = true
+inventory_storage = ExtResource("3_storage")
+allowed_item_categories = PackedStringArray("material")
+allow_incoming_items = false
+use_shelter_inventory_runtime = true
+shelter_source_id = &"utility_storage_box"
+world_display_enabled = false
+display_root_path = NodePath("../DisplayItems")
+display_slot_markers_root_path = NodePath("../DisplaySlotMarkers")
+display_max_models = 0
+display_fit_size = 0.12
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractBody" unique_id=1263742685]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.16, 0)
+shape = SubResource("BoxShape3D_interact")
+
+[node name="DisplayItems" type="Node3D" parent="." unique_id=1023342417]
+
+[node name="DisplaySlotMarkers" type="Node3D" parent="." unique_id=663160947]
+
+[node name="Slot_01" type="Marker3D" parent="DisplaySlotMarkers" unique_id=1465116714]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 0.28, -0.1)
+
+[node name="Slot_02" type="Marker3D" parent="DisplaySlotMarkers" unique_id=202696209]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.07, 0.28, -0.1)
+
+[node name="Slot_03" type="Marker3D" parent="DisplaySlotMarkers" unique_id=944666927]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.07, 0.28, -0.1)
+
+[node name="Slot_04" type="Marker3D" parent="DisplaySlotMarkers" unique_id=364408599]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.28, -0.1)
+
+[node name="Slot_05" type="Marker3D" parent="DisplaySlotMarkers" unique_id=310657960]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 0.28, 0.08)
+
+[node name="Slot_06" type="Marker3D" parent="DisplaySlotMarkers" unique_id=175064601]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.07, 0.28, 0.08)
+
+[node name="Slot_07" type="Marker3D" parent="DisplaySlotMarkers" unique_id=78707889]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.07, 0.28, 0.08)
+
+[node name="Slot_08" type="Marker3D" parent="DisplaySlotMarkers" unique_id=804800574]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 0.28, 0.08)
+
+[node name="ContainerPanelMark3D" type="Marker3D" parent="." unique_id=1684589882]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 0.9659258, 0.258819, 8.742278e-08, 0.258819, -0.9659258, 0, 0.64, -0.46)
+
+[node name="ContainerPanel3D" parent="." unique_id=1716970738 instance=ExtResource("4_panel")]
+transform = Transform3D(-1, 3.694646e-08, -7.9231945e-08, 0, 0.9063078, 0.42261824, 8.742278e-08, 0.42261824, -0.9063078, 0, 0.56, -0.42)
+anchor_mark_path = NodePath("../ContainerPanelMark3D")
+use_anchor_mark_transform_directly = false
+panel_pitch_degrees = -10.0
+panel_title_text = "杂物物资箱"
+show_alt_hint_label = false
+auto_place_hint_below_second_row = false
+allow_item_dragging = false
+allow_release_outside_panel = false
+
+[node name="LootOperateArea3D" type="Area3D" parent="." unique_id=1276145466]
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LootOperateArea3D" unique_id=131308709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.22, -0.23)
+shape = SubResource("BoxShape3D_operate")
+
+[node name="LabelBack" type="MeshInstance3D" parent="." unique_id=1902966425]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.36, -0.2)
+visible = false
+mesh = SubResource("Mesh_label_back")
+surface_material_override/0 = SubResource("Mat_label_back")
+
+[node name="CabinetLabel3D" type="Label3D" parent="." unique_id=1195517404]
+transform = Transform3D(0.38, 0, 0, 0, 0.38, 0, 0, 0, 0.38, 0, 0.43, -0.235)
+billboard = 1
+no_depth_test = true
+modulate = Color(1, 0.92, 0.68, 1)
+outline_modulate = Color(0.15, 0.1, 0.02, 1)
+text = "杂物物资箱"
+font_size = 40
+outline_size = 7

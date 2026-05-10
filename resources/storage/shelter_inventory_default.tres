@@ -1,15 +1,13 @@
 [gd_resource type="Resource" script_class="ShelterInventoryResource" format=3]
 
 [ext_resource type="Script" path="res://scripts/Inventory/shelter_inventory_resource.gd" id="1_shelter_script"]
-[ext_resource type="Script" path="res://scripts/Inventory/shelter_storage_source_resource.gd" id="6_source_script"]
-[ext_resource type="Resource" path="res://resources/storage/sources/food_cabinet_source.tres" id="2_food_source"]
-[ext_resource type="Resource" path="res://resources/storage/sources/medical_cabinet_source.tres" id="3_medical_source"]
-[ext_resource type="Resource" path="res://resources/storage/sources/equipment_rack_source.tres" id="4_equipment_source"]
-[ext_resource type="Resource" path="res://resources/storage/sources/temporary_return_bag_source.tres" id="5_return_source"]
+[ext_resource type="Script" path="res://scripts/Inventory/inventory_storage_resource.gd" id="2_storage_script"]
+[ext_resource type="Resource" path="res://resources/storage/food_cabinet_storage.tres" id="3_food_storage"]
+[ext_resource type="Resource" path="res://resources/storage/medical_cabinet_storage.tres" id="4_medical_storage"]
+[ext_resource type="Resource" path="res://resources/storage/equipment_rack_storage.tres" id="5_equipment_storage"]
+[ext_resource type="Resource" path="res://resources/storage/utility_storage_box_storage.tres" id="6_utility_storage"]
+[ext_resource type="Resource" path="res://resources/storage/temporary_return_bag_storage.tres" id="7_return_storage"]
 
 [resource]
 script = ExtResource("1_shelter_script")
-storage_sources = Array[ExtResource("6_source_script")]([ExtResource("2_food_source"), ExtResource("3_medical_source"), ExtResource("4_equipment_source"), ExtResource("5_return_source")])
-
-
-
+storage_sources = Array[ExtResource("2_storage_script")]([ExtResource("3_food_storage"), ExtResource("4_medical_storage"), ExtResource("5_equipment_storage"), ExtResource("6_utility_storage"), ExtResource("7_return_storage")])

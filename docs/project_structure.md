@@ -26,7 +26,7 @@
 - `resources/items/icons/`：物品 UI 图标。
 - `resources/items/models/`：物品展示模型。
 - `resources/storage/*.tres`：默认库存内容。
-- `resources/storage/sources/*.tres`：庇护所库存来源索引。
+- `resources/storage/*_storage.tres`：庇护所库存数据；同一资源内同时保存来源 ID、显示名、类型和外出池开关，不再维护单独的 `sources` 索引目录。
 - `resources/storage/shelter_inventory_default.tres`：新游戏默认庇护所库存索引。
 - 运行时库存由 `/root/Global` 统一提供，不要让外出地图和 3D 柜子各自复制一份长期状态。
 

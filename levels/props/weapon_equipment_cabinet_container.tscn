@@ -2,11 +2,12 @@
 
 [ext_resource type="PackedScene" path="res://levels/props/weapon_cabinet_model.tscn" id="1_model"]
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
-[ext_resource type="Resource" uid="uid://c6gf1skfo2fbn" path="res://resources/storage/equipment_rack_storage.tres" id="3_storage"]
+[ext_resource type="Resource" path="res://resources/storage/equipment_rack_storage.tres" id="3_storage"]
 [ext_resource type="PackedScene" uid="uid://g06rmnf0pul8" path="res://levels/props/sketchfab/weapon_cabinet_selected/weapon_locker.glb" id="3_tlubi"]
 [ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="4_panel"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="5_save"]
 [ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="11_68gf8"]
+[ext_resource type="Script" path="res://components/stencil_focus_outline_component.gd" id="99_focus_outline"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_tlubi"]
 size = Vector3(0.6483344, 2.05, 0.4016068)
@@ -36,6 +37,13 @@ script = ExtResource("5_save")
 [node name="WeaponCabinetModel" parent="." unique_id=1956248290 instance=ExtResource("1_model")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0005171299, 1.0370661, 0.0016155243)
 
+[node name="FocusOutline" type="Node3D" parent="."]
+script = ExtResource("99_focus_outline")
+outline_root_path = NodePath("../WeaponCabinetModel")
+outline_color = Color(1, 0.78, 0.22, 0.95)
+outline_width = 3.0
+use_flat_outline_normals = false
+attach_copies_as_siblings = true
 [node name="InteractBody" type="StaticBody3D" parent="." unique_id=1004558451]
 script = ExtResource("2_loot_dual")
 open_option_label = "打开武器/装备柜"
@@ -49,7 +57,7 @@ container_size = 24
 interaction_time = 0.45
 enable_item_stacking = true
 inventory_storage = ExtResource("3_storage")
-allowed_item_categories = PackedStringArray("tool", "weapon", "special", "material")
+allowed_item_categories = PackedStringArray("tool", "weapon", "special")
 allow_incoming_items = false
 use_shelter_inventory_runtime = true
 shelter_source_id = &"equipment_rack"
@@ -69,7 +77,7 @@ panel_pitch_degrees = 0.0
 slot_columns = 6
 panel_title_text = "装备柜"
 show_alt_hint_label = true
-hint_text_override = "只读库存：外出准备会读取这里，不能从背包拖入。"
+hint_text_override = "只读库存：仅放武器、工具和特殊装备；材料/能源放入杂物物资箱。"
 auto_place_hint_below_second_row = true
 allow_item_dragging = false
 allow_release_outside_panel = false

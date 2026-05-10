@@ -48,6 +48,7 @@ enum PanelAnchorMode {
 @export_range(-0.4, 0.4, 0.01) var vertical_offset: float = -0.08
 @export_range(-0.6, 0.6, 0.01) var horizontal_offset: float = 0.0
 @export var face_camera_when_using_mark: bool = false
+@export var face_camera_x_axis_once_when_opened: bool = false
 @export var use_anchor_mark_transform_directly: bool = true
 @export_range(-30.0, 30.0, 0.1) var panel_pitch_degrees: float = -11.0
 @export_range(-20.0, 20.0, 0.1) var panel_roll_degrees: float = 0.0
@@ -116,6 +117,8 @@ var _drag_item: ItemData
 var _panel_transform_initialized: bool = false
 var _hint_mouse_free_mode: bool = false
 var _missing_anchor_warned: bool = false
+var _open_face_camera_basis: Basis
+var _open_face_camera_basis_valid: bool = false
 
 
 func _ready() -> void:
@@ -236,6 +239,7 @@ func show_panel() -> void:
 	_is_open = true
 	visible = true
 	_panel_transform_initialized = false
+	_open_face_camera_basis_valid = false
 	if _hit_area != null:
 		_hit_area.input_ray_pickable = true
 	_update_panel_transform(0.0)
@@ -984,6 +988,8 @@ func _update_panel_transform(delta: float = 0.0) -> void:
 					if target_position.distance_squared_to(cam_pos) > 0.00001:
 						look_at(cam_pos, Vector3.UP, true)
 						base_basis = global_basis
+			if face_camera_x_axis_once_when_opened:
+				base_basis = _get_open_face_camera_x_axis_basis(target_position, base_basis)
 			target_basis = base_basis * tilt_basis
 	elif panel_anchor_mode == PanelAnchorMode.CAMERA_ONLY or allow_camera_fallback:
 		_refresh_camera_ref(true)
@@ -1013,6 +1019,38 @@ func _update_panel_transform(delta: float = 0.0) -> void:
 	var rot_alpha := clampf(delta * PANEL_ROT_LERP_SPEED, 0.0, 1.0)
 	global_position = global_position.lerp(target_position, pos_alpha)
 	global_basis = global_basis.orthonormalized().slerp(target_basis, rot_alpha).orthonormalized()
+
+
+func _get_open_face_camera_x_axis_basis(target_position: Vector3, base_basis: Basis) -> Basis:
+	if _open_face_camera_basis_valid:
+		return _open_face_camera_basis
+
+	_refresh_camera_ref(true)
+	if _camera == null or not is_instance_valid(_camera):
+		_open_face_camera_basis = base_basis
+		_open_face_camera_basis_valid = true
+		return _open_face_camera_basis
+
+	var mark_x_axis: Vector3 = base_basis.x.normalized()
+	var mark_y_axis: Vector3 = base_basis.y.normalized()
+	var mark_z_axis: Vector3 = base_basis.z.normalized()
+	var to_camera: Vector3 = _camera.global_position - target_position
+	var local_to_camera := Vector3(
+		to_camera.dot(mark_x_axis),
+		to_camera.dot(mark_y_axis),
+		to_camera.dot(mark_z_axis)
+	)
+	var z_y := Vector2(local_to_camera.z, local_to_camera.y)
+	if z_y.length_squared() < 0.00001:
+		_open_face_camera_basis = base_basis
+		_open_face_camera_basis_valid = true
+		return _open_face_camera_basis
+
+	var pitch := atan2(local_to_camera.y, local_to_camera.z)
+	_open_face_camera_basis = Basis(mark_x_axis, pitch) * base_basis
+	_open_face_camera_basis = _open_face_camera_basis.orthonormalized()
+	_open_face_camera_basis_valid = true
+	return _open_face_camera_basis
 
 
 func _on_hit_area_input_event(_camera_node: Node, event: InputEvent, hit_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:

@@ -117,10 +117,9 @@ func _test_outing_commit_entries_and_shelter_return() -> void:
 	storage.get_slot(0).set_stack(knife, 1)
 	storage.get_slot(1).set_stack(bandage, 2)
 
-	var source := ShelterStorageSourceResource.new()
+	var source := storage
 	source.source_id = &"test_cabinet"
 	source.display_name = "测试柜"
-	source.storage = storage
 	source.include_in_outing_pool = true
 
 	var shelter := ShelterInventoryResource.new()

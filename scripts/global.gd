@@ -223,7 +223,7 @@ func _build_shelter_inventory_save_payload() -> Dictionary:
 		var source_id := String(source.get("source_id")).strip_edges()
 		if source_id.is_empty():
 			continue
-		var storage := source.get("storage") as InventoryStorageResource
+		var storage := _get_storage_from_shelter_source(source)
 		source_payloads.append({
 			"source_id": source_id,
 			"display_name": String(source.get("display_name")),
@@ -253,11 +253,11 @@ func _apply_shelter_inventory_save_payload(payload: Dictionary) -> void:
 		if source == null:
 			continue
 		var storage_payload := source_payload.get("storage", {}) as Dictionary
-		var template_storage := source.get("storage") as InventoryStorageResource
+		var template_storage := _get_storage_from_shelter_source(source)
 		var slot_count := int(storage_payload.get("slot_count", 0))
 		var runtime_storage := get_or_create_shelter_storage_runtime(source_id, template_storage, slot_count)
 		_apply_storage_save_payload(runtime_storage, storage_payload)
-		source.set("storage", runtime_storage)
+		_bind_storage_to_shelter_source(source, runtime_storage)
 	shelter_inventory_changed.emit()
 
 
@@ -332,7 +332,23 @@ func _bind_shelter_inventory_sources_to_runtime() -> void:
 		var source_id := String(source.get("source_id")).strip_edges()
 		if source_id.is_empty():
 			continue
-		var template_storage := source.get("storage") as InventoryStorageResource
+		var template_storage := _get_storage_from_shelter_source(source)
 		var runtime_storage := get_or_create_shelter_storage_runtime(source_id, template_storage)
 		if runtime_storage != null:
-			source.set("storage", runtime_storage)
+			_bind_storage_to_shelter_source(source, runtime_storage)
+
+
+func _get_storage_from_shelter_source(source: Resource) -> InventoryStorageResource:
+	if source == null:
+		return null
+	return source as InventoryStorageResource
+
+
+func _bind_storage_to_shelter_source(source: Resource, runtime_storage: InventoryStorageResource) -> void:
+	if source == null or runtime_storage == null:
+		return
+	var storage := source as InventoryStorageResource
+	if storage == null:
+		return
+	storage.slot_count = runtime_storage.slot_count
+	storage.slots = runtime_storage.slots

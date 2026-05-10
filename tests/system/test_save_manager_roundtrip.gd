@@ -58,7 +58,7 @@ func _get_storage(global_node: Node, source_id: String) -> InventoryStorageResou
 		if source == null:
 			continue
 		if String(source.get("source_id")) == source_id:
-			return source.get("storage") as InventoryStorageResource
+			return source as InventoryStorageResource
 	return null
 
 

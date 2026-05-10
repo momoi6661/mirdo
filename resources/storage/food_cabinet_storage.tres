@@ -59,5 +59,10 @@ script = ExtResource("2_slot_script")
 
 [resource]
 script = ExtResource("1_storage_script")
+source_id = &"food_cabinet"
+display_name = "食品柜"
+source_kind = "food"
+include_in_outing_pool = true
+notes = "保留16格实体食品柜，只接收带“食品柜”标签的水和罐头类补给；不混放医疗、材料、武器或工具。"
 slot_count = 16
 slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16")])

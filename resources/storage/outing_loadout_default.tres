@@ -1,7 +1,6 @@
-[gd_resource type="Resource" script_class="OutingLoadoutResource" format=3]
+[gd_resource type="Resource" script_class="OutingLoadoutResource" format=3 uid="uid://d2tp58p5qnspn"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/outing_loadout_resource.gd" id="1_loadout_script"]
+[ext_resource type="Script" uid="uid://dygxjqh78m3yr" path="res://scripts/Inventory/outing_loadout_resource.gd" id="1_loadout_script"]
 
 [resource]
 script = ExtResource("1_loadout_script")
-slot_count = 12

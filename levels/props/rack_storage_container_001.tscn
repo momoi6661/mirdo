@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_save_comp"]
 [ext_resource type="Resource" uid="uid://1kynbrmkbx08" path="res://resources/storage/food_cabinet_storage.tres" id="4_storage_res"]
 [ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="6_gwyag"]
+[ext_resource type="Script" path="res://components/stencil_focus_outline_component.gd" id="99_focus_outline"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_rmem1"]
 load_path = "res://.godot/imported/light_green.png-b44969d0d43d37e6192da37812362394.s3tc.ctex"
@@ -76,6 +77,13 @@ script = ExtResource("3_save_comp")
 mesh = SubResource("ArrayMesh_141v5")
 skeleton = NodePath("")
 
+[node name="FocusOutline" type="Node3D" parent="."]
+script = ExtResource("99_focus_outline")
+outline_root_path = NodePath("../rack_001")
+outline_color = Color(1, 0.78, 0.22, 0.95)
+outline_width = 3.0
+use_flat_outline_normals = false
+attach_copies_as_siblings = true
 [node name="rack_001_col" type="StaticBody3D" parent="rack_001" unique_id=1046753200]
 script = ExtResource("1_yh1ol")
 open_option_label = "打开食品柜"

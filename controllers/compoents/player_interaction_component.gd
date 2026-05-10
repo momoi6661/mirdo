@@ -61,7 +61,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_sync_held_object_exception()
 
-	if _is_inventory_open():
+	if _is_any_blocking_ui_open(false):
 		_clear_target()
 		return
 
@@ -119,9 +119,9 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _external_ui_blocked:
 		return
-	if not _is_world_mode(current_interaction_mode) or current_interactable == null:
+	if _is_any_blocking_ui_open(false):
 		return
-	if _is_inventory_open():
+	if not _is_world_mode(current_interaction_mode) or current_interactable == null:
 		return
 	if event is not InputEventMouseButton:
 		return
@@ -885,6 +885,27 @@ func _is_inventory_open() -> bool:
 	if inventory == null:
 		return false
 	return bool(inventory.get("inventory_visible"))
+
+func _is_any_blocking_ui_open(include_local_panel: bool = true) -> bool:
+	if _is_inventory_open():
+		return true
+	return include_local_panel and _is_local_inventory_panel_open()
+
+func _is_local_inventory_panel_open() -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+
+	for entry in tree.get_nodes_in_group(&"local_inventory_panel_host"):
+		var host: Node = entry as Node
+		if host == null or not is_instance_valid(host):
+			continue
+		if not host.has_method("is_local_panel_open"):
+			continue
+		if bool(host.call("is_local_panel_open")):
+			return true
+
+	return false
 
 func _is_holding_object() -> bool:
 	if Global.player == null:
