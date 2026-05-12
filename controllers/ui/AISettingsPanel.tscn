@@ -1,0 +1,215 @@
+[gd_scene load_steps=7 format=3 uid="uid://codex_ai_settings_panel"]
+
+[ext_resource type="Script" path="res://controllers/scripts/ai_settings_panel.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.012, 0.012, 0.015, 0.985)
+border_width_left = 3
+border_color = Color(0.9, 0.3, 0.05, 0.92)
+corner_radius_top_left = 42
+corner_radius_bottom_left = 8
+corner_detail = 1
+shadow_size = 24
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_field"]
+bg_color = Color(0.04, 0.04, 0.05, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.18)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_field_focus"]
+bg_color = Color(0.06, 0.045, 0.04, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.9, 0.3, 0.05, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
+bg_color = Color(0.9, 0.3, 0.05, 0.14)
+border_width_left = 4
+border_color = Color(0.9, 0.3, 0.05, 0.95)
+content_margin_left = 16.0
+content_margin_right = 16.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.9, 0.3, 0.05, 0.28)
+border_width_left = 4
+border_color = Color(1, 0.45, 0.12, 1)
+content_margin_left = 16.0
+content_margin_right = 16.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[node name="AISettingsPanel" type="CanvasLayer"]
+layer = 20
+process_mode = 3
+script = ExtResource("1_script")
+
+[node name="PanelRoot" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="DimOverlay" type="ColorRect" parent="PanelRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.18)
+
+[node name="DrawerPanel" type="Panel" parent="PanelRoot"]
+unique_name_in_owner = true
+layout_mode = 1
+custom_minimum_size = Vector2(760, 0)
+layout_mode = 1
+anchors_preset = 11
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 760.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelRoot/DrawerPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 64.0
+offset_top = 72.0
+offset_right = -56.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="TitleLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 42
+text = "AI 对话设置"
+
+[node name="HintLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 16
+text = "连接对话模型。Base URL / API Key / Model 会在输入后自动保存。"
+autowrap_mode = 3
+
+[node name="BaseUrlLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.78)
+theme_override_font_sizes/font_size = 20
+text = "Base URL"
+
+[node name="BaseUrlLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_field")
+theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
+placeholder_text = "http://127.0.0.1:18080 或 https://api.example.com/v1"
+
+[node name="ApiKeyLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.78)
+theme_override_font_sizes/font_size = 20
+text = "API Key"
+
+[node name="ApiKeyLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+secret = true
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_field")
+theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
+placeholder_text = "sk-..."
+
+[node name="ModelLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.78)
+theme_override_font_sizes/font_size = 20
+text = "Model"
+
+[node name="ModelLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_field")
+theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
+placeholder_text = "例如 gpt-4.1-mini / qwen3 / local-model"
+
+[node name="StatusLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+theme_override_font_sizes/font_size = 16
+text = "设置会自动保存"
+
+[node name="Spacer" type="Control" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BackButton" type="Button" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_hover")
+text = "返回暂停菜单"
+alignment = 0
+
+[node name="AutoSaveTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 0.35
+one_shot = true

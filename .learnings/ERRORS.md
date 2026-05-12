@@ -1605,3 +1605,59 @@ Use `D:\aaaGodot\Godot_v4.6.2-stable_win64.exe --headless --path <project> -s <s
 - Tags: godot, tests, powershell
 
 ---
+
+## [ERR-20260512-001] godot_path_stale
+
+**Logged**: 2026-05-12T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: config
+
+### Summary
+`GODOT_PATH` pointed to `D:\aaaGodot\Godot_v4.6.1-stable_win64.exe`, but installed Godot is 4.6.2/4.7 beta.
+
+### Error
+```
+The term 'D:\aaaGodot\Godot_v4.6.1-stable_win64.exe' is not recognized...
+```
+
+### Context
+- Command attempted: `& $env:GODOT_PATH --headless --path . --script res://tests/system/test_ai_settings_persistence.gd`
+- Actual usable console exe found: `D:\aaaGodot\Godot_v4.6.2-stable_win64_console.exe`
+
+### Suggested Fix
+Use the discovered console executable for headless CLI verification, or update `GODOT_PATH`.
+
+### Metadata
+- Reproducible: yes
+- Related Files: project.godot
+
+---
+
+## [ERR-20260512-002] powershell_replace_concat
+
+**Logged**: 2026-05-12T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: tooling
+
+### Summary
+PowerShell `-replace` with a replacement expression using `+` must wrap the replacement in parentheses, otherwise extra operands are parsed for `-replace`.
+
+### Error
+```
+The -replace operator allows only two elements to follow it, not 3.
+```
+
+### Context
+- While patching Godot `.tscn` and `.gd` files from PowerShell.
+- Safer fallback: use a short Python script for multi-line structured edits.
+
+### Suggested Fix
+Use `$s = $s -replace 'pattern', ($replacement + "`r`n")` or switch to Python for multi-line patches.
+
+### Metadata
+- Reproducible: yes
+- Related Files: controllers/ui/pause_menu.tscn, controllers/scripts/pause_menu.gd
+
+---

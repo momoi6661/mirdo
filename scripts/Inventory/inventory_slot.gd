@@ -43,9 +43,7 @@ func FillSlot(data:ItemData, amount:int=1):
 		SlotData=null
 		StackCount=0
 		IconSlot.texture=null
-		if CountLabel:
-			CountLabel.text = ''
-			CountLabel.visible = false
+		_update_count_label()
 		return
 	
 	if SlotFilled and SlotData != data:
@@ -53,37 +51,54 @@ func FillSlot(data:ItemData, amount:int=1):
 	
 	SlotData=data
 	SlotFilled=true
-	StackCount = amount
+	StackCount = clampi(amount, 1, _get_item_max_stack(data))
 	
 	IconSlot.texture=data.Icon
-	if CountLabel:
-		CountLabel.text = str(StackCount)
-		CountLabel.visible = data.MaxStackSize > 1 and StackCount > 1
+	_update_count_label()
 
 func AddStack(amount:int) -> bool:
-	if not SlotFilled or StackCount + amount > SlotData.MaxStackSize:
+	if not SlotFilled or amount <= 0:
+		return false
+	var max_stack := _get_item_max_stack(SlotData)
+	if StackCount + amount > max_stack:
 		return false
 	
 	StackCount += amount
-	if CountLabel:
-		CountLabel.text = str(StackCount)
-		CountLabel.visible = SlotData.MaxStackSize > 1 and StackCount > 1
+	_update_count_label()
 	return true
 
 func RemoveStack(amount:int) -> bool:
-	if not SlotFilled or StackCount < amount:
+	if not SlotFilled or amount <= 0 or StackCount < amount:
 		return false
 	
 	StackCount -= amount
-	if CountLabel:
-		CountLabel.text = str(StackCount)
-		CountLabel.visible = SlotData.MaxStackSize > 1 and StackCount > 1
+	if StackCount <= 0:
+		ClearSlot()
+	else:
+		_update_count_label()
 	return true
 
 func GetAvailableSpace() -> int:
 	if not SlotFilled:
 		return 0
-	return SlotData.MaxStackSize - StackCount
+	return maxi(0, _get_item_max_stack(SlotData) - StackCount)
+
+func _get_item_max_stack(item: ItemData) -> int:
+	if item == null:
+		return 1
+	if item.outing_category == "weapon":
+		return 1
+	return maxi(1, item.MaxStackSize)
+
+func _update_count_label() -> void:
+	if not CountLabel:
+		return
+	if not SlotFilled or StackCount <= 1:
+		CountLabel.text = ""
+		CountLabel.visible = false
+		return
+	CountLabel.text = str(StackCount)
+	CountLabel.visible = _get_item_max_stack(SlotData) > 1
 
 func _get_drag_data(at_position: Vector2) -> Variant:
 	print("=== 开始拖拽 ===")

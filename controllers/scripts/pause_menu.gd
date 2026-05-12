@@ -12,6 +12,7 @@ signal exit_requested
 @onready var main_menu_button = %MainMenuButton
 @onready var exit_button = %ExitGameButton
 @onready var animation_player = %AnimationPlayer
+@onready var ai_settings_panel = get_node_or_null("%AISettingsPanel")
 
 @onready var ui_sound_player=%UISoundPlayer
 
@@ -45,6 +46,7 @@ func _ready() -> void:
 		debug_load_button.pressed.connect(_on_debug_load_pressed)
 	
 	_connect_button_hover_sounds()
+	_connect_ai_settings_panel()
 	
 	if get_parent() == get_tree().root:
 		show_menu()
@@ -81,6 +83,11 @@ func hide_menu() -> void:
 	
 	_play_ui_sound("menu_close")
 	
+	if ai_settings_panel != null and ai_settings_panel.visible:
+		if ai_settings_panel.has_method("_flush_auto_save"):
+			ai_settings_panel.call("_flush_auto_save")
+		ai_settings_panel.hide()
+	
 	if animation_player:
 		animation_player.play("fade_out")
 		await animation_player.animation_finished
@@ -91,6 +98,16 @@ func hide_menu() -> void:
 	Input.mouse_mode = pre_pause_mouse_mode
 	get_tree().paused = false
 	is_transitioning = false
+
+func _connect_ai_settings_panel() -> void:
+	if ai_settings_panel == null:
+		return
+	if ai_settings_panel.has_signal("back_requested") and not ai_settings_panel.back_requested.is_connected(_on_ai_settings_back_requested):
+		ai_settings_panel.back_requested.connect(_on_ai_settings_back_requested)
+
+func _on_ai_settings_back_requested() -> void:
+	if visible:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func _connect_button_hover_sounds() -> void:
 	var buttons = [continue_button, save_button, options_button, main_menu_button, exit_button]
@@ -137,6 +154,8 @@ func _on_debug_load_pressed() -> void:
 func _on_options_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("options_requested")
+	if ai_settings_panel != null and ai_settings_panel.has_method("open_panel"):
+		ai_settings_panel.call("open_panel")
 
 func _on_main_menu_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -177,6 +196,8 @@ func _close_world_panel_before_pause() -> bool:
 	return false
 
 func _is_ui_text_input_focused() -> bool:
+	if ai_settings_panel != null and ai_settings_panel.visible:
+		return true
 	var viewport := get_viewport()
 	if viewport == null:
 		return false
@@ -190,3 +211,4 @@ func _is_ui_text_input_focused() -> bool:
 	if focus_owner is CodeEdit:
 		return true
 	return false
+

@@ -262,6 +262,7 @@ follow_speed = 15.0
 [node name="InventoryDataService" type="Node" parent="Components" unique_id=1256058613]
 script = ExtResource("16_inv_data")
 inventory_storage = ExtResource("24_inv_storage")
+enable_item_stacking = true
 
 [node name="PlayerInteractionComponent" type="Node" parent="Components" unique_id=2034430049 node_paths=PackedStringArray("interaction_ray")]
 script = ExtResource("13_yvtcv")

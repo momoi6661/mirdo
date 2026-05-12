@@ -89,10 +89,8 @@ script = ExtResource("2_slot_script")
 
 [resource]
 script = ExtResource("1_storage_script")
-source_id = &"utility_storage_box"
-display_name = "杂物物资箱"
-source_kind = "material"
-include_in_outing_pool = true
-notes = "杂物/能源物资箱，存放电池、胶带、燃料罐、电力芯等材料；这些资源未来用于发电机和设施供能，不放入武器柜。"
 slot_count = 24
 slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16"), SubResource("Resource_slot_17"), SubResource("Resource_slot_18"), SubResource("Resource_slot_19"), SubResource("Resource_slot_20"), SubResource("Resource_slot_21"), SubResource("Resource_slot_22"), SubResource("Resource_slot_23"), SubResource("Resource_slot_24")])
+source_id = &"utility_storage_box"
+display_name = "杂物物资箱"
+notes = "杂物/能源物资箱，存放电池、胶带、燃料罐、电力芯等材料；这些资源未来用于发电机和设施供能，不放入武器柜。"

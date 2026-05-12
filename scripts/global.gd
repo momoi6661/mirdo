@@ -9,10 +9,13 @@ const TRANSITION_UI_SCENE_PATH := "res://controllers/ui/transition_screen.tscn"
 const OUTING_TRANSITION_PRESET := "b"
 const OUTING_TRANSITION_HOLD_SEC := 0.48
 const OUTING_TRANSITION_WAIT_FRAMES := 3
+const OUTING_PROGRESS_DEFAULT_PATH := "res://levels/outing/state/outing_map_progress_default.tres"
+const OUTING_PROGRESS_SCRIPT := preload("res://levels/outing/resources/outing_map_progress_resource.gd")
 
 var player
 var outing_return_scene_path: String = ""
 var _shelter_inventory_runtime: Resource
+var _outing_map_progress_runtime: Resource
 var _shelter_storage_runtime_by_source_id: Dictionary = {}
 var _outing_transition_busy: bool = false
 var _pending_scene_change_path: String = ""
@@ -48,6 +51,21 @@ func reset_shelter_inventory_runtime() -> void:
 	_shelter_storage_runtime_by_source_id.clear()
 	get_shelter_inventory_runtime()
 	shelter_inventory_changed.emit()
+
+
+func get_outing_map_progress_runtime() -> Resource:
+	if _outing_map_progress_runtime == null:
+		var template := load(OUTING_PROGRESS_DEFAULT_PATH) as Resource
+		if template != null:
+			_outing_map_progress_runtime = template.duplicate(true) as Resource
+		if _outing_map_progress_runtime == null:
+			_outing_map_progress_runtime = OUTING_PROGRESS_SCRIPT.new() as Resource
+	return _outing_map_progress_runtime
+
+
+func reset_outing_map_progress_runtime() -> void:
+	_outing_map_progress_runtime = null
+	get_outing_map_progress_runtime()
 
 
 func get_or_create_shelter_storage_runtime(
@@ -96,9 +114,10 @@ func notify_shelter_inventory_changed() -> void:
 
 func build_global_save_payload() -> Dictionary:
 	return {
-		"version": 1,
+		"version": 2,
 		"outing_return_scene_path": outing_return_scene_path,
 		"shelter_inventory": _build_shelter_inventory_save_payload(),
+		"outing_map_progress": _build_outing_map_progress_save_payload(),
 	}
 
 
@@ -108,6 +127,8 @@ func apply_global_save_payload(payload: Dictionary) -> void:
 	outing_return_scene_path = String(payload.get("outing_return_scene_path", "")).strip_edges()
 	if payload.has("shelter_inventory") and payload["shelter_inventory"] is Dictionary:
 		_apply_shelter_inventory_save_payload(payload["shelter_inventory"])
+	if payload.has("outing_map_progress") and payload["outing_map_progress"] is Dictionary:
+		_apply_outing_map_progress_save_payload(payload["outing_map_progress"])
 
 
 func go_to_outing_map_from_current_scene() -> void:
@@ -136,6 +157,7 @@ func return_from_outing_map() -> void:
 	await _change_scene_with_transition(target_path, false)
 	if _last_scene_change_error == OK:
 		outing_return_scene_path = ""
+		_save_game_deferred()
 
 
 func _change_scene_with_transition(scene_path: String, release_mouse_after_load: bool = false) -> void:
@@ -208,6 +230,57 @@ func _ensure_transition_ui() -> Node:
 	instance.name = "TransitionUI"
 	tree.root.add_child(instance)
 	return instance
+
+
+func _build_outing_map_progress_save_payload() -> Dictionary:
+	var progress := get_outing_map_progress_runtime()
+	if progress == null:
+		return {
+			"version": 1,
+			"unlocked_location_ids": [],
+			"discovered_unlock_keys": [],
+			"successful_explore_counts": {},
+		}
+	return {
+		"version": 1,
+		"unlocked_location_ids": _packed_string_array_to_array(progress.get("unlocked_location_ids")),
+		"discovered_unlock_keys": _packed_string_array_to_array(progress.get("discovered_unlock_keys")),
+		"successful_explore_counts": (progress.get("successful_explore_counts") as Dictionary).duplicate(true),
+	}
+
+
+func _apply_outing_map_progress_save_payload(payload: Dictionary) -> void:
+	var progress := get_outing_map_progress_runtime()
+	if progress == null:
+		return
+	progress.set("unlocked_location_ids", _array_to_unique_packed_string_array(payload.get("unlocked_location_ids", [])))
+	progress.set("discovered_unlock_keys", _array_to_unique_packed_string_array(payload.get("discovered_unlock_keys", [])))
+	var counts: Variant = payload.get("successful_explore_counts", {})
+	progress.set("successful_explore_counts", counts.duplicate(true) if counts is Dictionary else {})
+
+
+func _packed_string_array_to_array(values: Variant) -> Array[String]:
+	var result: Array[String] = []
+	for value in values:
+		var text := String(value).strip_edges()
+		if not text.is_empty() and not result.has(text):
+			result.append(text)
+	return result
+
+
+func _array_to_unique_packed_string_array(values: Variant) -> PackedStringArray:
+	var result := PackedStringArray()
+	for value in values:
+		var text := String(value).strip_edges()
+		if not text.is_empty() and not result.has(text):
+			result.append(text)
+	return result
+
+
+func _save_game_deferred() -> void:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("save_game"):
+		save_manager.call_deferred("save_game")
 
 
 func _build_shelter_inventory_save_payload() -> Dictionary:

@@ -89,10 +89,9 @@ script = ExtResource("2_slot_script")
 
 [resource]
 script = ExtResource("1_storage_script")
+slot_count = 24
+slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16"), SubResource("Resource_slot_17"), SubResource("Resource_slot_18"), SubResource("Resource_slot_19"), SubResource("Resource_slot_20"), SubResource("Resource_slot_21"), SubResource("Resource_slot_22"), SubResource("Resource_slot_23"), SubResource("Resource_slot_24")])
 source_id = &"medical_cabinet"
 display_name = "医疗柜"
 source_kind = "medical"
-include_in_outing_pool = true
 notes = "保留24格实体医疗柜，只存绷带、止痛药、消毒药、急救箱等医疗物资；材料/能源改由杂物物资箱管理。"
-slot_count = 24
-slots = Array[ExtResource("2_slot_script")]([SubResource("Resource_slot_01"), SubResource("Resource_slot_02"), SubResource("Resource_slot_03"), SubResource("Resource_slot_04"), SubResource("Resource_slot_05"), SubResource("Resource_slot_06"), SubResource("Resource_slot_07"), SubResource("Resource_slot_08"), SubResource("Resource_slot_09"), SubResource("Resource_slot_10"), SubResource("Resource_slot_11"), SubResource("Resource_slot_12"), SubResource("Resource_slot_13"), SubResource("Resource_slot_14"), SubResource("Resource_slot_15"), SubResource("Resource_slot_16"), SubResource("Resource_slot_17"), SubResource("Resource_slot_18"), SubResource("Resource_slot_19"), SubResource("Resource_slot_20"), SubResource("Resource_slot_21"), SubResource("Resource_slot_22"), SubResource("Resource_slot_23"), SubResource("Resource_slot_24")])

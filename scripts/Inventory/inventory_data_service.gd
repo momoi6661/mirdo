@@ -10,7 +10,7 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 @export var inventory_storage: InventoryStorageResource
 @export var initial_slot_configs: Array[SlotConfig] = []
 @export var allow_saved_slot_count_override: bool = false
-@export var enable_item_stacking: bool = false
+@export var enable_item_stacking: bool = true
 
 var inventory_visible: bool = false
 var _storage_runtime_initialized: bool = false
@@ -224,7 +224,6 @@ func get_inventory_data() -> Dictionary:
 
 	return {
 		"version": SAVE_VERSION,
-		"enable_item_stacking": enable_item_stacking,
 		"slot_count": inventory_storage.slot_count,
 		"slots": serialized_slots,
 	}
@@ -236,8 +235,8 @@ func load_inventory_data(data: Variant) -> void:
 
 	if data is Dictionary:
 		var dict_data: Dictionary = data
-		if dict_data.has("enable_item_stacking"):
-			enable_item_stacking = bool(dict_data.get("enable_item_stacking", enable_item_stacking))
+		# 堆叠规则属于库存配置/玩法规则，不属于存档内容。
+		# 旧存档可能保存过 enable_item_stacking=false；这里不再让旧存档覆盖玩家/柜子的当前配置。
 		if allow_saved_slot_count_override and dict_data.has("slot_count"):
 			inventory_storage.slot_count = maxi(1, int(dict_data.get("slot_count", inventory_storage.slot_count)))
 			inventory_storage.ensure_capacity()

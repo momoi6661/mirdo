@@ -15,6 +15,8 @@ func _init() -> void:
 
 
 func _run_tests() -> void:
+	_test_player_inventory_defaults_to_stacking()
+	_test_save_payload_does_not_override_stacking_rule()
 	_test_non_weapon_stacks_in_enabled_inventory()
 	_test_weapon_never_stacks_in_enabled_inventory()
 	_test_container_rejects_disallowed_category()
@@ -22,6 +24,31 @@ func _run_tests() -> void:
 	_test_transfer_does_not_stack_weapons()
 	_test_outing_loadout_stacks_non_weapons_only()
 	_test_outing_commit_entries_and_shelter_return()
+
+
+func _test_player_inventory_defaults_to_stacking() -> void:
+	var water := load("res://resources/items/water_bottle.tres") as ItemData
+	var inv := InventoryDataService.new()
+	inv.inventory_storage = InventoryStorageResource.new()
+	inv.inventory_storage.slot_count = 12
+	inv.inventory_storage.ensure_capacity()
+	inv._ready()
+	_expect(inv.pickup_item(water, 3), "角色身上物品栏默认应允许非武器堆叠")
+	_expect(int(inv.get_slot_data(0).get("amount", 0)) == 3, "角色身上物品栏拾取同类补给应堆到同一格")
+
+
+func _test_save_payload_does_not_override_stacking_rule() -> void:
+	var water := load("res://resources/items/water_bottle.tres") as ItemData
+	var inv := _make_inventory(12, true)
+	inv.load_inventory_data({
+		"version": 3,
+		"enable_item_stacking": false,
+		"slot_count": 12,
+		"slots": [],
+	})
+	_expect(inv.enable_item_stacking, "旧存档里的 enable_item_stacking=false 不应覆盖当前角色库存配置")
+	_expect(inv.pickup_item(water, 3), "加载旧存档后角色库存仍应允许堆叠")
+	_expect(int(inv.get_slot_data(0).get("amount", 0)) == 3, "旧存档加载后同类物品仍应堆到同一格")
 
 
 func _test_non_weapon_stacks_in_enabled_inventory() -> void:

@@ -470,7 +470,13 @@ func _load_progress_state() -> void:
 			if rule.get("start_unlocked"):
 				_unlocked_ids[String(rule.get("location_id"))] = true
 		return
-	_progress = load(DEFAULT_PROGRESS_PATH) as Resource
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null and global_node.has_method("get_outing_map_progress_runtime"):
+		_progress = global_node.call("get_outing_map_progress_runtime") as Resource
+	if _progress == null:
+		var progress_template := load(DEFAULT_PROGRESS_PATH) as Resource
+		if progress_template != null:
+			_progress = progress_template.duplicate(true) as Resource
 	if _progress == null:
 		var progress_script := load("res://levels/outing/resources/outing_map_progress_resource.gd") as Script
 		_progress = progress_script.new() as Resource if progress_script != null else Resource.new()
@@ -478,7 +484,10 @@ func _load_progress_state() -> void:
 		_unlocked_ids[String(id)] = true
 	for rule in _rules:
 		if rule.get("start_unlocked"):
-			_unlocked_ids[String(rule.get("location_id"))] = true
+			var start_id := String(rule.get("location_id"))
+			_unlocked_ids[start_id] = true
+			if _progress != null and _progress.has_method("unlock_location"):
+				_progress.call("unlock_location", start_id)
 
 
 func _load_shelter_inventory() -> void:
@@ -929,7 +938,6 @@ func _commit_loadout_to_shelter_inventory() -> Dictionary:
 			_increment_dict_count(summary["consumed_names"], item.ItemName, 1)
 	if int(summary["committed"]) > 0:
 		_notify_shelter_inventory_changed()
-		_save_after_expedition_inventory_change()
 	return summary
 
 
@@ -983,6 +991,7 @@ func _confirm_expedition() -> void:
 	_rebuild_tool_list()
 	_update_capacity_label()
 	_sync_map()
+	_save_after_expedition_state_change()
 	_expedition_resolving = false
 	if result_return_button != null:
 		result_return_button.disabled = false
@@ -1141,11 +1150,10 @@ func _deposit_loot_entries(entries: Array[Dictionary]) -> Dictionary:
 		summary["lost"] = int(summary["lost"]) + maxi(0, amount - added)
 	if int(summary["added"]) > 0:
 		_notify_shelter_inventory_changed()
-		_save_after_expedition_inventory_change()
 	return summary
 
 
-func _save_after_expedition_inventory_change() -> void:
+func _save_after_expedition_state_change() -> void:
 	var save_manager := get_node_or_null("/root/SaveManager")
 	if save_manager == null or not save_manager.has_method("save_game"):
 		return

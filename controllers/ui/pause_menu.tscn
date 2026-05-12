@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bkt2b3xik1gda" path="res://controllers/scripts/pause_menu.gd" id="1_script"]
 [ext_resource type="Shader" uid="uid://1nay0wyo4yvl" path="res://controllers/ui/shaders/cyber_glitch_transition.gdshader" id="2_rmx5d"]
+[ext_resource type="PackedScene" path="res://controllers/ui/AISettingsPanel.tscn" id="3_ai_settings_panel"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8747e"]
 shader = ExtResource("2_rmx5d")
@@ -426,6 +427,11 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.5)
 theme_override_font_sizes/font_size = 14
 text = "[ESC] 返回"
 
+
+[node name="AISettingsPanel" parent="." instance=ExtResource("3_ai_settings_panel")]
+unique_name_in_owner = true
+visible = false
+
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1518216197]
 unique_name_in_owner = true
 libraries/ = SubResource("AnimationLibrary_anim")
@@ -438,3 +444,4 @@ unique_name_in_owner = true
 [connection signal="pressed" from="Control/SidePanel/VBoxContainer/OptionsButton" to="." method="_on_options_pressed"]
 [connection signal="pressed" from="Control/SidePanel/VBoxContainer/MainMenuButton" to="." method="_on_main_menu_pressed"]
 [connection signal="pressed" from="Control/SidePanel/VBoxContainer/ExitGameButton" to="." method="_on_exit_pressed"]
+
