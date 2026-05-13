@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="InventoryStorageResource" format=3]
+[gd_resource type="Resource" script_class="InventoryStorageResource" format=3 uid="uid://c5l6uuhf65rvq"]
 
 [ext_resource type="Script" uid="uid://bobrl64w5up62" path="res://scripts/Inventory/inventory_storage_resource.gd" id="1_storage_script"]
 [ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
@@ -65,4 +65,3 @@ source_id = &"food_cabinet_2"
 display_name = "食品柜2号"
 source_kind = "food"
 notes = "保留16格实体食品柜，只接收带“食品柜”标签的水和罐头类补给；不混放医疗、材料、武器或工具。"
-

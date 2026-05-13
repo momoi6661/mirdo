@@ -3,10 +3,10 @@
 [ext_resource type="PackedScene" uid="uid://crceaemdo8gpf" path="res://levels/bunker_local_pbr.tscn" id="1_bunker"]
 [ext_resource type="Environment" uid="uid://d1jkw8urchsuj" path="res://environment/WE_bunker_real.tres" id="2_env"]
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_suxrs"]
-[ext_resource type="PackedScene" path="res://characters/xiaokong/xiaokong1.tscn" id="4_qn8gb"]
+[ext_resource type="PackedScene" uid="uid://b6svd2wt3lxks" path="res://characters/xiaokong/xiaokong1.tscn" id="4_qn8gb"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="4_u5pho"]
-[ext_resource type="PackedScene" path="res://resources/items/models/legacy/water_bottle.tscn" id="6_2kvbe"]
-[ext_resource type="PackedScene" path="res://resources/items/models/legacy/can_soup.tscn" id="7_b0r85"]
+[ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://resources/items/models/legacy/water_bottle.tscn" id="6_2kvbe"]
+[ext_resource type="PackedScene" uid="uid://cqwb5ngi64ksv" path="res://resources/items/models/legacy/can_soup.tscn" id="7_b0r85"]
 
 [sub_resource type="FogMaterial" id="FogMaterial_main_haze"]
 density = 0.014
@@ -195,7 +195,6 @@ affect_navigation_mesh = true
 
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
-xiaokong_status_panel = NodePath("../Xiaokong1/xiaokong/StatusPanel")
 
 [node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5113752, 0.0219687, -0.6291559)

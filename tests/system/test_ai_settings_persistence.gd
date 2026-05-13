@@ -31,7 +31,7 @@ func _test_settings_resource_roundtrip() -> void:
 	settings.call("set_config_path_for_tests", path)
 	settings.call("load_settings")
 
-	_expect(String(settings.get("base_url")) == "http://127.0.0.1:18080", "default base_url should target local backend")
+	_expect(String(settings.get("base_url")) == "", "default provider base_url should be empty until user fills model settings")
 	_expect(String(settings.get("api_key")) == "", "default api_key should be empty")
 	_expect(String(settings.get("model")) == "", "default model should be empty")
 

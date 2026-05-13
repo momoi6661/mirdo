@@ -1,0 +1,188 @@
+extends Node
+signal service_ready
+signal service_starting
+signal service_start_failed(error_message: String)
+signal service_stopped
+
+@export var auto_start_enabled: bool = true
+@export var stop_on_exit: bool = true
+@export var server_host: String = "127.0.0.1"
+@export_range(1, 65535, 1) var server_port: int = 5678
+@export var use_https: bool = false
+@export var health_path: String = "/health"
+@export var server_dir_path: String = "res://../Server"
+@export var server_script_name: String = "run_server.py"
+@export var python_executable: String = ""
+@export_range(0.2, 10.0, 0.1) var health_timeout_sec: float = 1.0
+@export_range(0.2, 10.0, 0.1) var startup_poll_interval_sec: float = 0.5
+@export_range(1.0, 30.0, 0.5) var startup_timeout_sec: float = 20.0
+@export var debug_log: bool = true
+
+var _health_request: HTTPRequest
+var _started_by_this_game: bool = false
+var _server_pid: int = 0
+var _checking_after_spawn: bool = false
+var _startup_elapsed_sec: float = 0.0
+var _poll_elapsed_sec: float = 0.0
+var _quit_requested: bool = false
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ensure_health_request()
+	set_process(true)
+	if auto_start_enabled:
+		call_deferred("ensure_service_running")
+
+func _process(delta: float) -> void:
+	if not _checking_after_spawn:
+		return
+	_startup_elapsed_sec += delta
+	_poll_elapsed_sec += delta
+	if _startup_elapsed_sec >= startup_timeout_sec:
+		_checking_after_spawn = false
+		var message := "server_start_timeout"
+		_log(message)
+		service_start_failed.emit(message)
+		return
+	if _poll_elapsed_sec >= startup_poll_interval_sec:
+		_poll_elapsed_sec = 0.0
+		_check_health(true)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE:
+		shutdown_service_if_owned()
+
+func ensure_service_running() -> void:
+	_ensure_health_request()
+	_checking_after_spawn = false
+	_check_health(false)
+
+func shutdown_service_if_owned() -> void:
+	if _quit_requested:
+		return
+	_quit_requested = true
+	if not stop_on_exit:
+		return
+	if _started_by_this_game and _server_pid > 0:
+		_log("stopping owned server pid=%d" % _server_pid)
+		OS.kill(_server_pid)
+		_server_pid = 0
+		_started_by_this_game = false
+		service_stopped.emit()
+
+func _check_health(after_spawn: bool) -> void:
+	_ensure_health_request()
+	if _health_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		return
+	_checking_after_spawn = after_spawn
+	_health_request.timeout = health_timeout_sec
+	var err := _health_request.request(_build_health_url(), PackedStringArray(["Accept: application/json"]), HTTPClient.METHOD_GET, "")
+	if err != OK:
+		_log("health_request_failed err=%d" % err)
+		if after_spawn:
+			return
+		_start_server_process()
+
+func _on_health_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var body_text := body.get_string_from_utf8()
+	if result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300 and _is_health_ok(body_text):
+		_checking_after_spawn = false
+		_log("server_ready")
+		service_ready.emit()
+		return
+	if _checking_after_spawn:
+		return
+	_start_server_process()
+
+func _start_server_process() -> void:
+	if _started_by_this_game and _server_pid > 0:
+		return
+	var command := _build_start_command()
+	var executable := String(command.get("executable", "")).strip_edges()
+	var arguments: Array = command.get("arguments", [])
+	if executable.is_empty():
+		var message := "python_executable_missing"
+		_log(message)
+		service_start_failed.emit(message)
+		return
+	_log("starting server executable=%s args=%s" % [executable, str(arguments)])
+	service_starting.emit()
+	var pid := OS.create_process(executable, PackedStringArray(arguments), false)
+	if pid <= 0:
+		var message := "server_process_failed_%d" % pid
+		_log(message)
+		service_start_failed.emit(message)
+		return
+	_server_pid = pid
+	_started_by_this_game = true
+	_checking_after_spawn = true
+	_startup_elapsed_sec = 0.0
+	_poll_elapsed_sec = startup_poll_interval_sec
+
+func _build_health_url() -> String:
+	var protocol := "https" if use_https else "http"
+	var path := health_path.strip_edges()
+	if path.is_empty():
+		path = "/health"
+	if not path.begins_with("/"):
+		path = "/" + path
+	return "%s://%s:%d%s" % [protocol, server_host, server_port, path]
+
+func _build_start_command() -> Dictionary:
+	var script_path := _server_script_path()
+	var executable := python_executable.strip_edges()
+	if executable.is_empty():
+		executable = _resolve_server_python_executable(script_path.get_base_dir())
+	return {
+		"executable": executable,
+		"script": script_path,
+		"arguments": [script_path],
+	}
+
+func _resolve_server_python_executable(server_dir: String) -> String:
+	var candidates: Array[String] = []
+	if OS.get_name() == "Windows":
+		candidates.append(server_dir.path_join(".venv").path_join("Scripts").path_join("python.exe"))
+		candidates.append(server_dir.path_join(".venv").path_join("Scripts").path_join("python"))
+	else:
+		candidates.append(server_dir.path_join(".venv").path_join("bin").path_join("python3"))
+		candidates.append(server_dir.path_join(".venv").path_join("bin").path_join("python"))
+	for candidate in candidates:
+		if FileAccess.file_exists(candidate):
+			return candidate
+	return _default_python_executable()
+
+func _server_script_path() -> String:
+	var server_dir := server_dir_path.strip_edges()
+	if server_dir.is_empty():
+		server_dir = "res://../Server"
+	var absolute_dir := ProjectSettings.globalize_path(server_dir)
+	var script_name := server_script_name.strip_edges()
+	if script_name.is_empty():
+		script_name = "run_server.py"
+	return absolute_dir.path_join(script_name)
+
+func _default_python_executable() -> String:
+	if OS.get_name() == "Windows":
+		return "python"
+	return "python3"
+
+func _is_health_ok(body_text: String) -> bool:
+	var parser := JSON.new()
+	if parser.parse(body_text) != OK or parser.data is not Dictionary:
+		return false
+	var data: Dictionary = parser.data
+	return bool(data.get("ok", false))
+
+func _ensure_health_request() -> void:
+	if _health_request != null and is_instance_valid(_health_request):
+		return
+	_health_request = HTTPRequest.new()
+	_health_request.name = "AIServiceHealthRequest"
+	add_child(_health_request)
+	if not _health_request.request_completed.is_connected(_on_health_completed):
+		_health_request.request_completed.connect(_on_health_completed)
+
+func _log(message: String) -> void:
+	if debug_log:
+		print("[AIServiceSupervisor] %s" % message)

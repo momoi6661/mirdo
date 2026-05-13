@@ -17,7 +17,7 @@ signal on_model_probe_received(response: Dictionary)
 signal on_model_probe_error(error_msg: String)
 
 @export var server_host: String = "127.0.0.1"
-@export_range(1, 65535, 1) var server_port: int = 18080
+@export_range(1, 65535, 1) var server_port: int = 5678
 @export var chat_stream_endpoint_path: String = "/chat_stream"
 @export var chat_endpoint_path: String = "/chat"
 @export var debug_subtitle_endpoint_path: String = "/debug/subtitle_test_stream"
@@ -28,13 +28,14 @@ signal on_model_probe_error(error_msg: String)
 @export var use_https: bool = false
 @export var request_timeout_sec: float = 45.0
 @export_range(10.0, 600.0, 1.0) var stream_idle_timeout_sec: float = 120.0
-@export var enable_true_sse_stream: bool = true
+@export var enable_true_sse_stream: bool = false
 @export var session_event_stream_enabled: bool = false
 @export_range(0.005, 0.2, 0.005) var stream_poll_interval_sec: float = 0.005
 @export_range(0.5, 60.0, 0.5) var session_event_keepalive_timeout_sec: float = 30.0
 @export_range(0.2, 10.0, 0.1) var session_event_reconnect_delay_sec: float = 1.5
 @export var debug_log: bool = false
 @export var always_log: bool = true
+@export var use_ai_settings_service: bool = true
 
 var is_requesting: bool = false
 
@@ -44,6 +45,7 @@ var _events_pull_request: HTTPRequest
 var _probe_request: HTTPRequest
 var _last_request_payload: Dictionary = {}
 var _last_request_context: Dictionary = {}
+var _settings_service: Node = null
 var _history_requesting: bool = false
 var _history_request_session_id: String = ""
 var _events_pull_requesting: bool = false
@@ -82,6 +84,7 @@ var _event_reconnect_left_sec: float = -1.0
 var _event_last_turn_id: int = 0
 
 func _ready() -> void:
+	_resolve_settings_service()
 	_ensure_http_request()
 	_ensure_history_request()
 	_ensure_events_pull_request()
@@ -1223,6 +1226,11 @@ func _normalize_chat_request(raw_payload: Dictionary) -> Dictionary:
 		"given_item": item_value,
 		"context": context_value,
 	}
+	var provider := _build_provider_from_settings()
+	if not provider.is_empty():
+		normalized["provider"] = provider
+	elif payload.get("provider", null) is Dictionary:
+		normalized["provider"] = (payload.get("provider") as Dictionary).duplicate(true)
 	if payload.has("max_context_turns"):
 		var max_context_turns_value := int(payload.get("max_context_turns", 0))
 		if max_context_turns_value > 0:
@@ -1237,3 +1245,31 @@ func _emit_error(msg: String) -> void:
 func _log(message: String) -> void:
 	if always_log or debug_log:
 		print("[AIManager] %s" % message)
+
+func set_settings_service_for_tests(service: Node) -> void:
+	_settings_service = service
+
+func _resolve_settings_service() -> void:
+	if not use_ai_settings_service:
+		return
+	if _settings_service != null and is_instance_valid(_settings_service):
+		return
+	_settings_service = get_node_or_null("/root/AISettings")
+
+func _build_provider_from_settings() -> Dictionary:
+	_resolve_settings_service()
+	if _settings_service == null:
+		return {}
+	var base_url := String(_settings_service.get("base_url")).strip_edges()
+	while base_url.length() > 1 and base_url.ends_with("/"):
+		base_url = base_url.substr(0, base_url.length() - 1)
+	var api_key := String(_settings_service.get("api_key")).strip_edges()
+	var model := String(_settings_service.get("model")).strip_edges()
+	if base_url.is_empty() or model.is_empty():
+		return {}
+	return {
+		"base_url": base_url,
+		"api_key": api_key,
+		"model": model,
+	}
+

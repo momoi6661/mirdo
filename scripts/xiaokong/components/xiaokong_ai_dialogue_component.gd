@@ -15,7 +15,7 @@ signal model_probe_failed(error_text: String)
 @export var time_component_path: NodePath
 @export var action_router_path: NodePath
 @export var auto_apply_ai_response: bool = true
-@export var use_local_fallback_on_error: bool = false
+@export var use_local_fallback_on_error: bool = true
 @export var fallback_reply_text: String = "信号不稳定，我们先留在避难所，稳住状态再行动。"
 @export_range(-20.0, 20.0, 0.5) var fallback_mood_delta: float = 1.0
 @export var session_id: String = "default_session"
@@ -390,6 +390,23 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 	var dialogue_text := _extract_dialogue(final_data)
 	if dialogue_text.is_empty():
 		dialogue_text = "……"
+	if _should_suppress_error_dialogue(dialogue_text, final_data) and use_local_fallback_on_error:
+		var error_reason := _extract_error_reason(dialogue_text, final_data)
+		var fallback_data = {
+			"dialogue": fallback_reply_text,
+			"action": "Idle",
+			"stat_change": {
+				"mood": fallback_mood_delta,
+			},
+		}
+		_log("ai_completed_error_fallback reason=%s" % error_reason)
+		_emit_dialogue_report(fallback_reply_text, fallback_data, {
+			"request_payload": _last_payload.duplicate(true),
+			"fallback": true,
+			"fallback_reason": error_reason,
+		})
+		_early_action_applied = ""
+		return
 	_emit_dialogue_report(dialogue_text, final_data.duplicate(true), {
 		"request_payload": _last_payload.duplicate(true),
 		"turn_id": turn_id,

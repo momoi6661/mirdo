@@ -4,7 +4,7 @@ signal settings_changed(settings: Dictionary)
 signal settings_saved(settings: Dictionary)
 signal save_failed(error_message: String)
 
-const DEFAULT_BASE_URL := "http://127.0.0.1:18080"
+const DEFAULT_BASE_URL := ""
 const DEFAULT_API_KEY := ""
 const DEFAULT_MODEL := ""
 const DEFAULT_CONFIG_PATH := "user://ai_settings.cfg"

@@ -1,14 +1,14 @@
 {
 	"authConfigured": true,
 	"bridgeUrl": "ws://127.0.0.1:8766",
-	"connected": true,
-	"helloAcknowledged": true,
-	"helloAttempts": 1,
+	"connected": false,
+	"helloAcknowledged": false,
+	"helloAttempts": 0,
 	"lastError": "",
-	"lastHeartbeatMs": 41894,
+	"lastHeartbeatMs": 0,
 	"projectPath": "D:/AAgodot/FPS/",
-	"registered": true,
-	"sessionId": "runtime-7056-8400",
-	"socketState": 1,
-	"timestamp": "2026-05-12T04:24:40"
+	"registered": false,
+	"sessionId": "runtime-340-862",
+	"socketState": 0,
+	"timestamp": "2026-05-13T02:14:40"
 }

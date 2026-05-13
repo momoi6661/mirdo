@@ -19,6 +19,5 @@ MaxStackSize = 5
 consumable_effect = SubResource("Resource_water_effect")
 outing_category = "food"
 can_take_outing = true
-inventory_tags = PackedStringArray("食品柜", "补给", "饮水")
 ai_rule_hint = "长时间外出和高温/粉尘环境中可消耗，降低口渴和返程失误风险。"
 metadata/_custom_type_script = "uid://bdhapua5nkgw8"

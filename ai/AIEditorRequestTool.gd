@@ -3,7 +3,7 @@ extends Node
 class_name AIEditorRequestTool
 
 @export var server_host: String = "127.0.0.1"
-@export_range(1, 65535, 1) var server_port: int = 18080
+@export_range(1, 65535, 1) var server_port: int = 5678
 @export var use_https: bool = false
 
 @export var chat_endpoint_path: String = "/chat"
@@ -31,6 +31,7 @@ class_name AIEditorRequestTool
 @export_multiline var last_response_json: String = "{}"
 @export var last_status: String = "idle"
 @export var warn_when_game_not_running: bool = true
+@export var use_ai_settings_service: bool = true
 
 var _send_chat_trigger: bool = false
 @export var send_chat_now: bool:
@@ -68,8 +69,10 @@ var _clear_request: HTTPRequest
 var _chat_busy: bool = false
 var _probe_busy: bool = false
 var _clear_busy: bool = false
+var _settings_service: Node = null
 
 func _ready() -> void:
+	_resolve_settings_service()
 	_ensure_requests()
 
 func send_chat_manual() -> void:
@@ -232,9 +235,40 @@ func _build_chat_payload() -> Dictionary:
 		"given_item": given_item.strip_edges(),
 		"context": context_dict,
 	}
+	var provider := _build_provider_from_settings()
+	if not provider.is_empty():
+		payload["provider"] = provider
 	if max_context_turns > 0:
 		payload["max_context_turns"] = max_context_turns
 	return payload
+
+
+func set_settings_service_for_tests(service: Node) -> void:
+	_settings_service = service
+
+func _resolve_settings_service() -> void:
+	if not use_ai_settings_service:
+		return
+	if _settings_service != null and is_instance_valid(_settings_service):
+		return
+	_settings_service = get_node_or_null("/root/AISettings")
+
+func _build_provider_from_settings() -> Dictionary:
+	_resolve_settings_service()
+	if _settings_service == null:
+		return {}
+	var base_url := String(_settings_service.get("base_url")).strip_edges()
+	while base_url.length() > 1 and base_url.ends_with("/"):
+		base_url = base_url.substr(0, base_url.length() - 1)
+	var api_key := String(_settings_service.get("api_key")).strip_edges()
+	var model := String(_settings_service.get("model")).strip_edges()
+	if base_url.is_empty() or model.is_empty():
+		return {}
+	return {
+		"base_url": base_url,
+		"api_key": api_key,
+		"model": model,
+	}
 
 func _resolve_effective_session_id(raw_session_id: String) -> String:
 	var clean := raw_session_id.strip_edges()

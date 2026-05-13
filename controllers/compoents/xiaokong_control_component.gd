@@ -230,7 +230,10 @@ func send_dialogue_text(text: String) -> bool:
 			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
 		_subtitle_stream_finished_early = false
-		_begin_subtitle_stream(subtitle_speaker_name)
+		if _dialogue_component != null and bool(_dialogue_component.get("use_local_fallback_on_error")):
+			_show_subtitle_once("小空正在思考……", subtitle_speaker_name)
+		else:
+			_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
 			_panel.call("set_dialogue_reply", "(thinking...)")
 		_set_status("Dialogue request sent.")
@@ -265,7 +268,7 @@ func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
 			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
 		_subtitle_stream_finished_early = false
-		_begin_subtitle_stream(subtitle_speaker_name)
+		_show_subtitle_once("字幕测试发送中……", subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
 			_panel.call("set_dialogue_reply", "(debug subtitle test...)")
 		_set_status("Debug subtitle test sent.")
