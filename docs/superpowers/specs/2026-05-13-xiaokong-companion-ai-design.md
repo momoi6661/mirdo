@@ -1,8 +1,8 @@
-# 小空陪伴 AI、自动表情与语义视觉设计
+# 角色 AI、自动表情与语义视觉设计
 
 **Date:** 2026-05-13  
 **Status:** Draft for user review  
-**Scope:** 小空角色 AI 控制解耦 / 陪伴型自主行为 / 自动表情与眨眼 / 场景设施语义感知 / AI 可用世界快照
+**Scope:** 通用角色 AI 控制解耦 / 陪伴型自主行为 / 自动表情与眨眼 / 场景设施语义感知 / AI 可用世界快照 / 小空首个接入
 
 ---
 
@@ -30,13 +30,13 @@
 3. **场景对 AI 没有语义**  
    场景中有餐桌、床、柜子、椅子、储物箱、食物等真实对象，但 AI 主要只能靠 Marker 名称或硬编码关键词理解它们。AI 缺少“这里有什么、东西干什么用、我能去哪、能做什么”的结构化世界快照。
 
-本设计目标是先建立清晰边界：让小空能“看见”设施语义，能在空闲时轻量自主行动，并能自动使用已有表情/眨眼资源，同时不破坏现有对话、坐下、床、梯子、外出等功能。
+本设计目标是先建立清晰边界：让角色能“看见”设施语义，能在空闲时轻量自主行动，并能自动使用已有表情/眨眼资源；小空作为首个接入角色，同时不破坏现有对话、坐下、床、梯子、外出等功能。
 
 ---
 
 ## 2. 目标
 
-第一版目标：
+第一版目标：通用组件先落地，小空作为首个接入与验证对象。
 
 1. **角色不再空站**
    - 玩家靠近时会关注玩家。
@@ -54,7 +54,7 @@
 3. **AI 控制解耦**
    - 短期保留旧 `apply_ai_response()` 外部入口，但内部执行链由新组件替代。
    - 新增更清晰的意图解释、动作执行、陪伴导演、表情导演、感知组件。
-   - 旧 Router 仅作为短期入口适配，核心控制由新组件替代。
+   - 旧小空 Router 仅作为短期入口适配，核心控制由通用新组件替代。
 
 4. **设施/物品语义视觉**
    - 给设施和物品添加可被 AI 读取的名称、描述、标签、可执行动作、导航点。
@@ -91,6 +91,32 @@
 - 实施计划必须优先建立新执行链，再迁移外部调用。
 
 ---
+---
+
+## 3.2 命名与复用决策：新组件不绑定小空
+
+新架构组件必须按“角色 AI / 世界语义”命名，不再用 `Xiaokong` 前缀。
+
+原因：
+
+- 感知、意图解释、动作执行、表情、陪伴行为都不是小空独有能力。
+- 后续如果增加其他 NPC，不应复制一套 `SomeNpcPerceptionComponent`。
+- 小空只是第一位接入该通用角色 AI 架构的角色。
+
+命名原则：
+
+- 通用角色能力使用 `Character*` 或 `CharacterAI*` 前缀。
+- 世界语义能力使用 `AIWorld*` 或 `AIPerception*` 前缀。
+- 只有小空特有状态、面板、旧兼容脚本继续保留 `Xiaokong` 前缀。
+- 新组件通过导出路径、接口和配置资源适配不同角色，而不是写死小空节点结构。
+
+小空接入方式：
+
+- 在小空场景中挂通用组件。
+- 通用组件通过 `CharacterAIProfileResource` 或导出 NodePath 绑定小空现有状态、导航、动画、表情、字幕组件。
+- 旧小空组件只作为迁移来源或适配对象，不再决定新架构命名。
+
+---
 ## 4. 总体架构
 
 建议采用“新架构接管旧架构”的方式。旧 `XiaokongAIActionRouterComponent` 不再作为核心长期保留，只作为短期薄适配层或迁移壳存在。
@@ -100,30 +126,31 @@ AI / 玩家交互 / 自主导演
         ↓
 XiaokongAIActionRouterComponent 兼容入口
         ↓
-XiaokongIntentInterpreterComponent
+CharacterAIIntentInterpreterComponent
         ↓
-XiaokongActionExecutorComponent
+CharacterAIActionExecutorComponent
         ↓
 现有 Navigation / Animation / IK / State / Face / Subtitle
 ```
 
 新增/调整组件：
 
-1. `XiaokongIntentInterpreterComponent`
-2. `XiaokongActionExecutorComponent`
-3. `XiaokongCompanionDirectorComponent`
-4. `XiaokongAffectiveDirectorComponent`
-5. `XiaokongPerceptionComponent`
+1. `CharacterAIIntentInterpreterComponent`
+2. `CharacterAIActionExecutorComponent`
+3. `CharacterCompanionDirectorComponent`
+4. `CharacterAffectiveDirectorComponent`
+5. `CharacterPerceptionComponent`
 6. `AIWorldObjectComponent`
 7. `AIPerceptionArea3D`
-8. 可选资源：`AIWorldObjectProfileResource`
+8. `CharacterAIProfileResource`
+9. 可选资源：`AIWorldObjectProfileResource`
 
 旧 `XiaokongAIActionRouterComponent` 的新定位：
 
 - **不再新增功能**。
 - **不再作为真实决策/执行中心**。
 - 短期只保留 `apply_ai_response(final_data)` 作为外部旧调用入口。
-- 入口内部立即转交给 `XiaokongIntentInterpreterComponent` 与 `XiaokongActionExecutorComponent`。
+- 入口内部立即转交给 `CharacterAIIntentInterpreterComponent` 与 `CharacterAIActionExecutorComponent`。
 - 迁移完成后，旧 Router 只剩薄适配，或由新入口完全替代。
 - 坐下、Marker 查找、导航、IK、状态增减等核心逻辑应迁移到新组件，不再在旧 Router 中继续扩写。
 
@@ -131,7 +158,7 @@ XiaokongActionExecutorComponent
 
 ## 5. 组件职责
 
-### 5.1 `XiaokongIntentInterpreterComponent`
+### 5.1 `CharacterAIIntentInterpreterComponent`
 
 职责：把外部输入标准化成内部意图，不执行任何动作。
 
@@ -178,7 +205,7 @@ XiaokongActionExecutorComponent
   - `target_ref`：对象/Marker/区域引用。
   - `action`：到达后播放什么动作。
 
-### 5.2 `XiaokongActionExecutorComponent`
+### 5.2 `CharacterAIActionExecutorComponent`
 
 职责：只执行标准意图。
 
@@ -186,7 +213,7 @@ XiaokongActionExecutorComponent
 
 - 现有动作控制器 / 动画状态机。
 - `XiaokongNavigationComponent`
-- `XiaokongPerceptionComponent`
+- `CharacterPerceptionComponent`
 - `XiaokongFaceAnimationComponent`
 - `WorldSubtitleComponent`
 - `XiaokongStateComponent`
@@ -209,7 +236,7 @@ XiaokongActionExecutorComponent
 - 旧 Router 只允许在短期内作为入口适配，不允许作为执行回退。
 - 如果某个旧分支质量明显有问题，优先用新实现替代，而不是搬运原问题。
 
-### 5.3 `XiaokongCompanionDirectorComponent`
+### 5.3 `CharacterCompanionDirectorComponent`
 
 职责：低频决策轻量自主陪伴行为。
 
@@ -259,7 +286,7 @@ XiaokongActionExecutorComponent
    - 触发一句短提示，例如“水好像不多了。”
    - 不自动扣物品，除非后续有明确规则。
 
-### 5.4 `XiaokongAffectiveDirectorComponent`
+### 5.4 `CharacterAffectiveDirectorComponent`
 
 职责：统一管理自动表情。
 
@@ -319,7 +346,7 @@ XiaokongActionExecutorComponent
 - 连续相同表情不重复 travel。
 - 临时表情带超时，到期自动恢复。
 
-### 5.5 `XiaokongPerceptionComponent`
+### 5.5 `CharacterPerceptionComponent`
 
 职责：生成 AI 可读的世界快照。
 
@@ -383,7 +410,28 @@ XiaokongActionExecutorComponent
 - 默认半径 `6~10 米`。
 - 对象数量限制，例如最近 `12` 个对象、最近 `6` 个区域、最近 `8` 个物品。
 
-### 5.6 `AIWorldObjectComponent`
+### 5.6 `CharacterAIProfileResource`
+
+通用角色 AI 配置资源，用于避免新组件写死小空节点结构。
+
+建议字段：
+
+```gdscript
+@export var character_id: StringName
+@export var display_name: String
+@export var state_component_path: NodePath
+@export var navigation_component_path: NodePath
+@export var action_controller_path: NodePath
+@export var face_component_path: NodePath
+@export var subtitle_component_path: NodePath
+@export var perception_origin_path: NodePath
+@export var player_target_path: NodePath
+@export var supported_intents: PackedStringArray
+@export var expression_map: Dictionary
+```
+
+小空第一版可以直接在场景中用导出 NodePath 绑定；当第二个角色接入时，再把共用配置沉淀到资源。
+### 5.7 `AIWorldObjectComponent`
 
 通用语义组件，挂在设施、家具、重要物品根节点上。
 
@@ -416,7 +464,7 @@ XiaokongActionExecutorComponent
 - 可以先挂在设施根节点，而不是每个 mesh。
 - 对已有容器、桌子、床、椅子进行增量添加。
 
-### 5.7 `AIPerceptionArea3D`
+### 5.8 `AIPerceptionArea3D`
 
 继承或组合 `Area3D`，用于表达区域语义。
 
@@ -630,10 +678,10 @@ Perception 应复用它：
 
 ### 陪伴 AI
 
-- 玩家靠近小空，小空会看向玩家。
-- 玩家走远，小空能跟到舒适距离，不贴脸。
-- 玩家停下，小空能停止或保持附近等待。
-- 长时间无操作，小空会找附近座位/桌边/床边待机。
+- 玩家靠近角色，角色会看向玩家。
+- 玩家走远，角色能跟到舒适距离，不贴脸。
+- 玩家停下，角色能停止或保持附近等待。
+- 长时间无操作，角色会找附近座位/桌边/床边待机。
 - 玩家刚下命令或对话后，自主 AI 不抢控制。
 
 ### 表情
@@ -665,28 +713,28 @@ Perception 应复用它：
 
 - 新增 `AIWorldObjectComponent`。
 - 新增 `AIPerceptionArea3D`。
-- 新增 `XiaokongPerceptionComponent`。
+- 新增 `CharacterPerceptionComponent`。
 - 给餐桌、座位、床、医疗柜、武器柜、储物箱添加第一批语义。
 - 输出 debug-friendly 的 perception snapshot。
 
 ### Phase 2：表情导演
 
-- 新增 `XiaokongAffectiveDirectorComponent`。
+- 新增 `CharacterAffectiveDirectorComponent`。
 - 接入 `XiaokongFaceAnimationComponent`。
 - 接入 AI emotion、状态组件、陪伴事件。
 - 验证眨眼、口型、表情切换。
 
 ### Phase 3：陪伴导演
 
-- 新增 `XiaokongCompanionDirectorComponent`。
+- 新增 `CharacterCompanionDirectorComponent`。
 - 使用 Perception 快照选择附近待机点。
 - 接入跟随、看向、短提示、空闲坐下。
 - 加冷却和手动控制保护。
 
 ### Phase 4：Router 替代
 
-- 新增 `XiaokongIntentInterpreterComponent`。
-- 新增 `XiaokongActionExecutorComponent`。
+- 新增 `CharacterAIIntentInterpreterComponent`。
+- 新增 `CharacterAIActionExecutorComponent`。
 - 旧 Router 的 `apply_ai_response()` 只作为旧入口转发到新组件。
 - 命令解析、Marker 查找、导航执行、坐下执行、状态增减全部迁到新组件。
 - 旧 Router 大分支标记 deprecated，并在验证通过后停止使用。
@@ -699,11 +747,12 @@ Perception 应复用它：
 
 - `res://components/ai_world_object_component.gd`
 - `res://components/ai_perception_area_3d.gd`
-- `res://scripts/xiaokong/components/xiaokong_perception_component.gd`
-- `res://scripts/xiaokong/components/xiaokong_affective_director_component.gd`
-- `res://scripts/xiaokong/components/xiaokong_companion_director_component.gd`
-- `res://scripts/xiaokong/components/xiaokong_intent_interpreter_component.gd`
-- `res://scripts/xiaokong/components/xiaokong_action_executor_component.gd`
+- `res://scripts/character_ai/components/character_perception_component.gd`
+- `res://scripts/character_ai/components/character_affective_director_component.gd`
+- `res://scripts/character_ai/components/character_companion_director_component.gd`
+- `res://scripts/character_ai/components/character_ai_intent_interpreter_component.gd`
+- `res://scripts/character_ai/components/character_ai_action_executor_component.gd`
+- `res://scripts/character_ai/resources/character_ai_profile_resource.gd`
 
 ### 主要更新场景
 
@@ -751,11 +800,12 @@ Perception 应复用它：
 
 ```text
 场景设施语义标注
-→ 小空感知附近对象
+→ 角色感知附近对象
 → 陪伴导演基于感知做低频自主行为
 → 表情导演基于 AI/状态/行为自动控制脸
 → 新 Intent/Executor 替代旧 Router，旧入口只做短期适配
 ```
 
 这样既能快速提升“活着感”，也能把当前过度集中的旧 AI 控制替换成可维护的新架构。
+
 
