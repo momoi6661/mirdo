@@ -52,9 +52,9 @@
    - 表情切换不频繁闪烁。
 
 3. **AI 控制解耦**
-   - 保留旧 `apply_ai_response()` 外部接口。
+   - 短期保留旧 `apply_ai_response()` 外部入口，但内部执行链由新组件替代。
    - 新增更清晰的意图解释、动作执行、陪伴导演、表情导演、感知组件。
-   - 旧 Router 逐步变成兼容外壳，而不是继续承载全部逻辑。
+   - 旧 Router 仅作为短期入口适配，核心控制由新组件替代。
 
 4. **设施/物品语义视觉**
    - 给设施和物品添加可被 AI 读取的名称、描述、标签、可执行动作、导航点。
@@ -78,9 +78,22 @@
 
 ---
 
+## 3.1 架构决策：新系统替代旧 Router
+
+本轮已明确：旧角色 AI 控制存在结构性问题，不能继续作为核心基础扩展。
+
+因此本设计采用以下决策：
+
+- 新系统不是旧 Router 的旁路增强，而是替代旧 Router 的核心职责。
+- `XiaokongAIActionRouterComponent` 只保留短期兼容入口，避免场景引用立刻全部断裂。
+- 新增功能必须进入 Interpreter / Executor / Perception / Director，不再写入旧 Router 的大文件。
+- 旧 Router 中有价值的能力可以按行为重新实现；不要机械搬运旧代码导致旧问题延续。
+- 实施计划必须优先建立新执行链，再迁移外部调用。
+
+---
 ## 4. 总体架构
 
-建议采用“兼容外壳 + 新组件逐步接管”的方式。
+建议采用“新架构接管旧架构”的方式。旧 `XiaokongAIActionRouterComponent` 不再作为核心长期保留，只作为短期薄适配层或迁移壳存在。
 
 ```text
 AI / 玩家交互 / 自主导演
@@ -105,12 +118,14 @@ XiaokongActionExecutorComponent
 7. `AIPerceptionArea3D`
 8. 可选资源：`AIWorldObjectProfileResource`
 
-旧 `XiaokongAIActionRouterComponent` 暂时保留：
+旧 `XiaokongAIActionRouterComponent` 的新定位：
 
-- 继续暴露 `apply_ai_response(final_data)`。
-- 继续返回原有 summary 格式。
-- 内部先调用新组件；新组件尚未覆盖的复杂路径回退旧逻辑。
-- 这样可以分阶段迁移，不一次性破坏现有功能。
+- **不再新增功能**。
+- **不再作为真实决策/执行中心**。
+- 短期只保留 `apply_ai_response(final_data)` 作为外部旧调用入口。
+- 入口内部立即转交给 `XiaokongIntentInterpreterComponent` 与 `XiaokongActionExecutorComponent`。
+- 迁移完成后，旧 Router 只剩薄适配，或由新入口完全替代。
+- 坐下、Marker 查找、导航、IK、状态增减等核心逻辑应迁移到新组件，不再在旧 Router 中继续扩写。
 
 ---
 
@@ -187,11 +202,12 @@ XiaokongActionExecutorComponent
 - 播放动作。
 - 到达后执行动作。
 
-迁移原则：
+替代原则：
 
-- 第一版不立即重写坐下全部细节。
-- 坐下、换座、直接坐下、站起后换座等复杂逻辑可先留在旧 Router，Executor 以包装调用方式使用。
-- 后续稳定后再把旧 Router 中 `COMMAND_SIT_DOWN` 分支迁入 Executor。
+- 第一版就把新 `ActionExecutor` 作为真实执行中心。
+- 坐下、换座、直接坐下、站起后换座等复杂逻辑可以从旧 Router 迁移/重写，但不再通过旧 Router 包装调用。
+- 旧 Router 只允许在短期内作为入口适配，不允许作为执行回退。
+- 如果某个旧分支质量明显有问题，优先用新实现替代，而不是搬运原问题。
 
 ### 5.3 `XiaokongCompanionDirectorComponent`
 
@@ -531,20 +547,21 @@ Companion Director 不直接扫场景节点，而是使用 Perception 快照。
 
 第一阶段：
 
-- 新增 Interpreter / Executor，但旧 Router 仍保留旧函数。
-- `apply_ai_response()` 先尝试新 Interpreter。
-- 对于已覆盖 intent，交给 Executor。
-- 对于坐下等复杂意图，可以暂时调用旧 Router 原逻辑。
+- 新增 Interpreter / Executor。
+- `apply_ai_response()` 保留为入口，但内部不继续走旧大分支。
+- 命令别名和 `_guess_command_from_text()` 迁到 Interpreter。
+- Marker/语义对象查找迁到 Perception/Executor。
+- 导航、坐下、看向、跟随等执行迁到 Executor。
 
 第二阶段：
 
-- 把命令别名和 `_guess_command_from_text()` 迁到 Interpreter。
-- 把 marker 搜索迁到 Perception 或 Executor。
-- 把导航执行迁到 Executor。
+- 旧 Router 中的大型命令分支停止使用，只留下薄入口、summary 适配和弃用注释。
+- 所有新功能只接入新组件。
 
 第三阶段：
 
-- 旧 Router 只剩兼容入口和 summary 适配。
+- 外部引用逐步改为新入口。
+- 旧 Router 可删除或保留为 deprecated shim。
 
 ### 9.2 与表情组件
 
@@ -666,12 +683,13 @@ Perception 应复用它：
 - 接入跟随、看向、短提示、空闲坐下。
 - 加冷却和手动控制保护。
 
-### Phase 4：Router 外壳解耦
+### Phase 4：Router 替代
 
 - 新增 `XiaokongIntentInterpreterComponent`。
 - 新增 `XiaokongActionExecutorComponent`。
-- 旧 Router 调用新组件。
-- 逐步迁移命令解析、Marker 查找、导航执行。
+- 旧 Router 的 `apply_ai_response()` 只作为旧入口转发到新组件。
+- 命令解析、Marker 查找、导航执行、坐下执行、状态增减全部迁到新组件。
+- 旧 Router 大分支标记 deprecated，并在验证通过后停止使用。
 
 ---
 
@@ -710,8 +728,8 @@ Perception 应复用它：
 
 ## 14. 风险与控制
 
-1. **风险：一次性大拆 Router 导致老功能坏。**  
-   控制：旧 Router 第一阶段保留，新增组件先旁路接入。
+1. **风险：替代旧 Router 导致老功能坏。**  
+   控制：保留 `apply_ai_response()` 入口和 summary 格式，但内部执行链切到新组件；逐项验证跟随、坐下、桌边进食、对话 action hint。
 
 2. **风险：语义标注工作量膨胀。**  
    控制：第一版只标核心设施，不做所有装饰。
@@ -736,7 +754,8 @@ Perception 应复用它：
 → 小空感知附近对象
 → 陪伴导演基于感知做低频自主行为
 → 表情导演基于 AI/状态/行为自动控制脸
-→ 旧 Router 保持兼容并逐步瘦身
+→ 新 Intent/Executor 替代旧 Router，旧入口只做短期适配
 ```
 
-这样既能快速提升“活着感”，又不会把现有复杂动作系统推倒重写。
+这样既能快速提升“活着感”，也能把当前过度集中的旧 AI 控制替换成可维护的新架构。
+
