@@ -1,4 +1,5 @@
 [gd_scene format=4 uid="uid://clhkqvv3hvkch"]
+[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [ext_resource type="Script" uid="uid://7htj44s8n20d" path="res://components/xiaokong_table_context_component.gd" id="1_table_context"]
 [ext_resource type="Script" uid="uid://0lyibrucelbp" path="res://components/xiaokong_table_data_panel_binding.gd" id="2_data_binding"]
@@ -56,7 +57,16 @@ size = Vector3(1.2229493, 0.6051758, 1.9779297)
 [sub_resource type="BoxShape3D" id="BoxShape3D_seat_operate_range"]
 size = Vector3(6.2, 1.8, 6.2)
 
-[node name="XiaokongTable" type="Node3D" unique_id=986428791]
+[node name="XiaokongTable" type="Node3D" unique_id=986428791 groups=["nav_source_bunker"]]
+script = ExtResource("ai_world_object")
+object_id = &"dining_table"
+display_name = "餐桌"
+ai_description = "避难所的用餐桌，可以围坐、吃饭、休息和查看桌面信息。"
+object_type = "table"
+tags = PackedStringArray("table", "food_area", "rest", "social")
+supported_actions = PackedStringArray("go_to", "sit", "eat_if_food_available", "look")
+marker_roles = {"look": NodePath("TableDataPanelMark3D")}
+
 
 [node name="table" type="MeshInstance3D" parent="." unique_id=585470609 groups=["nav_source_bunker"]]
 mesh = SubResource("ArrayMesh_m8l2r")

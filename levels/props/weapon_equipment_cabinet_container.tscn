@@ -1,4 +1,5 @@
 [gd_scene format=3 uid="uid://ixvh01dpgx8j"]
+[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [ext_resource type="PackedScene" path="res://levels/props/weapon_cabinet_model.tscn" id="1_model"]
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
@@ -29,7 +30,17 @@ transparency = 1
 albedo_color = Color(0.08, 0.09, 0.1, 0.88)
 roughness = 0.76
 
-[node name="WeaponEquipmentCabinetContainer" type="Node3D" unique_id=896453549 groups=["nav_source_bunker"]]
+[node name="WeaponEquipmentCabinetContainer" type="Node3D" unique_id=896453549 groups=["nav_source_bunker", "ai_world_object"]]
+script = ExtResource("ai_world_object")
+object_id = &"equipment_cabinet"
+display_name = "武器/装备柜"
+ai_description = "存放武器、工具和特殊装备，只在需要防卫或出行准备时使用。"
+object_type = "weapon"
+tags = PackedStringArray("storage", "weapon", "tool", "equipment")
+supported_actions = PackedStringArray("go_to", "open", "inspect", "take_equipment")
+nav_marker_path = NodePath("ContainerPanelMark3D")
+marker_roles = {"approach": NodePath("ContainerPanelMark3D"), "look": NodePath("ContainerPanelMark3D")}
+
 
 [node name="SaveComponent" type="Node" parent="." unique_id=424049987]
 script = ExtResource("5_save")

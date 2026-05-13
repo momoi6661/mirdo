@@ -1,4 +1,5 @@
 [gd_scene format=3 uid="uid://bwp2le0tn64sr"]
+[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [ext_resource type="PackedScene" uid="uid://cdwy1tsmmj6bi" path="res://levels/props/medical_cabinet_model.tscn" id="1_model"]
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
@@ -21,7 +22,17 @@ transparency = 1
 albedo_color = Color(0.06, 0.11, 0.09, 0.86)
 roughness = 0.78
 
-[node name="MedicalCabinetContainer" type="Node3D" unique_id=1960761740 groups=["nav_source_bunker"]]
+[node name="MedicalCabinetContainer" type="Node3D" unique_id=1960761740 groups=["nav_source_bunker", "ai_world_object"]]
+script = ExtResource("ai_world_object")
+object_id = &"medical_cabinet"
+display_name = "医疗柜"
+ai_description = "存放药品和医疗材料的柜子，受伤或需要补给时优先查看。"
+object_type = "medical"
+tags = PackedStringArray("storage", "medical", "supplies")
+supported_actions = PackedStringArray("go_to", "open", "inspect", "take_medical_item")
+nav_marker_path = NodePath("ContainerPanelMark3D")
+marker_roles = {"approach": NodePath("ContainerPanelMark3D"), "look": NodePath("ContainerPanelMark3D")}
+
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1656511133]
 script = ExtResource("5_save")
