@@ -8,6 +8,7 @@ func _init() -> void:
 func _run() -> void:
 	await _test_world_object_summary_includes_semantics_and_marker_roles()
 	await _test_perception_area_summary_includes_region_context()
+	await _test_character_perception_snapshot_filters_and_nests_marker_roles()
 	_finish()
 
 func _test_world_object_summary_includes_semantics_and_marker_roles() -> void:
@@ -81,6 +82,77 @@ func _test_perception_area_summary_includes_region_context() -> void:
 	area.queue_free()
 	await process_frame
 
+func _test_character_perception_snapshot_filters_and_nests_marker_roles() -> void:
+	var perception_script: Script = load("res://scripts/character_ai/components/character_perception_component.gd") as Script
+	var object_script: Script = load("res://components/ai_world_object_component.gd") as Script
+	var area_script: Script = load("res://components/ai_perception_area_3d.gd") as Script
+	_expect(perception_script != null, "CharacterPerceptionComponent script should load")
+	if perception_script == null or object_script == null or area_script == null:
+		return
+
+	var observer := Node3D.new()
+	root.add_child(observer)
+	observer.global_position = Vector3.ZERO
+
+	var perception := Node.new()
+	perception.set_script(perception_script)
+	perception.set("observer_path", observer.get_path())
+	perception.set("scan_radius", 5.0)
+	perception.set("max_objects", 4)
+	perception.set("max_areas", 4)
+	root.add_child(perception)
+
+	var near_object := _make_semantic_object(object_script, "near_table", "近处餐桌", Vector3(2, 0, 0), PackedStringArray(["table", "rest"]))
+	var far_object := _make_semantic_object(object_script, "far_bed", "远处床", Vector3(20, 0, 0), PackedStringArray(["bed", "rest"]))
+	root.add_child(near_object)
+	root.add_child(far_object)
+
+	var area := Area3D.new()
+	area.set_script(area_script)
+	area.set("area_id", &"near_area")
+	area.set("display_name", "附近区域")
+	area.set("ai_description", "这里是附近区域。")
+	area.set("tags", PackedStringArray(["nearby"]))
+	root.add_child(area)
+	area.global_position = Vector3(1, 0, 0)
+	area.add_to_group("ai_perception_area")
+
+	var snapshot: Dictionary = perception.call("build_perception_snapshot")
+	var objects: Array = snapshot.get("nearby_objects", [])
+	_expect(objects.size() == 1, "perception should include only objects inside scan radius")
+	if objects.size() > 0:
+		var first: Dictionary = objects[0]
+		_expect(String(first.get("id", "")) == "near_table", "near object should be included")
+		_expect(first.has("marker_roles"), "object marker roles should be nested under object summary")
+		_expect(String((first.get("marker_roles", {}) as Dictionary).get("approach", "")).ends_with("Approach_Mark3D"), "approach marker should be nested under object")
+	var areas: Array = snapshot.get("areas", [])
+	_expect(areas.size() == 1, "perception should include nearby semantic area")
+	_expect(not snapshot.has("markers"), "perception should not expose standalone markers as primary semantic objects")
+
+	perception.queue_free()
+	observer.queue_free()
+	near_object.queue_free()
+	far_object.queue_free()
+	area.queue_free()
+	await process_frame
+
+func _make_semantic_object(script: Script, id_text: String, label: String, position: Vector3, tag_values: PackedStringArray) -> Node3D:
+	var semantic_object := Node3D.new()
+	semantic_object.name = label
+	semantic_object.set_script(script)
+	semantic_object.set("object_id", StringName(id_text))
+	semantic_object.set("display_name", label)
+	semantic_object.set("ai_description", label + " 描述")
+	semantic_object.set("object_type", "generic")
+	semantic_object.set("tags", tag_values)
+	semantic_object.set("supported_actions", PackedStringArray(["go_to"]))
+	semantic_object.set("marker_roles", {"approach": NodePath("Approach_Mark3D")})
+	semantic_object.add_to_group("ai_world_object")
+	var approach := Marker3D.new()
+	approach.name = "Approach_Mark3D"
+	semantic_object.add_child(approach)
+	semantic_object.position = position
+	return semantic_object
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
@@ -93,4 +165,6 @@ func _finish() -> void:
 		for failure in _failures:
 			push_error(failure)
 		quit(1)
+
+
 
