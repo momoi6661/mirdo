@@ -13,6 +13,8 @@ func _run() -> void:
 	await _test_action_executor_resolves_object_marker_role()
 	await _test_affective_director_maps_emotion_and_stats_to_expression()
 	await _test_companion_director_picks_nearest_rest_object()
+	await _test_xiaokong_router_delegates_to_generic_interpreter_and_executor()
+	await _test_xiaokong_dialogue_payload_includes_perception_context()
 	_finish()
 
 func _test_world_object_summary_includes_semantics_and_marker_roles() -> void:
@@ -247,6 +249,75 @@ func _test_companion_director_picks_nearest_rest_object() -> void:
 
 	director.queue_free()
 	await process_frame
+func _test_xiaokong_router_delegates_to_generic_interpreter_and_executor() -> void:
+	var router_script: Script = load("res://scripts/xiaokong/components/xiaokong_ai_action_router_component.gd") as Script
+	_expect(router_script != null, "Xiaokong router script should load")
+	if router_script == null:
+		return
+	var router := Node.new()
+	router.set_script(router_script)
+	root.add_child(router)
+
+	var interpreter := _FakeInterpreter.new()
+	var executor := _FakeExecutor.new()
+	router.add_child(interpreter)
+	router.add_child(executor)
+	router.set("generic_intent_interpreter_path", interpreter.get_path())
+	router.set("generic_action_executor_path", executor.get_path())
+
+	var summary: Dictionary = router.call("apply_ai_response", {"command": "跟随我"})
+	_expect(interpreter.called, "router should call generic interpreter")
+	_expect(executor.called, "router should call generic executor")
+	_expect(bool(summary.get("generic_delegate_used", false)), "router summary should mark generic delegate usage")
+	_expect(bool(summary.get("command_applied", false)), "router summary should map executor ok to command_applied")
+	_expect(String(summary.get("navigation_mode", "")) == "follow_player", "router summary should expose delegated intent")
+
+	router.queue_free()
+	await process_frame
+
+func _test_xiaokong_dialogue_payload_includes_perception_context() -> void:
+	var dialogue_script: Script = load("res://scripts/xiaokong/components/xiaokong_ai_dialogue_component.gd") as Script
+	_expect(dialogue_script != null, "Xiaokong dialogue script should load")
+	if dialogue_script == null:
+		return
+	var dialogue := Node.new()
+	dialogue.set_script(dialogue_script)
+	root.add_child(dialogue)
+
+	var perception := _FakePerception.new()
+	dialogue.add_child(perception)
+	dialogue.set("perception_component_path", perception.get_path())
+	var payload: Dictionary = dialogue.call("_build_dialogue_payload", "看看周围", "")
+	var context: Dictionary = payload.get("context", {})
+	_expect(context.has("perception"), "dialogue context should include perception snapshot")
+	var perception_data: Dictionary = context.get("perception", {})
+	_expect((perception_data.get("nearby_objects", []) as Array).size() == 1, "perception context should include compact nearby objects")
+
+	dialogue.queue_free()
+	await process_frame
+
+class _FakeInterpreter:
+	extends Node
+	var called := false
+	func interpret_payload(payload: Dictionary) -> Dictionary:
+		called = true
+		return {"ok": true, "intent": "follow_player", "raw": payload.duplicate(true)}
+
+class _FakeExecutor:
+	extends Node
+	var called := false
+	func execute_intent(intent: Dictionary) -> Dictionary:
+		called = true
+		return {"ok": true, "intent": String(intent.get("intent", "")), "errors": []}
+
+class _FakePerception:
+	extends Node
+	func build_perception_snapshot() -> Dictionary:
+		return {
+			"nearby_objects": [{"id": "table", "name": "餐桌", "description": "可吃饭", "tags": ["table"], "actions": ["sit"], "distance": 1.0, "marker_roles": {"sit": "hidden"}}],
+			"areas": [{"id": "dining", "name": "餐桌区域", "description": "有桌椅", "tags": ["food_area"], "distance": 1.0}],
+			"visible_items": []
+		}
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
@@ -259,6 +330,7 @@ func _finish() -> void:
 		for failure in _failures:
 			push_error(failure)
 		quit(1)
+
 
 
 

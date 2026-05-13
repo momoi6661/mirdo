@@ -14,6 +14,7 @@ signal model_probe_failed(error_text: String)
 @export var state_component_path: NodePath
 @export var time_component_path: NodePath
 @export var action_router_path: NodePath
+@export var perception_component_path: NodePath
 @export var auto_apply_ai_response: bool = true
 @export var use_local_fallback_on_error: bool = true
 @export var fallback_reply_text: String = "信号不稳定，我们先留在避难所，稳住状态再行动。"
@@ -37,6 +38,7 @@ var _state_component: XiaokongStateComponent
 var _time_component: Node
 var _action_router: XiaokongAIActionRouterComponent
 var _subtitle_target: Node
+var _perception_component: Node
 
 var _request_in_flight: bool = false
 var _last_payload: Dictionary = {}
@@ -236,6 +238,9 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 		"debug_transparent": transparent_request_debug,
 		"request_source": "godot_runtime",
 	}
+	var perception_snapshot: Dictionary = _build_compact_perception_context()
+	if not perception_snapshot.is_empty():
+		context_data["perception"] = perception_snapshot
 
 	if _ai_manager != null and _ai_manager.has_method("build_chat_request"):
 		return _ai_manager.build_chat_request(
@@ -654,6 +659,8 @@ func _refresh_refs() -> void:
 	if _subtitle_target == null:
 		_subtitle_target = _find_subtitle_target()
 
+	_perception_component = _resolve_perception_component()
+
 func _find_ai_manager() -> AIManager:
 	var parent_node = get_parent()
 	if parent_node == null:
@@ -706,6 +713,57 @@ func _find_subtitle_target() -> Node:
 			continue
 		if node.has_method("show_once"):
 			return node
+	return null
+
+func _build_compact_perception_context() -> Dictionary:
+	var perception: Node = _resolve_perception_component()
+	if perception == null or not perception.has_method("build_perception_snapshot"):
+		return {}
+	var snapshot_value: Variant = perception.call("build_perception_snapshot")
+	if snapshot_value is not Dictionary:
+		return {}
+	var snapshot: Dictionary = snapshot_value as Dictionary
+	var compact: Dictionary = {}
+	var nearby_objects: Array = _compact_perception_entries(snapshot.get("nearby_objects", []), 8)
+	if not nearby_objects.is_empty():
+		compact["nearby_objects"] = nearby_objects
+	var areas: Array = _compact_perception_entries(snapshot.get("areas", []), 4)
+	if not areas.is_empty():
+		compact["areas"] = areas
+	var visible_items: Array = _compact_perception_entries(snapshot.get("visible_items", []), 6)
+	if not visible_items.is_empty():
+		compact["visible_items"] = visible_items
+	return compact
+
+func _compact_perception_entries(entries_value: Variant, limit: int) -> Array:
+	var compact_entries: Array = []
+	if entries_value is not Array:
+		return compact_entries
+	var entries: Array = entries_value as Array
+	var safe_limit: int = maxi(0, limit)
+	for entry_value in entries:
+		if compact_entries.size() >= safe_limit:
+			break
+		if entry_value is not Dictionary:
+			continue
+		var entry: Dictionary = entry_value as Dictionary
+		var compact: Dictionary = {}
+		for key in ["id", "name", "type", "description", "tags", "actions", "distance", "marker_roles"]:
+			if entry.has(key):
+				compact[key] = entry[key]
+		if not compact.is_empty():
+			compact_entries.append(compact)
+	return compact_entries
+
+func _resolve_perception_component() -> Node:
+	if perception_component_path == NodePath():
+		return _perception_component if _perception_component != null and is_instance_valid(_perception_component) else null
+	var by_path: Node = get_node_or_null(perception_component_path)
+	if by_path != null:
+		_perception_component = by_path
+		return by_path
+	if _perception_component != null and is_instance_valid(_perception_component):
+		return _perception_component
 	return null
 
 func _resolve_external_poll_session_id() -> String:

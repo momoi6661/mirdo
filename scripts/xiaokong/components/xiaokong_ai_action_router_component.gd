@@ -87,6 +87,8 @@ const COMMAND_ALIASES: Dictionary = {
 
 @export var action_controller_path: NodePath = NodePath("..")
 @export var state_component_path: NodePath
+@export var generic_intent_interpreter_path: NodePath
+@export var generic_action_executor_path: NodePath
 @export var follow_target_path: NodePath
 @export var markers_root_path: NodePath
 @export var ik_target_driver_path: NodePath = NodePath("../../根/IKTargets")
@@ -203,6 +205,11 @@ func apply_ai_response(final_data: Dictionary) -> Dictionary:
 		ai_response_applied.emit(summary)
 		return summary
 
+	if _try_apply_generic_character_ai(final_data, summary):
+		_apply_stat_change_from_ai_response(final_data, summary)
+		ai_response_applied.emit(summary)
+		return summary
+
 	var command_handled: bool = _apply_navigation_command(final_data, summary)
 
 	if not command_handled:
@@ -240,12 +247,85 @@ func apply_ai_response(final_data: Dictionary) -> Dictionary:
 			else:
 				summary["errors"].append("action_controller_has_no_trigger_action")
 
-	if _state_component != null and final_data.has("stat_change") and final_data["stat_change"] is Dictionary:
-		var normalized_delta: Dictionary = _normalize_stat_change(final_data["stat_change"])
-		summary["stat_change_applied"] = _state_component.apply_delta(normalized_delta, "ai_response")
+	_apply_stat_change_from_ai_response(final_data, summary)
 
 	ai_response_applied.emit(summary)
 	return summary
+
+func _try_apply_generic_character_ai(final_data: Dictionary, summary: Dictionary) -> bool:
+	var interpreter: Node = _resolve_generic_intent_interpreter()
+	var executor: Node = _resolve_generic_action_executor()
+	if interpreter == null or executor == null:
+		return false
+	if not interpreter.has_method("interpret_payload") or not executor.has_method("execute_intent"):
+		return false
+
+	var intent_value: Variant = interpreter.call("interpret_payload", final_data.duplicate(true))
+	if intent_value is not Dictionary:
+		summary["errors"].append("generic_intent_invalid")
+		return false
+
+	var intent: Dictionary = intent_value as Dictionary
+	if not bool(intent.get("ok", false)):
+		return false
+
+	var report_value: Variant = executor.call("execute_intent", intent.duplicate(true))
+	var report: Dictionary = {}
+	if report_value is Dictionary:
+		report = report_value as Dictionary
+	else:
+		report = {
+			"ok": false,
+			"intent": String(intent.get("intent", "")),
+			"errors": ["generic_executor_invalid_report"],
+		}
+
+	var intent_name: String = String(intent.get("intent", report.get("intent", ""))).strip_edges()
+	summary["generic_delegate_used"] = true
+	summary["command_requested"] = intent_name
+	summary["command_applied"] = bool(report.get("ok", false))
+	summary["navigation_mode"] = intent_name
+	if report.has("target_marker_path"):
+		summary["target_marker"] = String(report.get("target_marker_path", ""))
+	elif report.has("target_marker"):
+		summary["target_marker"] = String(report.get("target_marker", ""))
+	if report.has("move_target") and report["move_target"] is Vector3:
+		summary["move_target"] = report["move_target"]
+	if report.has("moved"):
+		summary["moved"] = bool(report.get("moved", false))
+	elif bool(report.get("ok", false)) and (intent_name == COMMAND_FOLLOW_PLAYER or intent_name == COMMAND_GO_TO_MARKER or intent_name == COMMAND_SIT_DOWN or intent_name == "go_to_object"):
+		summary["moved"] = true
+	if report.has("action"):
+		summary["action_requested"] = String(report.get("action", ""))
+
+	var report_errors: Variant = report.get("errors", [])
+	if report_errors is Array:
+		for error_value in report_errors as Array:
+			var error_text: String = String(error_value).strip_edges()
+			if not error_text.is_empty():
+				summary["errors"].append(error_text)
+	elif not String(report_errors).strip_edges().is_empty():
+		summary["errors"].append(String(report_errors).strip_edges())
+
+	return true
+
+func _resolve_generic_intent_interpreter() -> Node:
+	if generic_intent_interpreter_path == NodePath():
+		return null
+	return get_node_or_null(generic_intent_interpreter_path)
+
+func _resolve_generic_action_executor() -> Node:
+	if generic_action_executor_path == NodePath():
+		return null
+	return get_node_or_null(generic_action_executor_path)
+
+func _apply_stat_change_from_ai_response(final_data: Dictionary, summary: Dictionary) -> void:
+	if _state_component == null:
+		return
+	if not final_data.has("stat_change") or final_data["stat_change"] is not Dictionary:
+		return
+	var normalized_delta: Dictionary = _normalize_stat_change(final_data["stat_change"])
+	summary["stat_change_applied"] = _state_component.apply_delta(normalized_delta, "ai_response")
 
 func _refresh_refs() -> void:
 	_action_controller = get_node_or_null(action_controller_path)
