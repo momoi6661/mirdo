@@ -11,6 +11,8 @@ func _run() -> void:
 	await _test_character_perception_snapshot_filters_and_nests_marker_roles()
 	await _test_intent_interpreter_normalizes_common_commands()
 	await _test_action_executor_resolves_object_marker_role()
+	await _test_affective_director_maps_emotion_and_stats_to_expression()
+	await _test_companion_director_picks_nearest_rest_object()
 	_finish()
 
 func _test_world_object_summary_includes_semantics_and_marker_roles() -> void:
@@ -206,6 +208,45 @@ func _test_action_executor_resolves_object_marker_role() -> void:
 	executor.queue_free()
 	target.queue_free()
 	await process_frame
+func _test_affective_director_maps_emotion_and_stats_to_expression() -> void:
+	var script: Script = load("res://scripts/character_ai/components/character_affective_director_component.gd") as Script
+	_expect(script != null, "CharacterAffectiveDirectorComponent script should load")
+	if script == null:
+		return
+	var director := Node.new()
+	director.set_script(script)
+	root.add_child(director)
+
+	_expect(String(director.call("resolve_expression_for_emotion", "开心")) == "face_smile", "happy emotion should map to smile")
+	_expect(String(director.call("resolve_expression_for_emotion", "tired")) == "face_sad", "tired emotion should map to sad")
+	_expect(String(director.call("resolve_expression_for_emotion", "疑惑")) == "face_surprised", "confused emotion should map to surprised")
+	_expect(String(director.call("resolve_base_expression_from_stats", {"hunger": 10, "thirst": 80, "mood": 60, "favor": 20})) == "face_sad", "critical hunger should map to sad base expression")
+	_expect(String(director.call("resolve_base_expression_from_stats", {"hunger": 80, "thirst": 80, "mood": 80, "favor": 20})) == "face_smile", "high mood should map to smile base expression")
+
+	director.queue_free()
+	await process_frame
+
+func _test_companion_director_picks_nearest_rest_object() -> void:
+	var script: Script = load("res://scripts/character_ai/components/character_companion_director_component.gd") as Script
+	_expect(script != null, "CharacterCompanionDirectorComponent script should load")
+	if script == null:
+		return
+	var director := Node.new()
+	director.set_script(script)
+	root.add_child(director)
+
+	var snapshot := {
+		"nearby_objects": [
+			{"id": "far_bed", "name": "远处床", "tags": ["bed", "rest"], "distance": 4.0},
+			{"id": "near_chair", "name": "近处椅子", "tags": ["seat", "rest"], "distance": 1.5},
+			{"id": "box", "name": "箱子", "tags": ["storage"], "distance": 0.5},
+		]
+	}
+	var picked: Dictionary = director.call("pick_preferred_rest_object", snapshot)
+	_expect(String(picked.get("id", "")) == "near_chair", "companion director should pick nearest rest object")
+
+	director.queue_free()
+	await process_frame
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
@@ -218,6 +259,7 @@ func _finish() -> void:
 		for failure in _failures:
 			push_error(failure)
 		quit(1)
+
 
 
 
