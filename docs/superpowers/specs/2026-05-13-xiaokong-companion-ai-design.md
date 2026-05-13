@@ -117,6 +117,41 @@
 - 旧小空组件只作为迁移来源或适配对象，不再决定新架构命名。
 
 ---
+---
+
+## 3.3 AI 视觉语义决策：Area 是视觉范围，Object 是语义，Marker 是动作落点
+
+AI 视觉不应只靠导航点描述，也不应只靠一个大 Area 兜底。第一版采用三层职责：
+
+1. **`AIPerceptionArea3D`：区域视觉范围**
+   - 告诉 AI “这里是什么区域”。
+   - 例如餐桌区域、医疗区、休息区、储物区、出口区。
+   - 负责提供局部上下文：附近通常有什么、这个区域适合做什么。
+   - 回答问题：**“我附近处在什么环境？”**
+
+2. **`AIWorldObjectComponent`：物体/设施语义**
+   - 告诉 AI “这个东西是什么、干什么用、能做什么”。
+   - 例如餐桌、床、医疗柜、武器柜、储物箱、水瓶、食物。
+   - 负责名称、描述、标签、可用动作、使用限制、对角色状态的意义。
+   - 回答问题：**“这个对象有什么意义？”**
+
+3. **`Marker3D`：动作落点**
+   - 告诉执行系统 “要使用这个对象，角色应该站哪里、坐哪里、看哪里”。
+   - 只保留轻语义，例如 `role = approach / sit / stand / look / open`、`parent_object_id`、`action_on_arrival`。
+   - 不写大段描述，不承担对象语义。
+   - 回答问题：**“这个动作如何落地执行？”**
+
+设计结论：
+
+```text
+AIPerceptionArea3D 负责视觉范围和区域上下文
+AIWorldObjectComponent 负责设施/物品语义
+Marker3D 负责导航、坐下、注视、打开等动作落点
+```
+
+这样 AI 看到的是“餐桌区域里有餐桌、座位和食物”，而不是直接看到一堆 `Sit_Mark3D` / `Approach_Mark3D`。执行时再由对象语义找到对应 Marker。
+
+---
 ## 4. 总体架构
 
 建议采用“新架构接管旧架构”的方式。旧 `XiaokongAIActionRouterComponent` 不再作为核心长期保留，只作为短期薄适配层或迁移壳存在。
@@ -356,7 +391,7 @@ CharacterAIActionExecutorComponent
 - 附近 `AIPerceptionArea3D`。
 - 当前桌面 `XiaokongTableContextComponent` 能识别的食物。
 - `ItemData` 上的 `ItemName`、`Description`、`consumable_effect`。
-- 对象配置的 nav marker / look marker。
+- 对象配置的 nav marker / look marker / marker roles；Marker 只作为对象动作落点，不作为主要语义对象。
 
 输出示例：
 
@@ -433,7 +468,7 @@ CharacterAIActionExecutorComponent
 小空第一版可以直接在场景中用导出 NodePath 绑定；当第二个角色接入时，再把共用配置沉淀到资源。
 ### 5.7 `AIWorldObjectComponent`
 
-通用语义组件，挂在设施、家具、重要物品根节点上。
+通用语义组件，挂在设施、家具、重要物品根节点上。它是 AI 理解物体用途的主来源；Marker 只作为它的动作落点引用。
 
 字段：
 
@@ -446,6 +481,7 @@ CharacterAIActionExecutorComponent
 @export var supported_actions: PackedStringArray
 @export var nav_marker_path: NodePath
 @export var look_marker_path: NodePath
+@export var marker_roles: Dictionary # role -> NodePath，例如 {"sit": "Sit_Mark3D", "approach": "Approach_Mark3D"}
 @export var priority: int
 @export var enabled: bool
 ```
@@ -463,6 +499,13 @@ CharacterAIActionExecutorComponent
 - 不要求每个物体都有真实交互。
 - 可以先挂在设施根节点，而不是每个 mesh。
 - 对已有容器、桌子、床、椅子进行增量添加。
+
+Marker 约束：
+
+- Marker 不写长描述。
+- Marker 不作为 AI 感知列表的主要对象。
+- Marker 通过 `parent_object_id` 或对象内 `marker_roles` 归属于某个 `AIWorldObjectComponent`。
+- AI 选择对象，Executor 再选择该对象的合适 Marker。
 
 ### 5.8 `AIPerceptionArea3D`
 
@@ -697,6 +740,7 @@ Perception 应复用它：
 - Perception 快照能列出附近餐桌、座位、床、柜子等核心设施。
 - 每个语义对象包含名称、描述、标签、支持动作、距离。
 - 桌上食物能出现在 visible items，并包含可读效果。
+- Marker 不以独立语义对象形式淹没 perception；它们应挂在对象的动作落点字段下。
 - AI 对话 payload 可带精简 perception。
 
 ### Router 解耦
