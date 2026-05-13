@@ -9,6 +9,8 @@ func _run() -> void:
 	await _test_world_object_summary_includes_semantics_and_marker_roles()
 	await _test_perception_area_summary_includes_region_context()
 	await _test_character_perception_snapshot_filters_and_nests_marker_roles()
+	await _test_intent_interpreter_normalizes_common_commands()
+	await _test_action_executor_resolves_object_marker_role()
 	_finish()
 
 func _test_world_object_summary_includes_semantics_and_marker_roles() -> void:
@@ -153,6 +155,57 @@ func _make_semantic_object(script: Script, id_text: String, label: String, posit
 	semantic_object.add_child(approach)
 	semantic_object.position = position
 	return semantic_object
+func _test_intent_interpreter_normalizes_common_commands() -> void:
+	var script: Script = load("res://scripts/character_ai/components/character_ai_intent_interpreter_component.gd") as Script
+	_expect(script != null, "CharacterAIIntentInterpreterComponent script should load")
+	if script == null:
+		return
+	var interpreter := Node.new()
+	interpreter.set_script(script)
+	root.add_child(interpreter)
+
+	var follow: Dictionary = interpreter.call("interpret_payload", {"command": "跟随我"})
+	_expect(bool(follow.get("ok", false)), "follow command should parse")
+	_expect(String(follow.get("intent", "")) == "follow_player", "Chinese follow command should map to follow_player")
+
+	var sit: Dictionary = interpreter.call("interpret_payload", {"action": "坐下"})
+	_expect(bool(sit.get("ok", false)), "sit action should parse")
+	_expect(String(sit.get("intent", "")) == "sit_down", "Chinese sit action should map to sit_down")
+
+	var marker: Dictionary = interpreter.call("interpret_payload", {"command": "go_to_marker", "target_marker": "Bench_Sit"})
+	_expect(String(marker.get("intent", "")) == "go_to_marker", "go_to_marker should remain explicit")
+	_expect(String(marker.get("target_ref", "")) == "Bench_Sit", "target marker should become target_ref")
+
+	interpreter.queue_free()
+	await process_frame
+
+func _test_action_executor_resolves_object_marker_role() -> void:
+	var executor_script: Script = load("res://scripts/character_ai/components/character_ai_action_executor_component.gd") as Script
+	var object_script: Script = load("res://components/ai_world_object_component.gd") as Script
+	_expect(executor_script != null, "CharacterAIActionExecutorComponent script should load")
+	if executor_script == null or object_script == null:
+		return
+
+	var executor := Node.new()
+	executor.set_script(executor_script)
+	root.add_child(executor)
+
+	var target := _make_semantic_object(object_script, "table_main", "主餐桌", Vector3(1, 0, 0), PackedStringArray(["table", "rest"]))
+	root.add_child(target)
+
+	var report: Dictionary = executor.call("execute_intent", {
+		"intent": "go_to_object",
+		"target_ref": "table_main",
+		"marker_role": "approach",
+	})
+	_expect(bool(report.get("ok", false)), "executor should report ok for known object")
+	_expect(String(report.get("intent", "")) == "go_to_object", "executor report should include intent")
+	_expect(String(report.get("target_object_id", "")) == "table_main", "executor report should include target object id")
+	_expect(String(report.get("target_marker_path", "")).ends_with("Approach_Mark3D"), "executor should resolve approach marker path")
+
+	executor.queue_free()
+	target.queue_free()
+	await process_frame
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
@@ -165,6 +218,7 @@ func _finish() -> void:
 		for failure in _failures:
 			push_error(failure)
 		quit(1)
+
 
 
 
