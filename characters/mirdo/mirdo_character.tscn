@@ -52,7 +52,7 @@ shader_parameter/white_compress_strength = 0.42
 shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
 shader_parameter/alpha_cutoff = 0.02
 shader_parameter/saturation = 0.94
-shader_parameter/value_boost = 0.90
+shader_parameter/value_boost = 0.9
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ujsm0"]
 render_priority = -1
@@ -96,7 +96,9 @@ shader_parameter/white_compress_strength = 0.42
 shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
 shader_parameter/alpha_cutoff = 0.02
 shader_parameter/saturation = 0.94
-shader_parameter/value_boost = 0.90
+shader_parameter/value_boost = 0.9
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_root"]
 
 [node name="MirdoCharacter" type="CharacterBody3D" unique_id=2096496898]
 
@@ -109,31 +111,22 @@ shape = SubResource("CapsuleShape3D_body")
 [node name="Model" parent="VisualRoot" unique_id=50782955 instance=ExtResource("1_model")]
 
 [node name="vrm-mesh" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="0" unique_id=172482103]
-blend_shapes/aa = 1.0
 surface_material_override/0 = SubResource("ShaderMaterial_bryac")
 
 [node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="1" unique_id=1973055401]
 surface_material_override/0 = SubResource("ShaderMaterial_0fgpu")
 
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1595483476]
+
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=724573309]
 active = false
+root_motion_track = NodePath("VisualRoot/Model/Armature/Skeleton3D:hips")
+tree_root = SubResource("AnimationNodeStateMachine_root")
+anim_player = NodePath("../AnimationPlayer")
 
 [node name="AnimeToonApplier" type="Node" parent="." unique_id=849237690]
 script = ExtResource("2_toon_applier")
 include_mesh_name_filters = PackedStringArray()
 exclude_mesh_name_filters = PackedStringArray("collider", "collision")
-max_light_level = 0.68
-light_contribution = 0.78
-ambient_lift = 0.04
-rim_strength = 0.03
-bright_luma_start = 0.45
-bright_light_damping = 0.72
-bright_shadow_push = 0.38
-bright_tint_strength = 0.62
-bright_tint = Color(0.68, 0.52, 0.56, 1)
-white_compress_start = 0.62
-white_compress_strength = 0.42
-white_tint = Color(0.72, 0.58, 0.62, 1)
-value_boost = 0.9
 
 [editable path="VisualRoot/Model"]

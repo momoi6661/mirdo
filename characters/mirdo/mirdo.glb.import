@@ -41,7 +41,7 @@ materials/extract_format=0
 materials/extract_path=""
 _subresources={
 "nodes": {
-"PATH:GeneralSkeleton/Skeleton3D": {
+"PATH:Armature/Skeleton3D": {
 "retarget/bone_map": Resource("uid://d3x11c2pp6tw4", "res://characters/mirdo/mirdo_humanoid_bonemap.tres")
 }
 }

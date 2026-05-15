@@ -17,7 +17,6 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="24h"
 run/main_scene="uid://bghpt4tcal3g3"
 config/features=PackedStringArray("4.7", "Forward Plus")
-boot_splash/bg_color=Color(0.6413866, 0.7178594, 0.8959854, 1)
 config/icon="res://icon.svg"
 
 [autoload]
