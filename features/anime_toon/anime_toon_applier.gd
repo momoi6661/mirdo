@@ -20,16 +20,22 @@ class_name AnimeToonApplier
 @export var shade_threshold: float = 0.42
 @export var shade_softness: float = 0.06
 @export var shadow_level: float = 0.42
+@export var max_light_level: float = 0.68
 @export var light_wrap: float = 0.18
-@export var light_contribution: float = 1.0
-@export var ambient_lift: float = 0.10
-@export var rim_strength: float = 0.10
+@export var light_contribution: float = 0.78
+@export var ambient_lift: float = 0.04
+@export var rim_strength: float = 0.03
 
-@export_group("Bright Area Compression")
-@export var white_compress_start: float = 0.72
-@export var white_compress_strength: float = 0.22
-@export var white_tint: Color = Color(0.86, 0.80, 0.82, 1.0)
-@export var value_boost: float = 0.98
+@export_group("Bright Surface Light Control")
+@export var bright_luma_start: float = 0.45
+@export var bright_light_damping: float = 0.72
+@export var bright_shadow_push: float = 0.38
+@export var bright_tint_strength: float = 0.62
+@export var bright_tint: Color = Color(0.68, 0.52, 0.56, 1.0)
+@export var white_compress_start: float = 0.62
+@export var white_compress_strength: float = 0.42
+@export var white_tint: Color = Color(0.72, 0.58, 0.62, 1.0)
+@export var value_boost: float = 0.90
 
 func _ready() -> void:
 	if Engine.is_editor_hint() and not apply_in_editor:
@@ -86,10 +92,16 @@ func _configure_toon(toon: ShaderMaterial, source_material: Material) -> void:
 	toon.set_shader_parameter("shade_threshold", shade_threshold)
 	toon.set_shader_parameter("shade_softness", shade_softness)
 	toon.set_shader_parameter("shadow_level", shadow_level)
+	toon.set_shader_parameter("max_light_level", max_light_level)
 	toon.set_shader_parameter("light_wrap", light_wrap)
 	toon.set_shader_parameter("light_contribution", light_contribution)
 	toon.set_shader_parameter("ambient_lift", ambient_lift)
 	toon.set_shader_parameter("rim_strength", rim_strength)
+	toon.set_shader_parameter("bright_luma_start", bright_luma_start)
+	toon.set_shader_parameter("bright_light_damping", bright_light_damping)
+	toon.set_shader_parameter("bright_shadow_push", bright_shadow_push)
+	toon.set_shader_parameter("bright_tint_strength", bright_tint_strength)
+	toon.set_shader_parameter("bright_tint", bright_tint)
 	toon.set_shader_parameter("white_compress_start", white_compress_start)
 	toon.set_shader_parameter("white_compress_strength", white_compress_strength)
 	toon.set_shader_parameter("white_tint", white_tint)

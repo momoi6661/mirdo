@@ -1,30 +1,36 @@
-[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dlemmon7gmve1"]
 
-[ext_resource type="Shader" path="res://features/anime_toon/anime_toon.gdshader" id="1_toon"]
-[ext_resource type="ShaderMaterial" path="res://features/anime_toon/anime_outline_material.tres" id="2_outline"]
+[ext_resource type="Shader" uid="uid://cw7vfuhp4teqi" path="res://features/anime_toon/anime_toon.gdshader" id="1_toon"]
+[ext_resource type="Material" uid="uid://fdxuqaghbncr" path="res://features/anime_toon/anime_outline_material.tres" id="2_outline"]
 
 [resource]
 render_priority = 0
-shader = ExtResource("1_toon")
 next_pass = ExtResource("2_outline")
+shader = ExtResource("1_toon")
 shader_parameter/use_texture = true
 shader_parameter/base_color = Color(1, 1, 1, 1)
 shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
 shader_parameter/shade_threshold = 0.42
 shader_parameter/shade_softness = 0.06
 shader_parameter/shadow_level = 0.42
+shader_parameter/max_light_level = 0.68
 shader_parameter/light_wrap = 0.18
-shader_parameter/light_contribution = 1.0
+shader_parameter/light_contribution = 0.78
 shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
-shader_parameter/ambient_lift = 0.1
+shader_parameter/ambient_lift = 0.04
 shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
-shader_parameter/rim_strength = 0.1
+shader_parameter/rim_strength = 0.03
 shader_parameter/rim_threshold = 0.68
 shader_parameter/rim_softness = 0.08
 shader_parameter/rim_power = 3.2
-shader_parameter/white_compress_start = 0.72
-shader_parameter/white_compress_strength = 0.22
-shader_parameter/white_tint = Color(0.86, 0.8, 0.82, 1)
+shader_parameter/bright_luma_start = 0.45
+shader_parameter/bright_light_damping = 0.72
+shader_parameter/bright_shadow_push = 0.38
+shader_parameter/bright_tint_strength = 0.62
+shader_parameter/bright_tint = Color(0.68, 0.52, 0.56, 1)
+shader_parameter/white_compress_start = 0.62
+shader_parameter/white_compress_strength = 0.42
+shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
 shader_parameter/alpha_cutoff = 0.02
 shader_parameter/saturation = 0.94
-shader_parameter/value_boost = 0.98
+shader_parameter/value_boost = 0.9

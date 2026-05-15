@@ -1,11 +1,102 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://4lobvfpm66ua"]
 
-[ext_resource type="PackedScene" path="res://characters/mirdo/mirdo.tscn" id="1_model"]
-[ext_resource type="Script" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
+[ext_resource type="PackedScene" uid="uid://xt7mifn4cwms" path="res://characters/mirdo/mirdo.tscn" id="1_model"]
+[ext_resource type="Shader" uid="uid://vm6bw28e1lgc" path="res://features/anime_toon/anime_outline.gdshader" id="2_87wd2"]
+[ext_resource type="Script" uid="uid://cd4u156gxir4" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
+[ext_resource type="Shader" uid="uid://cw7vfuhp4teqi" path="res://features/anime_toon/anime_toon.gdshader" id="3_bryac"]
+[ext_resource type="Texture2D" uid="uid://dnwblq0cf4xco" path="res://characters/mirdo/mirdo_mirdo_BaseColor.png" id="4_ujsm0"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
 height = 0.9932617
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_87wd2"]
+render_priority = -1
+shader = ExtResource("2_87wd2")
+shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
+shader_parameter/outline_width = 0.0035
+shader_parameter/normal_smooth_blend = 0.65
+shader_parameter/min_direction_length = 0.002
+shader_parameter/distance_fade_start = 4.0
+shader_parameter/distance_fade_end = 18.0
+shader_parameter/alpha = 1.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bryac"]
+render_priority = 0
+next_pass = SubResource("ShaderMaterial_87wd2")
+shader = ExtResource("3_bryac")
+shader_parameter/albedo_texture = ExtResource("4_ujsm0")
+shader_parameter/use_texture = true
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
+shader_parameter/shade_threshold = 0.42
+shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_level = 0.42
+shader_parameter/max_light_level = 0.68
+shader_parameter/light_wrap = 0.18
+shader_parameter/light_contribution = 0.78
+shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
+shader_parameter/ambient_lift = 0.04
+shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
+shader_parameter/rim_strength = 0.03
+shader_parameter/rim_threshold = 0.68
+shader_parameter/rim_softness = 0.08
+shader_parameter/rim_power = 3.2
+shader_parameter/bright_luma_start = 0.45
+shader_parameter/bright_light_damping = 0.72
+shader_parameter/bright_shadow_push = 0.38
+shader_parameter/bright_tint_strength = 0.62
+shader_parameter/bright_tint = Color(0.68, 0.52, 0.56, 1)
+shader_parameter/white_compress_start = 0.62
+shader_parameter/white_compress_strength = 0.42
+shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/saturation = 0.94
+shader_parameter/value_boost = 0.90
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ujsm0"]
+render_priority = -1
+shader = ExtResource("2_87wd2")
+shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
+shader_parameter/outline_width = 0.0035
+shader_parameter/normal_smooth_blend = 0.65
+shader_parameter/min_direction_length = 0.002
+shader_parameter/distance_fade_start = 4.0
+shader_parameter/distance_fade_end = 18.0
+shader_parameter/alpha = 1.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_0fgpu"]
+render_priority = 0
+next_pass = SubResource("ShaderMaterial_ujsm0")
+shader = ExtResource("3_bryac")
+shader_parameter/albedo_texture = ExtResource("4_ujsm0")
+shader_parameter/use_texture = true
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
+shader_parameter/shade_threshold = 0.42
+shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_level = 0.42
+shader_parameter/max_light_level = 0.68
+shader_parameter/light_wrap = 0.18
+shader_parameter/light_contribution = 0.78
+shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
+shader_parameter/ambient_lift = 0.04
+shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
+shader_parameter/rim_strength = 0.03
+shader_parameter/rim_threshold = 0.68
+shader_parameter/rim_softness = 0.08
+shader_parameter/rim_power = 3.2
+shader_parameter/bright_luma_start = 0.45
+shader_parameter/bright_light_damping = 0.72
+shader_parameter/bright_shadow_push = 0.38
+shader_parameter/bright_tint_strength = 0.62
+shader_parameter/bright_tint = Color(0.68, 0.52, 0.56, 1)
+shader_parameter/white_compress_start = 0.62
+shader_parameter/white_compress_strength = 0.42
+shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/saturation = 0.94
+shader_parameter/value_boost = 0.90
 
 [node name="MirdoCharacter" type="CharacterBody3D" unique_id=2096496898]
 
@@ -15,27 +106,34 @@ shape = SubResource("CapsuleShape3D_body")
 
 [node name="VisualRoot" type="Node3D" parent="." unique_id=1526476277]
 
-[node name="Model" type="Node3D" parent="VisualRoot" unique_id=50782955 instance=ExtResource("1_model")]
+[node name="Model" parent="VisualRoot" unique_id=50782955 instance=ExtResource("1_model")]
+
+[node name="vrm-mesh" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="0" unique_id=172482103]
+blend_shapes/aa = 1.0
+surface_material_override/0 = SubResource("ShaderMaterial_bryac")
+
+[node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="1" unique_id=1973055401]
+surface_material_override/0 = SubResource("ShaderMaterial_0fgpu")
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=724573309]
 active = false
 
-[node name="AnimeToonApplier" type="Node" parent="."]
+[node name="AnimeToonApplier" type="Node" parent="." unique_id=849237690]
 script = ExtResource("2_toon_applier")
-target_root = NodePath("../VisualRoot/Model")
 include_mesh_name_filters = PackedStringArray()
 exclude_mesh_name_filters = PackedStringArray("collider", "collision")
-outline_width = 0.0035
-outline_color = Color(0.055, 0.043, 0.055, 1)
-normal_smooth_blend = 0.65
-shade_color = Color(0.58, 0.5, 0.58, 1)
-shade_threshold = 0.42
-shade_softness = 0.06
-shadow_level = 0.42
-light_wrap = 0.18
-ambient_lift = 0.1
-rim_strength = 0.1
-white_compress_start = 0.72
-white_compress_strength = 0.22
-white_tint = Color(0.86, 0.8, 0.82, 1)
-value_boost = 0.98
+max_light_level = 0.68
+light_contribution = 0.78
+ambient_lift = 0.04
+rim_strength = 0.03
+bright_luma_start = 0.45
+bright_light_damping = 0.72
+bright_shadow_push = 0.38
+bright_tint_strength = 0.62
+bright_tint = Color(0.68, 0.52, 0.56, 1)
+white_compress_start = 0.62
+white_compress_strength = 0.42
+white_tint = Color(0.72, 0.58, 0.62, 1)
+value_boost = 0.9
+
+[editable path="VisualRoot/Model"]
