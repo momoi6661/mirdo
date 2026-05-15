@@ -236,7 +236,7 @@ func _is_blend_shape_track_ready(track_path: String) -> bool:
 		return false
 	var node_path := NodePath(track_path.substr(0, separator_index))
 	var blend_shape_name := track_path.substr(separator_index + 1)
-	var mesh_node := get_node_or_null(node_path) as MeshInstance3D
+	var mesh_node := _resolve_blend_shape_mesh_node(node_path)
 	if mesh_node == null or mesh_node.mesh == null:
 		return false
 	var blend_shape_count: int = mesh_node.mesh.get_blend_shape_count()
@@ -246,6 +246,33 @@ func _is_blend_shape_track_ready(track_path: String) -> bool:
 		if String(mesh_node.mesh.get_blend_shape_name(index)) == blend_shape_name:
 			return true
 	return false
+
+func _resolve_blend_shape_mesh_node(node_path: NodePath) -> MeshInstance3D:
+	var by_self := get_node_or_null(node_path) as MeshInstance3D
+	if by_self != null:
+		return by_self
+	if face_animation_player != null:
+		var by_player := face_animation_player.get_node_or_null(node_path) as MeshInstance3D
+		if by_player != null:
+			return by_player
+	if face_animation_tree != null:
+		var by_tree := face_animation_tree.get_node_or_null(node_path) as MeshInstance3D
+		if by_tree != null:
+			return by_tree
+	var owner_node := owner as Node
+	if owner_node != null:
+		var by_owner := owner_node.get_node_or_null(node_path) as MeshInstance3D
+		if by_owner != null:
+			return by_owner
+	var parent_node := get_parent()
+	if parent_node != null:
+		var cursor := parent_node
+		while cursor != null:
+			var by_ancestor := cursor.get_node_or_null(node_path) as MeshInstance3D
+			if by_ancestor != null:
+				return by_ancestor
+			cursor = cursor.get_parent()
+	return null
 
 func _find_face_expression_transition(
 	face_expression_sm: AnimationNodeStateMachine,

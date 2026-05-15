@@ -132,6 +132,12 @@ func _extract_target_ref(payload: Dictionary) -> String:
 	var command_value: Variant = payload.get("command", null)
 	if command_value is Dictionary:
 		return _extract_target_ref(command_value as Dictionary)
+	for nested_key in ["action_hint", "navigation", "intent_payload", "command_payload", "payload", "parameters", "args"]:
+		var nested_value: Variant = payload.get(nested_key, null)
+		if nested_value is Dictionary:
+			var nested_target := _extract_target_ref(nested_value as Dictionary)
+			if not nested_target.is_empty():
+				return nested_target
 	return ""
 
 func _canonicalize(raw: String) -> String:

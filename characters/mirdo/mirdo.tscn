@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://xt7mifn4cwms"]
+
+[ext_resource type="PackedScene" uid="uid://clql12bwlaw21" path="res://characters/mirdo/mirdo.glb" id="1_4sspx"]
+
+[node name="mirdo" unique_id=1661528736 instance=ExtResource("1_4sspx")]

@@ -363,8 +363,18 @@ func _resolve_xiaokong_active_seat_marker(xiaokong_root: Node) -> Marker3D:
 		router = _find_node_with_method_recursive(xiaokong_root, &"get_active_sit_marker")
 	if router == null or not router.has_method("get_active_sit_marker"):
 		return null
+	if not _is_safe_script_instance(router):
+		return null
 	var marker: Variant = router.call("get_active_sit_marker")
 	return marker as Marker3D
+
+func _is_safe_script_instance(node: Node) -> bool:
+	if node == null:
+		return false
+	var script_value: Variant = node.get_script()
+	if script_value == null:
+		return true
+	return script_value is Script and (script_value as Script).can_instantiate()
 
 func _resolve_item_consumer(xiaokong_root: Node) -> Node:
 	if xiaokong_root == null:

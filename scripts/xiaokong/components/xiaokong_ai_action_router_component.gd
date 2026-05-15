@@ -289,6 +289,12 @@ func _try_apply_generic_character_ai(final_data: Dictionary, summary: Dictionary
 		summary["target_marker"] = String(report.get("target_marker_path", ""))
 	elif report.has("target_marker"):
 		summary["target_marker"] = String(report.get("target_marker", ""))
+	if report.has("target_object_id"):
+		summary["target_object_id"] = String(report.get("target_object_id", ""))
+	if report.has("target_object_type"):
+		summary["target_object_type"] = String(report.get("target_object_type", ""))
+	if report.has("target_object_tags"):
+		summary["target_object_tags"] = (report.get("target_object_tags", []) as Array).duplicate(true)
 	if report.has("move_target") and report["move_target"] is Vector3:
 		summary["move_target"] = report["move_target"]
 	if report.has("moved"):
@@ -297,6 +303,9 @@ func _try_apply_generic_character_ai(final_data: Dictionary, summary: Dictionary
 		summary["moved"] = true
 	if report.has("action"):
 		summary["action_requested"] = String(report.get("action", ""))
+
+	if bool(report.get("ok", false)):
+		_apply_generic_navigation_report(intent, report, summary)
 
 	var report_errors: Variant = report.get("errors", [])
 	if report_errors is Array:
@@ -308,6 +317,41 @@ func _try_apply_generic_character_ai(final_data: Dictionary, summary: Dictionary
 		summary["errors"].append(String(report_errors).strip_edges())
 
 	return true
+
+func _apply_generic_navigation_report(intent: Dictionary, report: Dictionary, summary: Dictionary) -> void:
+	if _action_controller == null or not _action_controller.has_method("navigate_to"):
+		return
+	if bool(summary.get("command_applied", false)) and bool(summary.get("moved", false)) and summary.get("move_target", Vector3.ZERO) is Vector3:
+		var existing_target: Vector3 = summary.get("move_target", Vector3.ZERO)
+		if existing_target != Vector3.ZERO:
+			return
+
+	var intent_name: String = String(intent.get("intent", report.get("intent", ""))).strip_edges()
+	var target_marker_path: String = String(report.get("target_marker_path", report.get("target_marker", ""))).strip_edges()
+	if target_marker_path.is_empty():
+		return
+
+	var marker: Marker3D = _find_marker_by_path(target_marker_path)
+	if marker == null:
+		summary["errors"].append("generic_target_marker_not_found")
+		summary["command_applied"] = false
+		summary["moved"] = false
+		return
+
+	match intent_name:
+		COMMAND_SIT_DOWN:
+			var sit_action: StringName = _normalize_action_name_for_command(intent.get("action", "SittingIdle"), &"SittingIdle")
+			_navigate_to_marker_and_queue_action(marker, sit_action, COMMAND_SIT_DOWN, summary)
+		COMMAND_GO_TO_MARKER, "go_to_object":
+			var object_type := String(report.get("target_object_type", "")).strip_edges()
+			var object_tags: Array = report.get("target_object_tags", [])
+			var marker_action := _get_marker_meta_action(marker)
+			var should_sit := object_type == "seat" or marker_action == &"SittingIdle" or object_tags.has("seat")
+			if should_sit:
+				_navigate_to_marker_and_queue_action(marker, &"SittingIdle", COMMAND_SIT_DOWN, summary)
+				summary["navigation_mode"] = "go_to_object_sit"
+			else:
+				_navigate_to_marker(marker, COMMAND_GO_TO_MARKER if intent_name == COMMAND_GO_TO_MARKER else "go_to_object", summary)
 
 func _resolve_generic_intent_interpreter() -> Node:
 	if generic_intent_interpreter_path == NodePath():

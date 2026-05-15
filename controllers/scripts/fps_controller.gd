@@ -74,7 +74,11 @@ var _camera_rotation : Vector3
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if is_ui_text_input_focused():
+	if is_ui_text_input_focused() or _is_custom_text_input_active():
+		if event is InputEventKey:
+			var vp_text := get_viewport()
+			if vp_text != null:
+				vp_text.set_input_as_handled()
 		return
 	_mouse_input = event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
 	if _mouse_input:
@@ -91,23 +95,15 @@ var _player_interaction_component: Node = null
 func _input(event):
 	if _is_custom_text_input_active():
 		var key_event := event as InputEventKey
-		var is_alt_toggle: bool = key_event != null and key_event.pressed and not key_event.echo and key_event.keycode == KEY_ALT
-		if is_alt_toggle:
-			if _is_dialogue_panel_open():
-				_toggle_dialogue_mouse_mode()
-			elif _is_inventory_panel_open():
-				_toggle_inventory_mouse_mode()
-			else:
-				_toggle_mouse_capture_mode()
-			var vp_alt := get_viewport()
-			if vp_alt != null:
-				vp_alt.set_input_as_handled()
-			return
-		else:
+		if key_event != null:
 			if event.is_action_released("drop_item"):
 				_is_holding_drop = false
 				_drop_timer = 0.0
+			var vp_text := get_viewport()
+			if vp_text != null:
+				vp_text.set_input_as_handled()
 			return
+		return
 
 	if event.is_action_pressed("inventory"):
 		_toggle_inventory_panel()

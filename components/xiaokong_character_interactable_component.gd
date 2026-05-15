@@ -149,6 +149,8 @@ func _is_xiaokong_seated(xiaokong_root: Node) -> bool:
 
 	var router: Node = _resolve_action_router()
 	if router != null and router.has_method("get_active_sit_marker"):
+		if not _is_safe_script_instance(router):
+			return false
 		var marker: Variant = router.call("get_active_sit_marker")
 		return marker is Marker3D and marker != null
 	return false
@@ -181,6 +183,8 @@ func _sync_seat_state_from_router() -> void:
 	var xiaokong_root: Node = _resolve_xiaokong_root()
 	var router: Node = _resolve_action_router()
 	if xiaokong_root == null or router == null or not router.has_method("get_active_sit_marker"):
+		return
+	if not _is_safe_script_instance(router):
 		return
 	var marker := router.call("get_active_sit_marker") as Marker3D
 	_seat_signal_is_seated = marker != null
@@ -242,6 +246,14 @@ func _resolve_xiaokong_root() -> Node:
 	if parent_node != null and parent_node.get_parent() != null:
 		return parent_node.get_parent()
 	return null
+
+func _is_safe_script_instance(node: Node) -> bool:
+	if node == null:
+		return false
+	var script_value: Variant = node.get_script()
+	if script_value == null:
+		return true
+	return script_value is Script and (script_value as Script).can_instantiate()
 
 func _pick_consume_item_path(food_entries: Array[Dictionary]) -> String:
 	var picked_path: String = ""

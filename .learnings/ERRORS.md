@@ -1661,3 +1661,135 @@ Use `$s = $s -replace 'pattern', ($replacement + "`r`n")` or switch to Python fo
 - Related Files: controllers/ui/pause_menu.tscn, controllers/scripts/pause_menu.gd
 
 ---
+
+## [ERR-20260513-001] rg_windowsapps_denied
+
+**Logged**: 2026-05-13T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: config
+
+### Summary
+Bundled rg.exe under WindowsApps failed with access denied when searching the Godot project.
+
+### Error
+```powershell
+Program 'rg.exe' failed to run: ... WindowsApps\OpenAI.Codex...\rg.exe ... 拒绝访问。
+```
+
+### Context
+- Command attempted: `rg -n ... .`
+- Environment: Codex Desktop on Windows, workspace `D:\AAgodot\FPS`.
+
+### Suggested Fix
+Use PowerShell `Get-ChildItem | Select-String` fallback, or invoke a different installed ripgrep path if available.
+
+### Metadata
+- Reproducible: unknown
+- Related Files: D:\AAgodot\FPS\.learnings\ERRORS.md
+---
+
+## [ERR-20260513-002] powershell_variable_colon_in_string
+
+**Logged**: 2026-05-13T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: config
+
+### Summary
+PowerShell interpreted `$p:` inside a double-quoted string as an invalid scoped variable reference.
+
+### Error
+```powershell
+Variable reference is not valid. ':' was not followed by a valid variable name character.
+```
+
+### Context
+- Command attempted to print file ranges using `"--- $p:$start-$end ---"`.
+
+### Suggested Fix
+Use `${p}:$start-$end` or string format operator instead.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:\AAgodot\FPS\.learnings\ERRORS.md
+---
+
+## [ERR-20260513-003] powershell_replace_operator_three_args
+
+**Logged**: 2026-05-13T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: docs
+
+### Summary
+PowerShell `-replace` was accidentally used with three following elements while inserting a spec section.
+
+### Error
+```powershell
+The -replace operator allows only two elements to follow it, not 3.
+```
+
+### Context
+- Updating `docs/superpowers/specs/2026-05-13-xiaokong-companion-ai-design.md`.
+
+### Suggested Fix
+Use regex MatchEvaluator, split replacement into temporary variables, or insert by line index.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:\AAgodot\FPS\docs\superpowers\specs\2026-05-13-xiaokong-companion-ai-design.md
+---
+
+## [ERR-20260513-004] powershell_markdown_backtick_string_conflict
+
+**Logged**: 2026-05-13T00:00:00+08:00
+**Priority**: low
+**Status**: pending
+**Area**: docs
+
+### Summary
+PowerShell parser failed while building a replacement string containing Markdown backticks and escaped newlines.
+
+### Error
+```powershell
+Unexpected token 'res://scripts/character_ai/components/character_ai_action_executor_component.gd``r`n-'
+```
+
+### Context
+- Updating AI design spec component names from Xiaokong-specific to generic Character AI names.
+
+### Suggested Fix
+Use here-strings or simpler sequential replacements instead of dense inline replacement strings.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:\AAgodot\FPS\docs\superpowers\specs\2026-05-13-xiaokong-companion-ai-design.md
+---
+
+## [ERR-20260513-005] godot_executable_not_found_in_expected_path
+
+**Logged**: 2026-05-13T00:00:00+08:00
+**Priority**: medium
+**Status**: pending
+**Area**: tests
+
+### Summary
+Attempted to run Godot headless tests, but `D:\Program Files\Godot\Godot_v4.x.exe` did not exist and `godot` was not on PATH.
+
+### Error
+```powershell
+The term 'godot' is not recognized as a name of a cmdlet, function, script file, or executable program.
+```
+
+### Context
+- Command attempted: `godot --headless --path D:\AAgodot\FPS -s res://tests/system/test_character_ai_semantics.gd`
+- Need a valid Godot executable to verify TDD RED/GREEN.
+
+### Suggested Fix
+Locate installed Godot executable under common paths or project tooling config, then use full absolute path for test commands.
+
+### Metadata
+- Reproducible: yes
+- Related Files: D:\AAgodot\FPS\tests\system\test_character_ai_semantics.gd
+---

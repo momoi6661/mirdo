@@ -203,18 +203,30 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
-func set_inventory_data(data_service: InventoryDataService) -> void:
+func set_inventory_data(data_service: Node) -> void:
 	if _inventory_data != null and is_instance_valid(_inventory_data):
-		if _inventory_data.inventory_changed.is_connected(_on_inventory_changed):
-			_inventory_data.inventory_changed.disconnect(_on_inventory_changed)
+		_disconnect_inventory_changed(_inventory_data)
 
-	_inventory_data = data_service
+	_inventory_data = data_service as InventoryDataService
 	if _inventory_data != null and is_instance_valid(_inventory_data):
-		if not _inventory_data.inventory_changed.is_connected(_on_inventory_changed):
-			_inventory_data.inventory_changed.connect(_on_inventory_changed)
+		_connect_inventory_changed(_inventory_data)
 
 	_rebuild_slot_visuals()
 	_refresh_all_slot_visuals()
+
+func _connect_inventory_changed(data_service: Node) -> void:
+	if data_service == null or not data_service.has_signal("inventory_changed"):
+		return
+	var callback := Callable(self, "_on_inventory_changed")
+	if not data_service.is_connected("inventory_changed", callback):
+		data_service.connect("inventory_changed", callback)
+
+func _disconnect_inventory_changed(data_service: Node) -> void:
+	if data_service == null or not data_service.has_signal("inventory_changed"):
+		return
+	var callback := Callable(self, "_on_inventory_changed")
+	if data_service.is_connected("inventory_changed", callback):
+		data_service.disconnect("inventory_changed", callback)
 
 
 func _apply_editor_preview_state() -> void:

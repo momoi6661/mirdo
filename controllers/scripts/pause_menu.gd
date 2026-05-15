@@ -137,8 +137,9 @@ func _on_continue_pressed() -> void:
 func _on_save_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("save_requested")
-	if has_node("/root/SaveManager"):
-		get_node("/root/SaveManager").save_game("manual_save")
+	var save_manager := get_tree().root.get_node_or_null("SaveManager")
+	if save_manager != null and save_manager.has_method("save_game"):
+		save_manager.call("save_game", "manual_save")
 
 func _on_debug_load_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -146,8 +147,9 @@ func _on_debug_load_pressed() -> void:
 	# 如果你在 UI 层面有动画或菜单隐藏逻辑，先关闭暂停菜单，恢复时间
 	hide_menu()
 	
-	if has_node("/root/SaveManager"):
-		get_node("/root/SaveManager").auto_load_game("manual_save")
+	var save_manager := get_tree().root.get_node_or_null("SaveManager")
+	if save_manager != null and save_manager.has_method("auto_load_game"):
+		save_manager.call("auto_load_game", "manual_save")
 	else:
 		print("[PauseMenu] 找不到 SaveManager！")
 

@@ -1,0 +1,41 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://characters/mirdo/mirdo.tscn" id="1_model"]
+[ext_resource type="Script" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.21240234
+height = 0.9932617
+
+[node name="MirdoCharacter" type="CharacterBody3D" unique_id=2096496898]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1270074745]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.50163084, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="VisualRoot" type="Node3D" parent="." unique_id=1526476277]
+
+[node name="Model" type="Node3D" parent="VisualRoot" unique_id=50782955 instance=ExtResource("1_model")]
+
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=724573309]
+active = false
+
+[node name="AnimeToonApplier" type="Node" parent="."]
+script = ExtResource("2_toon_applier")
+target_root = NodePath("../VisualRoot/Model")
+include_mesh_name_filters = PackedStringArray()
+exclude_mesh_name_filters = PackedStringArray("collider", "collision")
+outline_width = 0.0035
+outline_color = Color(0.055, 0.043, 0.055, 1)
+normal_smooth_blend = 0.65
+shade_color = Color(0.58, 0.5, 0.58, 1)
+shade_threshold = 0.42
+shade_softness = 0.06
+shadow_level = 0.42
+light_wrap = 0.18
+ambient_lift = 0.1
+rim_strength = 0.1
+white_compress_start = 0.72
+white_compress_strength = 0.22
+white_tint = Color(0.86, 0.8, 0.82, 1)
+value_boost = 0.98

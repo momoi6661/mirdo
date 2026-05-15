@@ -1,0 +1,30 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://features/anime_toon/anime_toon.gdshader" id="1_toon"]
+[ext_resource type="ShaderMaterial" path="res://features/anime_toon/anime_outline_material.tres" id="2_outline"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_toon")
+next_pass = ExtResource("2_outline")
+shader_parameter/use_texture = true
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
+shader_parameter/shade_threshold = 0.42
+shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_level = 0.42
+shader_parameter/light_wrap = 0.18
+shader_parameter/light_contribution = 1.0
+shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
+shader_parameter/ambient_lift = 0.1
+shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
+shader_parameter/rim_strength = 0.1
+shader_parameter/rim_threshold = 0.68
+shader_parameter/rim_softness = 0.08
+shader_parameter/rim_power = 3.2
+shader_parameter/white_compress_start = 0.72
+shader_parameter/white_compress_strength = 0.22
+shader_parameter/white_tint = Color(0.86, 0.8, 0.82, 1)
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/saturation = 0.94
+shader_parameter/value_boost = 0.98

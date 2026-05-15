@@ -38,6 +38,8 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var fill_input_on_option_click: bool = true
 @export var enable_multiline_wrap: bool = true
 @export_range(1, 8, 1) var input_max_lines: int = 4
+@export var submit_on_enter: bool = true
+@export var newline_with_shift_enter: bool = true
 @export var submit_with_ctrl_enter: bool = true
 @export var double_click_option_to_submit: bool = true
 @export_range(150, 1000, 10) var double_click_threshold_ms: int = 450
@@ -66,12 +68,16 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export_range(0.01, 0.20, 0.005) var input_text_padding_world: float = 0.03
 @export var center_input_and_placeholder_text: bool = false
 @export var center_send_text: bool = true
-@export var input_text_offset: Vector3 = Vector3(-0.33, -0.016, 0.012)
-@export var placeholder_text_offset: Vector3 = Vector3(-0.33, -0.016, 0.0122)
-@export var send_text_offset: Vector3 = Vector3(0.0, -0.016, 0.0122)
+@export var input_text_offset: Vector3 = Vector3(-0.33, 0.0, 0.012)
+@export var placeholder_text_offset: Vector3 = Vector3(-0.33, 0.0, 0.0122)
+@export var send_text_offset: Vector3 = Vector3(0.0, 0.0, 0.0122)
 @export_range(0.0005, 0.01, 0.0001) var text_surface_depth: float = 0.0022
 @export_range(0.01, 0.12, 0.001) var input_extra_height_per_line: float = 0.045
 @export_range(0.0003, 0.003, 0.0001) var text_pixel_size: float = 0.0009
+@export_range(-0.04, 0.04, 0.0005) var input_text_y_offset_world: float = -0.002
+@export_range(-0.04, 0.04, 0.0005) var caret_y_offset_world: float = -0.002
+@export_range(0.5, 1.5, 0.01) var caret_char_width_scale: float = 0.86
+@export_range(0.7, 1.4, 0.01) var caret_font_height_scale: float = 1.06
 
 @export_category("Style")
 @export var panel_color: Color = Color(1.0, 0.87, 0.94, 0.08)
@@ -91,7 +97,7 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var send_text_pressed_color: Color = Color(0.16, 0.05, 0.12, 1.0)
 @export var option_hover_text_color: Color = Color(1.0, 0.98, 1.0, 1.0)
 @export var option_pressed_text_color: Color = Color(1.0, 1.0, 1.0, 1.0)
-@export var caret_color: Color = Color(0.98, 0.30, 0.66, 1.0)
+@export var caret_color: Color = Color(0.23, 0.10, 0.17, 1.0)
 @export var panel_corner_radius: float = 0.045
 @export var row_corner_radius: float = 0.06
 @export var input_corner_radius: float = 0.045
@@ -102,8 +108,8 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var ui_render_priority: int = 12
 @export var text_render_priority: int = 64
 @export_range(0.10, 2.0, 0.01) var caret_blink_interval: float = 0.46
-@export_range(0.004, 0.04, 0.001) var caret_height_world: float = 0.038
-@export_range(0.0006, 0.01, 0.0001) var caret_width_world: float = 0.0048
+@export_range(0.004, 0.08, 0.001) var caret_height_world: float = 0.052
+@export_range(0.0006, 0.012, 0.0001) var caret_width_world: float = 0.0052
 @export_range(0.01, 0.08, 0.001) var caret_line_step_world: float = 0.032
 @export_range(0.0, 0.03, 0.0005) var caret_gap_world: float = 0.008
 @export_range(1.0, 1.08, 0.001) var hover_scale_multiplier: float = 1.01
@@ -179,10 +185,15 @@ func _input(event: InputEvent) -> void:
 	if event is not InputEventKey:
 		return
 	var key_event := event as InputEventKey
-	if not key_event.pressed or key_event.echo:
+	if not key_event.pressed:
 		return
 
 	if key_event.keycode == KEY_ESCAPE:
+		if key_event.echo:
+			var vp_escape_echo := get_viewport()
+			if vp_escape_echo != null:
+				vp_escape_echo.set_input_as_handled()
+			return
 		hide_panel()
 		var vp_close := get_viewport()
 		if vp_close != null:
@@ -192,29 +203,26 @@ func _input(event: InputEvent) -> void:
 	if not _input_focused:
 		return
 
-	if key_event.unicode > 0 and not key_event.ctrl_pressed and not key_event.alt_pressed and not key_event.meta_pressed:
-		_append_input_text(char(key_event.unicode))
-		var vp_char := get_viewport()
-		if vp_char != null:
-			vp_char.set_input_as_handled()
-		return
-
-	# IME 输入时，Enter 常用于候选确认；在 Ctrl+Enter 发送模式下，不拦截普通 Enter。
-
 	if key_event.keycode == KEY_ENTER or key_event.keycode == KEY_KP_ENTER:
-		var allow_submit: bool = (not enable_multiline_wrap) or (submit_with_ctrl_enter and key_event.ctrl_pressed)
-		if allow_submit:
-			_submit_input_text()
-		elif enable_multiline_wrap and not submit_with_ctrl_enter:
-			_append_input_text("\n")
-		else:
+		if key_event.echo:
+			var vp_enter_echo := get_viewport()
+			if vp_enter_echo != null:
+				vp_enter_echo.set_input_as_handled()
 			return
+		var wants_newline: bool = enable_multiline_wrap and newline_with_shift_enter and key_event.shift_pressed
+		var wants_submit: bool = submit_on_enter or (submit_with_ctrl_enter and key_event.ctrl_pressed) or not enable_multiline_wrap
+		if wants_newline and not key_event.ctrl_pressed:
+			_append_input_text("\n")
+		elif wants_submit:
+			_submit_input_text()
+		elif enable_multiline_wrap:
+			_append_input_text("\n")
 		var vp_submit := get_viewport()
 		if vp_submit != null:
 			vp_submit.set_input_as_handled()
 		return
 
-	if key_event.keycode == KEY_BACKSPACE:
+	if key_event.keycode == KEY_BACKSPACE or key_event.keycode == KEY_DELETE:
 		if not _input_text.is_empty():
 			_input_text = _input_text.substr(0, _input_text.length() - 1)
 			_refresh_input_text_visual()
@@ -223,11 +231,22 @@ func _input(event: InputEvent) -> void:
 			vp_back.set_input_as_handled()
 		return
 
+	if key_event.unicode > 0 and not key_event.ctrl_pressed and not key_event.alt_pressed and not key_event.meta_pressed:
+		_append_input_text(char(key_event.unicode))
+		var vp_char := get_viewport()
+		if vp_char != null:
+			vp_char.set_input_as_handled()
+		return
+
 	if key_event.keycode == KEY_SPACE and key_event.unicode == 0:
 		var vp_space := get_viewport()
 		if vp_space != null:
 			vp_space.set_input_as_handled()
 		return
+
+	var vp_any_key := get_viewport()
+	if vp_any_key != null:
+		vp_any_key.set_input_as_handled()
 
 func open_for_payload(payload: Dictionary) -> void:
 	_current_payload = payload.duplicate(true)
@@ -358,16 +377,14 @@ func _setup_visuals() -> void:
 		var input_align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER if input_centered else HORIZONTAL_ALIGNMENT_LEFT
 		_style_label(_input_text_label, input_text_color, input_align)
 		_configure_label_box(_input_text_label, maxf(0.05, input_size.x - input_text_padding_world * 2.0), input_align, input_centered, true, wrap_enabled)
-		if use_auto_layout_offsets:
-			_input_text_label.position = input_text_offset
+		_input_text_label.position = _get_input_text_origin(1, text_surface_depth)
 	if _placeholder_label != null:
 		var placeholder_centered: bool = bool(center_input_and_placeholder_text)
 		var placeholder_wrap: bool = bool(enable_multiline_wrap)
 		var placeholder_align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER if placeholder_centered else HORIZONTAL_ALIGNMENT_LEFT
 		_style_label(_placeholder_label, placeholder_color, placeholder_align)
 		_configure_label_box(_placeholder_label, maxf(0.05, input_size.x - input_text_padding_world * 2.0), placeholder_align, placeholder_centered, true, placeholder_wrap)
-		if use_auto_layout_offsets:
-			_placeholder_label.position = placeholder_text_offset
+		_placeholder_label.position = _get_input_text_origin(1, text_surface_depth + 0.0002)
 		_placeholder_label.text = input_placeholder_text
 	if _send_label != null:
 		var send_centered: bool = bool(center_send_text)
@@ -375,14 +392,13 @@ func _setup_visuals() -> void:
 		_style_label(_send_label, input_text_color, send_align)
 		_configure_label_box(_send_label, maxf(0.05, send_button_size.x - 0.01), send_align, send_centered, true)
 		_send_label.text = "发送"
-		if use_auto_layout_offsets:
-			_send_label.position = send_text_offset
+		_send_label.position = Vector3(send_text_offset.x, send_text_offset.y, text_surface_depth + 0.0002)
 	if _input_caret != null:
 		var caret_quad := _input_caret.mesh as QuadMesh
 		if caret_quad == null:
 			caret_quad = QuadMesh.new()
 			_input_caret.mesh = caret_quad
-		caret_quad.size = Vector2(caret_width_world, caret_height_world)
+		caret_quad.size = Vector2(caret_width_world, _get_caret_height_world())
 		_input_caret.material_override = _make_caret_material()
 		_input_caret.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_input_caret.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
@@ -740,10 +756,6 @@ func _refresh_input_text_visual() -> void:
 		_input_text_label.text = _input_text
 	if _placeholder_label != null:
 		_placeholder_label.text = input_placeholder_text if _input_text.is_empty() else ""
-	if use_auto_layout_offsets:
-		var offset_x: float = 0.0 if center_input_and_placeholder_text else -input_size.x * 0.5 + input_text_padding_world
-		input_text_offset.x = offset_x
-		placeholder_text_offset.x = offset_x
 	_apply_input_dynamic_height()
 	_update_caret_visual(0.0)
 
@@ -781,8 +793,6 @@ func _estimate_wrapped_line_count(text: String) -> int:
 	if not enable_multiline_wrap:
 		return 1
 	var usable_width: float = maxf(0.04, input_size.x - input_text_padding_world * 2.0)
-	var approx_char_width: float = maxf(0.005, text_pixel_size * 38.0)
-	var chars_per_line: int = maxi(1, int(floor(usable_width / approx_char_width)))
 	var total_lines: int = 0
 	var paragraphs: PackedStringArray = text.split("\n", false)
 	if paragraphs.is_empty():
@@ -792,13 +802,55 @@ func _estimate_wrapped_line_count(text: String) -> int:
 		if para_len <= 0:
 			total_lines += 1
 		else:
-			total_lines += int(ceil(float(para_len) / float(chars_per_line)))
+			total_lines += maxi(1, _wrap_paragraph_for_layout(para, usable_width).size())
 	return maxi(1, total_lines)
 
 func _get_chars_per_line() -> int:
 	var usable_width: float = maxf(0.04, input_size.x - input_text_padding_world * 2.0)
-	var approx_char_width: float = maxf(0.005, text_pixel_size * 38.0)
+	var approx_char_width: float = _get_approx_char_width()
 	return maxi(1, int(floor(usable_width / approx_char_width)))
+
+func _get_input_text_origin(line_count: int, z_value: float = 0.0) -> Vector3:
+	var x: float = 0.0 if center_input_and_placeholder_text else -input_size.x * 0.5 + input_text_padding_world
+	var visible_lines: int = clampi(maxi(1, line_count), 1, input_max_lines)
+	var total_text_height: float = float(visible_lines - 1) * caret_line_step_world
+	var y: float = total_text_height * 0.5 + input_text_y_offset_world
+	return Vector3(x, y, z_value)
+
+func _get_approx_char_width() -> float:
+	return maxf(0.005, text_pixel_size * 38.0 * caret_char_width_scale)
+
+func _get_font_for_measurement() -> Font:
+	if _input_text_label != null and _input_text_label.font != null:
+		return _input_text_label.font
+	return PANEL_FONT
+
+func _get_font_size_for_measurement() -> int:
+	if _input_text_label != null:
+		return _input_text_label.font_size
+	return 50
+
+func _get_pixel_size_for_measurement() -> float:
+	if _input_text_label != null:
+		return _input_text_label.pixel_size
+	return text_pixel_size
+
+func _measure_text_world_width(text: String) -> float:
+	if text.is_empty():
+		return 0.0
+	var font := _get_font_for_measurement()
+	if font == null:
+		return float(text.length()) * _get_approx_char_width()
+	var size_px: Vector2 = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, _get_font_size_for_measurement())
+	return maxf(0.0, size_px.x * _get_pixel_size_for_measurement())
+
+func _get_caret_height_world() -> float:
+	var font := _get_font_for_measurement()
+	if font != null:
+		var font_height_px := font.get_height(_get_font_size_for_measurement())
+		if font_height_px > 0.0:
+			return maxf(caret_height_world, font_height_px * _get_pixel_size_for_measurement() * caret_font_height_scale)
+	return caret_height_world
 
 func _wrap_text_for_layout(text: String) -> PackedStringArray:
 	var wrapped: PackedStringArray = PackedStringArray()
@@ -818,14 +870,39 @@ func _wrap_text_for_layout(text: String) -> PackedStringArray:
 		if para.is_empty():
 			wrapped.append("")
 			continue
-		var start: int = 0
-		while start < para.length():
-			var take: int = mini(chars_per_line, para.length() - start)
-			wrapped.append(para.substr(start, take))
-			start += take
+		var para_lines := _wrap_paragraph_for_layout(para, maxf(0.04, input_size.x - input_text_padding_world * 2.0))
+		for line in para_lines:
+			wrapped.append(line)
 	return wrapped
 
+func _wrap_paragraph_for_layout(para: String, usable_width: float) -> PackedStringArray:
+	var lines := PackedStringArray()
+	if para.is_empty():
+		lines.append("")
+		return lines
+	var current := ""
+	for i in range(para.length()):
+		var ch := para.substr(i, 1)
+		var candidate := current + ch
+		if not current.is_empty() and _measure_text_world_width(candidate) > usable_width:
+			lines.append(current)
+			current = ch
+		else:
+			current = candidate
+	if not current.is_empty():
+		lines.append(current)
+	return lines
+
 func _apply_input_dynamic_height() -> void:
+	var visible_line_count: int = clampi(_estimate_wrapped_line_count(_input_text if not _input_text.is_empty() else input_placeholder_text), 1, input_max_lines)
+	var input_origin := _get_input_text_origin(visible_line_count, text_surface_depth)
+	var placeholder_origin := _get_input_text_origin(1, text_surface_depth + 0.0002)
+	input_text_offset = input_origin
+	placeholder_text_offset = placeholder_origin
+	if _input_text_label != null:
+		_input_text_label.position = input_origin
+	if _placeholder_label != null:
+		_placeholder_label.position = placeholder_origin
 	if _input_mesh != null:
 		var iq := _input_mesh.mesh as QuadMesh
 		if iq != null:
@@ -882,11 +959,11 @@ func _update_follow_transform(delta: float) -> void:
 
 func _ensure_text_surface_depth() -> void:
 	if _input_text_label != null:
-		_input_text_label.position.z = text_surface_depth
+		_input_text_label.position.z = input_text_offset.z if input_text_offset.z > 0.0 else text_surface_depth
 	if _placeholder_label != null:
-		_placeholder_label.position.z = text_surface_depth + 0.0002
+		_placeholder_label.position.z = placeholder_text_offset.z if placeholder_text_offset.z > 0.0 else text_surface_depth + 0.0002
 	if _send_label != null:
-		_send_label.position.z = text_surface_depth + 0.0002
+		_send_label.position = Vector3(send_text_offset.x, send_text_offset.y, text_surface_depth + 0.0002)
 	if _input_caret != null:
 		_input_caret.position.z = text_surface_depth + 0.0003
 
@@ -910,9 +987,15 @@ func _update_caret_visual(delta: float) -> void:
 	var line_count: int = maxi(1, lines.size())
 	var line_index: int = maxi(0, line_count - 1)
 	var last_line: String = lines[line_index] if not lines.is_empty() else ""
-	var approx_char_width: float = maxf(0.005, text_pixel_size * 38.0)
-	var local_x: float = input_text_offset.x + float(last_line.length()) * approx_char_width + caret_gap_world
-	var local_y: float = input_text_offset.y + 0.003 - (float(line_count - 1) * caret_line_step_world * 0.5) - float(line_index) * caret_line_step_world
+	var origin := _get_input_text_origin(line_count, text_surface_depth)
+	var measured_line_width := _measure_text_world_width(last_line)
+	var local_x: float = origin.x + measured_line_width + caret_gap_world + caret_width_world * 0.65
+	var local_y: float = origin.y - float(line_index) * caret_line_step_world + caret_y_offset_world
+	var max_x: float = input_size.x * 0.5 - input_text_padding_world * 0.5
+	local_x = minf(local_x, max_x)
+	var caret_quad := _input_caret.mesh as QuadMesh
+	if caret_quad != null:
+		caret_quad.size = Vector2(caret_width_world, _get_caret_height_world())
 	_input_caret.position = Vector3(local_x, local_y, text_surface_depth + 0.0003)
 	_input_caret.visible = _input_focused and _caret_visible and _panel_alpha > 0.01
 

@@ -110,6 +110,8 @@ func get_container_save_data() -> Array:
 
 func build_inventory_save_payload() -> Dictionary:
 	return {
+		"source": "shelter_runtime" if _uses_shelter_runtime_storage() else "scene_container",
+		"shelter_source_id": String(shelter_source_id),
 		"container_name": container_name,
 		"container_size": container_size,
 		"enable_item_stacking": enable_item_stacking,
@@ -118,6 +120,12 @@ func build_inventory_save_payload() -> Dictionary:
 
 
 func apply_inventory_save_payload(payload: Variant) -> void:
+	if _uses_shelter_runtime_storage() and _should_ignore_scene_payload_for_shelter_runtime(payload):
+		_ensure_runtime_storage()
+		_rebuild_runtime_slots_from_storage()
+		_sanitize_runtime_storage_items()
+		_refresh_world_display()
+		return
 	if payload is Dictionary:
 		var dict_payload: Dictionary = payload
 		if dict_payload.has("container_size"):
@@ -157,6 +165,12 @@ func apply_inventory_storage_resource(storage: InventoryStorageResource) -> void
 
 # 2. 读取数据
 func load_container_save_data(saved_slots: Array) -> void:
+	if _uses_shelter_runtime_storage() and saved_slots.is_empty():
+		_ensure_runtime_storage()
+		_rebuild_runtime_slots_from_storage()
+		_sanitize_runtime_storage_items()
+		_refresh_world_display()
+		return
 	_ensure_runtime_storage()
 	_rebuild_runtime_slots_from_storage()
 
@@ -271,6 +285,30 @@ func _normalize_slot_amount(item: ItemData, amount: int) -> int:
 
 func _uses_shelter_runtime_storage() -> bool:
 	return use_shelter_inventory_runtime and not String(shelter_source_id).strip_edges().is_empty()
+
+
+func should_save_inventory_in_scene() -> bool:
+	return not _uses_shelter_runtime_storage()
+
+
+func should_load_inventory_from_scene() -> bool:
+	return not _uses_shelter_runtime_storage()
+
+
+func _should_ignore_scene_payload_for_shelter_runtime(payload: Variant) -> bool:
+	if payload is Dictionary:
+		var dict_payload := payload as Dictionary
+		var source_text := String(dict_payload.get("source", "")).strip_edges()
+		if source_text == "shelter_runtime":
+			return true
+		var payload_source_id := String(dict_payload.get("shelter_source_id", "")).strip_edges()
+		if not payload_source_id.is_empty() and payload_source_id == String(shelter_source_id).strip_edges():
+			return true
+		if dict_payload.has("slots") and (dict_payload.get("slots", []) as Array).is_empty():
+			return true
+	if payload is Array:
+		return (payload as Array).is_empty()
+	return false
 
 
 func _get_or_create_shelter_runtime_storage() -> InventoryStorageResource:

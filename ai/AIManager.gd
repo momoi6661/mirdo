@@ -1272,4 +1272,3 @@ func _build_provider_from_settings() -> Dictionary:
 		"api_key": api_key,
 		"model": model,
 	}
-

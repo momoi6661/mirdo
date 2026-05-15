@@ -1,5 +1,6 @@
 [gd_scene format=4 uid="uid://dkvdetsx46b2s"]
 
+[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="1_yh1ol"]
 [ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="2_container_panel"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_save_comp"]
@@ -68,7 +69,17 @@ size = Vector3(0.78, 0.18, 2.08)
 [sub_resource type="BoxShape3D" id="BoxShape3D_ayvi7"]
 size = Vector3(4.4655275, 2.1, 2.0195892)
 
-[node name="RackStorageContainer" type="Node3D" unique_id=528286684 groups=["nav_source_bunker"]]
+[node name="RackStorageContainer" type="Node3D" unique_id=528286684 groups=["nav_source_bunker", "ai_world_object"]]
+script = ExtResource("ai_world_object")
+object_id = &"food_cabinet"
+display_name = "食品柜"
+ai_description = "存放食物和饮水补给的柜子；玩家让你查看食物柜、食品柜或补给时，应走到这里检查。"
+object_type = "food"
+tags = PackedStringArray("storage", "food", "supplies", "cabinet")
+supported_actions = PackedStringArray("go_to", "open", "inspect", "check_supplies")
+nav_marker_path = NodePath("Approach_Mark3D")
+look_marker_path = NodePath("ContainerPanelMark3D")
+marker_roles = {"approach": NodePath("Approach_Mark3D"), "look": NodePath("ContainerPanelMark3D"), "open": NodePath("ContainerPanelMark3D")}
 
 [node name="SaveComponent" type="Node" parent="." unique_id=143927321]
 script = ExtResource("3_save_comp")
@@ -157,6 +168,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 0.30284557, -0.24)
 
 [node name="Slot_16" type="Marker3D" parent="DisplaySlotMarkers" unique_id=1024284656]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 0.30284557, -0.72)
+
+[node name="Approach_Mark3D" type="Marker3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.05, 0, 0)
 
 [node name="ContainerPanelMark3D" type="Marker3D" parent="." unique_id=570397540]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.613, 1.299, 0.015)

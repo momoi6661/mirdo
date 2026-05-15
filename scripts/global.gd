@@ -337,7 +337,7 @@ func _apply_shelter_inventory_save_payload(payload: Dictionary) -> void:
 func _build_storage_save_payload(storage: InventoryStorageResource) -> Dictionary:
 	var slots_payload: Array[Dictionary] = []
 	if storage == null:
-		return {"slot_count": 0, "slots": slots_payload}
+		return {"version": 1, "slot_count": 0, "slots": slots_payload}
 	storage.ensure_capacity()
 	for slot_index in range(storage.slot_count):
 		var slot := storage.get_slot(slot_index) as InventorySlotStackResource
@@ -349,6 +349,7 @@ func _build_storage_save_payload(storage: InventoryStorageResource) -> Dictionar
 			"amount": int(slot.amount),
 		})
 	return {
+		"version": 1,
 		"slot_count": int(storage.slot_count),
 		"slots": slots_payload,
 	}
@@ -356,6 +357,9 @@ func _build_storage_save_payload(storage: InventoryStorageResource) -> Dictionar
 
 func _apply_storage_save_payload(storage: InventoryStorageResource, payload: Dictionary) -> void:
 	if storage == null:
+		return
+	if _should_ignore_legacy_empty_storage_payload(storage, payload):
+		storage.ensure_capacity()
 		return
 	var slot_count := int(payload.get("slot_count", storage.slot_count))
 	if slot_count > 0:
@@ -378,6 +382,26 @@ func _apply_storage_save_payload(storage: InventoryStorageResource, payload: Dic
 		var slot := storage.get_slot(slot_id) as InventorySlotStackResource
 		if slot != null:
 			slot.set_stack(item, amount)
+
+
+func _should_ignore_legacy_empty_storage_payload(storage: InventoryStorageResource, payload: Dictionary) -> bool:
+	if payload.is_empty():
+		return false
+	var version_value: int = int(payload.get("version", 0))
+	if version_value > 0:
+		return false
+	var source_id := String(storage.source_id).strip_edges()
+	if source_id != "food_cabinet" and source_id != "food_cabinet_2":
+		return false
+	var slots_payload: Array = payload.get("slots", [])
+	if not slots_payload.is_empty():
+		return false
+	storage.ensure_capacity()
+	for i in range(storage.slot_count):
+		var slot := storage.get_slot(i) as InventorySlotStackResource
+		if slot != null and not slot.is_empty():
+			return true
+	return false
 
 
 func _get_shelter_source_by_id(source_id: String) -> Resource:

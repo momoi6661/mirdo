@@ -57,11 +57,11 @@ func get_save_data() -> Dictionary:
 	var inventory_payloads = {}
 	for child in parent.get_children():
 		if child == self: continue
-		if child.has_method("get_container_save_data"):
+		if child.has_method("get_container_save_data") and _should_save_inventory_node(child):
 			sibling_data["loot"] = child.get_container_save_data()
 		elif child.has_method("_get_custom_save_data"):
 			sibling_data[child.name] = child._get_custom_save_data()
-		if child.has_method("build_inventory_save_payload"):
+		if child.has_method("build_inventory_save_payload") and _should_save_inventory_node(child):
 			inventory_payloads[child.name] = child.build_inventory_save_payload()
 			
 	if not sibling_data.is_empty():
@@ -77,11 +77,11 @@ func get_save_data() -> Dictionary:
 		if node == null or node == self:
 			continue
 		var state := {}
-		if node.has_method("get_container_save_data"):
+		if node.has_method("get_container_save_data") and _should_save_inventory_node(node):
 			state["loot"] = node.get_container_save_data()
 		if node.has_method("_get_custom_save_data"):
 			state["custom"] = node._get_custom_save_data()
-		if node.has_method("build_inventory_save_payload"):
+		if node.has_method("build_inventory_save_payload") and _should_save_inventory_node(node):
 			state["inventory_payload"] = node.build_inventory_save_payload()
 		if state.is_empty():
 			continue
@@ -112,7 +112,7 @@ func load_save_data(data: Dictionary) -> void:
 		var sibling_data = data["siblings"]
 		for child in parent.get_children():
 			if child == self: continue
-			if child.has_method("load_container_save_data") and sibling_data.has("loot"):
+			if child.has_method("load_container_save_data") and sibling_data.has("loot") and _should_load_inventory_node(child):
 				child.load_container_save_data(sibling_data["loot"])
 			elif child.has_method("_load_custom_save_data") and sibling_data.has(child.name):
 				child._load_custom_save_data(sibling_data[child.name])
@@ -123,6 +123,8 @@ func load_save_data(data: Dictionary) -> void:
 			if child == self:
 				continue
 			if not child.has_method("apply_inventory_save_payload"):
+				continue
+			if not _should_load_inventory_node(child):
 				continue
 			if payloads.has(child.name):
 				child.apply_inventory_save_payload(payloads[child.name])
@@ -138,9 +140,25 @@ func load_save_data(data: Dictionary) -> void:
 			var target := parent.get_node_or_null(NodePath(path_str))
 			if target == null:
 				continue
-			if state.has("loot") and target.has_method("load_container_save_data"):
+			if state.has("loot") and target.has_method("load_container_save_data") and _should_load_inventory_node(target):
 				target.load_container_save_data(state["loot"])
 			if state.has("custom") and target.has_method("_load_custom_save_data"):
 				target._load_custom_save_data(state["custom"])
-			if state.has("inventory_payload") and target.has_method("apply_inventory_save_payload"):
+			if state.has("inventory_payload") and target.has_method("apply_inventory_save_payload") and _should_load_inventory_node(target):
 				target.apply_inventory_save_payload(state["inventory_payload"])
+
+
+func _should_save_inventory_node(node: Node) -> bool:
+	if node == null:
+		return false
+	if node.has_method("should_save_inventory_in_scene"):
+		return bool(node.call("should_save_inventory_in_scene"))
+	return true
+
+
+func _should_load_inventory_node(node: Node) -> bool:
+	if node == null:
+		return false
+	if node.has_method("should_load_inventory_from_scene"):
+		return bool(node.call("should_load_inventory_from_scene"))
+	return true

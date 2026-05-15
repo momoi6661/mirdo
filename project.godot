@@ -39,6 +39,13 @@ window/size/always_on_top=true
 
 enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg")
 
+[file_customization]
+
+folder_colors={
+"res://characters/": "teal",
+"res://features/": "green"
+}
+
 [input]
 
 move_forward={

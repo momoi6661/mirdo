@@ -10,6 +10,8 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 		"ok": false,
 		"intent": intent_name,
 		"target_object_id": "",
+		"target_object_type": "",
+		"target_object_tags": [],
 		"target_marker_path": "",
 		"errors": [],
 	}
@@ -45,6 +47,8 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 		return
 	report["ok"] = true
 	report["target_object_id"] = _get_world_object_id(target)
+	report["target_object_type"] = String(target.get("object_type")).strip_edges()
+	report["target_object_tags"] = _to_string_array(target.get("tags"))
 	report["target_marker_path"] = String(marker.get_path())
 
 func _find_world_object(target_ref: String) -> Node:
@@ -69,3 +73,13 @@ func _get_world_object_id(node: Node) -> String:
 	if not clean.is_empty():
 		return clean
 	return String(node.name)
+
+
+func _to_string_array(values: Variant) -> Array:
+	var result: Array = []
+	if values is PackedStringArray or values is Array:
+		for value in values:
+			var clean := String(value).strip_edges()
+			if not clean.is_empty():
+				result.append(clean)
+	return result

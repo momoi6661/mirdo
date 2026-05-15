@@ -15,6 +15,8 @@ signal model_probe_failed(error_text: String)
 @export var time_component_path: NodePath
 @export var action_router_path: NodePath
 @export var perception_component_path: NodePath
+@export var affective_director_path: NodePath
+@export var companion_director_path: NodePath
 @export var auto_apply_ai_response: bool = true
 @export var use_local_fallback_on_error: bool = true
 @export var fallback_reply_text: String = "信号不稳定，我们先留在避难所，稳住状态再行动。"
@@ -32,13 +34,16 @@ signal model_probe_failed(error_text: String)
 @export var suppress_error_dialogue_output: bool = true
 @export var subtitle_target_path: NodePath = NodePath("../WorldSubtitleComponent")
 @export var subtitle_speaker_name: String = "Xiaokong"
+@export var local_object_intent_fallback_enabled: bool = true
 
 var _ai_manager: AIManager
 var _state_component: XiaokongStateComponent
 var _time_component: Node
-var _action_router: XiaokongAIActionRouterComponent
+var _action_router: Node
 var _subtitle_target: Node
 var _perception_component: Node
+var _affective_director: Node
+var _companion_director: Node
 
 var _request_in_flight: bool = false
 var _last_payload: Dictionary = {}
@@ -361,9 +366,10 @@ func _on_ai_chunk(chunk: String) -> void:
 			_pending_action_hint = {}
 
 func _on_ai_action_hint(action_hint: Dictionary) -> void:
-	if not _request_in_flight:
-		return
 	if action_hint.is_empty():
+		return
+	if not _request_in_flight:
+		_apply_affective_response(action_hint)
 		return
 	if not _stream_first_chunk_received:
 		_pending_action_hint = action_hint.duplicate(true)
@@ -593,9 +599,12 @@ func _emit_dialogue_report(dialogue_text: String, ai_data: Dictionary, extras: D
 		dialogue_failed.emit(reason)
 		return
 
+	_refresh_refs()
 	var route_summary := {}
-	if auto_apply_ai_response and _action_router != null:
+	if auto_apply_ai_response and _action_router != null and _action_router.has_method("apply_ai_response"):
 		var routed_data := ai_data.duplicate(true)
+		routed_data = _apply_local_object_intent_fallback(routed_data, extras)
+		_notify_companion_external_action(routed_data)
 		var final_action := String(routed_data.get("action", "")).strip_edges()
 		if (not _early_action_applied.is_empty()) and final_action == _early_action_applied:
 			routed_data.erase("action")
@@ -651,9 +660,12 @@ func _refresh_refs() -> void:
 	if _time_component == null:
 		_time_component = _find_time_component()
 
-	_action_router = get_node_or_null(action_router_path) as XiaokongAIActionRouterComponent
+		_action_router = get_node_or_null(action_router_path)
 	if _action_router == null:
 		_action_router = _find_action_router()
+
+	_affective_director = _resolve_affective_director()
+	_companion_director = _resolve_companion_director()
 
 	_subtitle_target = get_node_or_null(subtitle_target_path)
 	if _subtitle_target == null:
@@ -712,6 +724,34 @@ func _find_subtitle_target() -> Node:
 		if node == null:
 			continue
 		if node.has_method("show_once"):
+			return node
+	return null
+
+func _resolve_affective_director() -> Node:
+	if affective_director_path != NodePath():
+		var by_path := get_node_or_null(affective_director_path)
+		if by_path != null:
+			return by_path
+	var parent_node = get_parent()
+	if parent_node == null:
+		return null
+	for child in parent_node.get_children():
+		var node := child as Node
+		if node != null and node.has_method("apply_ai_response") and node.has_method("resolve_expression_for_emotion"):
+			return node
+	return null
+
+func _resolve_companion_director() -> Node:
+	if companion_director_path != NodePath():
+		var by_path := get_node_or_null(companion_director_path)
+		if by_path != null:
+			return by_path
+	var parent_node = get_parent()
+	if parent_node == null:
+		return null
+	for child in parent_node.get_children():
+		var node := child as Node
+		if node != null and node.has_method("notify_external_ai_action"):
 			return node
 	return null
 
@@ -840,18 +880,114 @@ func _reset_stream_sync_state() -> void:
 	_stream_first_chunk_received = false
 	_pending_action_hint = {}
 
+func _apply_local_object_intent_fallback(ai_data: Dictionary, extras: Dictionary = {}) -> Dictionary:
+	if not local_object_intent_fallback_enabled:
+		return ai_data
+	if _ai_data_has_navigation_command(ai_data):
+		return ai_data
+	var request_payload: Dictionary = {}
+	var request_value: Variant = extras.get("request_payload", _last_payload)
+	if request_value is Dictionary:
+		request_payload = request_value as Dictionary
+	var player_text := String(request_payload.get("player_text", "")).strip_edges()
+	if player_text.is_empty():
+		return ai_data
+	var target_ref := _infer_target_object_from_player_text(player_text)
+	if target_ref.is_empty():
+		return ai_data
+	ai_data["command"] = "go_to_object"
+	ai_data["target_object"] = target_ref
+	ai_data["marker_role"] = _infer_marker_role_from_player_text(player_text)
+	ai_data["source"] = "player_text_intent_fallback"
+	var command_payload: Dictionary = {}
+	var existing_payload: Variant = ai_data.get("command_payload", {})
+	if existing_payload is Dictionary:
+		command_payload = (existing_payload as Dictionary).duplicate(true)
+	command_payload["target_object"] = target_ref
+	command_payload["marker_role"] = ai_data["marker_role"]
+	ai_data["command_payload"] = command_payload
+	_log("local_object_intent_fallback text=%s target=%s role=%s" % [player_text, target_ref, String(ai_data["marker_role"])])
+	return ai_data
+
+func _ai_data_has_navigation_command(ai_data: Dictionary) -> bool:
+	if not String(ai_data.get("command", "")).strip_edges().is_empty():
+		return true
+	for nested_key in ["command_payload", "navigation", "intent_payload", "action_hint"]:
+		var nested_value: Variant = ai_data.get(nested_key, null)
+		if nested_value is Dictionary:
+			var nested := nested_value as Dictionary
+			if not String(nested.get("command", nested.get("intent", ""))).strip_edges().is_empty():
+				return true
+	return false
+
+func _infer_target_object_from_player_text(player_text: String) -> String:
+	var text := player_text.strip_edges().to_lower()
+	if text.is_empty():
+		return ""
+	var has_inspect_verb := false
+	for verb in ["看看", "看下", "看一下", "查看", "检查", "去看", "过去", "去", "打开", "瞧瞧", "瞅瞅"]:
+		if text.find(verb) >= 0:
+			has_inspect_verb = true
+			break
+	if not has_inspect_verb:
+		return ""
+	var aliases := [
+		{"target": "food_cabinet", "words": ["食品柜", "食物柜", "食物", "食品", "补给柜", "补给", "吃的", "罐头", "水柜"]},
+		{"target": "medical_cabinet", "words": ["医疗柜", "医药柜", "药柜", "药品", "医疗", "急救"]},
+		{"target": "equipment_cabinet", "words": ["武器柜", "装备柜", "武器", "装备"]},
+		{"target": "utility_storage_box", "words": ["杂物箱", "物资箱", "工具箱", "箱子", "储物箱", "柜子", "柜"]},
+		{"target": "table_main", "words": ["桌子", "餐桌", "桌"]},
+		{"target": "bed", "words": ["床", "床铺"]},
+		{"target": "chair", "words": ["椅子", "座位", "坐的"]},
+	]
+	for alias in aliases:
+		for word in alias.get("words", []):
+			if text.find(String(word)) >= 0:
+				return String(alias.get("target", ""))
+	return ""
+
+func _infer_marker_role_from_player_text(player_text: String) -> String:
+	var text := player_text.strip_edges().to_lower()
+	if text.find("打开") >= 0:
+		return "open"
+	if text.find("看") >= 0 or text.find("查") >= 0 or text.find("瞧") >= 0 or text.find("瞅") >= 0:
+		return "approach"
+	return "approach"
+
 func _apply_action_hint(action_hint: Dictionary) -> void:
 	if action_hint.is_empty():
 		return
 	dialogue_action_hint_received.emit(action_hint.duplicate(true))
+	_apply_affective_response(action_hint)
 
 	var action_name := String(action_hint.get("action", "")).strip_edges()
 
-	if auto_apply_ai_response and _action_router != null:
-		var route_summary := _action_router.apply_ai_response(action_hint.duplicate(true))
+	if auto_apply_ai_response and _action_router != null and _action_router.has_method("apply_ai_response"):
+		var route_summary: Dictionary = _action_router.call("apply_ai_response", action_hint.duplicate(true))
 		if not action_name.is_empty() and bool(route_summary.get("action_applied", false)):
 			_early_action_applied = action_name
 			_log("early_action_applied action=%s" % action_name)
+
+func _apply_affective_response(ai_data: Dictionary) -> void:
+	if _affective_director == null or not is_instance_valid(_affective_director):
+		_affective_director = _resolve_affective_director()
+	if _affective_director == null or not _affective_director.has_method("apply_ai_response"):
+		return
+	_affective_director.call("apply_ai_response", ai_data.duplicate(true))
+
+func _notify_companion_external_action(ai_data: Dictionary) -> void:
+	if _companion_director == null or not is_instance_valid(_companion_director):
+		_companion_director = _resolve_companion_director()
+	if _companion_director == null or not _companion_director.has_method("notify_external_ai_action"):
+		return
+	var has_command := not String(ai_data.get("command", "")).strip_edges().is_empty()
+	var command_payload: Variant = ai_data.get("command_payload", {})
+	if command_payload is Dictionary and not (command_payload as Dictionary).is_empty():
+		has_command = true
+	var action_text := String(ai_data.get("action", "")).strip_edges()
+	var has_non_idle_action := not action_text.is_empty() and action_text != "Idle"
+	if has_command or has_non_idle_action:
+		_companion_director.call("notify_external_ai_action", ai_data.duplicate(true))
 
 func _log(message: String) -> void:
 	if always_log:
