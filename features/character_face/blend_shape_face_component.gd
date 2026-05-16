@@ -12,10 +12,13 @@ class_name BlendShapeFaceComponent
 @export_range(0.01, 0.5, 0.01) var face_talk_blend_duration: float = 0.12
 @export var auto_blink: bool = true
 @export_range(0.0, 1.0, 0.01) var blink_blend_amount: float = 1.0
-@export_range(0.05, 0.5, 0.01) var blink_duration: float = 0.14
-@export_range(2.0, 20.0, 0.1) var blink_interval_min: float = 4.5
-@export_range(2.0, 30.0, 0.1) var blink_interval_max: float = 9.0
-@export var disable_blink_on_fun: bool = true
+@export_range(0.08, 0.5, 0.01) var blink_duration: float = 0.22
+@export_range(0.01, 0.2, 0.005) var blink_close_time: float = 0.055
+@export_range(0.01, 0.2, 0.005) var blink_open_time: float = 0.075
+@export_range(1.0, 20.0, 0.1) var blink_interval_min: float = 2.6
+@export_range(1.0, 30.0, 0.1) var blink_interval_max: float = 5.2
+@export_range(0.05, 2.0, 0.01) var blink_resume_delay: float = 0.35
+@export var disable_blink_on_joy: bool = true
 @export_enum("neutral", "joy", "fun", "angry", "sorrow", "surprised") var inspector_expression: String = "neutral"
 @export var inspector_apply_expression: bool = false:
 	set(value):
@@ -78,6 +81,7 @@ var _rng := RandomNumberGenerator.new()
 var _blink_wait_left := 0.0
 var _blink_active := false
 var _blink_active_left := 0.0
+var _blink_elapsed := 0.0
 
 func _ready() -> void:
 	_rng.randomize()
@@ -96,6 +100,7 @@ func _process(delta: float) -> void:
 func set_expression(expression_name: StringName, weight: float = 1.0, duration: float = 0.12) -> bool:
 	if not _is_tree_ready():
 		return false
+	var was_blink_disabled := _should_disable_blink_now()
 	var state := _resolve_expression_state(expression_name)
 	if state == &"":
 		push_warning("Unknown expression: %s" % String(expression_name))
@@ -105,6 +110,8 @@ func set_expression(expression_name: StringName, weight: float = 1.0, duration: 
 	inspector_expression = String(_current_expression)
 	if _should_disable_blink_now():
 		_stop_blink_now()
+	elif was_blink_disabled:
+		_resume_blink_soon()
 	return true
 
 func set_face_expression(expression_name: StringName) -> bool:
@@ -238,28 +245,61 @@ func _process_blink(delta: float) -> void:
 		_stop_blink_now()
 		return
 	if _blink_active:
+		_blink_elapsed += delta
 		_blink_active_left -= delta
+		var weight := _calculate_blink_weight(_blink_elapsed)
+		_face_animation_tree.set(BLINK_BLEND_PATH, weight)
 		if _blink_active_left <= 0.0:
-			_stop_blink_now()
-			_schedule_next_blink()
+			_finish_blink_cycle()
 		return
 	_blink_wait_left -= delta
 	if _blink_wait_left <= 0.0:
-		_blink_active = true
-		_blink_active_left = maxf(blink_duration, 0.03)
-		_face_animation_tree.set(BLINK_BLEND_PATH, blink_blend_amount)
+		_start_blink_cycle()
+
+func _start_blink_cycle() -> void:
+	_blink_active = true
+	_blink_elapsed = 0.0
+	_blink_active_left = _blink_total_duration()
+	_face_animation_tree.set(BLINK_BLEND_PATH, 0.0)
+
+func _finish_blink_cycle() -> void:
+	_stop_blink_now()
+	_schedule_next_blink()
+
+func _calculate_blink_weight(elapsed: float) -> float:
+	var total := _blink_total_duration()
+	var close_time := clampf(blink_close_time, 0.005, total)
+	var open_time := clampf(blink_open_time, 0.005, total)
+	var hold_end := maxf(close_time, total - open_time)
+	if elapsed < close_time:
+		return blink_blend_amount * smoothstep(0.0, close_time, elapsed)
+	if elapsed < hold_end:
+		return blink_blend_amount
+	return blink_blend_amount * (1.0 - smoothstep(hold_end, total, minf(elapsed, total)))
+
+func _blink_total_duration() -> float:
+	return maxf(blink_duration, blink_close_time + blink_open_time + 0.02)
 
 func _schedule_next_blink() -> void:
 	_blink_wait_left = _rng.randf_range(blink_interval_min, maxf(blink_interval_max, blink_interval_min))
 
+func _resume_blink_soon() -> void:
+	_blink_active = false
+	_blink_active_left = 0.0
+	_blink_elapsed = 0.0
+	_blink_wait_left = minf(maxf(blink_resume_delay, 0.01), maxf(blink_interval_min, 0.01))
+	if _face_animation_tree != null:
+		_face_animation_tree.set(BLINK_BLEND_PATH, 0.0)
+
 func _stop_blink_now() -> void:
 	_blink_active = false
 	_blink_active_left = 0.0
+	_blink_elapsed = 0.0
 	if _face_animation_tree != null:
 		_face_animation_tree.set(BLINK_BLEND_PATH, 0.0)
 
 func _should_disable_blink_now() -> bool:
-	return disable_blink_on_fun and _current_expression == &"fun"
+	return disable_blink_on_joy and _current_expression == &"joy"
 
 func _set_talk_blend_target(value: float, duration: float) -> void:
 	_talk_blend_from = _talk_blend_value
@@ -277,7 +317,6 @@ func _update_talk_blend(delta: float) -> void:
 	else:
 		_talk_blend_value = _talk_blend_to
 	_face_animation_tree.set(TALK_BLEND_PATH, _talk_blend_value)
-	_face_animation_tree.set(BLINK_BLEND_PATH, 0.0)
 
 func _process_viseme_sequence(delta: float) -> void:
 	if not _sequence_active or not _is_tree_ready():

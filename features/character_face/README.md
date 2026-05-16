@@ -106,7 +106,7 @@ inspector_expression
 inspector_apply_expression
 ```
 
-注意：`fun` 表情默认关闭自动眨眼，因为这个表情自身可能已经带闭眼/眯眼效果。
+注意：`joy` 表情默认关闭自动眨眼，因为这个表情自身可能已经带闭眼/眯眼效果；切到其它表情会恢复随机自动眨眼。
 
 ## 口型 / Viseme
 
@@ -183,18 +183,21 @@ Components/WorldSubtitleComponent.face_talk_requested
 
 眨眼不再把 `BlinkBlend` 长期开启，否则会变成高频循环眨眼。
 
-现在由脚本随机短促触发：
+现在由脚本随机触发，并使用“闭眼渐入 -> 短暂停留 -> 睁眼渐出”的三段曲线，避免眨到一半被切掉：
 
 ```text
-blink_interval_min = 4.5
-blink_interval_max = 9.0
-blink_duration = 0.14
+blink_interval_min = 2.6
+blink_interval_max = 5.2
+blink_duration = 0.22
+blink_close_time = 0.055
+blink_open_time = 0.075
+blink_resume_delay = 0.35
 ```
 
-默认 `fun` 表情时关闭眨眼：
+默认 `joy` 表情时关闭眨眼：
 
 ```text
-disable_blink_on_fun = true
+disable_blink_on_joy = true
 ```
 
 如果需要调慢眨眼，优先调大：
@@ -233,8 +236,9 @@ is_talk_active() -> bool
 2. 不要把 `BlinkBlend` 常开。
    - 常开会导致 blink 动画循环，看起来眨眼过于频繁。
 
-3. `fun` 表情不要自动眨眼。
-   - 当前逻辑由 `disable_blink_on_fun` 控制。
+3. `joy` 表情不要自动眨眼。
+   - 当前逻辑由 `disable_blink_on_joy` 控制。
+   - 切到 `neutral / fun / angry / sorrow / surprised` 后会在 `blink_resume_delay` 秒左右快速恢复一次眨眼，然后进入随机眨眼间隔。
 
 4. 角色实际 BlendShape 名称大小写要注意：
 

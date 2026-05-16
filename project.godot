@@ -41,6 +41,7 @@ enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg")
 [file_customization]
 
 folder_colors={
+"res://3DModel/Actions/glb/": "yellow",
 "res://characters/": "teal",
 "res://features/": "green",
 "res://resources/": "red"
