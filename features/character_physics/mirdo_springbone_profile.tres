@@ -1,0 +1,94 @@
+[gd_resource type="Resource" script_class="AnimeSpringBoneProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://features/character_physics/anime_springbone_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+skeleton_path = NodePath("VisualRoot/Model/Armature/GeneralSkeleton")
+fallback_skeleton_paths = Array[NodePath]([NodePath("VisualRoot/Model/Armature/Skeleton3D"), NodePath("VisualRoot/Model/Armature/GeneralSkeleton")])
+auto_apply_on_ready = true
+clear_generated_nodes = true
+simulator_name = &"AnimeSpringBones"
+collision_root_name = &"AnimeSpringBoneColliders"
+external_force = Vector3(0, 0, 0)
+mutable_bone_axes = true
+influence = 0.78
+colliders = Array[Dictionary]([
+{
+"name": &"HeadSphere", "type": "sphere", "bone": &"Head", "radius": 0.118, "position": Vector3(0, 0.028, 0.01)
+},
+{
+"name": &"NeckSphere", "type": "sphere", "bone": &"Neck", "radius": 0.07, "position": Vector3(0, 0.005, 0.0)
+},
+{
+"name": &"ChestCapsule", "type": "capsule", "bone": &"Chest", "radius": 0.13, "height": 0.34, "inside": false, "position": Vector3(0, -0.035, 0.005)
+},
+{
+"name": &"HipsCapsule", "type": "capsule", "bone": &"Hips", "radius": 0.145, "height": 0.32, "inside": false, "position": Vector3(0, 0.025, 0.01)
+},
+{
+"name": &"LeftLegCapsule", "type": "capsule", "bone": &"LeftUpperLeg", "radius": 0.055, "height": 0.38, "inside": false, "position": Vector3(0, 0.13, 0.0)
+},
+{
+"name": &"RightLegCapsule", "type": "capsule", "bone": &"RightUpperLeg", "radius": 0.055, "height": 0.38, "inside": false, "position": Vector3(0, 0.13, 0.0)
+}
+])
+chains = Array[Dictionary]([
+{
+"name": &"Antenna", "root": &"hair_aho", "end": &"hair_aho.001", "center": &"Head", "radius": 0.009, "stiffness": 0.72, "drag": 0.62, "gravity": 0.03, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"BackHair_L", "root": &"hair_back.001.L", "end": &"hair_back.002.L", "center": &"Head", "radius": 0.018, "stiffness": 0.88, "drag": 0.54, "gravity": 0.10, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"BackHair_R", "root": &"hair_back.001.R", "end": &"hair_back.002.R", "center": &"Head", "radius": 0.018, "stiffness": 0.88, "drag": 0.54, "gravity": 0.10, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"FrontBang", "root": &"hair_front", "end": &"hair_front.001", "center": &"Head", "radius": 0.012, "stiffness": 1.25, "drag": 0.70, "gravity": 0.025, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"SideHair_L", "root": &"hair_side.L.001.L", "end": &"hair_side.L.002.L", "center": &"Head", "radius": 0.014, "stiffness": 0.92, "drag": 0.58, "gravity": 0.07, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"SideHair_R", "root": &"hair_side.L.001.R", "end": &"hair_side.L.002.R", "center": &"Head", "radius": 0.014, "stiffness": 0.92, "drag": 0.58, "gravity": 0.07, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"SideStrand_L", "root": &"hair_side_side.L", "end": &"hair_side_side.L.001", "center": &"Head", "radius": 0.011, "stiffness": 0.78, "drag": 0.56, "gravity": 0.09, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"SideStrand_R", "root": &"hair_side_side.R", "end": &"hair_side_side.R.001", "center": &"Head", "radius": 0.011, "stiffness": 0.78, "drag": 0.56, "gravity": 0.09, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"HairAccessory", "root": &"light", "end": &"light.001", "center": &"Head", "radius": 0.01, "stiffness": 1.55, "drag": 0.78, "gravity": 0.0, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatBack", "root": &"A_hem.001", "end": &"A_hem.003", "center": &"Hips", "radius": 0.026, "stiffness": 1.55, "drag": 0.74, "gravity": 0.18, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatBack_L", "root": &"B_hem.001.L", "end": &"B_hem.003.L", "center": &"Hips", "radius": 0.026, "stiffness": 1.45, "drag": 0.72, "gravity": 0.16, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatBack_R", "root": &"B_hem.001.R", "end": &"B_hem.003.R", "center": &"Hips", "radius": 0.026, "stiffness": 1.45, "drag": 0.72, "gravity": 0.16, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatSide_L", "root": &"C_hem.001.L", "end": &"C_hem.003.L", "center": &"Hips", "radius": 0.024, "stiffness": 1.35, "drag": 0.70, "gravity": 0.15, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatSide_R", "root": &"C_hem.001.R", "end": &"C_hem.003.R", "center": &"Hips", "radius": 0.024, "stiffness": 1.35, "drag": 0.70, "gravity": 0.15, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatFrontSide_L", "root": &"D_hem.001.L", "end": &"D_hem.003.L", "center": &"Hips", "radius": 0.023, "stiffness": 1.20, "drag": 0.68, "gravity": 0.13, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatFrontSide_R", "root": &"D_hem.001.R", "end": &"D_hem.003.R", "center": &"Hips", "radius": 0.023, "stiffness": 1.20, "drag": 0.68, "gravity": 0.13, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatFront_L", "root": &"E_hem.001.L", "end": &"E_hem.003.L", "center": &"Hips", "radius": 0.022, "stiffness": 1.08, "drag": 0.66, "gravity": 0.12, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatFront_R", "root": &"E_hem.001.R", "end": &"E_hem.003.R", "center": &"Hips", "radius": 0.022, "stiffness": 1.08, "drag": 0.66, "gravity": 0.12, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+},
+{
+"name": &"CoatFront", "root": &"F_hem.001", "end": &"F_hem.003", "center": &"Hips", "radius": 0.022, "stiffness": 1.05, "drag": 0.66, "gravity": 0.12, "gravity_direction": Vector3(0, -1, 0), "enable_all_child_collisions": true, "collisions": []
+}
+])

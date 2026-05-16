@@ -5,12 +5,15 @@
 [ext_resource type="Script" uid="uid://cd4u156gxir4" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
 [ext_resource type="Shader" uid="uid://cw7vfuhp4teqi" path="res://features/anime_toon/anime_toon.gdshader" id="3_bryac"]
 [ext_resource type="Texture2D" uid="uid://dnwblq0cf4xco" path="res://characters/mirdo/mirdo_mirdo_BaseColor.png" id="4_ujsm0"]
+[ext_resource type="Animation" uid="uid://bp36ptmp5d2ue" path="res://resources/animate/actions/Walk_mixamo.res" id="5_0fgpu"]
+[ext_resource type="Script" uid="uid://dr25rx8uwno5r" path="res://features/character_physics/anime_springbone_applier.gd" id="6_spring_applier"]
+[ext_resource type="Resource" path="res://features/character_physics/mirdo_springbone_profile.tres" id="7_spring_profile"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
 height = 0.9932617
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_87wd2"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mjxdy"]
 render_priority = -1
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
@@ -21,9 +24,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_bryac"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_iq3ao"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_87wd2")
+next_pass = SubResource("ShaderMaterial_mjxdy")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -54,7 +57,7 @@ shader_parameter/alpha_cutoff = 0.02
 shader_parameter/saturation = 0.94
 shader_parameter/value_boost = 0.9
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ujsm0"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_exug4"]
 render_priority = -1
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
@@ -65,9 +68,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_0fgpu"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fxplt"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_ujsm0")
+next_pass = SubResource("ShaderMaterial_exug4")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -97,6 +100,11 @@ shader_parameter/white_tint = Color(0.72, 0.58, 0.62, 1)
 shader_parameter/alpha_cutoff = 0.02
 shader_parameter/saturation = 0.94
 shader_parameter/value_boost = 0.9
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_whlhr"]
+_data = {
+&"Walk_mixamo": ExtResource("5_0fgpu")
+}
 
 [sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_root"]
 
@@ -110,17 +118,73 @@ shape = SubResource("CapsuleShape3D_body")
 
 [node name="Model" parent="VisualRoot" unique_id=50782955 instance=ExtResource("1_model")]
 
-[node name="vrm-mesh" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="0" unique_id=172482103]
-surface_material_override/0 = SubResource("ShaderMaterial_bryac")
+[node name="GeneralSkeleton" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 981439070) index="3" unique_id=729224244]
+bones/2/position = Vector3(-0.010139626, 0.42697263, 0.023385823)
+bones/2/rotation = Quaternion(-0.020774636, -0.004654903, 0.012918509, 0.9996899)
+bones/34/rotation = Quaternion(0.002820549, -0.018486997, -0.0042045005, 0.9998163)
+bones/35/rotation = Quaternion(-0.0013839096, -0.01466195, 0.0004152237, 0.9998915)
+bones/36/rotation = Quaternion(-0.029907763, 0.0044685504, -0.009364217, 0.9994989)
+bones/37/rotation = Quaternion(-0.10064659, 0.018784469, -0.044490978, 0.99374956)
+bones/60/rotation = Quaternion(0.4778605, 0.48604953, 0.6016572, -0.41643006)
+bones/61/rotation = Quaternion(0.10539678, 0.8624587, -0.4846446, -0.10087671)
+bones/62/rotation = Quaternion(0.12696916, -0.695614, 0.12696916, 0.6956141)
+bones/63/rotation = Quaternion(-0.07637455, 0.5995236, 0.03572444, 0.79590344)
+bones/64/rotation = Quaternion(0.101226985, -2.8312206e-07, -0.01221633, 0.9947884)
+bones/65/rotation = Quaternion(0.07782163, -7.4505806e-08, -0.009391665, 0.9969231)
+bones/66/rotation = Quaternion(0.038940966, -5.9604645e-08, -0.0046994686, 0.9992305)
+bones/70/rotation = Quaternion(0.09673421, 0.0036348258, -0.047397174, 0.9941745)
+bones/71/rotation = Quaternion(0.082210034, 0.0027944744, 0.0258784, 0.99627507)
+bones/72/rotation = Quaternion(0.03894091, -7.450581e-08, -0.004699499, 0.99923056)
+bones/76/rotation = Quaternion(0.10108815, -1.788139e-07, -0.012199579, 0.99480265)
+bones/77/rotation = Quaternion(0.0779607, -2.0861626e-07, -0.009408504, 0.9969121)
+bones/78/rotation = Quaternion(0.038940955, -4.470349e-08, -0.0046994095, 0.99923056)
+bones/82/rotation = Quaternion(0.101226985, -2.8312206e-07, -0.01221633, 0.9947884)
+bones/83/rotation = Quaternion(0.07782163, -7.4505806e-08, -0.009391665, 0.9969231)
+bones/84/rotation = Quaternion(0.038940966, -5.9604645e-08, -0.0046994686, 0.9992305)
+bones/88/rotation = Quaternion(-0.18772061, 0.7634871, 0.05159752, 0.61578095)
+bones/89/rotation = Quaternion(0.10704529, 0.060297854, 0.04630271, 0.9913433)
+bones/90/rotation = Quaternion(0.0324094, 0.02354455, -0.0041072965, 0.9991889)
+bones/95/rotation = Quaternion(0.53885084, -0.4470567, -0.55494064, -0.44924504)
+bones/96/rotation = Quaternion(-0.050395098, 0.83197427, -0.49957162, 0.23602414)
+bones/97/rotation = Quaternion(0.11580321, 0.6975598, -0.11580321, 0.6975599)
+bones/98/rotation = Quaternion(-0.03773062, -0.59322727, -0.035110608, 0.8033835)
+bones/99/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/100/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/101/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/105/rotation = Quaternion(0.06827269, -1.4901159e-08, 0.008320152, 0.9976321)
+bones/106/rotation = Quaternion(0.11352068, -2.9802315e-08, 0.013834622, 0.9934393)
+bones/107/rotation = Quaternion(0.056853786, -2.9802315e-08, 0.0069286507, 0.9983585)
+bones/111/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/112/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/113/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/117/rotation = Quaternion(0.06827272, 7.45058e-08, 0.008320122, 0.9976321)
+bones/118/rotation = Quaternion(0.11352071, -1.4901159e-08, 0.013834653, 0.9934394)
+bones/119/rotation = Quaternion(0.05685378, -1.04308114e-07, 0.0069286516, 0.99835855)
+bones/123/rotation = Quaternion(-0.109207965, -0.76571494, -0.03882999, 0.63265043)
+bones/124/rotation = Quaternion(0.097966075, -0.044818297, -0.037990123, 0.993454)
+bones/125/rotation = Quaternion(0.010185913, -0.0065478245, 0.01188186, 0.9998562)
+bones/130/rotation = Quaternion(0.040517483, -0.0991829, 0.9940121, 0.021474317)
+bones/131/rotation = Quaternion(0.0014694027, 0.9655124, -0.25715628, -0.040675584)
+bones/132/rotation = Quaternion(0.039542567, 0.767536, -0.6382834, -0.043811463)
+bones/140/rotation = Quaternion(-0.02046179, 0.2751008, 0.96104074, -0.017372444)
+bones/141/rotation = Quaternion(-0.0022543725, 0.9747072, -0.2234089, 0.005411602)
+bones/142/rotation = Quaternion(-0.02247165, 0.7680548, -0.6393576, 0.028440282)
 
-[node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/Skeleton3D" parent_id_path=PackedInt32Array(50782955, 119509027) index="1" unique_id=1973055401]
-surface_material_override/0 = SubResource("ShaderMaterial_0fgpu")
+[node name="vrm-mesh" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="0" unique_id=1180980717]
+surface_material_override/0 = SubResource("ShaderMaterial_iq3ao")
+
+[node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="1" unique_id=192404592]
+surface_material_override/0 = SubResource("ShaderMaterial_fxplt")
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1595483476]
+root_node = NodePath("../VisualRoot/Model")
+root_motion_track = NodePath("%GeneralSkeleton:Root")
+libraries/ = SubResource("AnimationLibrary_whlhr")
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=724573309]
 active = false
-root_motion_track = NodePath("VisualRoot/Model/Armature/Skeleton3D:hips")
+root_node = NodePath("../VisualRoot/Model")
+root_motion_track = NodePath("%GeneralSkeleton:Root")
 tree_root = SubResource("AnimationNodeStateMachine_root")
 anim_player = NodePath("../AnimationPlayer")
 
@@ -128,5 +192,9 @@ anim_player = NodePath("../AnimationPlayer")
 script = ExtResource("2_toon_applier")
 include_mesh_name_filters = PackedStringArray()
 exclude_mesh_name_filters = PackedStringArray("collider", "collision")
+
+[node name="AnimeSpringBoneApplier" type="Node" parent="." unique_id=1122459901]
+script = ExtResource("6_spring_applier")
+profile = ExtResource("7_spring_profile")
 
 [editable path="VisualRoot/Model"]

@@ -42,7 +42,8 @@ enabled=PackedStringArray("res://addons/godot_devtool/plugin.cfg")
 
 folder_colors={
 "res://characters/": "teal",
-"res://features/": "green"
+"res://features/": "green",
+"res://resources/": "red"
 }
 
 [input]
