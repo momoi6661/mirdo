@@ -231,11 +231,11 @@ func send_dialogue_text(text: String) -> bool:
 		_dialogue_stream_text = ""
 		_subtitle_stream_finished_early = false
 		if _dialogue_component != null and bool(_dialogue_component.get("use_local_fallback_on_error")):
-			_show_subtitle_once("小空正在思考……", subtitle_speaker_name)
+			_show_subtitle_once("思考中……", subtitle_speaker_name)
 		else:
 			_begin_subtitle_stream(subtitle_speaker_name)
 		if _panel != null and _panel.has_method("set_dialogue_reply"):
-			_panel.call("set_dialogue_reply", "(thinking...)")
+			_panel.call("set_dialogue_reply", "思考中……")
 		_set_status("Dialogue request sent.")
 		return true
 
@@ -931,3 +931,4 @@ func _try_release_ui_text_focus_by_click(screen_pos: Vector2) -> bool:
 		return false
 	control.release_focus()
 	return true
+

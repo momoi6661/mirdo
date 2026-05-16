@@ -566,8 +566,9 @@ func _should_face_talk() -> bool:
 		return false
 	if _streaming:
 		return true
-	var full_length := effective.length()
-	if _playing and _displayed_count < full_length:
+	if _playing:
+		return true
+	if _cleanup_left > 0.0 and not _active_letters.is_empty():
 		return true
 	return false
 

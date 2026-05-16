@@ -1,0 +1,12 @@
+[gd_resource type="Animation" format=3]
+
+[resource]
+resource_name = "face_angry"
+loop_mode = 1
+tracks/0/type = "blend_shape"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Armature/GeneralSkeleton/vrm-mesh:Angry")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 1, 1, 1, 1)

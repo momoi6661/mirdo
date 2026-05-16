@@ -1,0 +1,32 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[ext_resource type="Animation" path="res://features/character_face/animations/face_neutral.tres" id="1_neutral"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_joy.tres" id="2_joy"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_fun.tres" id="3_fun"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_angry.tres" id="4_angry"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_sorrow.tres" id="5_sorrow"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_surprised.tres" id="6_surprised"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_blink.tres" id="7_blink"]
+[ext_resource type="Animation" path="res://features/character_face/animations/face_talk_loop.tres" id="8_talk"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_aa.tres" id="9_aa"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_ih.tres" id="10_ih"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_ou.tres" id="11_ou"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_E.tres" id="12_E"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_oh.tres" id="13_oh"]
+
+[resource]
+_data = {
+&"face_neutral": ExtResource("1_neutral"),
+&"face_joy": ExtResource("2_joy"),
+&"face_fun": ExtResource("3_fun"),
+&"face_angry": ExtResource("4_angry"),
+&"face_sorrow": ExtResource("5_sorrow"),
+&"face_surprised": ExtResource("6_surprised"),
+&"face_blink": ExtResource("7_blink"),
+&"face_talk_loop": ExtResource("8_talk"),
+&"viseme_aa": ExtResource("9_aa"),
+&"viseme_ih": ExtResource("10_ih"),
+&"viseme_ou": ExtResource("11_ou"),
+&"viseme_E": ExtResource("12_E"),
+&"viseme_oh": ExtResource("13_oh")
+}

@@ -1,0 +1,12 @@
+[gd_resource type="Animation" format=3]
+
+[resource]
+resource_name = "face_blink"
+loop_mode = 1
+tracks/0/type = "blend_shape"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Armature/GeneralSkeleton/vrm-mesh:Blink")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0.03, 1, 1, 0.11, 1, 1, 0.18, 1, 0, 0.28, 1, 0)
