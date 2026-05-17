@@ -5,6 +5,7 @@ export.cfg
 export_presets.cfg
 
 # Godot devtool local state/logs
+.godot-devtool/
 .godot-devtool/*.log
 .godot-devtool/*-state.json
 .godot-devtool/audit.jsonl
@@ -16,6 +17,7 @@ export_presets.cfg
 .superpowers/
 .codex_tmp/
 .learnings/
+.bytro
 
 # Dependencies / package managers
 node_modules/
@@ -51,6 +53,9 @@ nul
 *.blend3
 *.blend@*
 *.blend~
+
+# Task documents folder
+/docs/
 
 # Large local export/build outputs
 build/
