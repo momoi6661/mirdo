@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_suxrs"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="4_u5pho"]
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://resources/items/models/legacy/water_bottle.tscn" id="6_2kvbe"]
-[ext_resource type="PackedScene" uid="uid://4lobvfpm66ua" path="res://characters/mirdo/mirdo_character.tscn" id="7_2kvbe"]
+[ext_resource type="PackedScene" uid="uid://b76364weqvdpn" path="res://characters/mirdo/mirdo_character.tscn" id="7_2kvbe"]
 [ext_resource type="PackedScene" uid="uid://cqwb5ngi64ksv" path="res://resources/items/models/legacy/can_soup.tscn" id="7_b0r85"]
 
 [sub_resource type="FogMaterial" id="FogMaterial_main_haze"]
