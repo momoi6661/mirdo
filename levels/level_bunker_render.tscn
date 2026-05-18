@@ -3,9 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://crceaemdo8gpf" path="res://levels/bunker_local_pbr.tscn" id="1_bunker"]
 [ext_resource type="Environment" uid="uid://d1jkw8urchsuj" path="res://environment/WE_bunker_real.tres" id="2_env"]
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_suxrs"]
-[ext_resource type="PackedScene" uid="uid://b6svd2wt3lxks" path="res://characters/xiaokong/xiaokong1.tscn" id="4_qn8gb"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="4_u5pho"]
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://resources/items/models/legacy/water_bottle.tscn" id="6_2kvbe"]
+[ext_resource type="PackedScene" uid="uid://4lobvfpm66ua" path="res://characters/mirdo/mirdo_character.tscn" id="7_2kvbe"]
 [ext_resource type="PackedScene" uid="uid://cqwb5ngi64ksv" path="res://resources/items/models/legacy/can_soup.tscn" id="7_b0r85"]
 
 [sub_resource type="FogMaterial" id="FogMaterial_main_haze"]
@@ -44,6 +44,7 @@ environment = ExtResource("2_env")
 
 [node name="KeySun" type="DirectionalLight3D" parent="." unique_id=1103206356]
 transform = Transform3D(0.84804815, -0.32094076, -0.42261827, 0, -0.79652625, 0.6046036, -0.52991927, -0.5127889, -0.67533857, 0, 0, 0)
+visible = false
 light_color = Color(1, 0.95, 0.88, 1)
 light_energy = 0.3
 light_indirect_energy = 0.38
@@ -63,6 +64,7 @@ interior = true
 
 [node name="ReflectionProbeBathroom" type="ReflectionProbe" parent="." unique_id=1902746311]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1.25, 2.45)
+visible = false
 update_mode = 1
 intensity = 0.02
 size = Vector3(5.2, 3.2, 5.4)
@@ -151,6 +153,7 @@ omni_shadow_mode = 0
 
 [node name="DeskLamp_Light" type="OmniLight3D" parent="." unique_id=797978531]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.2315874, 1.28343, 3.1927166)
+visible = false
 light_color = Color(1, 0.88, 0.72, 1)
 light_energy = 0.92
 light_indirect_energy = 0.24
@@ -164,11 +167,13 @@ omni_shadow_mode = 0
 
 [node name="HazeMain" type="FogVolume" parent="." unique_id=1107788677]
 transform = Transform3D(1, 0, 0, 0, 0.996195, -0.0871557, 0, 0.0871557, 0.996195, 0.35, 1.55, -0.35)
+visible = false
 size = Vector3(13.5, 3.2, 12)
 material = SubResource("FogMaterial_main_haze")
 
 [node name="HazeBack" type="FogVolume" parent="." unique_id=1383660824]
 transform = Transform3D(1, 0, 0, 0, 0.990268, 0.139173, 0, -0.139173, 0.990268, 0.2, 1.35, 4.2)
+visible = false
 size = Vector3(7.8, 2.6, 5.2)
 material = SubResource("FogMaterial_back_haze")
 
@@ -196,12 +201,12 @@ affect_navigation_mesh = true
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
 
-[node name="Xiaokong1" parent="." unique_id=1699226533 instance=ExtResource("4_qn8gb")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5113752, 0.0219687, -0.6291559)
-
 [node name="water_bottle" parent="." unique_id=2119110613 instance=ExtResource("6_2kvbe")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3309464, 1.1920929e-07, -0.95876676)
 
 [node name="can_soup" parent="." unique_id=1404458673 node_paths=PackedStringArray("highlight_meshes") instance=ExtResource("7_b0r85")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9284813, 0.015239999, -0.16258852)
 highlight_meshes = [NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_01 - Default_0"), NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_02 - Default_0"), null, null]
+
+[node name="MirdoCharacter" parent="." unique_id=2096496898 instance=ExtResource("7_2kvbe")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5628496, -0.011102285, -0.67850924)
