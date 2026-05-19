@@ -57,6 +57,7 @@ signal selected_state_applied(state_name: StringName, resolved_action_name: Stri
 	get = get_apply_selected_state_request
 @export var debug_log_actions: bool = false
 @export var move_blend_lerp_speed: float = 2.0
+@export var stop_to_action_xfade_trigger_time: float = 0.42
 
 var _animation_tree: AnimationTree
 var _playbacks: Dictionary = {}
@@ -71,6 +72,10 @@ var _posture_intent: StringName = &"stand"
 var _pending_state_after_locomotion_stop: StringName = &""
 var _pending_action_after_locomotion_stop: StringName = &""
 var _pending_after_stop_delay: float = 0.0
+var _pending_stop_action: StringName = &""
+var _pending_stop_entered: bool = false
+var _pending_stop_elapsed: float = 0.0
+var _pending_stop_phase_elapsed: float = 0.0
 var _move_blend_amount: float = 0.0
 var _target_move_blend_amount: float = 0.0
 
@@ -231,6 +236,7 @@ func _process(delta: float) -> void:
 	if not is_equal_approx(_move_blend_amount, _target_move_blend_amount):
 		_move_blend_amount = move_toward(_move_blend_amount, _target_move_blend_amount, move_blend_lerp_speed * delta)
 		_animation_tree.set("parameters/LocomotionSM/MoveLoop/WalkRunBlend/blend_amount", _move_blend_amount)
+	_update_pending_after_locomotion_stop(delta)
 
 func is_ready() -> bool:
 	return _animation_tree != null and not _playbacks.is_empty()
@@ -243,6 +249,8 @@ func request_action(action_name: StringName, _return_loop: StringName = &"") -> 
 		return true
 	if not ACTION_ROUTES.has(action):
 		return _fail(action_name, "unknown action")
+	if _should_stop_locomotion_before_action(action):
+		return _queue_after_locomotion_stop(&"", action)
 	var route: Dictionary = ACTION_ROUTES[action]
 	return _travel(StringName(route.mode), StringName(route.state), action, StringName(route.get("sub", &"")))
 
@@ -395,9 +403,17 @@ func _travel(mode_name: StringName, state_name: StringName, action_name: StringN
 	var playback := _playbacks.get(mode_name) as AnimationNodeStateMachinePlayback
 	if playback == null:
 		return _fail(action_name, "missing playback for mode %s" % String(mode_name))
-	playback.travel(String(state_name))
-	if not _set_mode(mode_name):
-		return false
+	var is_cross_mode := mode_name != _current_mode
+	if is_cross_mode:
+		# Cross-group blend is handled by Mode, but the target group should still use its own entry transition.
+		# Start from the group's Start pseudo-state, then travel to the requested state instead of jumping directly.
+		playback.start("Start", true)
+		playback.travel(String(state_name))
+		if not _set_mode(mode_name):
+			return false
+	else:
+		# Same-group changes must not touch Mode; Mode self-transition can reset/override the group's xfade.
+		playback.travel(String(state_name))
 	_current_mode = mode_name
 	_current_state = state_name
 	_current_sub_state = &""
@@ -409,6 +425,7 @@ func _travel(mode_name: StringName, state_name: StringName, action_name: StringN
 	body_action_started.emit(action_name, mode_name, state_name)
 	_schedule_pending_after_locomotion_stop(action_name)
 	return true
+
 
 func _travel_nested(mode_name: StringName, state_name: StringName, sub_state: StringName) -> void:
 	if _animation_tree == null:
@@ -520,11 +537,13 @@ func _resolve_state_to_action(state_name: StringName) -> StringName:
 func _resolve_contextual_locomotion_action(action_name: StringName) -> StringName:
 	var actual_state := get_current_state()
 	if action_name == &"locomotion_stop":
-		if _locomotion_intent == &"run" or actual_state in [&"RunStart", &"MoveLoop"]:
-			return &"run_to_stop"
-		if _locomotion_intent == &"walk" or actual_state in [&"WalkStart", &"MoveLoop"]:
-			return &"walk_to_stop"
-		return &"idle_normal"
+		match _get_active_locomotion_kind(actual_state):
+			&"run":
+				return &"run_to_stop"
+			&"walk":
+				return &"walk_to_stop"
+			_:
+				return &"idle_normal"
 	if action_name == &"run_forward" and _current_mode == MODE_LOCOMOTION and (actual_state in [&"WalkStart", &"MoveLoop"] or _locomotion_intent == &"walk"):
 		return &"run_loop"
 	if action_name == &"run_forward" and _current_mode == MODE_LOCOMOTION and (actual_state in [&"RunStart", &"MoveLoop"] or _locomotion_intent == &"run"):
@@ -538,17 +557,26 @@ func _resolve_contextual_locomotion_action(action_name: StringName) -> StringNam
 func _should_stop_locomotion_before_action(action_name: StringName) -> bool:
 	if _pending_action_after_locomotion_stop != &"":
 		return false
-	if _is_locomotion_action(action_name):
+	if _is_active_locomotion_action(action_name):
 		return false
-	var actual_state := get_current_state()
-	return _current_mode == MODE_LOCOMOTION and (actual_state in [&"WalkStart", &"RunStart", &"MoveLoop"] or _locomotion_intent in [&"walk", &"run"])
+	return _current_mode == MODE_LOCOMOTION and _locomotion_intent in [&"walk", &"run"]
 
-func _is_locomotion_action(action_name: StringName) -> bool:
+func _is_active_locomotion_action(action_name: StringName) -> bool:
 	return action_name in [
-		&"idle_normal", &"idle_relaxed", &"idle_sleepy", &"idle_alert", &"idle_fidget", &"listen", &"small_happy_bounce",
 		&"stand_to_walk", &"walk_forward", &"walk_loop", &"walk_to_stop",
 		&"stand_to_run", &"run_forward", &"run_loop", &"run_to_stop", &"run_to_walk", &"locomotion_stop",
 	]
+
+func _get_active_locomotion_kind(actual_state: StringName) -> StringName:
+	if _locomotion_intent == &"walk" or _locomotion_intent == &"run":
+		return _locomotion_intent
+	if actual_state == &"WalkStart" or actual_state == &"WalkStop":
+		return &"walk"
+	if actual_state == &"RunStart" or actual_state == &"RunStop":
+		return &"run"
+	if actual_state == &"MoveLoop":
+		return &"run" if maxf(_target_move_blend_amount, _move_blend_amount) >= 0.5 else &"walk"
+	return &"idle"
 
 func _apply_move_loop_blend_without_retravel(action_name: StringName) -> bool:
 	if _current_mode != MODE_LOCOMOTION:
@@ -575,40 +603,41 @@ func _apply_move_loop_blend_without_retravel(action_name: StringName) -> bool:
 func _queue_after_locomotion_stop(state_name: StringName, action_name: StringName) -> bool:
 	_pending_state_after_locomotion_stop = state_name
 	_pending_action_after_locomotion_stop = action_name
-	var actual_state := get_current_state()
-	var stop_action := &"locomotion_stop"
-	if _locomotion_intent == &"run" or actual_state in [&"RunStart", &"MoveLoop"]:
-		stop_action = &"run_to_stop"
-		_pending_after_stop_delay = _get_animation_length(&"run_to_stop_one_step", 1.2)
-	elif _locomotion_intent == &"walk" or actual_state in [&"WalkStart", &"MoveLoop"]:
-		stop_action = &"walk_to_stop"
-		_pending_after_stop_delay = _get_animation_length(&"walk_to_stop", 1.5)
-	else:
-		_pending_after_stop_delay = 0.0
+	var stop_action := &"run_to_stop" if _locomotion_intent == &"run" else &"walk_to_stop"
+	_pending_after_stop_delay = stop_to_action_xfade_trigger_time
+	_pending_stop_action = stop_action
+	_pending_stop_entered = false
+	_pending_stop_elapsed = 0.0
+	_pending_stop_phase_elapsed = 0.0
 	var ok := request_action(stop_action)
 	if ok:
 		body_state_requested.emit(state_name, _last_requested_action)
 	return ok
 
-func _schedule_pending_after_locomotion_stop(action_name: StringName) -> void:
-	if _pending_action_after_locomotion_stop == &"":
+func _schedule_pending_after_locomotion_stop(_action_name: StringName) -> void:
+	# Pending actions are released shortly after the stop state is actually entered.
+	# Mode.xfade_time then blends WalkStop/RunStop into the target group/action.
+	pass
+
+func _update_pending_after_locomotion_stop(delta: float) -> void:
+	if _pending_action_after_locomotion_stop == &"" or _pending_stop_action == &"":
 		return
-	if action_name != &"walk_to_stop" and action_name != &"run_to_stop":
-		return
-	var pending_action := _pending_action_after_locomotion_stop
-	var pending_state := _pending_state_after_locomotion_stop
-	var delay := _pending_after_stop_delay
+	_pending_stop_phase_elapsed += delta
+	if _pending_stop_phase_elapsed >= _pending_after_stop_delay:
+		_play_pending_after_locomotion_stop(_pending_state_after_locomotion_stop, _pending_action_after_locomotion_stop)
+
+func _play_pending_after_locomotion_stop(state_name: StringName, action_name: StringName) -> void:
 	_pending_action_after_locomotion_stop = &""
 	_pending_state_after_locomotion_stop = &""
 	_pending_after_stop_delay = 0.0
-	call_deferred("_play_pending_after_locomotion_stop", pending_state, pending_action, delay)
-
-func _play_pending_after_locomotion_stop(state_name: StringName, action_name: StringName, delay: float) -> void:
-	if delay > 0.0:
-		await get_tree().create_timer(delay).timeout
+	_pending_stop_action = &""
+	_pending_stop_entered = false
+	_pending_stop_elapsed = 0.0
+	_pending_stop_phase_elapsed = 0.0
 	request_action(action_name)
 	if state_name != &"":
 		body_state_requested.emit(state_name, _last_requested_action)
+
 
 func _set_target_move_blend(value: float) -> void:
 	_target_move_blend_amount = clampf(value, 0.0, 1.0)

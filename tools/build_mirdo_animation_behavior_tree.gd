@@ -35,11 +35,13 @@ func _build_root_tree() -> AnimationNodeBlendTree:
 	mode.resource_name = "BodyModeSelector"
 	mode.set_input_count(4)
 	mode.xfade_time = 0.36
-	mode.allow_transition_to_self = true
+	mode.allow_transition_to_self = false
 	mode.set_input_name(0, "Locomotion")
 	mode.set_input_name(1, "Posture")
 	mode.set_input_name(2, "Work")
 	mode.set_input_name(3, "Reaction")
+	for i in range(4):
+		mode.set_input_reset(i, false)
 	root.add_node(&"LocomotionSM", _build_locomotion_sm(), Vector2(-80, -120))
 	root.add_node(&"PostureSM", _build_posture_sm(), Vector2(-80, 80))
 	root.add_node(&"WorkSM", _build_work_sm(), Vector2(-80, 280))
@@ -67,22 +69,23 @@ func _build_locomotion_sm() -> AnimationNodeStateMachine:
 	_add_anim_state(sm, &"RunStart", &"stand_to_run", Vector2(930, 260))
 	_add_anim_state(sm, &"RunStop", &"run_to_stop_one_step", Vector2(1430, 260))
 	_add_transition(sm, &"Start", &"IdleNormal", _auto_transition(0.10, false))
-	for idle in [&"IdleRelaxed", &"IdleSleepy", &"IdleAlert", &"IdleFidget", &"Listen", &"HappyBounce"]:
-		_add_transition(sm, &"IdleNormal", idle, _manual_transition(0.28))
-		_add_transition(sm, idle, &"IdleNormal", _manual_transition(0.28))
-		_add_transition(sm, idle, &"WalkStart", _manual_transition(0.24))
-		_add_transition(sm, idle, &"RunStart", _manual_transition(0.22))
-	_add_transition(sm, &"IdleNormal", &"WalkStart", _manual_transition(0.24))
-	_add_transition(sm, &"IdleNormal", &"RunStart", _manual_transition(0.22))
+	var idle_states := [&"IdleNormal", &"IdleRelaxed", &"IdleSleepy", &"IdleAlert", &"IdleFidget", &"Listen", &"HappyBounce"]
+	for from_idle in idle_states:
+		for to_idle in idle_states:
+			if from_idle != to_idle:
+				_add_transition(sm, from_idle, to_idle, _manual_transition(0.42))
+		_add_transition(sm, from_idle, &"WalkStart", _manual_transition(0.26))
+		_add_transition(sm, from_idle, &"RunStart", _manual_transition(0.24))
+	# Stop is an interrupt, not a normal graph destination. Add direct xfade edges
+	# from all locomotion-like states so playback.travel("RunStop"/"WalkStop")
+	# does not route through a stale current node while another xfade is in progress.
+	for stop_source in [&"IdleNormal", &"IdleRelaxed", &"IdleSleepy", &"IdleAlert", &"IdleFidget", &"Listen", &"HappyBounce", &"WalkStart", &"RunStart", &"MoveLoop"]:
+		_add_transition(sm, stop_source, &"WalkStop", _manual_transition(0.30))
+		_add_transition(sm, stop_source, &"RunStop", _manual_transition(0.32))
 	_add_transition(sm, &"WalkStart", &"MoveLoop", _auto_transition(0.16, false))
-	_add_transition(sm, &"MoveLoop", &"WalkStop", _manual_transition(0.22))
-	_add_transition(sm, &"WalkStart", &"WalkStop", _manual_transition(0.18))
 	_add_transition(sm, &"WalkStop", &"IdleNormal", _auto_transition(0.20, false))
 	_add_transition(sm, &"RunStart", &"MoveLoop", _auto_transition(0.12, false))
-	_add_transition(sm, &"MoveLoop", &"RunStop", _manual_transition(0.16))
-	_add_transition(sm, &"RunStart", &"RunStop", _manual_transition(0.14))
 	_add_transition(sm, &"RunStop", &"IdleNormal", _auto_transition(0.18, false))
-	_add_transition(sm, &"RunStart", &"MoveLoop", _manual_transition(0.22))
 	return sm
 
 func _add_composite_walk_state(parent_sm: AnimationNodeStateMachine, state_name: StringName, pos: Vector2) -> void:
@@ -111,6 +114,7 @@ func _add_composite_run_state(parent_sm: AnimationNodeStateMachine, state_name: 
 	_add_transition(sm, &"IdleHold", &"Begin", _manual_transition(0.10))
 	parent_sm.add_node(state_name, sm, pos)
 
+
 func _build_posture_sm() -> AnimationNodeStateMachine:
 	var sm := _new_sm("PostureSM")
 	_add_anim_state(sm, &"SitDown", &"sit_down", Vector2(0, 0))
@@ -127,28 +131,28 @@ func _build_posture_sm() -> AnimationNodeStateMachine:
 
 func _build_work_sm() -> AnimationNodeStateMachine:
 	var sm := _new_sm("WorkSM")
-	_add_loop_state(sm, &"InspectCabinet", &"inspect_cabinet", Vector2(0, 0), _loop_xfade(&"inspect_cabinet"))
-	_add_loop_state(sm, &"CheckShelf", &"check_shelf_loop", Vector2(280, 0), _loop_xfade(&"check_shelf_loop"))
-	_add_loop_state(sm, &"CheckLower", &"check_lower_loop", Vector2(560, 0), _loop_xfade(&"check_lower_loop"))
-	_add_loop_state(sm, &"CountSupplies", &"count_supplies_loop", Vector2(840, 0), _loop_xfade(&"count_supplies_loop"))
-	_add_loop_state(sm, &"Drink", &"drink", Vector2(1120, 0), _loop_xfade(&"drink"))
-	_add_loop_state(sm, &"CuteExplain", &"cute_explain", Vector2(1400, 0), _loop_xfade(&"cute_explain"))
+	# Work states use plain Animation nodes so WorkSM's own transition xfade blends directly.
+	# Nested A/B loop state machines made travel() appear delayed or hard-cut in this group.
+	_add_anim_state(sm, &"InspectCabinet", &"inspect_cabinet", Vector2(0, 0))
+	_add_anim_state(sm, &"CheckShelf", &"check_shelf_loop", Vector2(280, 0))
+	_add_anim_state(sm, &"CheckLower", &"check_lower_loop", Vector2(560, 0))
+	_add_anim_state(sm, &"CountSupplies", &"count_supplies_loop", Vector2(840, 0))
+	_add_anim_state(sm, &"Drink", &"drink", Vector2(1120, 0))
+	_add_anim_state(sm, &"CuteExplain", &"cute_explain", Vector2(1400, 0))
 	_add_anim_state(sm, &"StandToReach", &"stand_to_reach", Vector2(0, 260))
 	_add_anim_state(sm, &"TakeItem", &"take_item", Vector2(280, 260))
 	_add_anim_state(sm, &"PlaceItem", &"place_item", Vector2(560, 260))
-	_add_transition(sm, &"Start", &"InspectCabinet", _auto_transition(0.10, false))
 	var work_loops: Array[StringName] = [&"InspectCabinet", &"CheckShelf", &"CheckLower", &"CountSupplies", &"Drink", &"CuteExplain"]
+	for entry_state in work_loops + [&"StandToReach", &"TakeItem", &"PlaceItem"]:
+		_add_transition(sm, &"Start", entry_state, _manual_transition(0.18))
 	for from_state in work_loops:
 		for to_state in work_loops:
 			if from_state == to_state:
 				continue
-			_add_transition(sm, from_state, to_state, _manual_transition(0.34))
-		_add_transition(sm, from_state, &"StandToReach", _manual_transition(0.24))
-		_add_transition(sm, from_state, &"TakeItem", _manual_transition(0.24))
-		_add_transition(sm, from_state, &"PlaceItem", _manual_transition(0.24))
-	_add_transition(sm, &"StandToReach", &"InspectCabinet", _auto_transition(0.30, false))
-	_add_transition(sm, &"TakeItem", &"InspectCabinet", _auto_transition(0.32, false))
-	_add_transition(sm, &"PlaceItem", &"InspectCabinet", _auto_transition(0.32, false))
+			_add_transition(sm, from_state, to_state, _manual_transition(0.28))
+		_add_transition(sm, from_state, &"StandToReach", _manual_transition(0.22))
+		_add_transition(sm, from_state, &"TakeItem", _manual_transition(0.22))
+		_add_transition(sm, from_state, &"PlaceItem", _manual_transition(0.22))
 	return sm
 
 func _build_reaction_sm() -> AnimationNodeStateMachine:
@@ -167,11 +171,12 @@ func _build_reaction_sm() -> AnimationNodeStateMachine:
 	_add_anim_state(sm, &"TurnLeft", &"turn_left", Vector2(480, 480))
 	_add_anim_state(sm, &"TurnRight", &"turn_right", Vector2(720, 480))
 	_add_anim_state(sm, &"Turn180", &"turn_180", Vector2(960, 480))
-	_add_transition(sm, &"Start", &"ReactionIdle", _auto_transition(0.10, false))
 	var reaction_states: Array[StringName] = [&"SmallNod", &"SmallWave", &"TinyWave", &"RubEye", &"SleepyYawn", &"CuteStartle", &"CuriousPeek", &"TiltHeadCute", &"LookAround", &"LookBack", &"TurnLeft", &"TurnRight", &"Turn180"]
+	for entry_state in [&"ReactionIdle"] + reaction_states:
+		_add_transition(sm, &"Start", entry_state, _manual_transition(0.16))
 	for state in reaction_states:
 		_add_transition(sm, &"ReactionIdle", state, _manual_transition(0.22))
-		_add_transition(sm, state, &"ReactionIdle", _auto_transition(0.26, false))
+		_add_transition(sm, state, &"ReactionIdle", _manual_transition(0.24))
 	for from_state in reaction_states:
 		for to_state in reaction_states:
 			if from_state == to_state:
