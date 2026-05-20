@@ -1166,20 +1166,23 @@ func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: St
 		result_title_label.text = "外出行动进行中"
 	if result_subtitle_label != null:
 		result_subtitle_label.text = "正在整理路线、风险和现场记录。"
-	var bar := _build_text_progress_bar(progress)
 	result_label.text = "[center][color=#ffb529][font_size=28]外出行动进行中[/font_size][/color][/center]\n\n"
 	result_label.text += "[color=#d8c790]目标[/color]  %s\n" % String(rule.get("display_name"))
 	result_label.text += "[color=#d8c790]阶段[/color]  %s\n%s\n\n" % [stage_name, stage_detail]
-	result_label.text += "[color=#ffd447]%s[/color]  %d%%\n\n" % [bar, int(round(progress * 100.0))]
-	result_label.text += "后端 AI 正在按：地点内置探索规则、路程耗时、现场搜索、携带物资、地点威胁、外缘发现规则生成本次报告。"
+	result_label.text += _format_expedition_progress_line(progress)
+	result_label.text += "\n[color=#8f8674]后端 AI 正在按地点内置探索规则、路程耗时、现场搜索、携带物资和地点威胁生成本次报告。[/color]"
 
 
-func _build_text_progress_bar(progress: float) -> String:
-	var filled := clampi(int(round(progress * 12.0)), 0, 12)
-	var parts: Array[String] = []
-	for i in range(12):
-		parts.append("■" if i < filled else "□")
-	return "".join(parts)
+func _format_expedition_progress_line(progress: float) -> String:
+	var percent := clampi(int(round(progress * 100.0)), 0, 100)
+	var phase := "准备路线"
+	if percent >= 80:
+		phase = "返程整理"
+	elif percent >= 40:
+		phase = "现场结算"
+	elif percent >= 15:
+		phase = "离开庇护所"
+	return "[color=#ffd447]行动进度[/color]  %s · %d%%\n\n" % [phase, percent]
 
 
 func _build_expedition_result_report(payload: Dictionary) -> String:
@@ -1192,50 +1195,55 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	var title := String(ai.get("title", "外出行动报告")).strip_edges() if ai != null else "外出行动报告"
 	if title.is_empty():
 		title = "外出行动报告"
-	var ai_fallback := bool(ai.get("fallback", false)) if ai != null else false
 	var local_fallback := bool(ai.get("local_backend_unreachable_fallback", false)) if ai != null else false
 	if result_title_label != null:
 		result_title_label.text = title
 	if result_subtitle_label != null:
 		result_subtitle_label.text = "连接不到后端，使用本地保守结算；结果仍会保存。" if local_fallback else "后端 AI 已生成经历；物资写入庇护所库存。"
-	var text := ""
-	text += _bb_section("行动概览")
-	text += "[table=2][cell][color=#d8c790]地点[/color][/cell][cell]%s[/cell]" % String(rule.get("display_name"))
-	text += "[cell][color=#d8c790]威胁[/color][/cell][cell]%d/5[/cell]" % int(rule.get("threat_level"))
-	text += "[cell][color=#d8c790]耗时[/color][/cell][cell]总计%s（路程%s / 搜索%s）[/cell]" % [
-		_format_duration(int(time_info.get("total", 0))),
-		_format_duration(int(time_info.get("route", 0))),
-		_format_duration(int(time_info.get("search", 0))),
-	]
-	text += "[cell][color=#d8c790]判断[/color][/cell][cell]%s[/cell][/table]\n\n" % String(payload.get("risk", "未记录异常。"))
 
 	var summary := String(ai.get("summary", "")).strip_edges() if ai != null else ""
 	var experience: Array = ai.get("experience", []) if ai != null and ai.get("experience", []) is Array else []
-	text += _bb_section("外出经历")
+	var text := ""
+	text += "[color=#8f8674]地点[/color]  %s    [color=#8f8674]威胁[/color]  %d/5    [color=#8f8674]耗时[/color]  %s\n" % [
+		String(rule.get("display_name")),
+		int(rule.get("threat_level")),
+		_format_duration(int(time_info.get("total", 0))),
+	]
+	text += "[color=#8f8674]路程[/color]  %s    [color=#8f8674]搜索[/color]  %s\n" % [
+		_format_duration(int(time_info.get("route", 0))),
+		_format_duration(int(time_info.get("search", 0))),
+	]
+	text += "[color=#d8c790]判断[/color]  %s\n" % String(payload.get("risk", "未记录异常。"))
+	text += _bb_divider()
+
+	text += _bb_section("外出记录")
 	if not summary.is_empty():
 		text += "[color=#f0e0bb]%s[/color]\n" % summary
 	if experience.is_empty():
-		text += "• 没有额外经历记录。\n"
+		text += "  没有额外经历记录。\n"
 	else:
+		var log_index := 1
 		for line_raw in experience:
 			var line := String(line_raw).strip_edges()
 			if not line.is_empty():
-				text += "• %s\n" % line
-	text += "\n"
+				text += "[color=#8f8674]%02d[/color]  %s\n" % [log_index, line]
+				log_index += 1
+	text += _bb_divider()
 
-	text += _bb_section("角色状态消耗")
+	text += _bb_section("状态变化")
 	text += _format_status_cost(payload.get("status_cost", {}))
-	text += "\n"
+	text += _bb_divider()
 
-	text += _bb_section("携带与消耗")
-	text += "[color=#d8c790]携带[/color]  %s\n" % _format_count_dictionary(commit.get("carried_names", {}), "无")
-	text += "[color=#d8c790]归还[/color]  %s\n" % _format_count_dictionary(commit.get("returned_names", {}), "无")
-	text += "[color=#d8c790]消耗[/color]  %s\n" % _format_count_dictionary(commit.get("consumed_names", {}), "无")
-	text += "[color=#8f8674]取出%d件 / 归还%d件 / 消耗%d件[/color]\n\n" % [
+	text += _bb_section("携带物处理")
+	text += "携带：%s\n" % _format_count_dictionary(commit.get("carried_names", {}), "无")
+	text += "归还：%s\n" % _format_count_dictionary(commit.get("returned_names", {}), "无")
+	text += "消耗：%s\n" % _format_count_dictionary(commit.get("consumed_names", {}), "无")
+	text += "[color=#8f8674]取出%d件 / 归还%d件 / 消耗%d件[/color]\n" % [
 		int(commit.get("committed", 0)),
 		int(commit.get("returned", 0)),
 		int(commit.get("consumed", 0)),
 	]
+	text += _bb_divider()
 
 	text += _bb_section("带回物资")
 	text += _format_loot_entries(payload.get("loot", []))
@@ -1243,20 +1251,24 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	if lost_count > 0:
 		text += "[color=#ff765d]外出带回包空间不足，丢失%d件。[/color]\n" % lost_count
 	else:
-		text += "[color=#9bd887]带回物资已优先放入对应柜子，放不下的才进入外出带回包。[/color]\n"
-	text += "\n"
+		text += "[color=#9bd887]带回物资已写入庇护所库存。[/color]\n"
+	text += _bb_divider()
 
 	text += _bb_section("地图进展")
 	if unlocked.is_empty():
 		text += "外缘发现：暂无新地点。本次主要补充资源和确认路线状态。\n"
 	else:
 		text += "[color=#ffd447]沿道路向外发现：%s[/color]\n" % " / ".join(unlocked)
-	text += "\n[color=#8f8674]提示：未解锁地点运行时不会显示；继续探索相邻地点会逐步扩展地图。[/color]"
+	text += "[color=#8f8674]提示：未解锁地点运行时不会显示；继续探索相邻地点会逐步扩展地图。[/color]"
 	return text
 
 
 func _bb_section(title: String) -> String:
-	return "[color=#ffd447][font_size=21]◆ %s[/font_size][/color]\n" % title
+	return "[color=#ffd447][font_size=21]%s[/font_size][/color]\n" % title
+
+
+func _bb_divider() -> String:
+	return "\n[color=#3f382c]────────────────────────[/color]\n"
 
 
 func _build_backend_ai_error_response(error_code: String, summary: String, experience: Array) -> Dictionary:
@@ -1592,17 +1604,29 @@ func _calculate_loadout_damage_reduction(commit_summary: Dictionary) -> float:
 func _resolve_player_state_component() -> Node:
 	var global_node := get_node_or_null("/root/Global")
 	if global_node != null:
-		var player_node := global_node.get("player") as Node
-		if player_node != null and is_instance_valid(player_node):
-			var state := player_node.get_node_or_null("Components/StateComponent")
+		var player_variant: Variant = global_node.get("player")
+		if is_instance_valid(player_variant) and player_variant is Node:
+			var player_node := player_variant as Node
+			var state := _get_valid_state_component_from_player(player_node)
 			if state != null:
 				return state
 	var tree := get_tree()
 	if tree != null:
-		for player in tree.get_nodes_in_group("Player"):
-			var state := (player as Node).get_node_or_null("Components/StateComponent")
+		for player_variant in tree.get_nodes_in_group("Player"):
+			if not is_instance_valid(player_variant) or player_variant is not Node:
+				continue
+			var state := _get_valid_state_component_from_player(player_variant as Node)
 			if state != null:
 				return state
+	return null
+
+
+func _get_valid_state_component_from_player(player_node: Node) -> Node:
+	if player_node == null or not is_instance_valid(player_node) or not player_node.is_inside_tree():
+		return null
+	var state := player_node.get_node_or_null("Components/StateComponent")
+	if state != null and is_instance_valid(state):
+		return state
 	return null
 
 

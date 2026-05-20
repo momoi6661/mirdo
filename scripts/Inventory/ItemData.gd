@@ -10,6 +10,7 @@ class_name ItemData
 @export_range(-100, 100, 1) var health_delta: int = 0
 @export_range(-100, 100, 1) var hunger_delta: int = 0
 @export_range(-100, 100, 1) var thirst_delta: int = 0
+@export_range(-100, 100, 1) var energy_delta: int = 0
 @export_enum("food", "medical", "material", "tool", "weapon", "special") var outing_category: String = "material"
 @export var can_take_outing: bool = false
 @export var can_use: bool = false
@@ -35,6 +36,8 @@ func get_consumable_delta() -> Dictionary:
 		delta["hunger"] = hunger_delta
 	if thirst_delta != 0:
 		delta["thirst"] = thirst_delta
+	if energy_delta != 0:
+		delta["energy"] = energy_delta
 	if consumable_effect != null:
 		var legacy_delta := consumable_effect.to_stat_delta()
 		for key in legacy_delta.keys():

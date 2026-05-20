@@ -155,7 +155,25 @@ func _execute_eat_option(xiaokong_root: Node) -> void:
 	var item_path: String = _pick_consume_item_path(food_entries)
 	if item_path.is_empty():
 		return
-	table_context.consume_food_entry_by_path(xiaokong_root, item_path, consume_reason, true)
+	var result := table_context.consume_food_entry_by_path(xiaokong_root, item_path, consume_reason, true)
+	if bool(result.get("ok", false)):
+		_notify_character_fed(xiaokong_root, result)
+
+func _notify_character_fed(xiaokong_root: Node, result: Dictionary) -> void:
+	if xiaokong_root == null:
+		return
+	var life := xiaokong_root.get_node_or_null("Components/CharacterAutonomousLife")
+	if life != null and life.has_method("notify_external_control"):
+		life.call("notify_external_control")
+	var consumer := xiaokong_root.get_node_or_null("Components/ItemConsumer")
+	if consumer != null and consumer.has_signal("item_consumed"):
+		return
+	var animation_behavior := xiaokong_root.get_node_or_null("Components/AnimationBehaviorTreeComponent")
+	if animation_behavior != null and animation_behavior.has_method("request_action"):
+		var action_name := StringName(String(result.get("suggested_action", "react_nod")))
+		if action_name == &"":
+			action_name = &"react_nod"
+		animation_behavior.call("request_action", action_name)
 
 func _can_show_eat_option(xiaokong_root: Node) -> bool:
 	if xiaokong_root == null:

@@ -2,7 +2,7 @@ extends SceneTree
 var failures:Array[String]=[]
 func _init(): call_deferred("_run")
 func _run():
- var scene:=load("res://controllers/ui/MainMenu.tscn") as PackedScene
+ var scene:=load("res://levels/menu/MainMenu.tscn") as PackedScene
  if scene==null:
   failures.append("MainMenu scene should load")
  else:
@@ -31,3 +31,4 @@ func _run():
  else:
   for f in failures: push_error(f)
   quit(1)
+

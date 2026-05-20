@@ -199,9 +199,21 @@ func use_item_in_slot(slot_index: int, target_state: Node = null) -> bool:
 	var state_component := target_state
 	if state_component == null:
 		state_component = _resolve_state_component()
-	if state_component == null or not state_component.has_method("apply_item_effect"):
+	if state_component == null:
 		return false
-	var effect: Dictionary = state_component.call("apply_item_effect", item, "inventory_use")
+	var effect: Dictionary = {}
+	if state_component.has_method("consume_item"):
+		var result_value: Variant = state_component.call("consume_item", item, "inventory_use")
+		if result_value is Dictionary:
+			var result := result_value as Dictionary
+			if not bool(result.get("ok", false)):
+				return false
+			var applied_value: Variant = result.get("applied_delta", {})
+			effect = applied_value as Dictionary if applied_value is Dictionary else {}
+	elif state_component.has_method("apply_item_effect"):
+		effect = state_component.call("apply_item_effect", item, "inventory_use")
+	else:
+		return false
 	if effect.is_empty():
 		return false
 	remove_from_slot(slot_index, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://features/anime_toon/mita_world_outline.gdshader" id="1_cfvxj"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_cfvxj")
+shader_parameter/outline_color = Color(0.18, 0.12, 0.15, 0.48)
+shader_parameter/outline_width = 0.0014
+shader_parameter/normal_smooth_blend = 0.88
+shader_parameter/min_direction_length = 0.002
+shader_parameter/distance_fade_start = 2.0
+shader_parameter/distance_fade_end = 20.0
+shader_parameter/alpha = 0.48
+shader_parameter/vertical_edge_bias = 0.25

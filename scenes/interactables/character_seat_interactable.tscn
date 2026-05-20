@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://components/character_ai_command_dispatcher_component.gd" id="1_dispatch"]
+[ext_resource type="Script" path="res://components/character_seat_interactable_component.gd" id="2_seat"]
+
+[node name="CharacterSeatInteractable" type="Node" groups=["character_interactable"]]
+script = ExtResource("2_seat")
+prompt_text = "让 Mirdo 坐下"
+occupied_prompt_text = "让 Mirdo 起身"
+world_panel_summary_text = ""
+
+[node name="CommandDispatcher" type="Node" parent="."]
+script = ExtResource("1_dispatch")

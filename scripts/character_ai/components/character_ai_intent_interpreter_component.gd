@@ -149,7 +149,7 @@ func _extract_target_nav_point(payload: Dictionary) -> String:
 	return ""
 
 func _extract_target_ref(payload: Dictionary) -> String:
-	for key in ["target_ref", "target_object", "object_id", "target_marker", "marker", "marker_name", "target_marker_name"]:
+	for key in ["target_ref", "target_object", "object_id", "target_marker_path", "marker_path", "target_marker", "marker", "marker_name", "target_marker_name"]:
 		if payload.has(key):
 			return String(payload[key]).strip_edges()
 	var command_value: Variant = payload.get("command", null)

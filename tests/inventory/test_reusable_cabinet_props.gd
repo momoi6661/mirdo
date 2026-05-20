@@ -16,7 +16,7 @@ func _init() -> void:
 		"InteractBody",
 		"武器/装备柜",
 		"res://resources/storage/equipment_rack_storage.tres",
-		PackedStringArray(["tool", "weapon", "special", "material"]),
+		PackedStringArray(["tool", "weapon", "special"]),
 		"res://resources/items/knife.tres"
 	)
 	if failures.is_empty():
@@ -60,9 +60,9 @@ func _check_container(scene_path: String, interact_path: String, expected_name: 
 	var panel := root.get_node_or_null("ContainerPanel3D")
 	if panel != null:
 		_expect(int(panel.get("slot_columns")) >= 6, scene_path + " panel should show more columns for expanded slots")
-		_expect(bool(panel.get("show_alt_hint_label")), scene_path + " cabinet panel should show read-only hint")
-		_expect(String(panel.get("hint_text_override")).contains("只读库存"), scene_path + " cabinet panel should explain read-only behavior")
-		_expect(not bool(panel.get("allow_item_dragging")), scene_path + " cabinet panel should be view-only for now")
+		_expect(bool(panel.get("show_alt_hint_label")), scene_path + " cabinet panel should show drag-out hint")
+		_expect(String(panel.get("hint_text_override")).contains("拖出物品"), scene_path + " cabinet panel should explain drag-out behavior")
+		_expect(bool(panel.get("allow_item_dragging")), scene_path + " cabinet panel should allow dragging items out")
 		_expect(not bool(panel.get("allow_release_outside_panel")), scene_path + " cabinet panel should not drop items into world")
 	root.queue_free()
 

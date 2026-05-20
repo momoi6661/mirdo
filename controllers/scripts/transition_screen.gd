@@ -12,8 +12,8 @@ signal transition_finished
 @export_range(0.05, 2.0, 0.01) var uncover_duration: float = 0.28
 @export_range(0.0, 3.0, 0.01) var default_hold_time: float = 0.18
 
-@export var preset_a_color: Color = Color(0.015, 0.015, 0.020, 1.0)
-@export var preset_b_color: Color = Color(0.010, 0.010, 0.016, 1.0)
+@export var preset_a_color: Color = Color(0.84, 0.16, 0.46, 1.0)
+@export var preset_b_color: Color = Color(0.52, 0.06, 0.30, 1.0)
 
 @onready var animation_player: AnimationPlayer = %AnimationPlayer
 @onready var control: Control = $Control
@@ -43,7 +43,7 @@ static func ensure_global_instance() -> Node:
 func _ready() -> void:
 	layer = 128
 	visible = false
-	control.mouse_filter = Control.MOUSE_FILTER_STOP
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	control.modulate = Color.WHITE
 	_ensure_overlay_material()
 	_rebuild_animations()
@@ -54,6 +54,7 @@ func start_transition(_message: String = "", fade_in: bool = true) -> void:
 	_apply_preset(default_preset)
 	_start_time = Time.get_ticks_msec() / 1000.0
 	visible = true
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
 	_is_transitioning = true
 	if fade_in:
 		_is_covered = false
@@ -61,6 +62,30 @@ func start_transition(_message: String = "", fade_in: bool = true) -> void:
 	else:
 		_is_covered = true
 		_set_progress(1.0)
+
+func hold_cover(_message: String = "", preset: String = "a") -> void:
+	_apply_preset(preset)
+	_start_time = Time.get_ticks_msec() / 1000.0
+	visible = true
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
+	_is_transitioning = true
+	_is_covered = false
+	_play_animation("cover_in")
+	await animation_player.animation_finished
+	_is_covered = true
+	cover_reached.emit()
+
+func release_cover() -> void:
+	await stop_transition()
+
+func force_release_cover() -> void:
+	if animation_player != null:
+		animation_player.stop()
+	_is_transitioning = false
+	_is_covered = false
+	visible = false
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_set_progress(0.0)
 
 func update_progress(_value: float) -> void:
 	pass
@@ -76,6 +101,7 @@ func stop_transition() -> void:
 	_is_transitioning = false
 	_is_covered = false
 	visible = false
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_set_progress(0.0)
 	transition_finished.emit()
 
@@ -86,6 +112,7 @@ func play_action_transition(action: Callable, preset: String = "a", hold_sec: fl
 	var safe_hold: float = default_hold_time if hold_sec < 0.0 else hold_sec
 	_apply_preset(preset)
 	visible = true
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
 	_start_time = Time.get_ticks_msec() / 1000.0
 	_is_transitioning = true
 	_is_covered = false
@@ -106,6 +133,7 @@ func play_action_transition(action: Callable, preset: String = "a", hold_sec: fl
 	_is_transitioning = false
 	_is_covered = false
 	visible = false
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_set_progress(0.0)
 	transition_finished.emit()
 
@@ -119,6 +147,7 @@ func play_scene_transition(
 	var safe_hold: float = default_hold_time if hold_sec < 0.0 else hold_sec
 	_apply_preset(preset)
 	visible = true
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
 	_start_time = Time.get_ticks_msec() / 1000.0
 	_is_transitioning = true
 	_is_covered = false
@@ -146,6 +175,7 @@ func play_scene_transition(
 	_is_transitioning = false
 	_is_covered = false
 	visible = false
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_set_progress(0.0)
 	transition_finished.emit()
 
@@ -179,6 +209,9 @@ func _apply_preset(preset: String) -> void:
 	material.set_shader_parameter("preset_b_mix", 1.0 if _current_preset == "b" else 0.0)
 	material.set_shader_parameter("tint_a", preset_a_color)
 	material.set_shader_parameter("tint_b", preset_b_color)
+	material.set_shader_parameter("center_tint", Color(0.86, 0.20, 0.52, 1.0))
+	material.set_shader_parameter("side_tint", Color(0.42, 0.055, 0.25, 1.0))
+	material.set_shader_parameter("gradient_mix", 1.0)
 
 func _set_progress(value: float) -> void:
 	var material: ShaderMaterial = _get_overlay_material()

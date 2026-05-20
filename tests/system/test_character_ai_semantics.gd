@@ -11,6 +11,8 @@ func _run() -> void:
 	await _test_character_perception_snapshot_filters_and_nests_marker_roles()
 	await _test_intent_interpreter_normalizes_common_commands()
 	await _test_action_executor_resolves_object_marker_role()
+	await _test_action_executor_safely_reads_object_without_object_id_property()
+	await _test_action_executor_stand_up_uses_stand_marker_without_navigation()
 	await _test_affective_director_maps_emotion_and_stats_to_expression()
 	await _test_affective_director_applies_ai_response_to_face_component()
 	await _test_affective_director_binds_dialogue_completion_to_face_expression()
@@ -224,6 +226,83 @@ func _test_action_executor_resolves_object_marker_role() -> void:
 	executor.queue_free()
 	target.queue_free()
 	await process_frame
+
+func _test_action_executor_safely_reads_object_without_object_id_property() -> void:
+	var life_script: Script = load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	_expect(life_script != null, "CharacterAutonomousLifeComponent script should load")
+	if life_script == null:
+		return
+
+	var life := Node.new()
+	life.set_script(life_script)
+	root.add_child(life)
+
+	var plain_target := Node3D.new()
+	plain_target.name = "PlainTargetWithoutObjectId"
+	root.add_child(plain_target)
+	plain_target.add_to_group("ai_world_object")
+
+	var found: Variant = life.call("_find_world_object", "PlainTargetWithoutObjectId")
+	_expect(found == plain_target, "autonomous life should fallback to node name when object_id property is missing")
+
+	life.queue_free()
+	plain_target.queue_free()
+	await process_frame
+
+func _test_action_executor_stand_up_uses_stand_marker_without_navigation() -> void:
+	var executor_script: Script = load("res://scripts/character_ai/components/character_ai_action_executor_component.gd") as Script
+	_expect(executor_script != null, "CharacterAIActionExecutorComponent script should load")
+	if executor_script == null:
+		return
+
+	var actor := CharacterBody3D.new()
+	actor.name = "MirdoStandTestActor"
+	root.add_child(actor)
+	actor.global_position = Vector3.ZERO
+
+	var animation := _FakeAnimationBehavior.new()
+	animation.name = "AnimationBehavior"
+	actor.add_child(animation)
+
+	var motor := _FakeNavigationMotor.new()
+	motor.name = "NavigationMotor"
+	actor.add_child(motor)
+
+	var executor := Node.new()
+	executor.name = "CharacterAIActionExecutor"
+	executor.set_script(executor_script)
+	actor.add_child(executor)
+	executor.set("actor_path", NodePath(".."))
+	executor.set("animation_behavior_path", NodePath("../AnimationBehavior"))
+	executor.set("navigation_motor_path", NodePath("../NavigationMotor"))
+	executor.set("stand_relocate_delay_sec", 0.0)
+
+	var seat := Marker3D.new()
+	seat.name = "Sit_Mark3D"
+	root.add_child(seat)
+	seat.global_position = Vector3(0.0, 0.0, 0.0)
+
+	var stand := Marker3D.new()
+	stand.name = "Stand_Mark3D"
+	root.add_child(stand)
+	stand.global_position = Vector3(0.4, 0.0, 0.0)
+
+	executor.set("_active_sit_marker_path", seat.get_path())
+	executor.set("_active_stand_marker_path", stand.get_path())
+	var report: Dictionary = executor.call("apply_ai_response", {"command": "stand_up"})
+	_expect(bool(report.get("action_applied", false)), "stand_up should apply directly")
+	_expect(motor.move_calls == 0, "stand_up should not start NavigationAgent path from seat")
+	await process_frame
+	await process_frame
+	_expect(animation.actions.has(&"stand_up"), "stand_up animation should be requested")
+	_expect(motor.snap_calls + motor.align_calls > 0, "stand_up should relocate to stand marker")
+	_expect(executor.call("get_active_sit_marker") == null, "active seat should clear after stand relocation")
+
+	actor.queue_free()
+	seat.queue_free()
+	stand.queue_free()
+	await process_frame
+
 func _test_affective_director_maps_emotion_and_stats_to_expression() -> void:
 	var script: Script = load("res://scripts/character_ai/components/character_affective_director_component.gd") as Script
 	_expect(script != null, "CharacterAffectiveDirectorComponent script should load")
@@ -788,6 +867,39 @@ class _FakeActionController:
 		return current_state
 	func is_navigating() -> bool:
 		return navigating
+
+class _FakeAnimationBehavior:
+	extends Node
+	var actions: Array[StringName] = []
+	var current_mode: StringName = &"Posture"
+	func request_action(action_name: StringName) -> bool:
+		actions.append(action_name)
+		if action_name == &"idle_normal":
+			current_mode = &"Locomotion"
+		return true
+	func request_state(state_name: StringName) -> bool:
+		return request_action(state_name)
+	func get_current_mode() -> StringName:
+		return current_mode
+
+class _FakeNavigationMotor:
+	extends Node
+	var move_calls := 0
+	var snap_calls := 0
+	var align_calls := 0
+	func is_navigating() -> bool:
+		return false
+	func move_to_marker(_marker: Marker3D, _arrival_action: StringName = &"", _run: bool = false) -> bool:
+		move_calls += 1
+		return true
+	func align_to_marker(_marker: Marker3D, _preserve_current_height: bool = false, _duration_sec: float = -1.0) -> bool:
+		align_calls += 1
+		return false
+	func snap_to_marker(_marker: Marker3D, _preserve_current_height: bool = false) -> bool:
+		snap_calls += 1
+		return true
+	func face_direction(_direction: Vector3, _delta: float = 1.0) -> void:
+		pass
 
 class _FakeInterpreter:
 	extends Node

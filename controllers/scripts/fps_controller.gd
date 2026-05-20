@@ -311,7 +311,9 @@ func _on_inventory_drop_requested(item: ItemData, amount: int) -> void:
 
 
 func _on_global_character_inventory_use_requested(payload: Dictionary) -> void:
-	var target_state := _resolve_inventory_use_target_state(payload)
+	var target_state := _resolve_inventory_use_target_consumer(payload)
+	if target_state == null:
+		target_state = _resolve_inventory_use_target_state(payload)
 	if target_state == null:
 		push_warning("找不到 Mirdo 状态组件，无法打开物品使用背包。")
 		return
@@ -326,6 +328,19 @@ func _on_global_character_inventory_use_requested(payload: Dictionary) -> void:
 	if inventory_panel_3d.has_method("set_use_target_context"):
 		inventory_panel_3d.call("set_use_target_context", target_state, target_label)
 	_set_inventory_panel_open(true, true)
+
+
+func _resolve_inventory_use_target_consumer(payload: Dictionary) -> Node:
+	var character := _resolve_inventory_use_character(payload)
+	if character == null:
+		return null
+	var by_components := character.get_node_or_null("Components/ItemConsumer")
+	if by_components != null and by_components.has_method("consume_item"):
+		return by_components
+	var by_root := character.get_node_or_null("ItemConsumer")
+	if by_root != null and by_root.has_method("consume_item"):
+		return by_root
+	return null
 
 
 func _resolve_inventory_use_target_state(payload: Dictionary) -> Node:

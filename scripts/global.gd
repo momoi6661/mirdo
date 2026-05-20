@@ -70,6 +70,10 @@ func reset_outing_map_progress_runtime() -> void:
 	get_outing_map_progress_runtime()
 
 
+func reset_time_state_runtime() -> void:
+	_time_state_runtime = _default_time_state()
+
+
 func get_or_create_shelter_storage_runtime(
 	source_id: Variant,
 	template_storage: InventoryStorageResource = null,

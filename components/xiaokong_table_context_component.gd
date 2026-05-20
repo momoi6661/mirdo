@@ -7,7 +7,7 @@ const XIAOKONG_GROUP: StringName = &"Xiaokong"
 const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 const SIGNAL_XIAOKONG_SEAT_STATE_CHANGED: StringName = &"xiaokong_seat_state_changed"
 const OPTION_ID_EAT: String = "eat"
-const OPTION_LABEL_EAT: String = "让小空食用"
+const OPTION_LABEL_EAT: String = "让 Mirdo 食用"
 const STAT_DISPLAY_ORDER := ["hunger", "thirst", "mood", "favor"]
 const STAT_DISPLAY_NAME := {
 	"hunger": "饱食",
@@ -32,6 +32,7 @@ var _seat_signal_xiaokong_path: String = ""
 
 func _ready() -> void:
 	add_to_group(TABLE_CONTEXT_GROUP)
+	add_to_group(&"character_table_context")
 	_bind_global_seat_signal()
 	var scan_area: Area3D = _resolve_scan_area()
 	if scan_area != null:
@@ -94,6 +95,9 @@ func is_xiaokong_seated_here(xiaokong_root: Node) -> bool:
 		return false
 	return table_root == seat_marker or table_root.is_ancestor_of(seat_marker)
 
+func is_character_seated_here(character_root: Node) -> bool:
+	return is_xiaokong_seated_here(character_root)
+
 func consume_food_entry_by_path(
 	xiaokong_root: Node,
 	item_path: String,
@@ -118,6 +122,13 @@ func consume_food_entry_by_path(
 	if consumer == null or not consumer.has_method("consume_item"):
 		return {"ok": false, "error": "item_consumer_not_found"}
 
+	var pickable_component := _resolve_pickable_component(item_node)
+	if pickable_component != null and pickable_component.has_method("attach_visual_to"):
+		pickable_component.call("attach_visual_to", xiaokong_root)
+	var animation_behavior := xiaokong_root.get_node_or_null("Components/AnimationBehaviorTreeComponent") if xiaokong_root != null else null
+	if animation_behavior != null and animation_behavior.has_method("request_state"):
+		animation_behavior.call("request_state", &"work_take_item")
+
 	var result: Dictionary = consumer.call("consume_item", item_data, reason)
 	if not bool(result.get("ok", false)):
 		return result
@@ -127,12 +138,25 @@ func consume_food_entry_by_path(
 		save_component = _find_save_component_recursive(item_node)
 	if save_component != null and save_component.has_method("mark_destroyed"):
 		save_component.call("mark_destroyed")
+	if pickable_component != null:
+		if pickable_component.has_method("detach_held_visual_to"):
+			pickable_component.call("detach_held_visual_to", xiaokong_root)
+		elif pickable_component.has_method("release_held_visual_after"):
+			pickable_component.call("release_held_visual_after")
 	item_node.queue_free()
 
 	result["item_path"] = trimmed_path
 	result["item_name"] = _get_item_name(item_data, item_node)
 	result["delta_summary"] = _build_delta_summary(item_data.get_consumable_delta())
 	return result
+
+func consume_item_entry_by_path(
+	character_root: Node,
+	item_path: String,
+	reason: String = "character_table_consume",
+	require_seated: bool = true
+) -> Dictionary:
+	return consume_food_entry_by_path(character_root, item_path, reason, require_seated)
 
 func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldInteractionPanelModel:
 	var xiaokong_root: Node = _resolve_any_xiaokong()
@@ -358,7 +382,9 @@ func _is_local_point_inside_shape(shape: Shape3D, local_position: Vector3) -> bo
 func _resolve_xiaokong_active_seat_marker(xiaokong_root: Node) -> Marker3D:
 	if xiaokong_root == null:
 		return null
-	var router := xiaokong_root.get_node_or_null("Components/AIActionRouter")
+	var router := xiaokong_root.get_node_or_null("Components/CharacterAIActionExecutor")
+	if router == null:
+		router = xiaokong_root.get_node_or_null("Components/AIActionRouter")
 	if router == null:
 		router = _find_node_with_method_recursive(xiaokong_root, &"get_active_sit_marker")
 	if router == null or not router.has_method("get_active_sit_marker"):
@@ -491,6 +517,13 @@ func _find_save_component_recursive(root_node: Node) -> Node:
 			return nested
 	return null
 
+func _resolve_pickable_component(item_node: Node) -> Node:
+	if item_node == null:
+		return null
+	if item_node.has_method("attach_visual_to"):
+		return item_node
+	return _find_node_with_method_recursive(item_node, &"attach_visual_to")
+
 func _find_node_with_method_recursive(root_node: Node, method_name: StringName) -> Node:
 	if root_node == null:
 		return null
@@ -513,12 +546,13 @@ func _resolve_seated_xiaokong_on_this_table() -> Node:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return null
-	for entry in tree.get_nodes_in_group(XIAOKONG_GROUP):
-		var xiaokong_root := entry as Node
-		if xiaokong_root == null or not is_instance_valid(xiaokong_root):
-			continue
-		if is_xiaokong_seated_here(xiaokong_root):
-			return xiaokong_root
+	for group_name in [XIAOKONG_GROUP, &"Mirdo", &"AICharacter"]:
+		for entry in tree.get_nodes_in_group(group_name):
+			var xiaokong_root := entry as Node
+			if xiaokong_root == null or not is_instance_valid(xiaokong_root):
+				continue
+			if is_xiaokong_seated_here(xiaokong_root):
+				return xiaokong_root
 	return null
 
 func _resolve_any_xiaokong() -> Node:
@@ -528,10 +562,11 @@ func _resolve_any_xiaokong() -> Node:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return null
-	for entry in tree.get_nodes_in_group(XIAOKONG_GROUP):
-		var xiaokong_root := entry as Node
-		if xiaokong_root != null and is_instance_valid(xiaokong_root):
-			return xiaokong_root
+	for group_name in [XIAOKONG_GROUP, &"Mirdo", &"AICharacter"]:
+		for entry in tree.get_nodes_in_group(group_name):
+			var xiaokong_root := entry as Node
+			if xiaokong_root != null and is_instance_valid(xiaokong_root):
+				return xiaokong_root
 	return null
 
 func _pick_consume_item_path(food_entries: Array[Dictionary]) -> String:

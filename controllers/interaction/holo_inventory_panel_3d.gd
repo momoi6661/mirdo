@@ -18,6 +18,11 @@ const HINT_LABEL_SIDE_PADDING_WORLD := 0.035
 const HINT_LABEL_BOTTOM_PADDING_WORLD := 0.028
 const HINT_OVERRIDE_EXTRA_HEIGHT_WORLD := 0.18
 const HINT_OVERRIDE_GRID_GAP_WORLD := 0.072
+const USE_HOLD_DURATION_SEC := 0.6
+const USE_HOLD_RING_SEGMENTS := 48
+const USE_HOLD_RING_RADIUS_WORLD := 0.034
+const USE_HOLD_RING_THICKNESS_WORLD := 0.006
+const USE_HOLD_RING_MOUSE_OFFSET_WORLD := Vector2(0.0, 0.075)
 
 enum PanelAnchorMode {
 	MARK_ONLY,
@@ -40,6 +45,7 @@ enum PanelAnchorMode {
 @export var drag_ghost_path: NodePath = NodePath("DragGhost")
 @export var drag_icon_path: NodePath = NodePath("DragGhost/Icon")
 @export var drag_count_path: NodePath = NodePath("DragGhost/Count")
+@export var use_hold_indicator_path: NodePath = NodePath("UseHoldIndicator")
 
 @export_category("Panel Layout")
 @export var panel_size_world: Vector2 = Vector2(1.02, 0.72)
@@ -104,6 +110,9 @@ var _hit_shape: CollisionShape3D
 var _drag_ghost: Node3D
 var _drag_icon: MeshInstance3D
 var _drag_count: Label3D
+var _use_hold_indicator: Node3D
+var _use_hold_ring_track: MeshInstance3D
+var _use_hold_ring_fill: MeshInstance3D
 
 var _is_open: bool = false
 var _slot_visuals: Array[Dictionary] = []
@@ -114,6 +123,11 @@ var _drag_active: bool = false
 var _drag_from_slot: int = -1
 var _drag_amount: int = 0
 var _drag_item: ItemData
+var _use_hold_active: bool = false
+var _use_hold_slot: int = -1
+var _use_hold_elapsed: float = 0.0
+var _use_hold_progress: float = 0.0
+var _use_hold_tween: Tween
 var _panel_transform_initialized: bool = false
 var _hint_mouse_free_mode: bool = false
 var _use_target_state: Node = null
@@ -130,6 +144,7 @@ func _ready() -> void:
 	_setup_static_visuals()
 	_setup_hit_area()
 	_setup_drag_ghost_visual()
+	_setup_use_hold_indicator_visual()
 	_setup_title_label_style()
 	_setup_hint_label_style()
 	set_inventory_data(_inventory_data)
@@ -159,6 +174,8 @@ func _process(_delta: float) -> void:
 	_update_hover_from_pointer()
 	if _drag_active:
 		_update_drag_ghost_from_mouse()
+	if _use_hold_active:
+		_update_use_hold_indicator_from_mouse()
 
 
 func _input(event: InputEvent) -> void:
@@ -175,9 +192,7 @@ func _input(event: InputEvent) -> void:
 				if _is_local_point_inside_panel(press_local):
 					var press_slot: int = _slot_index_from_local_point(press_local)
 					if press_slot >= 0:
-						if mb.double_click:
-							_try_use_slot_item(press_slot)
-						elif allow_item_dragging:
+						if allow_item_dragging:
 							_handle_left_press(press_slot, mb.shift_pressed, mb.ctrl_pressed)
 						get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _drag_active:
@@ -209,12 +224,18 @@ func _input(event: InputEvent) -> void:
 				if _is_local_point_inside_panel(right_local):
 					var right_slot: int = _slot_index_from_local_point(right_local)
 					if right_slot >= 0:
-						_try_use_slot_item(right_slot)
+						_begin_use_hold(right_slot)
 						get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and not mb.pressed and _use_hold_active:
+			_cancel_use_hold()
+			get_viewport().set_input_as_handled()
 	elif event is InputEventKey:
 		var key_event := event as InputEventKey
 		if key_event.pressed and key_event.keycode == KEY_ESCAPE and _drag_active:
 			_cancel_drag()
+			get_viewport().set_input_as_handled()
+		elif key_event.pressed and key_event.keycode == KEY_ESCAPE and _use_hold_active:
+			_cancel_use_hold()
 			get_viewport().set_input_as_handled()
 
 
@@ -228,6 +249,9 @@ func set_inventory_data(data_service: Node) -> void:
 
 	_rebuild_slot_visuals()
 	_refresh_all_slot_visuals()
+	_setup_static_visuals()
+	_setup_hit_area()
+	_setup_hint_label_style()
 
 func _connect_inventory_changed(data_service: Node) -> void:
 	if data_service == null or not data_service.has_signal("inventory_changed"):
@@ -284,6 +308,7 @@ func hide_panel() -> void:
 	visible = false
 	if _hit_area != null:
 		_hit_area.input_ray_pickable = false
+	_cancel_use_hold()
 	_cancel_drag()
 	_set_hover_slot(-1)
 	panel_visibility_changed.emit(false)
@@ -360,6 +385,30 @@ func use_slot_item_for_tests(slot_index: int) -> bool:
 	return _try_use_slot_item(slot_index)
 
 
+func begin_use_hold_for_tests(slot_index: int) -> bool:
+	return _begin_use_hold(slot_index)
+
+
+func advance_use_hold_for_tests(delta: float) -> void:
+	_advance_use_hold(delta)
+
+
+func cancel_use_hold_for_tests() -> void:
+	_cancel_use_hold()
+
+
+func get_use_hold_progress_for_tests() -> float:
+	return _use_hold_progress
+
+
+func get_use_hold_indicator_mode_for_tests() -> String:
+	return "mouse_circle"
+
+
+func is_use_hold_tween_running_for_tests() -> bool:
+	return _use_hold_tween != null and _use_hold_tween.is_valid() and _use_hold_tween.is_running()
+
+
 func is_mouse_over_panel() -> bool:
 	var viewport := get_viewport()
 	if viewport == null:
@@ -419,6 +468,11 @@ func _resolve_nodes() -> void:
 	_drag_ghost = get_node_or_null(drag_ghost_path) as Node3D
 	_drag_icon = get_node_or_null(drag_icon_path) as MeshInstance3D
 	_drag_count = get_node_or_null(drag_count_path) as Label3D
+	_use_hold_indicator = get_node_or_null(use_hold_indicator_path) as Node3D
+	if _use_hold_indicator == null and not Engine.is_editor_hint():
+		_use_hold_indicator = Node3D.new()
+		_use_hold_indicator.name = "UseHoldIndicator"
+		add_child(_use_hold_indicator)
 
 	_refresh_anchor_mark_ref()
 	_refresh_camera_ref(panel_anchor_mode != PanelAnchorMode.MARK_ONLY)
@@ -611,6 +665,34 @@ func _setup_drag_ghost_visual() -> void:
 
 	if _drag_ghost != null:
 		_drag_ghost.visible = false
+
+
+func _setup_use_hold_indicator_visual() -> void:
+	if _use_hold_indicator == null:
+		return
+	_use_hold_indicator.visible = false
+	for child in _use_hold_indicator.get_children():
+		child.queue_free()
+
+	_use_hold_ring_track = MeshInstance3D.new()
+	_use_hold_ring_track.name = "Track"
+	_use_hold_ring_track.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_use_hold_ring_track.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	_use_hold_ring_track.mesh = _create_ring_mesh(1.0)
+	var track_mat := _create_unshaded_material(Color(0.03, 0.06, 0.09, 0.82), Color(0.0, 0.0, 0.0, 0.0), 0.0)
+	track_mat.render_priority = 120
+	_use_hold_ring_track.material_override = track_mat
+	_use_hold_indicator.add_child(_use_hold_ring_track)
+
+	_use_hold_ring_fill = MeshInstance3D.new()
+	_use_hold_ring_fill.name = "Fill"
+	_use_hold_ring_fill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_use_hold_ring_fill.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	_use_hold_ring_fill.mesh = _create_ring_mesh(0.0)
+	var fill_mat := _create_unshaded_material(Color(0.48, 0.88, 1.0, 0.96), Color(0.22, 0.58, 1.0, 0.9), 0.65)
+	fill_mat.render_priority = 121
+	_use_hold_ring_fill.material_override = fill_mat
+	_use_hold_indicator.add_child(_use_hold_ring_fill)
 
 
 func _current_slot_count() -> int:
@@ -1161,11 +1243,111 @@ func _try_use_slot_item(slot_index: int) -> bool:
 	return used
 
 
+func _begin_use_hold(slot_index: int) -> bool:
+	if _drag_active:
+		return false
+	if _inventory_data == null or not is_instance_valid(_inventory_data):
+		return false
+	if slot_index < 0:
+		return false
+	var slot_data := _inventory_data.get_slot_data(slot_index)
+	var item := slot_data.get("item", null) as ItemData
+	var amount: int = int(slot_data.get("amount", 0))
+	if item == null or amount <= 0:
+		return false
+	if not item.is_usable():
+		return false
+	_cancel_use_hold()
+	_use_hold_active = true
+	_use_hold_slot = slot_index
+	_use_hold_elapsed = 0.0
+	_use_hold_progress = 0.0
+	_update_use_hold_ring_mesh()
+	if _use_hold_indicator != null:
+		_use_hold_indicator.visible = true
+	_update_use_hold_indicator_from_mouse()
+	_use_hold_tween = create_tween()
+	_use_hold_tween.set_trans(Tween.TRANS_LINEAR)
+	_use_hold_tween.set_ease(Tween.EASE_IN_OUT)
+	_use_hold_tween.tween_method(Callable(self, "_set_use_hold_progress"), 0.0, 1.0, USE_HOLD_DURATION_SEC)
+	_use_hold_tween.tween_callback(Callable(self, "_complete_use_hold"))
+	return true
+
+
+func _advance_use_hold(delta: float) -> void:
+	if not _use_hold_active:
+		return
+	_use_hold_elapsed += maxf(0.0, delta)
+	var manual_progress := _use_hold_elapsed / USE_HOLD_DURATION_SEC
+	if manual_progress > _use_hold_progress:
+		_set_use_hold_progress(manual_progress)
+	if _use_hold_progress >= 1.0:
+		_complete_use_hold()
+
+
+func _set_use_hold_progress(value: float) -> void:
+	_use_hold_progress = clampf(value, 0.0, 1.0)
+	_update_use_hold_ring_mesh()
+
+
+func _complete_use_hold() -> void:
+	if not _use_hold_active:
+		return
+	var slot_to_use := _use_hold_slot
+	_cancel_use_hold()
+	_try_use_slot_item(slot_to_use)
+
+
+func _cancel_use_hold() -> void:
+	var previous_slot := _use_hold_slot
+	if _use_hold_tween != null and _use_hold_tween.is_valid():
+		_use_hold_tween.kill()
+	_use_hold_tween = null
+	_use_hold_active = false
+	_use_hold_slot = -1
+	_use_hold_elapsed = 0.0
+	_use_hold_progress = 0.0
+	if _use_hold_indicator != null:
+		_use_hold_indicator.visible = false
+	_update_use_hold_ring_mesh()
+	if previous_slot >= 0:
+		_refresh_single_slot_visual(previous_slot)
+
+
+func _update_use_hold_indicator_from_mouse() -> void:
+	if not _use_hold_active or _use_hold_indicator == null:
+		return
+	var hit_info := _get_mouse_local_hit_info()
+	if bool(hit_info.get("hit", false)):
+		var local_point: Vector3 = hit_info.get("local", Vector3.ZERO) as Vector3
+		_use_hold_indicator.global_basis = global_basis
+		_use_hold_indicator.global_position = to_global(Vector3(
+			local_point.x + USE_HOLD_RING_MOUSE_OFFSET_WORLD.x,
+			local_point.y + USE_HOLD_RING_MOUSE_OFFSET_WORLD.y,
+			0.036
+		))
+		return
+	if _camera != null and is_instance_valid(_camera):
+		var viewport := get_viewport()
+		if viewport != null:
+			var mouse_pos := viewport.get_mouse_position()
+			var from := _camera.project_ray_origin(mouse_pos)
+			var to := from + _camera.project_ray_normal(mouse_pos) * distance_from_camera
+			_use_hold_indicator.global_basis = _camera.global_basis
+			_use_hold_indicator.global_position = to + _camera.global_basis.y * USE_HOLD_RING_MOUSE_OFFSET_WORLD.y
+
+
+func _update_use_hold_ring_mesh() -> void:
+	if _use_hold_ring_fill != null:
+		_use_hold_ring_fill.mesh = _create_ring_mesh(_use_hold_progress)
+
+
 func _handle_left_press(slot_index: int, shift_pressed: bool, ctrl_pressed: bool) -> void:
 	if not allow_item_dragging:
 		return
 	if _drag_active:
 		return
+	_cancel_use_hold()
 	if _inventory_data == null:
 		return
 	if slot_index < 0:
@@ -1439,3 +1621,43 @@ func _create_unshaded_material(albedo: Color, emission: Color, emission_energy: 
 	mat.emission = emission
 	mat.emission_energy_multiplier = emission_energy
 	return mat
+
+
+func _create_ring_mesh(progress: float) -> ArrayMesh:
+	var safe_progress := clampf(progress, 0.0, 1.0)
+	var segment_count: int = maxi(1, int(ceil(float(USE_HOLD_RING_SEGMENTS) * safe_progress)))
+	var outer_radius := USE_HOLD_RING_RADIUS_WORLD
+	var inner_radius := maxf(0.001, outer_radius - USE_HOLD_RING_THICKNESS_WORLD)
+	var start_angle := -PI * 0.5
+	var end_angle := start_angle + TAU * safe_progress
+	if safe_progress >= 0.999:
+		end_angle = start_angle + TAU
+
+	var vertices := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for i in range(segment_count + 1):
+		var t := float(i) / float(segment_count)
+		var angle := lerpf(start_angle, end_angle, t)
+		var dir := Vector2(cos(angle), sin(angle))
+		vertices.append(Vector3(dir.x * outer_radius, dir.y * outer_radius, 0.0))
+		vertices.append(Vector3(dir.x * inner_radius, dir.y * inner_radius, 0.0002))
+		uvs.append(Vector2(t, 0.0))
+		uvs.append(Vector2(t, 1.0))
+
+	for i in range(segment_count):
+		var outer_a := i * 2
+		var inner_a := outer_a + 1
+		var outer_b := outer_a + 2
+		var inner_b := outer_a + 3
+		indices.append_array(PackedInt32Array([outer_a, outer_b, inner_a, inner_a, outer_b, inner_b]))
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	if vertices.size() >= 4:
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh

@@ -466,6 +466,17 @@ func get_current_state() -> StringName:
 		return StringName(playback.get_current_node())
 	return _current_state
 
+func get_current_state_name() -> StringName:
+	return get_current_state()
+
+func consume_root_motion_delta() -> Dictionary:
+	if _animation_tree == null or not _animation_tree.active:
+		return {}
+	return {
+		"position": _animation_tree.get_root_motion_position(),
+		"rotation": _animation_tree.get_root_motion_rotation(),
+	}
+
 func get_current_sub_state() -> StringName:
 	return _current_sub_state
 
@@ -616,6 +627,8 @@ func _resolve_state_to_action(state_name: StringName) -> StringName:
 			return &"walk_forward"
 		&"run":
 			return &"run_forward"
+		&"sit_down":
+			return &"sit_down"
 		&"seated_idle":
 			if _posture_intent == &"seated" or _current_mode == MODE_POSTURE:
 				return &"seated_idle"

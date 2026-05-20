@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" uid="uid://cbmhrtu2ovbw3" path="res://scripts/Inventory/InteracableItem.gd" id="1_interactable"]
 [ext_resource type="Resource" uid="uid://casjryoyf0u0t" path="res://resources/items/water_bottle.tres" id="2_item"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_save"]
 [ext_resource type="PackedScene" uid="uid://dy0rmghg0jw4n" path="res://3DModel/water/water_bottle.glb" id="4_model"]
+[ext_resource type="Script" path="res://components/character_pickable_item_component.gd" id="5_pickable"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_bottle"]
 height = 0.40
@@ -23,6 +24,14 @@ outline_width = 0.1
 
 [node name="SaveComponent" type="Node" parent="."]
 script = ExtResource("3_save")
+
+[node name="CharacterPickableItem" type="Node3D" parent="."]
+script = ExtResource("5_pickable")
+visual_root_path = NodePath("../WaterBottleModel")
+hold_position_offset = Vector3(0.03, -0.02, 0.0)
+hold_rotation_degrees = Vector3(82, 0, 10)
+hold_scale = Vector3(1, 1, 1)
+use_action = &"work_drink"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)

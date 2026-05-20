@@ -189,7 +189,7 @@ func _on_main_menu_pressed() -> void:
 	await hide_menu()
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file("res://controllers/ui/MainMenu.tscn")
+	get_tree().change_scene_to_file("res://levels/menu/MainMenu.tscn")
 
 func _on_exit_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -257,4 +257,5 @@ func _is_ui_text_input_focused() -> bool:
 	if focus_owner is CodeEdit:
 		return true
 	return false
+
 

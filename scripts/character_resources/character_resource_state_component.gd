@@ -4,9 +4,9 @@ class_name CharacterResourceStateComponent
 signal stats_changed(snapshot: Dictionary, applied_delta: Dictionary, reason: String)
 signal critical_state_changed(stat_name: StringName, is_critical: bool, value: float)
 
-const STAT_KEYS: PackedStringArray = ["health", "hunger", "thirst"]
-const LEGACY_STAT_KEYS: PackedStringArray = ["mood", "favor"]
-const SAVE_VERSION: int = 2
+const STAT_KEYS: PackedStringArray = ["health", "hunger", "thirst", "energy", "mood", "favor"]
+const LEGACY_STAT_KEYS: PackedStringArray = []
+const SAVE_VERSION: int = 3
 
 @export_category("Identity")
 @export var character_id: StringName = &"character"
@@ -16,7 +16,7 @@ const SAVE_VERSION: int = 2
 @export_range(0, 100, 1) var initial_health: float = 100.0
 @export_range(0, 100, 1) var initial_hunger: float = 65.0
 @export_range(0, 100, 1) var initial_thirst: float = 60.0
-# 旧 AI 组件仍可能读取 mood/favor，状态栏不显示，保存兼容用。
+@export_range(0, 100, 1) var initial_energy: float = 75.0
 @export_range(0, 100, 1) var initial_mood: float = 70.0
 @export_range(0, 100, 1) var initial_favor: float = 35.0
 
@@ -29,6 +29,9 @@ const SAVE_VERSION: int = 2
 @export_category("Time Decay")
 @export_range(0, 20, 0.1) var hunger_decay_per_hour: float = 2.0
 @export_range(0, 20, 0.1) var thirst_decay_per_hour: float = 3.0
+@export_range(0, 20, 0.1) var energy_decay_per_hour: float = 4.0
+@export_range(0, 20, 0.1) var energy_decay_when_need_critical: float = 2.0
+@export_range(0, 20, 0.1) var mood_decay_when_energy_critical: float = 1.0
 @export_range(0, 20, 0.1) var health_decay_when_hunger_critical: float = 1.0
 @export_range(0, 20, 0.1) var health_decay_when_thirst_critical: float = 1.5
 # 旧字段保留，避免旧场景属性丢失；新状态栏不使用。
@@ -54,8 +57,6 @@ func reset_to_initial(reason: String = "reset") -> void:
 
 func get_snapshot() -> Dictionary:
 	var snapshot := _stats.duplicate(true)
-	for key in LEGACY_STAT_KEYS:
-		snapshot[key] = _legacy_stats.get(key, _default_legacy_value(key))
 	snapshot["character_id"] = String(character_id)
 	snapshot["display_name"] = display_name
 	return snapshot
@@ -68,8 +69,9 @@ func build_ai_stats() -> Dictionary:
 		"health": int(round(get_stat(&"health"))),
 		"hunger": int(round(get_stat(&"hunger"))),
 		"thirst": int(round(get_stat(&"thirst"))),
-		"mood": int(round(float(_legacy_stats.get("mood", initial_mood)))),
-		"favor": int(round(float(_legacy_stats.get("favor", initial_favor)))),
+		"energy": int(round(get_stat(&"energy"))),
+		"mood": int(round(get_stat(&"mood"))),
+		"favor": int(round(get_stat(&"favor"))),
 		"needs": build_need_summary(),
 	}
 
@@ -82,6 +84,8 @@ func build_need_summary() -> String:
 		parts.append("饥饿，需要食物")
 	if is_critical(&"thirst"):
 		parts.append("口渴，需要饮水")
+	if is_critical(&"energy"):
+		parts.append("精力很低，需要休息")
 	if parts.is_empty():
 		parts.append("状态稳定")
 	return "；".join(parts)
@@ -162,8 +166,14 @@ func tick_hours(hours: float) -> Dictionary:
 	}
 	if is_critical(&"hunger"):
 		decay["health"] = float(decay.get("health", 0.0)) - health_decay_when_hunger_critical * hours
+	decay["energy"] = -energy_decay_per_hour * hours
+	if is_critical(&"hunger"):
+		decay["energy"] = float(decay.get("energy", 0.0)) - energy_decay_when_need_critical * hours
 	if is_critical(&"thirst"):
 		decay["health"] = float(decay.get("health", 0.0)) - health_decay_when_thirst_critical * hours
+		decay["energy"] = float(decay.get("energy", 0.0)) - energy_decay_when_need_critical * hours
+	if is_critical(&"energy"):
+		decay["mood"] = float(decay.get("mood", 0.0)) - mood_decay_when_energy_critical * hours
 	return apply_delta(decay, "time_decay")
 
 
@@ -171,7 +181,7 @@ func is_critical(stat_name: StringName) -> bool:
 	var key := String(stat_name)
 	if key == "health":
 		return get_stat(stat_name) <= health_critical_threshold
-	if key == "hunger" or key == "thirst":
+	if key == "hunger" or key == "thirst" or key == "energy":
 		return get_stat(stat_name) <= need_critical_threshold
 	return false
 
@@ -206,9 +216,12 @@ func _load_custom_save_data(data: Dictionary) -> void:
 				_legacy_stats[key] = clampf(float(loaded_stats[key]), min_stat_value, max_stat_value)
 	var legacy_loaded: Variant = data.get("legacy_stats", {})
 	if legacy_loaded is Dictionary:
-		for key in LEGACY_STAT_KEYS:
-			if legacy_loaded.has(key):
-				_legacy_stats[key] = clampf(float(legacy_loaded[key]), min_stat_value, max_stat_value)
+		for key in ["mood", "favor"]:
+			if legacy_loaded.has(key) and not _stats.has(key):
+				_stats[key] = clampf(float(legacy_loaded[key]), min_stat_value, max_stat_value)
+	for key in STAT_KEYS:
+		if not _stats.has(key):
+			_stats[key] = _default_stat_value(key)
 	_emit_state_update({}, "load")
 
 
@@ -217,11 +230,11 @@ func _reset_to_initial_stats() -> void:
 		"health": initial_health,
 		"hunger": initial_hunger,
 		"thirst": initial_thirst,
-	}
-	_legacy_stats = {
+		"energy": initial_energy,
 		"mood": initial_mood,
 		"favor": initial_favor,
 	}
+	_legacy_stats = {}
 
 
 func _clamp_all_stats() -> void:
@@ -242,6 +255,9 @@ func _default_stat_value(key: String) -> float:
 		"health": return initial_health
 		"hunger": return initial_hunger
 		"thirst": return initial_thirst
+		"energy": return initial_energy
+		"mood": return initial_mood
+		"favor": return initial_favor
 		_: return 0.0
 
 
@@ -261,6 +277,8 @@ func _extract_delta(delta: Dictionary, key: String) -> float:
 		return float(delta["ai_hunger"])
 	if key == "thirst" and delta.has("ai_thirst"):
 		return float(delta["ai_thirst"])
+	if key == "energy" and delta.has("ai_energy"):
+		return float(delta["ai_energy"])
 	if key == "mood" and delta.has("ai_mood"):
 		return float(delta["ai_mood"])
 	if key == "favor" and delta.has("ai_favor"):

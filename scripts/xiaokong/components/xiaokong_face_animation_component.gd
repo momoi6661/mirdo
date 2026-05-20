@@ -35,6 +35,9 @@ const FACE_EXPRESSION_STATES := {
 	&"face_sad": &"Sad",
 	&"face_angry": &"Angry",
 	&"face_surprised": &"Surprised",
+	&"face_fun": &"Fun",
+	&"face_joy": &"Joy",
+	&"face_sorrow": &"Sorrow",
 }
 const FACE_EXPRESSION_STATE_ORDER: Array[StringName] = [
 	&"Neutral",
@@ -42,6 +45,9 @@ const FACE_EXPRESSION_STATE_ORDER: Array[StringName] = [
 	&"Sad",
 	&"Angry",
 	&"Surprised",
+	&"Fun",
+	&"Joy",
+	&"Sorrow",
 ]
 
 var _current_face_expression: StringName = FACE_DEFAULT_EXPRESSION

@@ -14,6 +14,9 @@ func _run() -> void:
 	await _test_character_interactable_emits_inventory_use_request()
 	await _test_holo_panel_uses_target_state_context()
 	await _test_holo_panel_without_context_uses_inventory_default_state()
+	await _test_holo_panel_right_hold_uses_target_state_context()
+	await _test_holo_panel_right_hold_cancel_does_not_use_item()
+	await _test_holo_panel_hint_stays_below_item_grid()
 	await _test_player_controller_opens_inventory_for_mirdo_context()
 	_restore_previous_save_slot()
 	_finish()
@@ -159,6 +162,139 @@ func _test_holo_panel_without_context_uses_inventory_default_state() -> void:
 
 	host.queue_free()
 	await process_frame
+
+
+func _test_holo_panel_right_hold_uses_target_state_context() -> void:
+	var panel_script := load("res://controllers/interaction/holo_inventory_panel_3d.gd") as Script
+	var inventory_script := load("res://scripts/Inventory/inventory_data_service.gd") as Script
+	var item := load("res://resources/items/can_soup.tres") as ItemData
+	if panel_script == null or inventory_script == null or item == null:
+		return
+
+	var host := Node3D.new()
+	root.add_child(host)
+	var target_state := _FakeItemTargetState.new()
+	target_state.name = "MirdoState"
+	host.add_child(target_state)
+	var self_state := _FakeItemTargetState.new()
+	self_state.name = "PlayerState"
+	host.add_child(self_state)
+	var inventory := Node.new()
+	inventory.set_script(inventory_script)
+	host.add_child(inventory)
+	inventory.set("state_component_path", inventory.get_path_to(self_state))
+	inventory.call("pickup_item", item, 2)
+	var panel := Node3D.new()
+	panel.set_script(panel_script)
+	host.add_child(panel)
+	panel.call("set_inventory_data", inventory)
+	panel.call("set_use_target_context", target_state, "Mirdo")
+
+	_expect(panel.has_method("begin_use_hold_for_tests"), "panel should expose begin_use_hold_for_tests")
+	_expect(panel.has_method("advance_use_hold_for_tests"), "panel should expose advance_use_hold_for_tests")
+	_expect(panel.has_method("get_use_hold_progress_for_tests"), "panel should expose get_use_hold_progress_for_tests")
+	_expect(panel.has_method("get_use_hold_indicator_mode_for_tests"), "panel should expose get_use_hold_indicator_mode_for_tests")
+	_expect(panel.has_method("is_use_hold_tween_running_for_tests"), "panel should expose is_use_hold_tween_running_for_tests")
+	if not panel.has_method("begin_use_hold_for_tests") or not panel.has_method("advance_use_hold_for_tests"):
+		host.queue_free()
+		await process_frame
+		return
+
+	_expect(bool(panel.call("begin_use_hold_for_tests", 0)), "right-hold should start on a usable item")
+	_expect(String(panel.call("get_use_hold_indicator_mode_for_tests")) == "mouse_circle", "right-hold progress should be a mouse-following circular indicator")
+	_expect(bool(panel.call("is_use_hold_tween_running_for_tests")), "right-hold progress should be driven by a Tween")
+	panel.call("advance_use_hold_for_tests", 0.2)
+	_expect(target_state.applied_items.is_empty(), "short right-hold should not use item before progress completes")
+	_expect(float(panel.call("get_use_hold_progress_for_tests")) > 0.0, "right-hold should expose visible progress")
+	panel.call("advance_use_hold_for_tests", 1.0)
+	_expect(target_state.applied_items.size() == 1, "completed right-hold should use item on target")
+	_expect(self_state.applied_items.is_empty(), "completed target right-hold should not use item on self")
+	_expect(int(inventory.call("get_slot_data", 0).get("amount", 0)) == 1, "completed right-hold should consume one item")
+
+	host.queue_free()
+	await process_frame
+
+
+func _test_holo_panel_right_hold_cancel_does_not_use_item() -> void:
+	var panel_script := load("res://controllers/interaction/holo_inventory_panel_3d.gd") as Script
+	var inventory_script := load("res://scripts/Inventory/inventory_data_service.gd") as Script
+	var item := load("res://resources/items/water_bottle.tres") as ItemData
+	if panel_script == null or inventory_script == null or item == null:
+		return
+
+	var host := Node3D.new()
+	root.add_child(host)
+	var self_state := _FakeItemTargetState.new()
+	self_state.name = "PlayerState"
+	host.add_child(self_state)
+	var inventory := Node.new()
+	inventory.set_script(inventory_script)
+	host.add_child(inventory)
+	inventory.set("state_component_path", inventory.get_path_to(self_state))
+	inventory.call("pickup_item", item, 1)
+	var panel := Node3D.new()
+	panel.set_script(panel_script)
+	host.add_child(panel)
+	panel.call("set_inventory_data", inventory)
+
+	if not panel.has_method("begin_use_hold_for_tests") or not panel.has_method("advance_use_hold_for_tests") or not panel.has_method("cancel_use_hold_for_tests"):
+		host.queue_free()
+		await process_frame
+		return
+
+	_expect(bool(panel.call("begin_use_hold_for_tests", 0)), "right-hold should start for cancel test")
+	panel.call("advance_use_hold_for_tests", 0.2)
+	panel.call("cancel_use_hold_for_tests")
+	panel.call("advance_use_hold_for_tests", 1.0)
+	_expect(self_state.applied_items.is_empty(), "cancelled right-hold should not use item")
+	_expect(inventory.call("has_item_in_slot", 0), "cancelled right-hold should keep item in slot")
+	_expect(float(panel.call("get_use_hold_progress_for_tests")) == 0.0, "cancelled right-hold should clear progress")
+
+	host.queue_free()
+	await process_frame
+
+
+func _test_holo_panel_hint_stays_below_item_grid() -> void:
+	var panel_scene := load("res://controllers/interaction/HoloInventoryPanel3D.tscn") as PackedScene
+	var inventory_script := load("res://scripts/Inventory/inventory_data_service.gd") as Script
+	_expect(panel_scene != null, "HoloInventoryPanel3D scene should load for hint layout test")
+	_expect(inventory_script != null, "InventoryDataService script should load for hint layout test")
+	if panel_scene == null or inventory_script == null:
+		return
+
+	var host := Node3D.new()
+	root.add_child(host)
+	var inventory := Node.new()
+	inventory.set_script(inventory_script)
+	host.add_child(inventory)
+	inventory.call("_ensure_storage")
+	inventory.get("inventory_storage").set("slot_count", 24)
+	inventory.get("inventory_storage").call("ensure_capacity")
+	var panel := panel_scene.instantiate() as Node3D
+	host.add_child(panel)
+	panel.set("show_alt_hint_label", true)
+	panel.set("hint_text_override", "拖出物品：拖到背包面板可拿取；柜子仍只读，不能从背包放回。")
+	panel.set("auto_place_hint_below_second_row", true)
+	panel.call("set_inventory_data", inventory)
+
+	var grid_bottom_y := _get_panel_grid_bottom_y(panel, 24)
+	var hint_label := panel.get_node_or_null("HintLabel") as Label3D
+	_expect(hint_label != null, "panel should have HintLabel for layout test")
+	if hint_label != null:
+		_expect(hint_label.position.y < grid_bottom_y - 0.01, "panel hint text should be below all item slots")
+
+	host.queue_free()
+	await process_frame
+
+
+func _get_panel_grid_bottom_y(panel: Node, slot_count: int) -> float:
+	var columns := maxi(1, int(panel.get("slot_columns")))
+	var rows := int(ceil(float(slot_count) / float(columns)))
+	var slot_size := float(panel.get("slot_size_world"))
+	var slot_gap := float(panel.get("slot_gap_world"))
+	var slots_offset := panel.get("slots_offset") as Vector2
+	var grid_h := float(rows) * slot_size + float(rows - 1) * slot_gap
+	return slots_offset.y - grid_h * 0.5
 
 
 func _test_player_controller_opens_inventory_for_mirdo_context() -> void:

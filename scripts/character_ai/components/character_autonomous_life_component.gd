@@ -14,6 +14,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var perception_component_path: NodePath
 @export var planner_path: NodePath
 @export var mind_state_path: NodePath
+@export var state_component_path: NodePath
 @export var animation_behavior_path: NodePath
 @export var navigation_motor_path: NodePath
 @export var action_executor_path: NodePath
@@ -48,6 +49,8 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(0.1, 8.0, 0.05) var run_speed: float = 3.6
 @export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 10.0
 @export_range(0.1, 30.0, 0.1) var far_distance: float = 7.0
+@export_range(0.0, 100.0, 1.0) var low_energy_threshold: float = 35.0
+@export_range(0.0, 100.0, 1.0) var critical_energy_threshold: float = 18.0
 @export_range(0.0, 1.0, 0.01) var run_when_far_chance: float = 0.08
 
 @export_category("Decision Weights")
@@ -68,6 +71,9 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var stop_action: StringName = &"idle_normal"
 @export var listen_action: StringName = &"listen"
 @export var ambient_actions: PackedStringArray = PackedStringArray(["idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce", "tiny_wave"])
+@export var seated_ambient_actions: PackedStringArray = PackedStringArray(["seated_idle", "seated_sleepy"])
+@export var player_social_actions: PackedStringArray = PackedStringArray(["tiny_wave", "small_wave", "small_nod", "cute_explain", "tilt_head_cute"])
+@export var player_social_seated_actions: PackedStringArray = PackedStringArray(["seated_idle"])
 @export var inspect_marker_role: String = "approach"
 @export var sit_marker_role: String = "sit"
 @export var debug_log: bool = false
@@ -75,6 +81,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 var _perception_component: Node
 var _planner: Node
 var _mind_state: Node
+var _state_component: Node
 var _animation_behavior: Node
 var _navigation_motor: Node
 var _action_executor: Node
@@ -149,6 +156,8 @@ func force_think_now() -> bool:
 	return _think(true)
 
 func is_navigating() -> bool:
+	if _navigation_motor != null and _navigation_motor.has_method("is_navigating"):
+		return _navigation_active or bool(_navigation_motor.call("is_navigating"))
 	return _navigation_active
 
 func stop_autonomous_navigation(play_stop: bool = true) -> void:
@@ -194,10 +203,12 @@ func _dispatch_decision(decision: Dictionary) -> bool:
 			_movement_cooldown_left = movement_cooldown_sec
 			_start_dwell(float(decision.get("dwell_time_sec", 1.2)))
 		"ambient":
-			_request_body_action(StringName(String(decision.get("action", String(idle_action)))))
+			var ambient_action := String(decision.get("action", String(idle_action)))
+			_request_body_action(StringName(ambient_action))
 			_apply_decision_expression(decision)
 			_movement_cooldown_left = movement_cooldown_sec
 			_start_dwell(float(decision.get("dwell_time_sec", 1.4)))
+			_apply_resource_delta_for_action(ambient_action, decision)
 			_try_request_self_talk(decision, self_talk_chance_on_ambient)
 		_:
 			return false
@@ -222,7 +233,7 @@ func _start_nav_point_navigation(decision: Dictionary) -> bool:
 	_navigation_active = true
 	_moving_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("move_to_marker"):
-		var run_flag := bool(decision.get("run", false))
+		var run_flag := bool(decision.get("run", false)) and float(_get_resource_snapshot().get("energy", 70.0)) >= low_energy_threshold
 		if not bool(_navigation_motor.call("move_to_marker", marker, _arrival_action, run_flag)):
 			_navigation_active = false
 			_navigation_decision = {}
@@ -236,6 +247,7 @@ func _start_nav_point_navigation(decision: Dictionary) -> bool:
 	if not target.is_empty():
 		_target_cooldowns[target] = float(decision.get("cooldown_sec", same_target_cooldown_sec))
 	_movement_cooldown_left = movement_cooldown_sec
+	_apply_resource_delta_for_movement(decision)
 	_remember_local_decision(decision)
 	_notify_decision_executed(decision)
 	autonomous_decision_made.emit(decision.duplicate(true))
@@ -257,7 +269,7 @@ func _start_object_navigation(decision: Dictionary) -> bool:
 	_navigation_active = true
 	_moving_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("move_to_marker"):
-		var run_flag := bool(decision.get("run", false))
+		var run_flag := bool(decision.get("run", false)) and float(_get_resource_snapshot().get("energy", 70.0)) >= low_energy_threshold
 		if not bool(_navigation_motor.call("move_to_marker", marker, _arrival_action, run_flag)):
 			_navigation_active = false
 			_navigation_decision = {}
@@ -273,6 +285,7 @@ func _start_object_navigation(decision: Dictionary) -> bool:
 	if String(decision.get("marker_role", "")).to_lower() == sit_marker_role.to_lower():
 		_sit_cooldown_left = sit_cooldown_sec
 	_movement_cooldown_left = movement_cooldown_sec
+	_apply_resource_delta_for_movement(decision)
 	_remember_local_decision(decision)
 	_notify_decision_executed(decision)
 	autonomous_decision_made.emit(decision.duplicate(true))
@@ -332,15 +345,31 @@ func _finish_navigation() -> void:
 	_think_left = maxf(_think_left, post_arrival_think_delay_sec)
 	if _mind_state != null and _mind_state.has_method("apply_behavior_feedback"):
 		_mind_state.call("apply_behavior_feedback", String(finished.get("feedback", finished.get("kind", ""))), finished)
+	_apply_resource_delta_for_action(String(arrival), finished)
 	_try_request_self_talk(finished, self_talk_chance_on_arrival)
 	autonomous_navigation_finished.emit(finished)
 
 func _make_fallback_decision(snapshot: Dictionary) -> Dictionary:
 	var mind := _get_mind_snapshot()
+	var resources: Dictionary = snapshot.get("resource_stats", {}) as Dictionary if snapshot.get("resource_stats", {}) is Dictionary else {}
+	var energy := float(resources.get("energy", 70.0))
+	var mood := float(resources.get("mood", 55.0))
 	var tired := float(mind.get("tiredness", 0.0))
+	if energy < critical_energy_threshold and _sit_cooldown_left <= 0.0:
+		var urgent_rest := _make_object_decision(snapshot, true)
+		if not urgent_rest.is_empty():
+			urgent_rest["dwell_time_sec"] = 9.0
+			urgent_rest["arrival_expression"] = "face_sorrow"
+			return urgent_rest
 	var bored := float(mind.get("boredom", 0.0))
 	var curious := float(mind.get("curiosity", 0.0))
 	var social_need := float(mind.get("social", 0.0))
+	if _is_currently_seated():
+		if energy < low_energy_threshold:
+			return {"kind": "ambient", "action": "seated_sleepy", "feedback": "seated_sleepy", "dwell_time_sec": 7.0, "arrival_expression": "face_sorrow"}
+		if social_need > 0.58 and _last_decision_kind != "look_at_player" and _rng.randf() < look_at_player_chance:
+			return {"kind": "look_at_player", "action": _pick_player_social_action(true), "feedback": "look_at_player", "dwell_time_sec": 1.2}
+		return _make_seated_ambient_decision()
 	if tired > 0.62 and _sit_cooldown_left <= 0.0:
 		var sit_decision := _make_object_decision(snapshot, true)
 		if not sit_decision.is_empty():
@@ -351,7 +380,7 @@ func _make_fallback_decision(snapshot: Dictionary) -> Dictionary:
 		if not inspect_decision.is_empty() and _rng.randf() < inspect_chance:
 			return inspect_decision
 	if social_need > 0.55 and _last_decision_kind != "look_at_player" and _rng.randf() < look_at_player_chance:
-		return {"kind": "look_at_player", "action": String(listen_action), "feedback": "look_at_player", "dwell_time_sec": 1.2}
+		return {"kind": "look_at_player", "action": _pick_player_social_action(false), "feedback": "look_at_player", "dwell_time_sec": 1.2}
 	return _make_ambient_decision()
 
 func _get_mind_snapshot() -> Dictionary:
@@ -387,6 +416,26 @@ func _make_ambient_decision() -> Dictionary:
 	if action.is_empty():
 		return {}
 	return {"kind": "ambient", "action": action, "feedback": action, "dwell_time_sec": _dwell_for_action(action)}
+
+func _make_seated_ambient_decision() -> Dictionary:
+	var actions := seated_ambient_actions if not seated_ambient_actions.is_empty() else PackedStringArray(["seated_idle"])
+	var candidates: Array[String] = []
+	for value in actions:
+		var action := _sanitize_seated_action(String(value).strip_edges())
+		if action.is_empty() or action == _last_ambient_action:
+			continue
+		candidates.append(action)
+	if candidates.is_empty():
+		candidates.append(_sanitize_seated_action(String(actions[0]).strip_edges()))
+	var picked := candidates[_rng.randi_range(0, candidates.size() - 1)]
+	_last_ambient_action = picked
+	return {
+		"kind": "ambient",
+		"action": picked,
+		"feedback": picked,
+		"dwell_time_sec": _dwell_for_action(picked),
+		"arrival_expression": _expression_for_action(picked),
+	}
 
 func _collect_object_candidates(snapshot: Dictionary, want_sit: bool) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
@@ -484,6 +533,33 @@ func _pick_ambient_action() -> String:
 	_last_ambient_action = picked
 	return picked
 
+func _pick_player_social_action(is_seated: bool) -> String:
+	var actions := player_social_seated_actions if is_seated else player_social_actions
+	if actions.is_empty():
+		return "seated_idle" if is_seated else String(listen_action)
+	var candidates: Array[String] = []
+	for value in actions:
+		var action := String(value).strip_edges()
+		if is_seated:
+			action = _sanitize_seated_action(action)
+		if action.is_empty() or action == _last_ambient_action:
+			continue
+		candidates.append(action)
+	if candidates.is_empty():
+		var fallback := String(actions[0]).strip_edges()
+		return _sanitize_seated_action(fallback) if is_seated else fallback
+	var picked := candidates[_rng.randi_range(0, candidates.size() - 1)]
+	_last_ambient_action = picked
+	return picked
+
+func _sanitize_seated_action(action: String) -> String:
+	match action.strip_edges().to_lower():
+		"seated_sleepy":
+			return "seated_sleepy"
+		"seated_idle", "listen", "small_nod", "tiny_wave", "small_wave", "cute_explain", "tilt_head_cute", "idle_normal", "idle_relaxed":
+			return "seated_idle"
+	return "seated_idle"
+
 func _dwell_for_arrival(arrival_action: String) -> float:
 	match arrival_action:
 		"work_count_supplies", "work_inspect_cabinet", "work_check_shelf", "work_check_lower":
@@ -496,9 +572,11 @@ func _dwell_for_arrival(arrival_action: String) -> float:
 
 func _dwell_for_action(action: String) -> float:
 	match action:
+		"seated_idle", "seated_sleepy": return 6.0
 		"sleepy_yawn", "rub_eye": return 2.0
 		"small_happy_bounce", "look_around", "curious_peek": return 1.8
-		"tiny_wave", "tilt_head_cute": return 1.3
+		"tiny_wave", "small_wave", "small_nod", "tilt_head_cute": return 1.3
+		"cute_explain": return 2.2
 	return 1.4
 
 func _start_dwell(duration: float) -> void:
@@ -537,14 +615,20 @@ func _resolve_decision_marker(decision: Dictionary) -> Marker3D:
 func _resolve_nav_point_marker(decision: Dictionary) -> Marker3D:
 	var path_text := String(decision.get("target_path", "")).strip_edges()
 	if not path_text.is_empty():
-		var by_path := get_node_or_null(NodePath(path_text)) as Marker3D
-		if by_path != null:
-			return by_path
+		var by_path: Marker3D = null
 		var scene_tree := get_tree()
-		if scene_tree != null:
+		if path_text.begins_with("/") and scene_tree != null:
 			by_path = scene_tree.root.get_node_or_null(NodePath(path_text)) as Marker3D
 			if by_path != null:
 				return by_path
+		elif is_inside_tree():
+			by_path = get_node_or_null(NodePath(path_text)) as Marker3D
+			if by_path != null:
+				return by_path
+			if scene_tree != null and scene_tree.current_scene != null:
+				by_path = scene_tree.current_scene.get_node_or_null(NodePath(path_text)) as Marker3D
+				if by_path != null:
+					return by_path
 	var target_ref := String(decision.get("target_nav_point", "")).strip_edges()
 	if target_ref.is_empty():
 		return null
@@ -647,17 +731,55 @@ func _apply_decision_face_target(decision: Dictionary, delta: float = 1.0) -> bo
 			return true
 	return false
 
+func _is_sit_action(action_name: StringName) -> bool:
+	var text := String(action_name).strip_edges().to_lower()
+	return text in ["sit", "sit_down", "seated_idle", "seated_sleepy", "sittingidle", "sitting_idle"]
+
 func _expression_for_action(action: String) -> String:
 	match action.strip_edges().to_lower():
 		"work_count_supplies", "work_take_item", "work_check_lower", "curious_peek", "tilt_head_cute":
-			return "fun"
-		"work_drink", "tiny_wave", "small_happy_bounce", "react_wave":
-			return "joy"
+			return "face_fun"
+		"work_drink", "tiny_wave", "small_wave", "small_nod", "small_happy_bounce", "react_wave":
+			return "face_joy"
+		"cute_explain":
+			return "face_fun"
 		"rub_eye", "sleepy_yawn", "seated_sleepy":
-			return "sorrow"
+			return "face_sorrow"
+		"disappointed":
+			return "face_sorrow"
 		"cute_startle", "look_back":
-			return "surprised"
+			return "face_surprised"
 	return ""
+
+func _apply_resource_delta_for_movement(decision: Dictionary) -> void:
+	var distance := float(decision.get("distance", 0.0))
+	var cost := -maxf(0.4, distance * 0.08)
+	if bool(decision.get("run", false)):
+		cost *= 2.0
+	_apply_resource_delta({"energy": cost}, "ai_movement")
+
+func _apply_resource_delta_for_action(action: String, decision: Dictionary = {}) -> void:
+	var lowered := action.strip_edges().to_lower()
+	var delta := {}
+	match lowered:
+		"work_count_supplies", "work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_take_item":
+			delta["energy"] = -1.2
+		"seated_idle":
+			delta["energy"] = 1.8
+			delta["mood"] = 0.4
+		"seated_sleepy":
+			delta["energy"] = 3.0
+			delta["mood"] = 0.6
+		"rub_eye", "sleepy_yawn":
+			delta["energy"] = -0.2
+	if delta.is_empty():
+		return
+	_apply_resource_delta(delta, String(decision.get("feedback", lowered)))
+
+func _apply_resource_delta(delta: Dictionary, reason: String) -> void:
+	_refresh_refs()
+	if _state_component != null and _state_component.has_method("apply_delta"):
+		_state_component.call("apply_delta", delta, reason)
 
 func _try_request_self_talk(decision: Dictionary, chance: float) -> bool:
 	if not self_talk_enabled:
@@ -712,7 +834,10 @@ func _choose_planner_decision(snapshot: Dictionary) -> Dictionary:
 		"last_target": _last_object_target(),
 		"last_nav_point": _last_nav_point_target(),
 		"target_cooldowns": _target_cooldowns.duplicate(),
+		"is_seated": _is_currently_seated(),
 	}
+	if snapshot.has("resource_stats"):
+		context["resource_stats"] = snapshot.get("resource_stats", {})
 	if snapshot.has("known_nav_points"):
 		context["known_nav_points"] = snapshot.get("known_nav_points", [])
 	elif _perception_component != null and _perception_component.has_method("build_known_nav_points"):
@@ -730,11 +855,28 @@ func _last_object_target() -> String:
 func _last_nav_point_target() -> String:
 	return String(_navigation_decision.get("target_nav_point", "")).strip_edges()
 
-func _build_snapshot() -> Dictionary:
-	if _perception_component == null or not _perception_component.has_method("build_perception_snapshot"):
+func _get_resource_snapshot() -> Dictionary:
+	_refresh_refs()
+	if _state_component == null:
 		return {}
-	var value: Variant = _perception_component.call("build_perception_snapshot")
-	return value as Dictionary if value is Dictionary else {}
+	if _state_component.has_method("get_snapshot"):
+		var value: Variant = _state_component.call("get_snapshot")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	return {}
+
+func _build_snapshot() -> Dictionary:
+	var snapshot := {}
+	if _perception_component != null and _perception_component.has_method("build_perception_snapshot"):
+		var value: Variant = _perception_component.call("build_perception_snapshot")
+		if value is Dictionary:
+			snapshot = (value as Dictionary).duplicate(true)
+	var resource_stats := _get_resource_snapshot()
+	if not resource_stats.is_empty():
+		snapshot["resource_stats"] = resource_stats
+		if _mind_state != null and _mind_state.has_method("apply_resource_snapshot"):
+			_mind_state.call("apply_resource_snapshot", resource_stats)
+	return snapshot
 
 func _get_block_reason(ignore_grace: bool) -> String:
 	if not ignore_grace and _external_grace_left > 0.0:
@@ -749,6 +891,8 @@ func _face_player(delta: float) -> void:
 	var player := _find_player()
 	if player == null or _actor == null:
 		return
+	if _navigation_motor != null and _navigation_motor.has_method("request_turn_toward_position"):
+		_navigation_motor.call("request_turn_toward_position", player.global_position)
 	if _navigation_motor != null and _navigation_motor.has_method("face_position"):
 		_navigation_motor.call("face_position", player.global_position, delta)
 		return
@@ -787,6 +931,16 @@ func _is_external_action_busy() -> bool:
 		return bool(_action_executor.call("is_navigating"))
 	return false
 
+func _is_currently_seated() -> bool:
+	_refresh_refs()
+	if _action_executor != null and _action_executor.has_method("get_active_sit_marker"):
+		var marker: Variant = _action_executor.call("get_active_sit_marker")
+		if marker is Marker3D:
+			return true
+	if _animation_behavior != null and _animation_behavior.has_method("get_current_mode"):
+		return StringName(_animation_behavior.call("get_current_mode")) == &"Posture"
+	return false
+
 func _bind_external_control_signals() -> void:
 	if _action_executor != null:
 		_connect_signal_if_exists(_action_executor, "ai_response_application_started", "_on_external_ai_started")
@@ -823,14 +977,24 @@ func _on_motor_navigation_finished(_finished_action: StringName = &"") -> void:
 	var finished := _navigation_decision.duplicate(true)
 	_navigation_active = false
 	_navigation_decision = {}
+	var arrival := _arrival_action
 	_arrival_action = &""
 	_moving_action = &""
+	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation"):
+		_navigation_motor.call("stop_navigation", false)
 	_apply_decision_face_target(finished, 1.0)
+	# CharacterNavigationMotor owns seat arrival sequencing.  For sit actions it may
+	# still be aligning/smooth-attaching to the final seat marker when this signal
+	# arrives, so do not request sit_down here or the character will sit at the
+	# projected navmesh point instead of the actual seat marker.
+	if arrival != &"" and not _is_sit_action(arrival):
+		_request_body_action(arrival)
 	_apply_decision_expression(finished)
 	_start_dwell(float(finished.get("dwell_time_sec", post_arrival_dwell_default_sec)))
 	_think_left = maxf(_think_left, post_arrival_think_delay_sec)
 	if _mind_state != null and _mind_state.has_method("apply_behavior_feedback"):
 		_mind_state.call("apply_behavior_feedback", String(finished.get("feedback", finished.get("kind", ""))), finished)
+	_apply_resource_delta_for_action(String(arrival), finished)
 	_try_request_self_talk(finished, self_talk_chance_on_arrival)
 	autonomous_navigation_finished.emit(finished)
 
@@ -871,6 +1035,7 @@ func _refresh_refs() -> void:
 	_perception_component = get_node_or_null(perception_component_path) if perception_component_path != NodePath() else null
 	_planner = get_node_or_null(planner_path) if planner_path != NodePath() else null
 	_mind_state = get_node_or_null(mind_state_path) if mind_state_path != NodePath() else null
+	_state_component = get_node_or_null(state_component_path) if state_component_path != NodePath() else null
 	_animation_behavior = get_node_or_null(animation_behavior_path) if animation_behavior_path != NodePath() else null
 	_navigation_motor = get_node_or_null(navigation_motor_path) if navigation_motor_path != NodePath() else null
 	_action_executor = get_node_or_null(action_executor_path) if action_executor_path != NodePath() else null
@@ -884,6 +1049,8 @@ func _refresh_refs() -> void:
 		_planner = _find_sibling_with_method(&"choose_decision")
 	if _mind_state == null:
 		_mind_state = _find_sibling_with_method(&"get_state_snapshot")
+	if _state_component == null:
+		_state_component = _find_sibling_with_method(&"get_snapshot")
 	if _animation_behavior == null:
 		_animation_behavior = _find_sibling_with_method(&"request_action")
 	if _navigation_motor == null:
@@ -941,11 +1108,20 @@ func _has_any_tag(entry: Dictionary, tag_list: PackedStringArray) -> bool:
 func _get_world_object_id(node: Node) -> String:
 	if node == null:
 		return ""
-	var value: Variant = node.get("object_id")
-	var clean := String(value).strip_edges()
-	if not clean.is_empty():
-		return clean
+	var value: Variant = _safe_get(node, "object_id", null)
+	if value != null:
+		var clean := str(value).strip_edges()
+		if not clean.is_empty():
+			return clean
 	return String(node.name)
+
+func _safe_get(node: Object, property_name: String, fallback: Variant = null) -> Variant:
+	if node == null:
+		return fallback
+	for info in node.get_property_list():
+		if String((info as Dictionary).get("name", "")) == property_name:
+			return node.get(property_name)
+	return fallback
 
 func _log(message: String) -> void:
 	if debug_log:

@@ -26,6 +26,17 @@ signal navigation_cancelled()
 @export_range(0.05, 2.0, 0.01) var arrival_distance: float = 0.35
 @export_range(0.1, 5.0, 0.05) var follow_distance: float = 1.4
 @export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 10.0
+@export_category("Seat Exit")
+@export_range(0.0, 3.0, 0.01) var stand_relocate_delay_sec: float = 0.92
+@export_range(0.0, 1.0, 0.01) var stand_relocate_duration_sec: float = 0.16
+@export_range(0.0, 2.0, 0.01) var stand_relocate_max_planar_distance: float = 1.25
+@export_category("Seat Pose")
+@export var seat_use_root_motion: bool = true
+@export_range(0.0, 1.0, 0.01) var seat_pre_align_duration_sec: float = 0.12
+@export_range(0.0, 1.0, 0.01) var seat_pre_align_max_planar_distance: float = 0.45
+@export var seat_snap_if_no_root_motion: bool = false
+@export var stand_use_root_motion: bool = true
+@export var stand_snap_if_no_root_motion: bool = false
 @export var debug_log: bool = false
 
 var _intent_interpreter: Node
@@ -40,6 +51,12 @@ var _navigation_target_position: Vector3 = Vector3.ZERO
 var _navigation_target_marker_path: NodePath
 var _pending_arrival_action: StringName = &""
 var _moving_action: StringName = &""
+var _pending_sit_marker_path: NodePath
+var _active_sit_marker_path: NodePath
+var _active_stand_marker_path: NodePath
+var _pending_seat_marker_after_approach_path: NodePath
+var _pending_seat_action_after_approach: StringName = &""
+var _stand_relocate_serial: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -65,6 +82,10 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 		"go_to_nav_point":
 			_resolve_nav_point_marker(intent, report)
 		"go_to_object", "sit_down":
+			if _resolve_direct_marker_from_intent(intent, report):
+				if report.get("ok", false):
+					report["chosen_action"] = _choose_body_action_for_target(report, intent)
+				return report
 			_resolve_object_marker(intent, report)
 			if report.get("ok", false):
 				report["chosen_action"] = _choose_body_action_for_target(report, intent)
@@ -77,6 +98,13 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 		"look_at_player":
 			report["ok"] = true
 			report["chosen_action"] = StringName(String(intent.get("action", "listen")).strip_edges())
+		"stand_up":
+			if not _resolve_stand_marker_from_active_seat(intent, report):
+				report["ok"] = true
+				report["chosen_action"] = &"stand_up"
+		"pick_up_item", "use_item", "eat_item":
+			if _resolve_pickable_item_marker(intent, report):
+				report["chosen_action"] = &"work_take_item"
 		_:
 			report["ok"] = true
 	return report
@@ -107,6 +135,7 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 		if bool(intent_report.get("ok", false)):
 			match String(intent.get("intent", "")):
 				"follow_player":
+					_clear_active_sit_marker()
 					report["navigation_started"] = _start_follow_player()
 					report["action_applied"] = report["navigation_started"]
 					report["action"] = String(walk_action)
@@ -120,6 +149,13 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 					return report
 				"look_at_player":
 					_face_player()
+				"stand_up":
+					var stand_path_text := String(intent_report.get("target_marker_path", "")).strip_edges()
+					_start_stand_up_from_active_seat(NodePath(stand_path_text) if not stand_path_text.is_empty() else NodePath())
+					report["action_applied"] = true
+					report["action"] = "stand_up"
+					ai_response_application_finished.emit(report.duplicate(true))
+					return report
 			var chosen := StringName(String(intent_report.get("chosen_action", "")))
 			var marker_path := String(intent_report.get("target_marker_path", "")).strip_edges()
 			if not marker_path.is_empty():
@@ -145,15 +181,25 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 	return report
 
 func is_navigating() -> bool:
-	if _navigation_motor != null and _navigation_motor.has_method("is_navigating"):
-		return bool(_navigation_motor.call("is_navigating")) or _navigation_active or _follow_active
-	return _navigation_active or _follow_active
+	var motor_active := _navigation_motor != null and _navigation_motor.has_method("is_navigating") and bool(_navigation_motor.call("is_navigating"))
+	return motor_active or _navigation_active or _follow_active
 
 func is_busy() -> bool:
 	return is_navigating()
 
 func stop_navigation_from_external() -> void:
 	_stop_navigation(true)
+
+func get_active_sit_marker() -> Marker3D:
+	if _active_sit_marker_path == NodePath():
+		return null
+	return _get_marker_from_path(String(_active_sit_marker_path))
+
+func get_active_sit_marker_path() -> String:
+	return String(_active_sit_marker_path)
+
+func clear_active_sit_marker() -> void:
+	_clear_active_sit_marker()
 
 func _physics_process(delta: float) -> void:
 	if _navigation_motor != null and _navigation_motor.has_method("is_navigating"):
@@ -217,9 +263,10 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 		report["errors"].append("target_marker_not_found")
 		return
 	report["ok"] = true
-	report["target_object_id"] = _get_world_object_id(target)
-	report["target_object_type"] = String(target.get("object_type")).strip_edges()
-	report["target_object_tags"] = _to_string_array(target.get("tags"))
+	var summary := _build_world_object_summary(target)
+	report["target_object_id"] = String(summary.get("id", _get_world_object_id(target)))
+	report["target_object_type"] = String(summary.get("type", _safe_get(target, "object_type", ""))).strip_edges()
+	report["target_object_tags"] = _to_string_array(summary.get("tags", _safe_get(target, "tags", [])))
 	report["target_marker_path"] = String(marker.get_path())
 
 func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
@@ -233,34 +280,106 @@ func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
 		return
 	report["ok"] = true
 	report["target_object_id"] = target_ref
-	report["target_object_type"] = String(marker.get("point_type")).strip_edges()
-	report["target_object_tags"] = _to_string_array(marker.get("tags"))
+	report["target_object_type"] = String(_safe_get(marker, "point_type", "")).strip_edges()
+	report["target_object_tags"] = _to_string_array(_safe_get(marker, "tags", []))
 	report["target_marker_path"] = String(marker.get_path())
 	var action := String(intent.get("action", "")).strip_edges()
 	if action.is_empty():
-		action = String(marker.get("arrival_action")).strip_edges()
+		action = String(_safe_get(marker, "arrival_action", "")).strip_edges()
 	report["chosen_action"] = action
+
+func _resolve_direct_marker_from_intent(intent: Dictionary, report: Dictionary) -> bool:
+	var raw_path := String(intent.get("target_marker_path", intent.get("target_ref", ""))).strip_edges()
+	if raw_path.is_empty():
+		return false
+	var marker := _get_marker_from_path(raw_path)
+	if marker == null:
+		return false
+	report["ok"] = true
+	report["target_object_id"] = raw_path
+	report["target_object_type"] = "seat" if String(intent.get("intent", "")) == "sit_down" else "marker"
+	report["target_object_tags"] = ["seat"] if String(intent.get("intent", "")) == "sit_down" else []
+	report["target_marker_path"] = String(marker.get_path())
+	return true
+
+func _resolve_stand_marker_from_active_seat(intent: Dictionary, report: Dictionary) -> bool:
+	var raw_path := String(intent.get("target_marker_path", intent.get("target_ref", ""))).strip_edges()
+	if raw_path.is_empty() and _active_stand_marker_path != NodePath():
+		raw_path = String(_active_stand_marker_path)
+	var marker := _get_marker_from_path(raw_path) if not raw_path.is_empty() else null
+	if marker == null:
+		report["ok"] = true
+		report["chosen_action"] = &"stand_up"
+		return false
+	report["ok"] = true
+	report["target_object_id"] = raw_path
+	report["target_object_type"] = "stand_marker"
+	report["target_object_tags"] = ["stand"]
+	report["target_marker_path"] = String(marker.get_path())
+	report["chosen_action"] = &"stand_up"
+	return true
+
+func _resolve_pickable_item_marker(intent: Dictionary, report: Dictionary) -> bool:
+	var target_ref := String(intent.get("target_ref", intent.get("target_object_id", ""))).strip_edges()
+	if target_ref.is_empty():
+		report["errors"].append("target_ref_empty")
+		return false
+	var target := _find_pickable_item(target_ref)
+	if target == null:
+		report["errors"].append("pickable_item_not_found")
+		return false
+	var marker: Marker3D = null
+	if target.has_method("get_nav_marker"):
+		marker = target.call("get_nav_marker") as Marker3D
+	elif target.has_method("get_marker_for_role"):
+		marker = target.call("get_marker_for_role", "approach") as Marker3D
+	if marker == null and target is Marker3D:
+		marker = target as Marker3D
+	if marker == null:
+		report["errors"].append("pickable_marker_not_found")
+		return false
+	report["ok"] = true
+	report["target_object_id"] = target_ref
+	report["target_object_type"] = "food"
+	report["target_object_tags"] = ["food", "pickable", "usable"]
+	report["target_marker_path"] = String(marker.get_path())
+	return true
 
 func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringName) -> bool:
 	_refresh_refs()
 	if marker_path == NodePath():
 		return false
-	var marker := get_node_or_null(marker_path) as Marker3D
-	if marker == null:
-		var tree := get_tree()
-		if tree != null and String(marker_path).begins_with("/"):
-			marker = tree.root.get_node_or_null(marker_path) as Marker3D
+	var marker := _get_marker_from_path(String(marker_path))
 	if marker == null:
 		_log("navigation marker missing: %s" % String(marker_path))
 		return false
-	_pending_arrival_action = arrival_action
-	_navigation_target_marker_path = marker_path
-	_navigation_target_position = marker.global_position
+	var actual_marker := marker
+	var actual_arrival_action := arrival_action
+	if _is_sit_action(arrival_action):
+		var approach_marker := _resolve_approach_marker_for_seat(marker)
+		if approach_marker != null and approach_marker != marker:
+			actual_marker = approach_marker
+			actual_arrival_action = &""
+			_pending_seat_marker_after_approach_path = marker.get_path()
+			_pending_seat_action_after_approach = arrival_action
+		else:
+			_pending_seat_marker_after_approach_path = NodePath()
+			_pending_seat_action_after_approach = &""
+		_pending_sit_marker_path = marker.get_path()
+		var stand_marker := _resolve_stand_marker_for_seat(marker)
+		_active_stand_marker_path = stand_marker.get_path() if stand_marker != null else NodePath()
+	else:
+		_pending_sit_marker_path = NodePath()
+		_pending_seat_marker_after_approach_path = NodePath()
+		_pending_seat_action_after_approach = &""
+	_pending_arrival_action = actual_arrival_action
+	_navigation_target_marker_path = actual_marker.get_path()
+	_navigation_target_position = actual_marker.global_position
 	_navigation_active = true
 	_follow_active = false
 	_moving_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("move_to_marker"):
-		if not bool(_navigation_motor.call("move_to_marker", marker, arrival_action, false)):
+		if not bool(_navigation_motor.call("move_to_marker", actual_marker, actual_arrival_action, false)):
 			_navigation_active = false
 			_navigation_target_marker_path = NodePath()
 			return false
@@ -268,9 +387,10 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 		_navigation_agent.target_desired_distance = arrival_distance
 		_navigation_agent.path_desired_distance = maxf(0.05, arrival_distance * 0.5)
 		_navigation_agent.target_position = _navigation_target_position
-	_request_body_action(walk_action)
-	_log("navigation started marker=%s arrival_action=%s" % [String(marker_path), String(arrival_action)])
-	navigation_started.emit(marker_path, arrival_action)
+	if _navigation_motor == null:
+		_request_body_action(walk_action)
+	_log("navigation started marker=%s arrival_action=%s" % [String(actual_marker.get_path()), String(actual_arrival_action)])
+	navigation_started.emit(actual_marker.get_path(), actual_arrival_action)
 	return true
 
 func _start_follow_player() -> bool:
@@ -305,11 +425,16 @@ func _update_follow_target() -> void:
 
 func _finish_navigation() -> void:
 	var finished_action := _pending_arrival_action
+	var finished_marker_path := _navigation_target_marker_path
 	_stop_navigation(false)
-	if _pending_arrival_action != &"":
-		_request_body_action(_pending_arrival_action)
+	if _pending_seat_marker_after_approach_path != NodePath():
+		_start_seat_after_approach()
+		return
+	if finished_action != &"":
+		_request_body_action(finished_action)
 	else:
 		_request_body_action(stop_action)
+	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_pending_arrival_action = &""
 	navigation_finished.emit(finished_action)
 
@@ -324,11 +449,18 @@ func _bind_navigation_motor_signals() -> void:
 		_navigation_motor.connect("navigation_cancelled", cancelled_cb)
 
 func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
+	var finished_marker_path := _navigation_target_marker_path
 	_navigation_active = false
 	_follow_active = false
 	_navigation_target_marker_path = NodePath()
 	_moving_action = &""
 	_pending_arrival_action = &""
+	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation"):
+		_navigation_motor.call("stop_navigation", false)
+	if _pending_seat_marker_after_approach_path != NodePath():
+		_start_seat_after_approach()
+		return
+	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	navigation_finished.emit(finished_action)
 
 func _on_motor_navigation_cancelled() -> void:
@@ -345,6 +477,10 @@ func _stop_navigation(play_stop: bool = true) -> void:
 	_follow_active = false
 	_navigation_target_marker_path = NodePath()
 	_moving_action = &""
+	if play_stop:
+		_pending_sit_marker_path = NodePath()
+		_pending_seat_marker_after_approach_path = NodePath()
+		_pending_seat_action_after_approach = &""
 	if _actor != null:
 		_actor.velocity.x = 0.0
 		_actor.velocity.z = 0.0
@@ -356,6 +492,8 @@ func _face_player() -> void:
 	var player := _find_player()
 	if player == null or _actor == null:
 		return
+	if _navigation_motor != null and _navigation_motor.has_method("request_turn_toward_position"):
+		_navigation_motor.call("request_turn_toward_position", player.global_position)
 	if _navigation_motor != null and _navigation_motor.has_method("face_position"):
 		_navigation_motor.call("face_position", player.global_position, 1.0)
 		return
@@ -397,6 +535,10 @@ func _normalize_ai_payload(ai_data: Dictionary) -> Dictionary:
 			var nested_role := String(command_payload.get("marker_role", command_payload.get("role", ""))).strip_edges()
 			if not nested_role.is_empty():
 				out["marker_role"] = nested_role
+		if String(out.get("target_marker_path", "")).strip_edges().is_empty():
+			var nested_marker_path := String(command_payload.get("target_marker_path", command_payload.get("marker_path", ""))).strip_edges()
+			if not nested_marker_path.is_empty():
+				out["target_marker_path"] = nested_marker_path
 	for nested_key in ["face", "facial", "mouth", "lip_sync", "lipsync"]:
 		var nested_face: Variant = out.get(nested_key, {})
 		if nested_face is Dictionary:
@@ -542,10 +684,237 @@ func _find_ai_nav_point(target_ref: String) -> Marker3D:
 			if value is Dictionary:
 				id = String((value as Dictionary).get("id", "")).strip_edges()
 		if id.is_empty():
-			id = String(node.get("point_id")).strip_edges()
+			id = String(_safe_get(node, "point_id", "")).strip_edges()
 		if id == target_ref or String(node.name) == target_ref:
 			return node as Marker3D
 	return null
+
+func _find_pickable_item(target_ref: String) -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	for group_name in [&"ai_pickable_item", world_object_group]:
+		for candidate in tree.get_nodes_in_group(group_name):
+			var node := candidate as Node
+			if node == null or not is_instance_valid(node):
+				continue
+			if _node_matches_pickable_ref(node, target_ref):
+				return node
+			var parent := node.get_parent()
+			if parent != null and _node_matches_pickable_ref(parent, target_ref):
+				return node
+	return null
+
+func _node_matches_pickable_ref(node: Node, target_ref: String) -> bool:
+	if String(node.name) == target_ref or (node.is_inside_tree() and String(node.get_path()) == target_ref):
+		return true
+	if node.has_method("build_ai_pickable_summary"):
+		var summary_value: Variant = node.call("build_ai_pickable_summary", _actor)
+		if summary_value is Dictionary:
+			var summary := summary_value as Dictionary
+			if String(summary.get("id", "")).strip_edges() == target_ref:
+				return true
+			if String(summary.get("path", "")).strip_edges() == target_ref:
+				return true
+	if node.has_method("build_ai_object_summary"):
+		var object_summary: Variant = node.call("build_ai_object_summary", _actor)
+		if object_summary is Dictionary:
+			if String((object_summary as Dictionary).get("id", "")).strip_edges() == target_ref:
+				return true
+	return false
+
+func _get_marker_from_path(path_text: String) -> Marker3D:
+	var clean := path_text.strip_edges()
+	if clean.is_empty():
+		return null
+	var marker := get_node_or_null(NodePath(clean)) as Marker3D
+	if marker != null:
+		return marker
+	var tree := get_tree()
+	if tree != null:
+		if clean.begins_with("/"):
+			marker = tree.root.get_node_or_null(NodePath(clean)) as Marker3D
+		elif tree.current_scene != null:
+			marker = tree.current_scene.get_node_or_null(NodePath(clean)) as Marker3D
+	return marker
+
+func _is_sit_action(action: StringName) -> bool:
+	var text := String(action).strip_edges().to_lower()
+	return text in ["sit", "sit_down", "sittingidle", "sitting_idle", "seated_idle", "seated_sleepy"]
+
+func _clear_active_sit_marker() -> void:
+	if _active_sit_marker_path != NodePath():
+		_set_marker_seat_occupied_state(_get_marker_from_path(String(_active_sit_marker_path)), false)
+	_active_sit_marker_path = NodePath()
+	_active_stand_marker_path = NodePath()
+	_pending_sit_marker_path = NodePath()
+	_pending_seat_marker_after_approach_path = NodePath()
+	_pending_seat_action_after_approach = &""
+
+func _update_seat_state_after_arrival(finished_action: StringName, fallback_marker_path: NodePath) -> void:
+	if _is_sit_action(finished_action):
+		_active_sit_marker_path = _pending_sit_marker_path if _pending_sit_marker_path != NodePath() else fallback_marker_path
+		_set_marker_seat_occupied_state(_get_marker_from_path(String(_active_sit_marker_path)), true)
+	elif String(finished_action).strip_edges().to_lower() in ["stand", "stand_up", "idle", "idle_normal"]:
+		_clear_active_sit_marker()
+
+func _start_stand_up_from_active_seat(stand_marker_path: NodePath = NodePath()) -> void:
+	_stop_navigation(false)
+	_stand_relocate_serial += 1
+	var serial := _stand_relocate_serial
+	var seat_path := _active_sit_marker_path
+	var resolved_stand_path := stand_marker_path
+	if resolved_stand_path == NodePath():
+		resolved_stand_path = _active_stand_marker_path
+	if resolved_stand_path == NodePath() and seat_path != NodePath():
+		var seat_marker := _get_marker_from_path(String(seat_path))
+		var stand_marker := _resolve_stand_marker_for_seat(seat_marker)
+		if stand_marker != null:
+			resolved_stand_path = stand_marker.get_path()
+			_active_stand_marker_path = resolved_stand_path
+	_request_body_action(&"stand_up")
+	call_deferred("_relocate_to_stand_marker_after_delay", resolved_stand_path, seat_path, serial)
+
+func _relocate_to_stand_marker_after_delay(stand_marker_path: NodePath, seat_marker_path: NodePath, serial: int) -> void:
+	var tree := get_tree()
+	if tree != null and stand_relocate_delay_sec > 0.0:
+		await tree.create_timer(stand_relocate_delay_sec).timeout
+	if serial != _stand_relocate_serial:
+		return
+	_refresh_refs()
+	var stand_marker := _get_marker_from_path(String(stand_marker_path))
+	if stand_marker != null and not stand_use_root_motion:
+		_face_marker_forward(stand_marker)
+		var relocated := false
+		if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
+			relocated = bool(_navigation_motor.call("align_to_marker", stand_marker, true, stand_relocate_duration_sec))
+		if not relocated:
+			if _actor != null:
+				var planar := stand_marker.global_position - _actor.global_position
+				planar.y = 0.0
+				if stand_relocate_max_planar_distance <= 0.0 or planar.length() <= stand_relocate_max_planar_distance:
+					if _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
+						relocated = bool(_navigation_motor.call("snap_to_marker", stand_marker, true))
+					if not relocated:
+						_snap_actor_to_marker(stand_marker, true)
+						relocated = true
+				elif _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
+					relocated = bool(_navigation_motor.call("snap_to_marker", stand_marker, true))
+		if not relocated:
+			_log("stand relocate skipped: too far from stand marker %s" % String(stand_marker_path))
+	_set_marker_seat_occupied_state(_get_marker_from_path(String(seat_marker_path)), false)
+	_active_sit_marker_path = NodePath()
+	_active_stand_marker_path = NodePath()
+	_pending_sit_marker_path = NodePath()
+	if _animation_behavior != null and _animation_behavior.has_method("get_current_mode"):
+		if StringName(_animation_behavior.call("get_current_mode")) == &"Posture":
+			_request_body_action(default_idle_action)
+
+func _start_seat_after_approach() -> void:
+	var seat_path := _pending_seat_marker_after_approach_path
+	var sit_action := _pending_seat_action_after_approach
+	_pending_seat_marker_after_approach_path = NodePath()
+	_pending_seat_action_after_approach = &""
+	var seat_marker := _get_marker_from_path(String(seat_path))
+	if seat_marker == null:
+		_request_body_action(sit_action)
+		_update_seat_state_after_arrival(sit_action, seat_path)
+		navigation_finished.emit(sit_action)
+		return
+	_face_marker_forward(seat_marker)
+	if not seat_use_root_motion:
+		if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
+			_navigation_motor.call("align_to_marker", seat_marker, true)
+		elif seat_snap_if_no_root_motion and _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
+			_navigation_motor.call("snap_to_marker", seat_marker, true)
+		elif seat_snap_if_no_root_motion:
+			_snap_actor_to_marker(seat_marker, true)
+	else:
+		_pre_align_for_root_motion_seat(seat_marker)
+	_request_body_action(sit_action)
+	_update_seat_state_after_arrival(sit_action, seat_path)
+	navigation_finished.emit(sit_action)
+
+func _pre_align_for_root_motion_seat(seat_marker: Marker3D) -> void:
+	if seat_marker == null or _actor == null:
+		return
+	var delta := seat_marker.global_position - _actor.global_position
+	delta.y = 0.0
+	if delta.length() > seat_pre_align_max_planar_distance:
+		return
+	if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
+		_navigation_motor.call("align_to_marker", seat_marker, true, seat_pre_align_duration_sec)
+	else:
+		_snap_actor_to_marker(seat_marker, true)
+
+func _resolve_approach_marker_for_seat(seat_marker: Marker3D) -> Marker3D:
+	if seat_marker == null:
+		return null
+	var from_meta: Variant = seat_marker.get_meta("approach_marker_path", NodePath())
+	var marker := _marker_from_meta_or_sibling(from_meta, seat_marker, "Approach_Mark3D")
+	return marker
+
+func _resolve_stand_marker_for_seat(seat_marker: Marker3D) -> Marker3D:
+	if seat_marker == null:
+		return null
+	var from_meta: Variant = seat_marker.get_meta("stand_marker_path", NodePath())
+	return _marker_from_meta_or_sibling(from_meta, seat_marker, "Stand_Mark3D")
+
+func _marker_from_meta_or_sibling(value: Variant, base_marker: Marker3D, sibling_name: String) -> Marker3D:
+	var path_text := ""
+	if value is NodePath:
+		path_text = String(value)
+	else:
+		path_text = String(value).strip_edges()
+	if not path_text.is_empty():
+		var by_path := base_marker.get_node_or_null(NodePath(path_text)) as Marker3D
+		if by_path != null:
+			return by_path
+		by_path = _get_marker_from_path(path_text)
+		if by_path != null:
+			return by_path
+	var parent := base_marker.get_parent()
+	if parent != null:
+		var sibling := parent.get_node_or_null(sibling_name) as Marker3D
+		if sibling != null:
+			return sibling
+	return null
+
+func _face_marker_forward(marker: Marker3D) -> void:
+	if marker == null:
+		return
+	var forward := marker.global_basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.0001:
+		return
+	if _navigation_motor != null and _navigation_motor.has_method("face_direction"):
+		_navigation_motor.call("face_direction", forward.normalized(), 1.0)
+	else:
+		_face_direction(forward.normalized(), 1.0)
+
+func _snap_actor_to_marker(marker: Marker3D, preserve_height: bool) -> void:
+	if marker == null or _actor == null:
+		return
+	var scale := _actor.global_transform.basis.get_scale()
+	var forward := marker.global_basis.z
+	forward.y = 0.0
+	if forward.length_squared() <= 0.0001:
+		forward = Vector3.FORWARD
+	var basis := Basis(Vector3.UP, atan2(forward.x, forward.z)).orthonormalized().scaled(scale)
+	var origin := marker.global_position
+	if preserve_height:
+		origin.y = _actor.global_position.y
+	_actor.global_transform = Transform3D(basis, origin)
+	_actor.velocity = Vector3.ZERO
+
+func _set_marker_seat_occupied_state(marker: Marker3D, occupied: bool) -> void:
+	if marker == null or not is_instance_valid(marker):
+		return
+	marker.set_meta("xiaokong_seat_occupied", occupied)
+	marker.set_meta("character_seat_occupied", occupied)
+	var occupant_text := String(_actor.name) if _actor != null else ""
+	marker.set_meta("xiaokong_seat_occupant", occupant_text if occupied else "")
+	marker.set_meta("character_seat_occupant", occupant_text if occupied else "")
 
 func _refresh_refs() -> void:
 	_intent_interpreter = get_node_or_null(intent_interpreter_path) if intent_interpreter_path != NodePath() else null
@@ -599,11 +968,26 @@ func _find_player() -> Node3D:
 func _get_world_object_id(node: Node) -> String:
 	if node == null:
 		return ""
-	var value: Variant = node.get("object_id")
+	var value: Variant = _safe_get(node, "object_id", "")
 	var clean := String(value).strip_edges()
 	if not clean.is_empty():
 		return clean
 	return String(node.name)
+
+func _build_world_object_summary(node: Node) -> Dictionary:
+	if node != null and node.has_method("build_ai_object_summary"):
+		var value: Variant = node.call("build_ai_object_summary", _actor)
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	return {}
+
+func _safe_get(node: Object, property_name: String, fallback: Variant = null) -> Variant:
+	if node == null:
+		return fallback
+	for info in node.get_property_list():
+		if String((info as Dictionary).get("name", "")) == property_name:
+			return node.get(property_name)
+	return fallback
 
 
 func _to_string_array(values: Variant) -> Array:

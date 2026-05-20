@@ -92,9 +92,9 @@ panel_pitch_degrees = 0.0
 slot_columns = 6
 panel_title_text = "装备柜"
 show_alt_hint_label = true
-hint_text_override = "只读库存：仅放武器、工具和特殊装备；材料/能源放入杂物物资箱。"
+hint_text_override = "拖出物品：拖到背包面板可拿取；柜子仍只读，不能从背包放回。"
 auto_place_hint_below_second_row = true
-allow_item_dragging = false
+allow_item_dragging = true
 allow_release_outside_panel = false
 
 [node name="LootOperateArea3D" type="Area3D" parent="." unique_id=1363270931]

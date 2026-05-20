@@ -2,25 +2,61 @@
 
 [ext_resource type="Script" uid="uid://1b0r75vvk3gy" path="res://controllers/scripts/character_status_bars_2d.gd" id="1_script"]
 
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_player_status_panel"]
+bg_color = Color(0.018, 0.022, 0.026, 0.78)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.20, 0.25, 0.28, 0.82)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 3
+shadow_offset = Vector2(1, 2)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_player_status_bar_bg"]
+bg_color = Color(0.045, 0.052, 0.058, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.16, 0.19, 0.21, 0.86)
+corner_radius_top_left = 1
+corner_radius_top_right = 1
+corner_radius_bottom_right = 1
+corner_radius_bottom_left = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_player_status_bar_fill"]
+bg_color = Color(0.38, 0.72, 0.52, 0.95)
+corner_radius_top_left = 1
+corner_radius_top_right = 1
+corner_radius_bottom_right = 1
+corner_radius_bottom_left = 1
+
 [node name="CharacterStatusBars2D" type="CanvasLayer" unique_id=2025663734]
 layer = 1
 process_mode = 3
 script = ExtResource("1_script")
 
 [node name="Panel" type="PanelContainer" parent="." unique_id=408000422]
-custom_minimum_size = Vector2(280, 156)
+custom_minimum_size = Vector2(292, 118)
 anchors_preset = 3
 anchor_left = 0.0
 anchor_top = 1.0
 anchor_right = 0.0
 anchor_bottom = 1.0
-offset_left = 28.0
-offset_top = -186.0
-offset_right = 308.0
-offset_bottom = -30.0
+offset_left = 26.0
+offset_top = -144.0
+offset_right = 318.0
+offset_bottom = -26.0
 grow_horizontal = 1
 grow_vertical = 0
 mouse_filter = 1
+theme_override_styles/panel = SubResource("StyleBoxFlat_player_status_panel")
 
 [node name="GlowLine" type="ColorRect" parent="Panel"]
 layout_mode = 1
@@ -32,22 +68,23 @@ offset_right = -8.0
 offset_bottom = 7.0
 grow_horizontal = 2
 mouse_filter = 2
-color = Color(0.75, 0.95, 1, 0.45)
+color = Color(0.20, 0.30, 0.34, 0.50)
 
 [node name="ScanLine" type="ColorRect" parent="Panel"]
+visible = false
 layout_mode = 1
 offset_left = -38.0
 offset_top = 7.0
 offset_right = -10.0
 offset_bottom = 148.0
 mouse_filter = 2
-color = Color(0.82, 0.95, 1, 0.12)
+color = Color(0.28, 0.34, 0.36, 0.16)
 
 [node name="Margin" type="MarginContainer" parent="Panel" unique_id=1109918668]
 layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 9
-theme_override_constants/margin_right = 12
+theme_override_constants/margin_left = 13
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 13
 theme_override_constants/margin_bottom = 10
 
 [node name="VBox" type="VBoxContainer" parent="Panel/Margin" unique_id=468365140]
@@ -61,90 +98,96 @@ theme_override_constants/separation = 8
 [node name="NameLabel" type="Label" parent="Panel/Margin/VBox/Header" unique_id=105669794]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.95, 0.91, 0.72, 0.95)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.70, 0.76, 0.78, 0.96)
+theme_override_font_sizes/font_size = 19
 
 [node name="SummaryLabel" type="Label" parent="Panel/Margin/VBox/Header" unique_id=1463101458]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.76, 0.92, 0.82, 0.92)
-theme_override_font_sizes/font_size = 17
+theme_override_colors/font_color = Color(0.58, 0.66, 0.68, 0.90)
+theme_override_font_sizes/font_size = 13
 text = "状态稳定"
 horizontal_alignment = 2
 
 [node name="HealthRow" type="HBoxContainer" parent="Panel/Margin/VBox" unique_id=1565643674]
 layout_mode = 2
-theme_override_constants/separation = 7
+theme_override_constants/separation = 6
 
 [node name="Icon" type="Label" parent="Panel/Margin/VBox/HealthRow" unique_id=360282072]
-custom_minimum_size = Vector2(28, 0)
+custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.65, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.58, 0.64, 0.66, 0.92)
+theme_override_font_sizes/font_size = 13
 text = "HP"
 
 [node name="Bar" type="ProgressBar" parent="Panel/Margin/VBox/HealthRow" unique_id=1515486423]
-custom_minimum_size = Vector2(150, 16)
+custom_minimum_size = Vector2(160, 12)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_player_status_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_player_status_bar_fill")
 value = 100.0
 show_percentage = false
 
 [node name="ValueLabel" type="Label" parent="Panel/Margin/VBox/HealthRow" unique_id=1787676413]
 custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.96, 0.88, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.70, 0.76, 0.78, 0.96)
+theme_override_font_sizes/font_size = 13
 text = "100"
 horizontal_alignment = 2
 
 [node name="HungerRow" type="HBoxContainer" parent="Panel/Margin/VBox" unique_id=1816133790]
 layout_mode = 2
-theme_override_constants/separation = 7
+theme_override_constants/separation = 6
 
 [node name="Icon" type="Label" parent="Panel/Margin/VBox/HungerRow" unique_id=240382168]
-custom_minimum_size = Vector2(28, 0)
+custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.84, 0.38, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.58, 0.64, 0.66, 0.92)
+theme_override_font_sizes/font_size = 13
 text = "FO"
 
 [node name="Bar" type="ProgressBar" parent="Panel/Margin/VBox/HungerRow" unique_id=1437965927]
-custom_minimum_size = Vector2(150, 16)
+custom_minimum_size = Vector2(160, 12)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_player_status_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_player_status_bar_fill")
 value = 100.0
 show_percentage = false
 
 [node name="ValueLabel" type="Label" parent="Panel/Margin/VBox/HungerRow" unique_id=585228679]
 custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.96, 0.88, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.70, 0.76, 0.78, 0.96)
+theme_override_font_sizes/font_size = 13
 text = "100"
 horizontal_alignment = 2
 
 [node name="ThirstRow" type="HBoxContainer" parent="Panel/Margin/VBox" unique_id=986476988]
 layout_mode = 2
-theme_override_constants/separation = 7
+theme_override_constants/separation = 6
 
 [node name="Icon" type="Label" parent="Panel/Margin/VBox/ThirstRow" unique_id=10799267]
-custom_minimum_size = Vector2(28, 0)
+custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.76, 1, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.58, 0.64, 0.66, 0.92)
+theme_override_font_sizes/font_size = 13
 text = "WA"
 
 [node name="Bar" type="ProgressBar" parent="Panel/Margin/VBox/ThirstRow" unique_id=1640387778]
-custom_minimum_size = Vector2(150, 16)
+custom_minimum_size = Vector2(160, 12)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_player_status_bar_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_player_status_bar_fill")
 value = 100.0
 show_percentage = false
 
 [node name="ValueLabel" type="Label" parent="Panel/Margin/VBox/ThirstRow" unique_id=610207948]
 custom_minimum_size = Vector2(34, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.96, 0.88, 0.95)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.70, 0.76, 0.78, 0.96)
+theme_override_font_sizes/font_size = 13
 text = "100"
 horizontal_alignment = 2

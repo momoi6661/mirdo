@@ -19,6 +19,31 @@ signal navigation_failed(reason: String)
 @export_range(0.0, 30.0, 0.1) var deceleration: float = 18.0
 @export_range(0.0, 2.0, 0.01) var repath_interval_sec: float = 0.25
 @export var scale_navigation_by_actor_scale: bool = true
+@export var project_targets_to_navmesh: bool = true
+@export_range(0.0, 3.0, 0.01) var max_target_projection_distance: float = 2.0
+
+@export_category("Off NavMesh Recovery")
+@export var off_navmesh_recovery_enabled: bool = true
+@export_range(0.02, 2.0, 0.01) var off_navmesh_max_start_distance: float = 0.8
+@export_range(0.02, 0.8, 0.01) var off_navmesh_recovery_arrival_distance: float = 0.16
+@export_range(0.1, 4.0, 0.05) var off_navmesh_recovery_speed: float = 1.35
+@export_range(0.0, 1.0, 0.01) var off_navmesh_agent_resume_delay_sec: float = 0.08
+
+@export_category("Seat Arrival")
+@export var seat_arrival_align_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var seat_align_delay_sec: float = 0.18
+@export_range(0.0, 1.5, 0.01) var seat_attach_duration_sec: float = 0.26
+@export_range(0.0, 1.0, 0.01) var seat_attach_max_planar_distance: float = 0.75
+@export var seat_preserve_current_height: bool = true
+@export_range(-180.0, 180.0, 0.1) var seat_marker_yaw_offset_degrees: float = 0.0
+@export var keep_navigation_busy_until_seat_action: bool = true
+
+@export_category("Root Motion")
+@export var use_root_motion_for_pose_transitions: bool = true
+@export var root_motion_states: PackedStringArray = PackedStringArray(["SitDown", "StandUp"])
+@export_range(0.0, 2.0, 0.01) var root_motion_translation_scale: float = 1.0
+@export_range(0.0, 2.0, 0.01) var root_motion_rotation_scale: float = 1.0
+@export_range(0.0, 5.0, 0.05) var root_motion_max_speed: float = 2.2
 
 @export_category("Turning")
 @export var turn_enabled: bool = true
@@ -31,6 +56,9 @@ signal navigation_failed(reason: String)
 @export var use_turn_states_before_locomotion: bool = true
 @export_range(5.0, 180.0, 1.0) var turn_state_min_angle_degrees: float = 55.0
 @export_range(90.0, 180.0, 1.0) var turn_180_min_angle_degrees: float = 135.0
+@export_range(0.0, 1.2, 0.01) var turn_state_min_play_time_sec: float = 0.34
+@export_range(0.0, 1.5, 0.01) var turn_state_max_wait_sec: float = 0.72
+@export_range(1.0, 90.0, 1.0) var turn_state_release_angle_degrees: float = 22.0
 @export var turn_left_action: StringName = &"turn_left"
 @export var turn_right_action: StringName = &"turn_right"
 @export var turn_180_action: StringName = &"turn_180"
@@ -56,6 +84,7 @@ var _actor: CharacterBody3D
 var _navigation_agent: NavigationAgent3D
 var _animation_behavior: Node
 var _target_position: Vector3 = Vector3.ZERO
+var _raw_target_position: Vector3 = Vector3.ZERO
 var _target_path: NodePath = NodePath()
 var _arrival_action: StringName = &""
 var _navigating: bool = false
@@ -72,6 +101,15 @@ var _forced_run: bool = false
 var _locomotion_velocity_gate_active: bool = false
 var _pending_turn_action: StringName = &""
 var _navigation_start_grace_left: float = 0.0
+var _seat_attach_serial: int = 0
+var _seat_arrival_pending: bool = false
+var _turn_wait_left: float = 0.0
+var _turn_wait_elapsed: float = 0.0
+var _queued_move_action_after_turn: StringName = &""
+var _off_navmesh_recovering: bool = false
+var _off_navmesh_recovery_target: Vector3 = Vector3.ZERO
+var _off_navmesh_resume_left: float = 0.0
+var _off_navmesh_recovery_action: StringName = &""
 
 func _ready() -> void:
 	_actor = self
@@ -79,7 +117,7 @@ func _ready() -> void:
 	set_physics_process(true)
 
 func is_navigating() -> bool:
-	return _navigating or _follow_active
+	return _navigating or _follow_active or _seat_arrival_pending
 
 func get_navigation_debug_snapshot() -> Dictionary:
 	return {
@@ -90,10 +128,37 @@ func get_navigation_debug_snapshot() -> Dictionary:
 		"locomotion_velocity_ready": _is_locomotion_velocity_ready(),
 		"locomotion_velocity_gate_active": _locomotion_velocity_gate_active,
 		"pending_turn_action": String(_pending_turn_action),
+		"turn_wait_left": _turn_wait_left,
+		"queued_move_action_after_turn": String(_queued_move_action_after_turn),
 		"forced_run": _forced_run,
+		"off_navmesh_recovering": _off_navmesh_recovering,
+		"off_navmesh_recovery_target": _off_navmesh_recovery_target,
+		"off_navmesh_resume_left": _off_navmesh_resume_left,
+		"off_navmesh_recovery_action": String(_off_navmesh_recovery_action),
+		"seat_arrival_pending": _seat_arrival_pending,
 		"target_position": _target_position,
+		"raw_target_position": _raw_target_position,
 		"velocity": _actor.velocity if _actor != null else Vector3.ZERO,
 	}
+
+func align_to_marker(marker: Marker3D, preserve_current_height: bool = false, duration_sec: float = -1.0) -> bool:
+	if marker == null or _actor == null:
+		return false
+	var target := _compute_body_transform_for_marker(marker, preserve_current_height)
+	var delta := target.origin - _actor.global_position
+	delta.y = 0.0
+	if delta.length() > maxf(0.05, seat_attach_max_planar_distance):
+		return false
+	_smooth_attach_to_transform(target, seat_attach_duration_sec if duration_sec < 0.0 else duration_sec)
+	return true
+
+func snap_to_marker(marker: Marker3D, preserve_current_height: bool = false) -> bool:
+	if marker == null or _actor == null:
+		return false
+	var target := _compute_body_transform_for_marker(marker, preserve_current_height)
+	_actor.global_transform = target
+	_actor.velocity = Vector3.ZERO
+	return true
 
 func move_to_marker(marker: Marker3D, arrival_action: StringName = &"", run: bool = false) -> bool:
 	if marker == null:
@@ -109,7 +174,8 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	if _actor == null:
 		navigation_failed.emit("actor_missing")
 		return false
-	_target_position = target_position
+	_raw_target_position = target_position
+	_target_position = _project_target_to_navigation_map(target_position)
 	_target_path = target_path
 	_arrival_action = arrival_action
 	_follow_active = false
@@ -122,13 +188,27 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_navigation_opened_doors.clear()
 	_forced_run = run
 	_navigation_start_grace_left = 0.18
+	_turn_wait_left = 0.0
+	_turn_wait_elapsed = 0.0
+	_queued_move_action_after_turn = &""
+	_off_navmesh_recovering = false
+	_off_navmesh_resume_left = 0.0
+	_off_navmesh_recovery_action = &""
+	_seat_arrival_pending = false
+	var recovering_from_off_navmesh := false
 	if _navigation_agent != null:
 		_navigation_agent.target_desired_distance = _scaled_distance(arrival_distance)
 		_navigation_agent.path_desired_distance = maxf(0.05, _scaled_distance(arrival_distance * 0.5))
 		_navigation_agent.target_position = _target_position
-	_request_turn_state_toward(_target_position)
-	_set_moving_action(run_action if run else walk_action)
-	_log("move_to %s arrival=%s" % [str(_target_position), String(arrival_action)])
+		recovering_from_off_navmesh = _try_start_off_navmesh_recovery()
+	var first_move_action := run_action if run else walk_action
+	if recovering_from_off_navmesh:
+		pass
+	elif _request_turn_state_toward(_target_position):
+		_queued_move_action_after_turn = first_move_action
+	else:
+		_set_moving_action(first_move_action)
+	_log("move_to raw=%s projected=%s arrival=%s" % [str(_raw_target_position), str(_target_position), String(arrival_action)])
 	navigation_started.emit(target_path, arrival_action)
 	return true
 
@@ -163,8 +243,17 @@ func stop_navigation(play_stop: bool = true) -> void:
 	_moving_action = &""
 	_locomotion_velocity_gate_active = false
 	_forced_run = false
+	_seat_attach_serial += 1
+	_seat_arrival_pending = false
+	_turn_wait_left = 0.0
+	_turn_wait_elapsed = 0.0
+	_queued_move_action_after_turn = &""
+	_pending_turn_action = &""
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
+	_off_navmesh_recovering = false
+	_off_navmesh_resume_left = 0.0
+	_off_navmesh_recovery_action = &""
 	_navigation_opened_doors.clear()
 	if _actor != null:
 		_actor.velocity.x = 0.0
@@ -181,6 +270,14 @@ func face_position(target_position: Vector3, delta: float = 1.0) -> void:
 	var direction := target_position - _actor.global_position
 	direction.y = 0.0
 	face_direction(direction, delta)
+
+func request_turn_toward_position(target_position: Vector3) -> bool:
+	return _request_turn_state_toward(target_position)
+
+func request_turn_toward_direction(direction: Vector3) -> bool:
+	if _actor == null:
+		return false
+	return _request_turn_state_toward(_actor.global_position + direction)
 
 func face_direction(direction: Vector3, delta: float = 1.0) -> void:
 	if not turn_enabled or _actor == null or direction.length() < min_turn_direction_length:
@@ -201,13 +298,17 @@ func _physics_process(delta: float) -> void:
 	if _follow_active:
 		_update_follow_target()
 	if not _navigating:
+		if _should_apply_root_motion_transition(false):
+			_apply_root_motion_transition(delta)
 		return
 	_refresh_refs()
 	if _actor == null:
 		stop_navigation(false)
 		navigation_failed.emit("actor_missing")
 		return
-	var final_distance := _actor.global_position.distance_to(_target_position)
+	if _update_off_navmesh_recovery(delta):
+		return
+	var final_distance := _horizontal_distance(_actor.global_position, _target_position)
 	if final_distance <= _scaled_distance(arrival_distance):
 		_finish_navigation()
 		return
@@ -236,6 +337,12 @@ func _physics_process(delta: float) -> void:
 		return
 	if _navigation_start_grace_left > 0.0:
 		_navigation_start_grace_left = maxf(_navigation_start_grace_left - delta, 0.0)
+		_apply_horizontal_velocity(Vector3.ZERO, delta)
+		_apply_gravity(delta)
+		_actor.move_and_slide()
+		face_direction(direction, delta)
+		return
+	if _update_turn_wait(direction, delta):
 		_apply_horizontal_velocity(Vector3.ZERO, delta)
 		_apply_gravity(delta)
 		_actor.move_and_slide()
@@ -277,13 +384,20 @@ func _update_follow_target() -> void:
 	offset.y = 0.0
 	if offset.length() < 0.01:
 		offset = _follow_target.global_basis.z
-	_target_position = _follow_target.global_position + offset.normalized() * _follow_distance
-	_navigating = _actor.global_position.distance_to(_target_position) > _scaled_distance(arrival_distance)
+	_raw_target_position = _follow_target.global_position + offset.normalized() * _follow_distance
+	_target_position = _project_target_to_navigation_map(_raw_target_position)
+	_navigating = _horizontal_distance(_actor.global_position, _target_position) > _scaled_distance(arrival_distance)
 	if _navigation_agent != null:
 		_navigation_agent.target_position = _target_position
 
+func _horizontal_distance(a: Vector3, b: Vector3) -> float:
+	var offset := b - a
+	offset.y = 0.0
+	return offset.length()
+
 func _finish_navigation() -> void:
 	var finished_action := _arrival_action
+	var finished_target_path := _target_path
 	_navigating = false
 	_follow_active = false
 	_target_path = NodePath()
@@ -297,11 +411,52 @@ func _finish_navigation() -> void:
 		_actor.velocity.x = 0.0
 		_actor.velocity.z = 0.0
 	if finished_action != &"":
-		_request_body_action(finished_action)
+		if seat_arrival_align_enabled and _is_sit_action(finished_action):
+			_finish_seat_navigation(finished_action, finished_target_path)
+			if keep_navigation_busy_until_seat_action:
+				return
+		else:
+			_request_body_action(finished_action)
 	else:
 		_request_body_action(stop_action)
 	_arrival_action = &""
 	navigation_finished.emit(finished_action)
+
+func _finish_seat_navigation(finished_action: StringName, finished_target_path: NodePath) -> void:
+	var marker := _get_marker_from_path(finished_target_path)
+	if marker == null:
+		_request_body_action(finished_action)
+		_arrival_action = &""
+		navigation_finished.emit(finished_action)
+		return
+	_seat_attach_serial += 1
+	_seat_arrival_pending = keep_navigation_busy_until_seat_action
+	var serial := _seat_attach_serial
+	call_deferred("_run_seat_arrival_sequence", marker, finished_action, serial)
+
+func _run_seat_arrival_sequence(marker: Marker3D, finished_action: StringName, serial: int) -> void:
+	if marker == null or not is_instance_valid(marker) or _actor == null:
+		_complete_seat_arrival_pending(finished_action, serial, false)
+		return
+	var tree := get_tree()
+	if tree != null and seat_align_delay_sec > 0.0:
+		await tree.create_timer(seat_align_delay_sec).timeout
+		if serial != _seat_attach_serial:
+			return
+	if not is_instance_valid(marker) or _actor == null:
+		_complete_seat_arrival_pending(finished_action, serial, false)
+		return
+	_smooth_attach_to_transform(_compute_body_transform_for_marker(marker, seat_preserve_current_height), seat_attach_duration_sec, false)
+	_request_body_action(finished_action)
+	_complete_seat_arrival_pending(finished_action, serial, true)
+
+func _complete_seat_arrival_pending(finished_action: StringName, serial: int, emit_finished: bool) -> void:
+	if serial != _seat_attach_serial:
+		return
+	_seat_arrival_pending = false
+	_arrival_action = &""
+	if emit_finished:
+		navigation_finished.emit(finished_action)
 
 func _set_moving_action(action_name: StringName) -> void:
 	if action_name == &"":
@@ -332,7 +487,29 @@ func _request_turn_state_toward(target_position: Vector3) -> bool:
 		return false
 	var action := _turn_state_for_signed_angle(signed_angle)
 	_pending_turn_action = action
-	return _request_body_action(action)
+	var ok := _request_body_action(action)
+	if ok:
+		_turn_wait_left = maxf(turn_state_max_wait_sec, turn_state_min_play_time_sec)
+		_turn_wait_elapsed = 0.0
+	return ok
+
+func _update_turn_wait(direction: Vector3, delta: float) -> bool:
+	if _pending_turn_action == &"" or _queued_move_action_after_turn == &"":
+		return false
+	_turn_wait_left = maxf(0.0, _turn_wait_left - delta)
+	_turn_wait_elapsed += delta
+	var remaining_angle := absf(rad_to_deg(_signed_flat_angle_to_direction(direction.normalized())))
+	var can_release_by_angle := _turn_wait_elapsed >= turn_state_min_play_time_sec and remaining_angle <= turn_state_release_angle_degrees
+	var must_release := _turn_wait_left <= 0.0
+	if not can_release_by_angle and not must_release:
+		return true
+	var move_action := _queued_move_action_after_turn
+	_pending_turn_action = &""
+	_queued_move_action_after_turn = &""
+	_turn_wait_left = 0.0
+	_turn_wait_elapsed = 0.0
+	_set_moving_action(move_action)
+	return false
 
 func _signed_flat_angle_to_direction(direction: Vector3) -> float:
 	if _actor == null or direction.length() <= min_turn_direction_length:
@@ -357,6 +534,168 @@ func _get_locomotion_animation_state() -> StringName:
 	if _animation_behavior == null or not _animation_behavior.has_method("get_current_state"):
 		return &""
 	return StringName(_animation_behavior.call("get_current_state"))
+
+func _compute_body_transform_for_marker(marker: Marker3D, preserve_current_height: bool) -> Transform3D:
+	var next := _actor.global_transform
+	if marker == null:
+		return next
+	var body_scale := next.basis.get_scale()
+	var marker_forward := marker.global_basis.z
+	marker_forward.y = 0.0
+	if marker_forward.length_squared() <= 0.0001:
+		marker_forward = Vector3.FORWARD
+	marker_forward = marker_forward.normalized()
+	var yaw := atan2(marker_forward.x, marker_forward.z) + deg_to_rad(seat_marker_yaw_offset_degrees)
+	next.basis = Basis(Vector3.UP, yaw).orthonormalized().scaled(body_scale)
+	var origin := marker.global_position
+	if preserve_current_height:
+		origin.y = _actor.global_position.y
+	next.origin = origin
+	return next
+
+func _smooth_attach_to_transform(target_transform: Transform3D, duration_sec: float, begin_new_serial: bool = true) -> void:
+	if _actor == null:
+		return
+	if begin_new_serial:
+		_seat_attach_serial += 1
+	var serial := _seat_attach_serial
+	var safe_duration := maxf(duration_sec, 0.0)
+	var start_transform := _actor.global_transform
+	_actor.velocity = Vector3.ZERO
+	if safe_duration <= 0.01 or get_tree() == null:
+		_actor.global_transform = target_transform
+		_actor.velocity = Vector3.ZERO
+		return
+	var steps := maxi(2, int(round(safe_duration * 60.0)))
+	var start_basis := start_transform.basis.orthonormalized()
+	var target_basis := target_transform.basis.orthonormalized()
+	var body_scale := start_transform.basis.get_scale()
+	for step in range(steps):
+		await get_tree().physics_frame
+		if serial != _seat_attach_serial or _actor == null:
+			return
+		var t := float(step + 1) / float(steps)
+		t = t * t * (3.0 - 2.0 * t)
+		var origin := start_transform.origin.lerp(target_transform.origin, t)
+		var basis := start_basis.slerp(target_basis, t).scaled(body_scale)
+		_actor.global_transform = Transform3D(basis, origin)
+		_actor.velocity = Vector3.ZERO
+	if serial == _seat_attach_serial and _actor != null:
+		_actor.global_transform = target_transform
+		_actor.velocity = Vector3.ZERO
+
+func _is_sit_action(action_name: StringName) -> bool:
+	var text := String(action_name).strip_edges().to_lower()
+	return text in ["sit", "sit_down", "seated_idle", "seated_sleepy", "sittingidle", "sitting_idle"]
+
+func _try_start_off_navmesh_recovery() -> bool:
+	if not off_navmesh_recovery_enabled or _navigation_agent == null or _actor == null:
+		return false
+	if not _navigation_agent.is_inside_tree():
+		return false
+	var nav_map := _navigation_agent.get_navigation_map()
+	if not nav_map.is_valid():
+		return false
+	var closest := NavigationServer3D.map_get_closest_point(nav_map, _actor.global_position)
+	if not _is_valid_navmesh_point(closest):
+		return false
+	var offset := closest - _actor.global_position
+	offset.y = 0.0
+	if offset.length() <= _scaled_distance(off_navmesh_max_start_distance):
+		return false
+	_off_navmesh_recovering = true
+	_off_navmesh_recovery_target = closest
+	_off_navmesh_resume_left = 0.0
+	_navigation_start_grace_left = 0.0
+	_repath_left = 0.0
+	var first_move_action := run_action if _forced_run else walk_action
+	_off_navmesh_recovery_action = first_move_action
+	if _request_turn_state_toward(_off_navmesh_recovery_target):
+		_queued_move_action_after_turn = first_move_action
+	else:
+		_set_moving_action(first_move_action)
+	_log("off-navmesh recovery to %s distance=%.2f" % [str(_off_navmesh_recovery_target), offset.length()])
+	return true
+
+func _project_target_to_navigation_map(world_position: Vector3) -> Vector3:
+	if not project_targets_to_navmesh:
+		return world_position
+	if _navigation_agent == null or not _navigation_agent.is_inside_tree():
+		return world_position
+	var nav_map := _navigation_agent.get_navigation_map()
+	if not nav_map.is_valid():
+		return world_position
+	var projected := NavigationServer3D.map_get_closest_point(nav_map, world_position)
+	if not _is_valid_navmesh_point(projected):
+		return world_position
+	var delta := projected - world_position
+	delta.y = 0.0
+	if max_target_projection_distance > 0.0 and delta.length() > max_target_projection_distance:
+		return world_position
+	return projected
+
+func _update_off_navmesh_recovery(delta: float) -> bool:
+	if not _off_navmesh_recovering:
+		if _off_navmesh_resume_left > 0.0:
+			_off_navmesh_resume_left = maxf(0.0, _off_navmesh_resume_left - delta)
+			_apply_horizontal_velocity(Vector3.ZERO, delta)
+			_apply_gravity(delta)
+			_actor.move_and_slide()
+			if _off_navmesh_resume_left <= 0.0 and _navigation_agent != null:
+				_navigation_agent.target_position = _target_position
+				_repath_left = 0.0
+			return true
+		return false
+	var to_recovery := _off_navmesh_recovery_target - _actor.global_position
+	to_recovery.y = 0.0
+	if to_recovery.length() <= _scaled_distance(off_navmesh_recovery_arrival_distance):
+		_off_navmesh_recovering = false
+		_off_navmesh_resume_left = off_navmesh_agent_resume_delay_sec
+		_off_navmesh_recovery_action = &""
+		_actor.velocity.x = 0.0
+		_actor.velocity.z = 0.0
+		if _navigation_agent != null:
+			_navigation_agent.target_position = _target_position
+		return true
+	var direction := to_recovery.normalized()
+	if _update_turn_wait(direction, delta):
+		_apply_horizontal_velocity(Vector3.ZERO, delta)
+		_apply_gravity(delta)
+		_actor.move_and_slide()
+		face_direction(direction, delta)
+		return true
+	if _moving_action == &"":
+		_set_moving_action(_off_navmesh_recovery_action if _off_navmesh_recovery_action != &"" else (run_action if _forced_run else walk_action))
+	if not _is_locomotion_velocity_ready():
+		_apply_horizontal_velocity(Vector3.ZERO, delta)
+		_apply_gravity(delta)
+		_actor.move_and_slide()
+		face_direction(direction, delta)
+		return true
+	_apply_horizontal_velocity(direction * off_navmesh_recovery_speed, delta)
+	_apply_gravity(delta)
+	_actor.move_and_slide()
+	face_direction(direction, delta)
+	return true
+
+func _is_valid_navmesh_point(point: Vector3) -> bool:
+	return is_finite(point.x) and is_finite(point.y) and is_finite(point.z) and point != Vector3.INF
+
+func _get_marker_from_path(path: NodePath) -> Marker3D:
+	if path == NodePath():
+		return null
+	var text := String(path).strip_edges()
+	var marker := get_node_or_null(path) as Marker3D
+	if marker != null:
+		return marker
+	var tree := get_tree()
+	if tree == null:
+		return null
+	if text.begins_with("/"):
+		return tree.root.get_node_or_null(path) as Marker3D
+	if tree.current_scene != null:
+		return tree.current_scene.get_node_or_null(path) as Marker3D
+	return null
 
 func _scaled_distance(value: float) -> float:
 	if not scale_navigation_by_actor_scale or _actor == null:
@@ -508,6 +847,44 @@ func _request_body_action(action_name: StringName) -> bool:
 	if _animation_behavior.has_method("request_action"):
 		return bool(_animation_behavior.call("request_action", action_name))
 	return false
+
+func _should_apply_root_motion_transition(navigation_active: bool) -> bool:
+	_refresh_refs()
+	if not use_root_motion_for_pose_transitions:
+		return false
+	if navigation_active:
+		return false
+	if _animation_behavior == null or not _animation_behavior.has_method("consume_root_motion_delta"):
+		return false
+	var state := _get_locomotion_animation_state()
+	if state == &"" and _animation_behavior.has_method("get_current_state_name"):
+		state = StringName(_animation_behavior.call("get_current_state_name"))
+	if state == &"":
+		return false
+	return root_motion_states.has(String(state))
+
+func _apply_root_motion_transition(delta: float) -> void:
+	if _actor == null or _animation_behavior == null:
+		return
+	var delta_value: Variant = _animation_behavior.call("consume_root_motion_delta")
+	var root_delta: Dictionary = delta_value if delta_value is Dictionary else {}
+	var local_position: Vector3 = root_delta.get("position", Vector3.ZERO) as Vector3
+	local_position *= root_motion_translation_scale
+	local_position.y = 0.0
+	var world_motion := _actor.global_transform.basis * local_position
+	var motion_velocity := Vector3.ZERO
+	if delta > 0.0001:
+		motion_velocity = world_motion / delta
+	if root_motion_max_speed > 0.0 and motion_velocity.length() > root_motion_max_speed:
+		motion_velocity = motion_velocity.normalized() * root_motion_max_speed
+	_actor.velocity.x = motion_velocity.x
+	_actor.velocity.z = motion_velocity.z
+	_apply_gravity(delta)
+	_actor.move_and_slide()
+	var local_rotation: Quaternion = root_delta.get("rotation", Quaternion.IDENTITY) as Quaternion
+	var yaw_delta := local_rotation.get_euler().y * root_motion_rotation_scale
+	if absf(yaw_delta) > 0.0001:
+		_actor.rotate_y(yaw_delta)
 
 func _refresh_refs() -> void:
 	_actor = self

@@ -1,7 +1,7 @@
 [gd_scene format=4 uid="uid://c8j0kbeach01"]
 [ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
-[ext_resource type="PackedScene" path="res://scenes/interactables/xiaokong_seat_interactable.tscn" id="1_seat"]
+[ext_resource type="PackedScene" path="res://scenes/interactables/character_seat_interactable.tscn" id="1_seat"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_7kxt7"]
 load_path = "res://.godot/imported/table_bench.png-076992c657b1d44d8d22ad5d6fa100a7.s3tc.ctex"
@@ -74,7 +74,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, 0)
 shape = SubResource("BoxShape3D_beach")
 
 [node name="SeatInteractable" parent="bench_col" unique_id=1045320476 instance=ExtResource("1_seat")]
-prompt_text = "让小空坐下"
+prompt_text = "让 Mirdo 坐下"
+occupied_prompt_text = "让 Mirdo 起身"
 interaction_time = 0.3
 approach_marker_path = NodePath("../../Approach_Mark3D")
 target_marker_path = NodePath("../../Sit_Mark3D")
@@ -83,11 +84,12 @@ stand_toggle_distance = 1.2
 
 [node name="Sit_Mark3D" type="Marker3D" parent="." unique_id=284447878]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.22, 0.41, 0)
-metadata/xiaokong_action = "SittingIdle"
+metadata/character_action = "seated_idle"
+metadata/stand_marker_path = NodePath("../Stand_Mark3D")
 
 [node name="Approach_Mark3D" type="Marker3D" parent="." unique_id=961143284]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.33, 0.05, 0.02)
 
 [node name="Stand_Mark3D" type="Marker3D" parent="." unique_id=1943835057]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.3089893, 0.05, 0.065800786)
-metadata/xiaokong_action = "Idle"
+metadata/character_action = "idle_normal"

@@ -21,6 +21,9 @@ signal decision_scored(best_decision: Dictionary, candidates: Array)
 @export var avoid_tags: PackedStringArray = PackedStringArray(["danger", "blocked"])
 @export var debug_tags: PackedStringArray = PackedStringArray(["debug", "experiment", "test"])
 @export var ambient_actions: PackedStringArray = PackedStringArray(["idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce", "tiny_wave", "rub_eye", "sleepy_yawn"])
+@export var seated_ambient_actions: PackedStringArray = PackedStringArray(["seated_idle", "seated_sleepy"])
+@export var player_social_actions: PackedStringArray = PackedStringArray(["tiny_wave", "small_wave", "small_nod", "cute_explain", "tilt_head_cute"])
+@export var player_social_seated_actions: PackedStringArray = PackedStringArray(["seated_idle"])
 @export var nav_point_group: StringName = &"ai_nav_point"
 @export_range(1, 64, 1) var max_nav_point_candidates: int = 24
 @export var debug_log: bool = false
@@ -46,14 +49,25 @@ func choose_decision(context: Dictionary = {}) -> Dictionary:
 	_refresh_refs()
 	var mind := _get_mind_snapshot()
 	var snapshot := _get_perception_snapshot(context)
+	var resource_stats: Dictionary = context.get("resource_stats", snapshot.get("resource_stats", {})) as Dictionary if (context.get("resource_stats", snapshot.get("resource_stats", {})) is Dictionary) else {}
+	if not resource_stats.is_empty():
+		mind["energy"] = float(resource_stats.get("energy", 70.0))
+		mind["mood"] = float(resource_stats.get("mood", 55.0))
+	if bool(context.get("is_seated", false)):
+		snapshot["is_seated"] = true
 	if _mind_state != null and _mind_state.has_method("apply_perception_hint"):
 		_mind_state.call("apply_perception_hint", snapshot)
 		mind = _get_mind_snapshot()
+		if not resource_stats.is_empty():
+			mind["energy"] = float(resource_stats.get("energy", 70.0))
+			mind["mood"] = float(resource_stats.get("mood", 55.0))
 	var candidates: Array = []
+	var is_seated := bool(context.get("is_seated", false))
 	_add_social_candidates(candidates, mind, snapshot)
-	_add_object_candidates(candidates, mind, snapshot, context)
-	_add_nav_point_candidates(candidates, mind, context)
-	_add_ambient_candidates(candidates, mind)
+	if not is_seated:
+		_add_object_candidates(candidates, mind, snapshot, context)
+		_add_nav_point_candidates(candidates, mind, context)
+	_add_ambient_candidates(candidates, mind, is_seated)
 	_postprocess_candidate_scores(candidates, mind, context)
 	if candidates.is_empty():
 		return {}
@@ -81,8 +95,15 @@ func notify_decision_executed(decision: Dictionary) -> void:
 func _add_social_candidates(out: Array, mind: Dictionary, _snapshot: Dictionary) -> void:
 	var social := float(mind.get("social", 0.0))
 	var boredom := float(mind.get("boredom", 0.0))
-	out.append({"kind": "look_at_player", "action": "listen", "score": social * 0.62 + boredom * 0.08, "feedback": "look_at_player", "cooldown_sec": 14.0})
-	out.append({"kind": "ambient", "action": "tiny_wave", "score": social * 0.46 + boredom * 0.07, "feedback": "small_wave", "cooldown_sec": 18.0})
+	var intent: Variant = mind.get("high_level_intent", {})
+	var is_seated := bool(_snapshot.get("is_seated", false))
+	var fed_bonus := 0.0
+	if intent is Dictionary and String((intent as Dictionary).get("kind", "")) == "recently_fed":
+		fed_bonus = 0.95
+	out.append({"kind": "look_at_player", "action": _pick_social_action(is_seated), "score": social * 0.62 + boredom * 0.08 + fed_bonus * 0.45, "feedback": "look_at_player", "cooldown_sec": 14.0, "arrival_expression": "face_joy" if fed_bonus > 0.0 else "face_neutral"})
+	out.append({"kind": "ambient", "action": _pick_social_action(is_seated), "score": social * 0.46 + boredom * 0.07 + fed_bonus * 0.55, "feedback": "small_wave", "cooldown_sec": 18.0, "arrival_expression": "face_joy"})
+	if fed_bonus > 0.0:
+		out.append({"kind": "ambient", "action": "seated_idle" if is_seated else "small_happy_bounce", "score": fed_bonus * 0.70 + social * 0.22, "feedback": "fed", "cooldown_sec": 28.0, "arrival_expression": "face_joy", "dwell_time_sec": 1.8})
 
 func _add_object_candidates(out: Array, mind: Dictionary, snapshot: Dictionary, context: Dictionary) -> void:
 	var objects: Variant = snapshot.get("nearby_objects", [])
@@ -142,8 +163,11 @@ func _add_nav_point_candidates(out: Array, mind: Dictionary, context: Dictionary
 
 func _score_nav_point(entry: Dictionary, mind: Dictionary, context: Dictionary) -> float:
 	var score := float(entry.get("priority", 1.0)) * 0.35 + movement_bias
-	if _has_any_tag(entry, sit_tags) and float(mind.get("tiredness", 0.0)) < 0.55:
+	var energy := float(mind.get("energy", 70.0))
+	if _has_any_tag(entry, sit_tags) and float(mind.get("tiredness", 0.0)) < 0.55 and energy > 35.0:
 		score -= 1.0
+	if _has_any_tag(entry, sit_tags) and energy < 35.0:
+		score += (35.0 - energy) / 35.0 * 1.3
 	if _has_any_tag(entry, supply_tags):
 		score += float(mind.get("duty", 0.0)) * 0.45 + float(mind.get("curiosity", 0.0)) * 0.12
 	if _has_any_tag(entry, medical_tags):
@@ -159,6 +183,8 @@ func _score_nav_point(entry: Dictionary, mind: Dictionary, context: Dictionary) 
 	else:
 		score += float(mind.get("boredom", 0.0)) * 0.35
 	var intent: Dictionary = mind.get("high_level_intent", {})
+	if String(intent.get("kind", "")) == "recently_fed" and _has_any_tag(entry, supply_tags):
+		score -= 0.45
 	var priority_tags: Variant = intent.get("priority_tags", []) if intent is Dictionary else []
 	if priority_tags is Array or priority_tags is PackedStringArray:
 		for tag in priority_tags:
@@ -219,13 +245,18 @@ func _find_observer() -> Node3D:
 		parent_node = parent_node.get_parent()
 	return null
 
-func _add_ambient_candidates(out: Array, mind: Dictionary) -> void:
+func _add_ambient_candidates(out: Array, mind: Dictionary, is_seated: bool = false) -> void:
 	var boredom := float(mind.get("boredom", 0.0))
 	var curiosity := float(mind.get("curiosity", 0.0))
 	var tiredness := float(mind.get("tiredness", 0.0))
 	var caution := float(mind.get("caution", 0.0))
-	for action in ambient_actions:
+	var energy := float(mind.get("energy", 70.0))
+	var low_energy_bonus := maxf(0.0, (40.0 - energy) / 40.0)
+	var source_actions := seated_ambient_actions if is_seated else ambient_actions
+	for action in source_actions:
 		var action_text := String(action).strip_edges()
+		if is_seated:
+			action_text = _sanitize_seated_action(action_text)
 		if action_text.is_empty():
 			continue
 		var score := boredom * 0.36 + curiosity * 0.14
@@ -236,13 +267,36 @@ func _add_ambient_candidates(out: Array, mind: Dictionary) -> void:
 			"curious_peek", "tilt_head_cute":
 				score += curiosity * 0.35
 			"rub_eye", "sleepy_yawn":
-				score += tiredness * 0.65
+				score += tiredness * 0.65 + low_energy_bonus * 0.45
 				feedback = action_text
 			"small_happy_bounce", "tiny_wave":
 				score += float(mind.get("social", 0.0)) * 0.22
+			"small_wave", "small_nod", "cute_explain":
+				score += float(mind.get("social", 0.0)) * 0.30
+			"seated_idle":
+				score += 0.28
+			"seated_sleepy":
+				score += tiredness * 0.55 + low_energy_bonus * 0.75
+			"listen":
+				score += float(mind.get("social", 0.0)) * 0.16
 		if _last_decision_kind == "ambient" and action_text == String(_last_target_ref):
 			score -= 0.55
 		out.append({"kind": "ambient", "action": action_text, "score": score, "feedback": feedback, "cooldown_sec": 10.0})
+
+func _pick_social_action(is_seated: bool) -> String:
+	var actions := player_social_seated_actions if is_seated else player_social_actions
+	if actions.is_empty():
+		return "seated_idle" if is_seated else "listen"
+	var picked := String(actions[_rng.randi_range(0, actions.size() - 1)]).strip_edges()
+	return _sanitize_seated_action(picked) if is_seated else picked
+
+func _sanitize_seated_action(action: String) -> String:
+	match action.strip_edges().to_lower():
+		"seated_sleepy":
+			return "seated_sleepy"
+		"seated_idle", "listen", "small_nod", "tiny_wave", "small_wave", "cute_explain", "tilt_head_cute", "idle_normal", "idle_relaxed":
+			return "seated_idle"
+	return "seated_idle"
 
 func _score_inspect(entry: Dictionary, mind: Dictionary, distance: float, context: Dictionary) -> float:
 	var score := float(mind.get("curiosity", 0.0)) * 0.55 + float(mind.get("duty", 0.0)) * 0.55 + movement_bias
@@ -251,6 +305,8 @@ func _score_inspect(entry: Dictionary, mind: Dictionary, distance: float, contex
 	if _has_any_tag(entry, medical_tags):
 		score += float(mind.get("caution", 0.0)) * 0.20 + float(mind.get("duty", 0.0)) * 0.20
 	var intent: Dictionary = mind.get("high_level_intent", {})
+	if String(intent.get("kind", "")) == "recently_fed" and _has_any_tag(entry, supply_tags):
+		score -= 0.55
 	var priority_tags: Variant = intent.get("priority_tags", []) if intent is Dictionary else []
 	if priority_tags is Array or priority_tags is PackedStringArray:
 		for tag in priority_tags:
@@ -262,7 +318,9 @@ func _score_inspect(entry: Dictionary, mind: Dictionary, distance: float, contex
 	return score
 
 func _score_sit(_entry: Dictionary, mind: Dictionary, distance: float) -> float:
-	var score := float(mind.get("tiredness", 0.0)) * 0.72 + float(mind.get("boredom", 0.0)) * 0.12
+	var energy := float(mind.get("energy", 70.0))
+	var low_energy_bonus := maxf(0.0, (45.0 - energy) / 45.0)
+	var score := float(mind.get("tiredness", 0.0)) * 0.72 + float(mind.get("boredom", 0.0)) * 0.12 + low_energy_bonus * 1.1
 	score -= distance * object_distance_penalty
 	if _last_decision_kind == "sit":
 		score -= repeat_target_penalty
@@ -290,20 +348,20 @@ func _expression_for_entry(entry: Dictionary, arrival_action: String = "") -> St
 	var action := arrival_action.strip_edges().to_lower()
 	var object_type := String(entry.get("type", "")).strip_edges().to_lower()
 	if action == "work_count_supplies" or object_type == "food" or _has_any_tag(entry, supply_tags):
-		return "fun"
+		return "face_fun"
 	if action == "work_check_shelf" or object_type == "medical" or _has_any_tag(entry, medical_tags):
-		return "neutral"
+		return "face_neutral"
 	if action == "work_check_lower" or _has_any_tag(entry, lower_check_tags):
-		return "fun"
+		return "face_fun"
 	if action == "work_inspect_cabinet" or _has_any_tag(entry, PackedStringArray(["equipment", "cabinet", "storage"])):
-		return "neutral"
+		return "face_neutral"
 	if _has_any_tag(entry, PackedStringArray(["door", "lookout", "caution"])):
-		return "surprised"
+		return "face_surprised"
 	if _has_any_tag(entry, PackedStringArray(["teacher", "social"])):
-		return "joy"
+		return "face_joy"
 	if _has_any_tag(entry, sit_tags) or action in ["rub_eye", "sleepy_yawn", "seated_sleepy"]:
-		return "sorrow"
-	return "neutral"
+		return "face_sorrow"
+	return "face_neutral"
 
 func _arrival_action_for_entry(entry: Dictionary) -> String:
 	var object_type := String(entry.get("type", "")).to_lower()

@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" uid="uid://cbmhrtu2ovbw3" path="res://scripts/Inventory/InteracableItem.gd" id="1_interactable"]
 [ext_resource type="Resource" uid="uid://dp3xsip8d64ax" path="res://resources/items/can_soup.tres" id="2_item"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="3_save"]
 [ext_resource type="PackedScene" uid="uid://bysrhfgrummve" path="res://3DModel/cansoup/can-soup.glb" id="4_model"]
+[ext_resource type="Script" path="res://components/character_pickable_item_component.gd" id="5_pickable"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_can"]
 height = 0.20
@@ -22,6 +23,13 @@ outline_width = 0.1
 
 [node name="SaveComponent" type="Node" parent="."]
 script = ExtResource("3_save")
+
+[node name="CharacterPickableItem" type="Node3D" parent="."]
+script = ExtResource("5_pickable")
+visual_root_path = NodePath("../CanSoupModel")
+hold_position_offset = Vector3(0.025, -0.015, 0.0)
+hold_rotation_degrees = Vector3(88, 0, 8)
+hold_scale = Vector3(1, 1, 1)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.10, 0)

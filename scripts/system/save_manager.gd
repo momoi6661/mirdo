@@ -6,10 +6,11 @@ const SAVE_DIR := "user://saves/"
 const DEFAULT_SLOT := "slot_01"
 const SAVE_EXTENSION := ".tres"
 const PROFILE_PATH := "user://save_profile.tres"
-const MAIN_MENU_SCENE_PATH := "res://controllers/ui/MainMenu.tscn"
+const MAIN_MENU_SCENE_PATH := "res://levels/menu/MainMenu.tscn"
 const MIN_LOAD_TRANSITION_TIME := 0.35
 const TRANSITION_MESSAGE := "DATA_RESTORATION // IN_PROGRESS"
 const AUTOSAVE_INTERVAL_SEC := 60.0
+const EXTERNAL_LOAD_COVER_META := "external_load_cover_active"
 
 signal save_started(slot_name: String)
 signal save_finished(slot_name: String, success: bool, file_path: String)
@@ -85,6 +86,49 @@ func auto_save_current_game() -> bool:
 func load_current_game() -> bool:
 	var loaded: bool = await load_game()
 	return loaded
+
+
+func start_or_load_game(new_game_scene_path: String = "") -> bool:
+	var slot_name := _resolve_load_slot_name()
+	if has_save(slot_name):
+		print("[SaveManager] 进入游戏前加载存档: ", slot_name)
+		var loaded: bool = await load_game(slot_name)
+		if loaded:
+			return true
+		push_warning("[SaveManager] 存档加载失败，不会自动新开: %s reason=%s" % [slot_name, last_error])
+		return false
+	last_error = "没有可用存档，无法继续游戏: " + slot_name
+	print("[SaveManager] " + last_error)
+	return false
+
+
+func start_new_game(new_game_scene_path: String = "") -> bool:
+	_start_new_game_runtime()
+	var target_scene := new_game_scene_path.strip_edges()
+	if target_scene.is_empty():
+		target_scene = "res://levels/level_bunker_render.tscn"
+	if not ResourceLoader.exists(target_scene):
+		last_error = "新游戏场景不存在: " + target_scene
+		return false
+	var changed: bool = await _change_scene_after_threaded_load(target_scene, "进入新游戏场景失败")
+	if not changed:
+		return false
+	current_slot_name = _resolve_slot_name(current_slot_name)
+	last_loaded_slot_name = current_slot_name
+	_save_profile(current_slot_name)
+	return true
+
+
+func _start_new_game_runtime() -> void:
+	session_destroyed_objects.clear()
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null:
+		if global_node.has_method("reset_shelter_inventory_runtime"):
+			global_node.call("reset_shelter_inventory_runtime")
+		if global_node.has_method("reset_outing_map_progress_runtime"):
+			global_node.call("reset_outing_map_progress_runtime")
+		if global_node.has_method("reset_time_state_runtime"):
+			global_node.call("reset_time_state_runtime")
 
 
 func list_save_slots() -> Array[Dictionary]:
@@ -205,13 +249,16 @@ func load_game(slot_name: String = "") -> bool:
 	load_started.emit(resolved_slot)
 	get_tree().paused = false
 
-	var transition_ui := _ensure_transition_ui()
+	var use_external_cover := bool(get_meta(EXTERNAL_LOAD_COVER_META, false))
+	var transition_ui := null if use_external_cover else _ensure_transition_ui()
 	var start_time := Time.get_ticks_msec()
-	_begin_transition(transition_ui)
+	if not use_external_cover:
+		_begin_transition(transition_ui)
 
 	var save_game := _load_save_resource(file_path)
 	if save_game == null:
 		await _finish_load_transition(transition_ui, start_time)
+		await _release_external_load_cover_if_needed(use_external_cover)
 		is_loading = false
 		last_error = "存档资源无法读取或类型不正确: " + file_path
 		load_failed.emit(resolved_slot, last_error)
@@ -225,6 +272,7 @@ func load_game(slot_name: String = "") -> bool:
 	var scene_loaded := await _change_to_saved_scene(save_game.current_level_path)
 	if not scene_loaded:
 		await _finish_load_transition(transition_ui, start_time)
+		await _release_external_load_cover_if_needed(use_external_cover)
 		is_loading = false
 		load_failed.emit(resolved_slot, last_error)
 		load_finished.emit(resolved_slot, false)
@@ -235,6 +283,7 @@ func load_game(slot_name: String = "") -> bool:
 	_apply_global_runtime_to_loaded_scene()
 	await _wait_scene_ready()
 	await _finish_load_transition(transition_ui, start_time)
+	await _release_external_load_cover_if_needed(use_external_cover)
 
 	is_loading = false
 	last_loaded_slot_name = resolved_slot
@@ -242,6 +291,21 @@ func load_game(slot_name: String = "") -> bool:
 	load_finished.emit(resolved_slot, true)
 	print("[SaveManager] Game loaded: ", file_path)
 	return true
+
+
+func set_external_load_cover_active(active: bool) -> void:
+	set_meta(EXTERNAL_LOAD_COVER_META, active)
+
+
+func _release_external_load_cover_if_needed(use_external_cover: bool) -> void:
+	if not use_external_cover:
+		return
+	set_external_load_cover_active(false)
+	var transition_ui := get_node_or_null("/root/TransitionUI")
+	if transition_ui != null and transition_ui.has_method("release_cover"):
+		await transition_ui.call("release_cover")
+		if transition_ui.has_method("force_release_cover"):
+			transition_ui.call("force_release_cover")
 
 
 func delete_save(slot_name: String = "") -> bool:
@@ -294,6 +358,42 @@ func _load_save_resource(file_path: String) -> SaveGame:
 	return resource as SaveGame
 
 
+func _change_scene_after_threaded_load(target_scene: String, error_prefix: String) -> bool:
+	if not ResourceLoader.exists(target_scene):
+		last_error = "场景不存在: " + target_scene
+		push_error("[SaveManager] " + last_error)
+		return false
+	var request_result := ResourceLoader.load_threaded_request(target_scene, "PackedScene", true)
+	if request_result != OK and request_result != ERR_BUSY:
+		last_error = "%s: %s (request %d)" % [error_prefix, target_scene, request_result]
+		push_error("[SaveManager] " + last_error)
+		return false
+	while true:
+		var progress: Array = []
+		var status := ResourceLoader.load_threaded_get_status(target_scene, progress)
+		match status:
+			ResourceLoader.THREAD_LOAD_LOADED:
+				var packed := ResourceLoader.load_threaded_get(target_scene) as PackedScene
+				if packed == null:
+					last_error = "%s: %s (not PackedScene)" % [error_prefix, target_scene]
+					push_error("[SaveManager] " + last_error)
+					return false
+				var result := get_tree().change_scene_to_packed(packed)
+				if result != OK:
+					last_error = "%s: %s (%d)" % [error_prefix, target_scene, result]
+					push_error("[SaveManager] " + last_error)
+					return false
+				await _wait_scene_ready()
+				return true
+			ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				last_error = "%s: %s (thread status %d)" % [error_prefix, target_scene, status]
+				push_error("[SaveManager] " + last_error)
+				return false
+			_:
+				await get_tree().process_frame
+	return false
+
+
 func _change_to_saved_scene(scene_path: String) -> bool:
 	var target_scene := scene_path.strip_edges()
 	if target_scene.is_empty():
@@ -312,10 +412,8 @@ func _change_to_saved_scene(scene_path: String) -> bool:
 		current_path = current_scene.scene_file_path.strip_edges()
 	if current_path == target_scene:
 		return true
-	var result := tree.change_scene_to_file(target_scene)
-	if result != OK:
-		last_error = "切换存档场景失败: %s (%d)" % [target_scene, result]
-		push_error("[SaveManager] " + last_error)
+	var changed: bool = await _change_scene_after_threaded_load(target_scene, "切换存档场景失败")
+	if not changed:
 		return false
 	await _wait_scene_ready()
 	return true
