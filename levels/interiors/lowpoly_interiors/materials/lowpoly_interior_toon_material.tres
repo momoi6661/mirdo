@@ -1,0 +1,38 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://features/anime_toon/anime_toon.gdshader" id="1_toon"]
+[ext_resource type="Texture2D" path="res://3DModel/lowpoly_interior_kit/textures/T_colorpalette.png" id="2_palette"]
+[ext_resource type="Material" path="res://levels/interiors/lowpoly_interiors/materials/lowpoly_interior_outline_material.tres" id="3_outline"]
+
+[resource]
+render_priority = 0
+next_pass = ExtResource("3_outline")
+shader = ExtResource("1_toon")
+shader_parameter/albedo_texture = ExtResource("2_palette")
+shader_parameter/use_texture = true
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/shade_color = Color(0.5, 0.48, 0.55, 1)
+shader_parameter/shade_threshold = 0.47
+shader_parameter/shade_softness = 0.045
+shader_parameter/shadow_level = 0.52
+shader_parameter/max_light_level = 0.78
+shader_parameter/light_wrap = 0.12
+shader_parameter/light_contribution = 0.82
+shader_parameter/ambient_color = Color(0.72, 0.7, 0.78, 1)
+shader_parameter/ambient_lift = 0.055
+shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
+shader_parameter/rim_strength = 0.015
+shader_parameter/rim_threshold = 0.75
+shader_parameter/rim_softness = 0.08
+shader_parameter/rim_power = 3.0
+shader_parameter/bright_luma_start = 0.68
+shader_parameter/bright_light_damping = 0.35
+shader_parameter/bright_shadow_push = 0.12
+shader_parameter/bright_tint_strength = 0.18
+shader_parameter/bright_tint = Color(0.78, 0.68, 0.72, 1)
+shader_parameter/white_compress_start = 0.82
+shader_parameter/white_compress_strength = 0.08
+shader_parameter/white_tint = Color(0.85, 0.78, 0.82, 1)
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/saturation = 1.08
+shader_parameter/value_boost = 0.98

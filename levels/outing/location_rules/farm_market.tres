@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("食物", "种子", "工具")
 recommended_auxiliary_tools = PackedStringArray("地图册", "近战武器", "手电")
 detail_notes = PackedStringArray("东南外缘补给点", "收益偏食物和种子", "空旷但撤退路线长")
-ai_exploration_rule = "AI 应生成郊边市场、装卸棚、塑料箱和食物残留。强调路程远和搬运限制；不能生成新庇护所。"
+ai_exploration_rule = "丧尸末世探索：郊边农贸棚空旷但撤退距离长，塑料箱、冷藏摊、装卸棚和腐烂食物会吸引游荡尸群。AI 要强调搬运限制和远路返程压力。收益偏食物、种子、工具；可能因尸群穿过空地而只带走少量物资；不能生成新庇护所。"

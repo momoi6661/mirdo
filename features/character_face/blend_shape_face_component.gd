@@ -18,7 +18,7 @@ class_name BlendShapeFaceComponent
 @export_range(1.0, 20.0, 0.1) var blink_interval_min: float = 2.6
 @export_range(1.0, 30.0, 0.1) var blink_interval_max: float = 5.2
 @export_range(0.05, 2.0, 0.01) var blink_resume_delay: float = 0.35
-@export var disable_blink_on_joy: bool = true
+@export var disable_blink_on_joy: bool = false
 @export_enum("neutral", "joy", "fun", "angry", "sorrow", "surprised") var inspector_expression: String = "neutral"
 @export var inspector_apply_expression: bool = false:
 	set(value):
@@ -34,15 +34,29 @@ class_name BlendShapeFaceComponent
 
 const EXPRESSION_ALIASES := {
 	&"neutral": &"Neutral",
+	&"face_neutral": &"Neutral",
 	&"joy": &"Joy",
+	&"face_joy": &"Joy",
 	&"smile": &"Joy",
+	&"face_smile": &"Joy",
 	&"happy": &"Joy",
+	&"face_happy": &"Joy",
 	&"fun": &"Fun",
+	&"face_fun": &"Fun",
 	&"angry": &"Angry",
+	&"face_angry": &"Angry",
 	&"sorrow": &"Sorrow",
+	&"face_sorrow": &"Sorrow",
 	&"sad": &"Sorrow",
+	&"face_sad": &"Sorrow",
+	&"sleepy": &"Sorrow",
+	&"face_sleepy": &"Sorrow",
+	&"worried": &"Sorrow",
+	&"face_worried": &"Sorrow",
 	&"surprised": &"Surprised",
+	&"face_surprised": &"Surprised",
 	&"surprise": &"Surprised",
+	&"face_surprise": &"Surprised",
 }
 const VISEME_ALIASES := {
 	&"a": &"aa",

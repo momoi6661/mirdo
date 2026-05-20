@@ -1,0 +1,122 @@
+[gd_resource type="Resource" script_class="CharacterStatusRuleSetResource" format=3]
+
+[ext_resource type="Script" path="res://scripts/character_resources/resources/character_status_rule_set_resource.gd" id="1_rule_set"]
+[ext_resource type="Script" path="res://scripts/character_resources/resources/character_status_rule_resource.gd" id="2_rule"]
+[ext_resource type="Script" path="res://scripts/character_resources/resources/character_status_value_state_resource.gd" id="3_value_state"]
+
+[sub_resource type="Resource" id="hunger_very_hungry"]
+script = ExtResource("3_value_state")
+id = &"hunger_very_hungry"
+label_text = "很饿"
+display_text = "很饿"
+threshold_value = 25.0
+
+[sub_resource type="Resource" id="hunger_hungry"]
+script = ExtResource("3_value_state")
+id = &"hunger_hungry"
+label_text = "有点饿"
+display_text = "有点饿"
+threshold_value = 55.0
+
+[sub_resource type="Resource" id="hunger_normal"]
+script = ExtResource("3_value_state")
+id = &"hunger_normal"
+label_text = "饱食稳定"
+display_text = "饱食稳定"
+is_default = true
+
+[sub_resource type="Resource" id="thirst_very_thirsty"]
+script = ExtResource("3_value_state")
+id = &"thirst_very_thirsty"
+stat_key = "thirst"
+label_text = "口渴"
+display_text = "口渴"
+threshold_value = 30.0
+
+[sub_resource type="Resource" id="thirst_thirsty"]
+script = ExtResource("3_value_state")
+id = &"thirst_thirsty"
+stat_key = "thirst"
+label_text = "有点渴"
+display_text = "有点渴"
+threshold_value = 55.0
+
+[sub_resource type="Resource" id="thirst_normal"]
+script = ExtResource("3_value_state")
+id = &"thirst_normal"
+stat_key = "thirst"
+label_text = "水分稳定"
+display_text = "水分稳定"
+is_default = true
+
+[sub_resource type="Resource" id="mood_good"]
+script = ExtResource("3_value_state")
+id = &"mood_good"
+stat_key = "mood"
+label_text = "心情不错"
+display_text = "心情不错"
+compare = 1
+threshold_value = 70.0
+
+[sub_resource type="Resource" id="mood_low"]
+script = ExtResource("3_value_state")
+id = &"mood_low"
+stat_key = "mood"
+label_text = "有些低落"
+display_text = "有些低落"
+threshold_value = 35.0
+
+[sub_resource type="Resource" id="mood_neutral"]
+script = ExtResource("3_value_state")
+id = &"mood_neutral"
+stat_key = "mood"
+label_text = "平静"
+display_text = "平静"
+is_default = true
+
+[sub_resource type="Resource" id="favor_close"]
+script = ExtResource("3_value_state")
+id = &"favor_close"
+stat_key = "favor"
+label_text = "信任你"
+display_text = "信任你"
+compare = 1
+threshold_value = 55.0
+
+[sub_resource type="Resource" id="favor_distant"]
+script = ExtResource("3_value_state")
+id = &"favor_distant"
+stat_key = "favor"
+label_text = "还有点拘谨"
+display_text = "还有点拘谨"
+threshold_value = 20.0
+
+[sub_resource type="Resource" id="favor_neutral"]
+script = ExtResource("3_value_state")
+id = &"favor_neutral"
+stat_key = "favor"
+label_text = "关系普通"
+display_text = "关系普通"
+is_default = true
+
+[sub_resource type="Resource" id="status_poor"]
+script = ExtResource("2_rule")
+id = &"status_poor"
+display_text = "需要照顾"
+hunger_enabled = true
+hunger_value = 35.0
+thirst_enabled = true
+thirst_value = 35.0
+
+[sub_resource type="Resource" id="status_happy_close"]
+script = ExtResource("2_rule")
+id = &"status_happy_close"
+display_text = "愿意依赖老师"
+mood_enabled = true
+mood_value = 75.0
+favor_enabled = true
+favor_value = 65.0
+
+[resource]
+script = ExtResource("1_rule_set")
+entries = Array[Resource]([SubResource("hunger_very_hungry"), SubResource("hunger_hungry"), SubResource("hunger_normal"), SubResource("thirst_very_thirsty"), SubResource("thirst_thirsty"), SubResource("thirst_normal"), SubResource("mood_good"), SubResource("mood_low"), SubResource("mood_neutral"), SubResource("favor_close"), SubResource("favor_distant"), SubResource("favor_neutral"), SubResource("status_poor"), SubResource("status_happy_close")])

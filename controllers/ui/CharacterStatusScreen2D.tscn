@@ -1,0 +1,301 @@
+[gd_scene load_steps=2 format=3 uid="uid://character_status_screen_2d"]
+
+[ext_resource type="Script" path="res://controllers/scripts/character_status_screen_2d.gd" id="1_script"]
+
+[node name="CharacterStatusScreen2D" type="CanvasLayer"]
+layer = 80
+process_mode = 3
+script = ExtResource("1_script")
+
+[node name="Root" type="Control" parent="."]
+visible = true
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Dim" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.005, 0.006, 0.005, 0.68)
+
+[node name="GridBack" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.055, 0.06, 0.052, 0.28)
+
+[node name="MainPanel" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -430.0
+offset_top = -270.0
+offset_right = 430.0
+offset_bottom = 270.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(430, 270)
+mouse_filter = 0
+
+[node name="Margin" type="MarginContainer" parent="Root/MainPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 26
+
+[node name="Content" type="VBoxContainer" parent="Root/MainPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="VBoxContainer" parent="Root/MainPanel/Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="NameLabel" type="Label" parent="Root/MainPanel/Margin/Content/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.93, 0.76, 1)
+theme_override_font_sizes/font_size = 46
+text = "角色"
+uppercase = true
+
+[node name="SubtitleLabel" type="Label" parent="Root/MainPanel/Margin/Content/Header"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.72, 0.62, 0.92)
+theme_override_font_sizes/font_size = 20
+text = "STATUS // 生命 · 饥饿 · 口渴"
+
+[node name="Divider" type="ColorRect" parent="Root/MainPanel/Margin/Content"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.82, 0.72, 0.36, 0.55)
+
+[node name="Body" type="HBoxContainer" parent="Root/MainPanel/Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="StatusCard" type="PanelContainer" parent="Root/MainPanel/Margin/Content/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.85
+
+[node name="StatusMargin" type="MarginContainer" parent="Root/MainPanel/Margin/Content/Body/StatusCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 20
+
+[node name="StatusVBox" type="VBoxContainer" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="PseudoModelFrame" type="Panel" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox"]
+custom_minimum_size = Vector2(280, 190)
+layout_mode = 2
+
+[node name="ModelShadow" type="ColorRect" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox/PseudoModelFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -72.0
+offset_top = 58.0
+offset_right = 72.0
+offset_bottom = 82.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.22)
+
+[node name="HoloRing" type="ColorRect" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox/PseudoModelFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -92.0
+offset_top = 50.0
+offset_right = 92.0
+offset_bottom = 56.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = -0.035
+color = Color(0.54, 0.92, 1, 0.22)
+
+[node name="ModelGlow" type="ColorRect" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox/PseudoModelFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -80.0
+offset_top = -64.0
+offset_right = 80.0
+offset_bottom = 64.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = -0.09
+color = Color(0.72, 0.67, 0.42, 0.26)
+
+[node name="ModelSilhouette" type="Panel" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox/PseudoModelFrame"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -58.0
+offset_top = -82.0
+offset_right = 58.0
+offset_bottom = 84.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = -0.12
+
+[node name="ScanLine" type="ColorRect" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox/PseudoModelFrame"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = -12.0
+offset_bottom = 11.0
+grow_horizontal = 2
+color = Color(0.7, 0.95, 1, 0.3)
+
+[node name="SummaryLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.97, 0.9, 0.58, 1)
+theme_override_font_sizes/font_size = 32
+text = "状态稳定"
+
+[node name="DetailLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/StatusCard/StatusMargin/StatusVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.86, 0.76, 0.92)
+theme_override_font_sizes/font_size = 20
+text = "生命 100，饥饿 100，口渴 100。"
+autowrap_mode = 3
+
+[node name="Metrics" type="VBoxContainer" parent="Root/MainPanel/Margin/Content/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.15
+theme_override_constants/separation = 18
+
+[node name="HealthRow" type="VBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="TitleLine" type="HBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics/HealthRow"]
+layout_mode = 2
+
+[node name="MetricLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/HealthRow/TitleLine"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 25
+text = "生命"
+
+[node name="ValueLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/HealthRow/TitleLine"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 24
+text = "100%"
+
+[node name="Bar" type="ProgressBar" parent="Root/MainPanel/Margin/Content/Body/Metrics/HealthRow"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="HungerRow" type="VBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="TitleLine" type="HBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics/HungerRow"]
+layout_mode = 2
+
+[node name="MetricLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/HungerRow/TitleLine"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 25
+text = "饥饿"
+
+[node name="ValueLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/HungerRow/TitleLine"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 24
+text = "100%"
+
+[node name="Bar" type="ProgressBar" parent="Root/MainPanel/Margin/Content/Body/Metrics/HungerRow"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="ThirstRow" type="VBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="TitleLine" type="HBoxContainer" parent="Root/MainPanel/Margin/Content/Body/Metrics/ThirstRow"]
+layout_mode = 2
+
+[node name="MetricLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/ThirstRow/TitleLine"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 25
+text = "口渴"
+
+[node name="ValueLabel" type="Label" parent="Root/MainPanel/Margin/Content/Body/Metrics/ThirstRow/TitleLine"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.96, 0.88, 1)
+theme_override_font_sizes/font_size = 24
+text = "100%"
+
+[node name="Bar" type="ProgressBar" parent="Root/MainPanel/Margin/Content/Body/Metrics/ThirstRow"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="Footer" type="HBoxContainer" parent="Root/MainPanel/Margin/Content"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 12
+
+[node name="SaveButton" type="Button" parent="Root/MainPanel/Margin/Content/Footer"]
+layout_mode = 2
+text = "保存状态"
+
+[node name="CloseButton" type="Button" parent="Root/MainPanel/Margin/Content/Footer"]
+layout_mode = 2
+text = "关闭"
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+volume_db = -7.0
+
+

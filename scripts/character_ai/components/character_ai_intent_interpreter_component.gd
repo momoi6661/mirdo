@@ -5,6 +5,7 @@ const INTENT_FOLLOW_PLAYER := "follow_player"
 const INTENT_STOP_FOLLOW := "stop_follow"
 const INTENT_LOOK_AT_PLAYER := "look_at_player"
 const INTENT_GO_TO_MARKER := "go_to_marker"
+const INTENT_GO_TO_NAV_POINT := "go_to_nav_point"
 const INTENT_GO_TO_OBJECT := "go_to_object"
 const INTENT_SIT_DOWN := "sit_down"
 const INTENT_STAND_UP := "stand_up"
@@ -31,6 +32,10 @@ const COMMAND_ALIASES := {
 	"go_to_marker": INTENT_GO_TO_MARKER,
 	"goto_marker": INTENT_GO_TO_MARKER,
 	"go_marker": INTENT_GO_TO_MARKER,
+	"go_to_nav_point": INTENT_GO_TO_NAV_POINT,
+	"goto_nav_point": INTENT_GO_TO_NAV_POINT,
+	"go_nav_point": INTENT_GO_TO_NAV_POINT,
+	"nav_point": INTENT_GO_TO_NAV_POINT,
 	"go_to_object": INTENT_GO_TO_OBJECT,
 	"goto_object": INTENT_GO_TO_OBJECT,
 	"sit": INTENT_SIT_DOWN,
@@ -59,6 +64,7 @@ func interpret_payload(payload: Dictionary) -> Dictionary:
 		"ok": true,
 		"intent": intent,
 		"target_ref": _extract_target_ref(payload),
+		"target_nav_point": _extract_target_nav_point(payload),
 		"marker_role": String(payload.get("marker_role", payload.get("role", ""))).strip_edges(),
 		"action": String(payload.get("action", "")).strip_edges(),
 		"source": String(payload.get("source", "payload")).strip_edges(),
@@ -113,6 +119,8 @@ func _guess_intent(raw: String, canonical: String) -> String:
 		return INTENT_LOOK_AT_PLAYER
 	if canonical.contains("go_to_object") or canonical.contains("object"):
 		return INTENT_GO_TO_OBJECT
+	if canonical.contains("nav_point"):
+		return INTENT_GO_TO_NAV_POINT
 	if canonical.contains("go_to") or canonical.contains("marker"):
 		return INTENT_GO_TO_MARKER
 	if lower.find("停止") >= 0 and lower.find("跟") >= 0:
@@ -123,6 +131,21 @@ func _guess_intent(raw: String, canonical: String) -> String:
 		return INTENT_LOOK_AT_PLAYER
 	if lower.find("坐下") >= 0 or lower.find("坐着") >= 0:
 		return INTENT_SIT_DOWN
+	return ""
+
+func _extract_target_nav_point(payload: Dictionary) -> String:
+	for key in ["target_nav_point", "nav_point", "nav_point_id", "target_point", "point_id"]:
+		if payload.has(key):
+			return String(payload[key]).strip_edges()
+	var command_value: Variant = payload.get("command", null)
+	if command_value is Dictionary:
+		return _extract_target_nav_point(command_value as Dictionary)
+	for nested_key in ["action_hint", "navigation", "intent_payload", "command_payload", "payload", "parameters", "args"]:
+		var nested_value: Variant = payload.get(nested_key, null)
+		if nested_value is Dictionary:
+			var nested_target := _extract_target_nav_point(nested_value as Dictionary)
+			if not nested_target.is_empty():
+				return nested_target
 	return ""
 
 func _extract_target_ref(payload: Dictionary) -> String:

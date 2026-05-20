@@ -1,5 +1,4 @@
 [gd_scene format=3 uid="uid://bwp2le0tn64sr"]
-[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [ext_resource type="PackedScene" uid="uid://cdwy1tsmmj6bi" path="res://levels/props/medical_cabinet_model.tscn" id="1_model"]
 [ext_resource type="Script" uid="uid://p2i082rsw3xd" path="res://components/loot_container_dual_component.gd" id="2_loot_dual"]
@@ -7,12 +6,13 @@
 [ext_resource type="PackedScene" uid="uid://dh5hen0gidepf" path="res://controllers/interaction/HoloInventoryPanel3D.tscn" id="4_panel"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="5_save"]
 [ext_resource type="Script" uid="uid://b2qwc7ykv0bmx" path="res://components/stencil_focus_outline_component.gd" id="99_focus_outline"]
+[ext_resource type="Script" uid="uid://dq4drjvlf4qv0" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_interact"]
 size = Vector3(0.35185546, 0.47566652, 0.17634766)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_operate"]
-size = Vector3(2.619458, 2.4, 2.4262695)
+size = Vector3(2.5706277, 2.4, 2.444458)
 
 [sub_resource type="BoxMesh" id="Mesh_label_back"]
 size = Vector3(0.54, 0.16, 0.016)
@@ -22,7 +22,7 @@ transparency = 1
 albedo_color = Color(0.06, 0.11, 0.09, 0.86)
 roughness = 0.78
 
-[node name="MedicalCabinetContainer" type="Node3D" unique_id=1960761740 groups=["nav_source_bunker", "ai_world_object"]]
+[node name="MedicalCabinetContainer" type="Node3D" unique_id=1960761740 groups=["ai_world_object", "nav_source_bunker"]]
 script = ExtResource("ai_world_object")
 object_id = &"medical_cabinet"
 display_name = "医疗柜"
@@ -32,8 +32,11 @@ tags = PackedStringArray("storage", "medical", "supplies")
 supported_actions = PackedStringArray("go_to", "open", "inspect", "take_medical_item")
 nav_marker_path = NodePath("Approach_Mark3D")
 look_marker_path = NodePath("ContainerPanelMark3D")
-marker_roles = {"approach": NodePath("Approach_Mark3D"), "look": NodePath("ContainerPanelMark3D"), "open": NodePath("ContainerPanelMark3D")}
-
+marker_roles = {
+"approach": NodePath("Approach_Mark3D"),
+"look": NodePath("ContainerPanelMark3D"),
+"open": NodePath("ContainerPanelMark3D")
+}
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1656511133]
 script = ExtResource("5_save")
@@ -43,10 +46,7 @@ script = ExtResource("5_save")
 [node name="FocusOutline" type="Node3D" parent="." unique_id=1455750592]
 script = ExtResource("99_focus_outline")
 outline_root_path = NodePath("../MedicalCabinetModel")
-outline_color = Color(1, 0.78, 0.22, 0.95)
-outline_width = 3.0
-use_flat_outline_normals = false
-attach_copies_as_siblings = true
+
 [node name="InteractBody" type="StaticBody3D" parent="." unique_id=1029319306]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.17536101)
 script = ExtResource("2_loot_dual")
@@ -73,7 +73,7 @@ shape = SubResource("BoxShape3D_interact")
 [node name="ContainerPanelMark3D" type="Marker3D" parent="." unique_id=1137141726]
 transform = Transform3D(-1, 2.2626677e-08, -8.444391e-08, 0, 0.96592575, 0.258819, 8.742278e-08, 0.258819, -0.96592575, 0, 0.02, -0.62)
 
-[node name="Approach_Mark3D" type="Marker3D" parent="."]
+[node name="Approach_Mark3D" type="Marker3D" parent="." unique_id=1113190144]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -1.05)
 
 [node name="ContainerPanel3D" parent="." unique_id=1646109924 instance=ExtResource("4_panel")]
@@ -94,7 +94,7 @@ collision_mask = 4
 monitorable = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="LootOperateArea3D" unique_id=339880647]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.015466332, -0.35, -0.78813475)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1760869, -0.35, -0.797229)
 shape = SubResource("BoxShape3D_operate")
 
 [node name="LabelBack" type="MeshInstance3D" parent="." unique_id=1854243540]

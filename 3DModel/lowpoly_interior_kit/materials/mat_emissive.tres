@@ -1,0 +1,8 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://nrmfvmyy28ow"]
+
+[ext_resource type="Texture2D" uid="uid://bbhl5s13ea77w" path="res://3DModel/lowpoly_interior_kit/textures/T_colorpalette.png" id="1_glyrb"]
+
+[resource]
+albedo_texture = ExtResource("1_glyrb")
+emission_enabled = true
+emission_texture = ExtResource("1_glyrb")

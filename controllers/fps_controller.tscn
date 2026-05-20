@@ -27,6 +27,11 @@
 [ext_resource type="PackedScene" uid="uid://6fmvbd1hhedb" path="res://controllers/interaction/XiaokongDialogueInputPanel3D.tscn" id="26_xk_dialogue_panel"]
 [ext_resource type="PackedScene" uid="uid://bcttpkk0u6xyf" path="res://controllers/ui/TimeHud.tscn" id="27_time_hud"]
 
+[ext_resource type="Script" path="res://scripts/character_resources/character_resource_state_component.gd" id="28_resource_state"]
+[ext_resource type="Script" path="res://scripts/character_resources/character_resource_time_decay_component.gd" id="30_resource_decay"]
+
+[ext_resource type="PackedScene" path="res://controllers/ui/CharacterStatusBars2D.tscn" id="29_status_bars"]
+
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
 
@@ -264,6 +269,25 @@ script = ExtResource("16_inv_data")
 inventory_storage = ExtResource("24_inv_storage")
 enable_item_stacking = true
 
+[node name="StateComponent" type="Node" parent="Components"]
+script = ExtResource("28_resource_state")
+character_id = &"player"
+display_name = "老师"
+initial_hunger = 82.0
+initial_thirst = 78.0
+initial_mood = 70.0
+initial_favor = 0.0
+hunger_decay_per_hour = 1.35
+thirst_decay_per_hour = 1.75
+health_decay_when_hunger_critical = 0.45
+health_decay_when_thirst_critical = 0.65
+
+[node name="StateTimeDecay" type="Node" parent="Components"]
+script = ExtResource("30_resource_decay")
+state_component_path = NodePath("../StateComponent")
+real_seconds_per_game_hour = 900.0
+min_tick_game_hours = 0.05
+
 [node name="PlayerInteractionComponent" type="Node" parent="Components" unique_id=2034430049 node_paths=PackedStringArray("interaction_ray")]
 script = ExtResource("13_yvtcv")
 interaction_ray = NodePath("../../Marker3D/CameraOffset/Camera3D/PickUpRayCast")
@@ -333,13 +357,6 @@ spring_length = -1.0
 
 [node name="InventoryPanelMark3D" type="Marker3D" parent="." unique_id=1616811236]
 transform = Transform3D(1, 0, 0, 0, 0.9659254, 0.25881892, 0, -0.25881892, 0.9659254, 0, 0.98809254, -0.5110427)
-
-[node name="XiaokongDialoguePanelMark3D" type="Marker3D" parent="." unique_id=1616811299]
-transform = Transform3D(1, 0, 0, 0, 0.9291326, 0.36974674, 0, -0.36974674, 0.9291326, 0, 1.2342131, -0.66732955)
-
-[node name="XiaokongDialogueInputPanel3D" parent="." unique_id=1622201001 instance=ExtResource("26_xk_dialogue_panel")]
-transform = Transform3D(1, 0, 0, 0, 0.9291326, 0.36974674, 0, -0.36974674, 0.9291326, 0, 1.2342131, -0.66732955)
-anchor_mark_path = NodePath("../XiaokongDialoguePanelMark3D")
 
 [node name="HoloInventoryPanel3D" parent="." unique_id=1599883766 instance=ExtResource("15_3og01")]
 transform = Transform3D(1, 0, 0, 0, 0.8746197, 0.48480964, 0, -0.48480964, 0.8746197, 0, 0.98809254, -0.5110427)
@@ -438,6 +455,11 @@ anchor_right = 0.5
 offset_top = 20.0
 offset_bottom = 176.0
 grow_horizontal = 2
+
+[node name="PlayerStatusBars2D" parent="." instance=ExtResource("29_status_bars")]
+state_component_path = NodePath("../Components/StateComponent")
+constant_motion = true
+breathe_seconds = 2.4
 
 [node name="XiaokongControlPanel" type="PanelContainer" parent="Control" unique_id=118273645]
 visible = false
@@ -635,3 +657,5 @@ shape = SubResource("CylinderShape3D_kick")
 
 [connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
 [connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]
+
+

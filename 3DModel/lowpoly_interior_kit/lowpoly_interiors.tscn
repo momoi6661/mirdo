@@ -1,0 +1,118 @@
+[gd_scene format=3 uid="uid://dkitimfoujrqu"]
+
+[ext_resource type="PackedScene" uid="uid://q2co7rpjviyk" path="res://3DModel/lowpoly_interior_kit/lowpoly_interiors.glb" id="1_wunyf"]
+[ext_resource type="Material" uid="uid://ya53bdswog5r" path="res://3DModel/lowpoly_interior_kit/materials/mat_default.tres" id="3_qb3qj"]
+[ext_resource type="Material" uid="uid://nrmfvmyy28ow" path="res://3DModel/lowpoly_interior_kit/materials/mat_emissive.tres" id="4_qwxnf"]
+
+[node name="lowpoly_interiors" unique_id=967125844 instance=ExtResource("1_wunyf")]
+
+[node name="M_SchoolTable" parent="." index="0" unique_id=968495880]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_SchoolChair" parent="." index="1" unique_id=1941765261]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Ceiling_Lamp" parent="." index="2" unique_id=211971849]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Ceiling_Lightbulbs" parent="M_Ceiling_Lamp" index="0" unique_id=1027476482]
+surface_material_override/0 = ExtResource("4_qwxnf")
+
+[node name="M_SchoolTeacherTable" parent="." index="3" unique_id=1395324894]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BlackBoard" parent="." index="4" unique_id=1181346894]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Corc_Board" parent="." index="5" unique_id=412480733]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_1" parent="." index="6" unique_id=85126873]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_doors_empty_1" parent="." index="7" unique_id=1372459192]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_doors" parent="." index="8" unique_id=1299179311]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_floor_0" parent="." index="9" unique_id=235025679]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_ceiling" parent="." index="10" unique_id=1094203637]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Window_1" parent="." index="11" unique_id=2012170870]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Window_2" parent="." index="12" unique_id=651074487]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_2" parent="." index="13" unique_id=1071570001]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_doors_empty_2" parent="." index="14" unique_id=299178413]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_3" parent="." index="15" unique_id=909779168]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_wall_doors_empty_3" parent="." index="16" unique_id=904562132]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_floor_1" parent="." index="17" unique_id=1660369306]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_floor_3" parent="." index="18" unique_id=494109763]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Bed" parent="." index="19" unique_id=1810007691]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_shelf_small" parent="." index="20" unique_id=1468864867]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookClosed_1" parent="." index="21" unique_id=1870643930]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookOpen_1" parent="." index="22" unique_id=151971210]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookClosed_2" parent="." index="23" unique_id=645493156]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookOpen_2" parent="." index="24" unique_id=128228782]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookClosed_3" parent="." index="25" unique_id=902834551]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookOpen_3" parent="." index="26" unique_id=753236061]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_BookClosed_4" parent="." index="27" unique_id=325261248]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_LampSmall" parent="." index="28" unique_id=980263044]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_room_desk" parent="." index="29" unique_id=482745264]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Bookshelf" parent="." index="30" unique_id=1113798192]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_Wardrobe" parent="." index="31" unique_id=803594702]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_retroTV" parent="." index="32" unique_id=1767449444]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_HopsonBook_Closed" parent="." index="33" unique_id=957297272]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_HopsonBook_Open" parent="." index="34" unique_id=794140587]
+material_override = ExtResource("3_qb3qj")
+
+[node name="M_scienctific_poster_1" parent="." index="35" unique_id=1423754014]
+material_override = ExtResource("3_qb3qj")

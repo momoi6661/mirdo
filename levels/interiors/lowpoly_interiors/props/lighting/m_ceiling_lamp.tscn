@@ -1,0 +1,47 @@
+[gd_scene format=4]
+
+[ext_resource type="Material" path="res://3DModel/lowpoly_interior_kit/materials/mat_default.tres" id="1_n0i3a"]
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_gb6jb"]
+_surfaces = [{
+"aabb": AABB(-1.3531251, 2.3841858e-07, -0.2580589, 2.7062502, 0.08963728, 0.5161177),
+"format": 34359742465,
+"index_count": 48,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAAAAIAAwAFAAEAAwAGAAUABgAEAAcABAACAAcABgAHAAUACAACAAEACAAJAAIACQAHAAIACgAIAAEACgABAAUACQALAAcACwAKAAUACwAFAAcA"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 12,
+"vertex_data": PackedByteArray("NDOtP+CTtz1IIIQ+NDOtPwAAgDRMIIS+NDOtPwAAgDRIIIQ+NDOtP+CTtz1MIIS+NDOtv+CTtz1IIIQ+NDOtvwAAgDRMIIS+NDOtv+CTtz1MIIS+NDOtvwAAgDRIIIQ+p5mnPwAAgDQwdFu+p5mnPwAAgDQwdFs+p5mnvwAAgDQwdFu+p5mnvwAAgDQwdFs+")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_xwlgu"]
+resource_name = "lowpoly_interiors_Cube_002"
+_surfaces = [{
+"aabb": AABB(-1.3531251, 2.3841858e-07, -0.2580589, 2.7062502, 0.08963728, 0.5161177),
+"attribute_data": PackedByteArray("yVT0PgCLBj3JVPQ+QLi2PMlU9D4AiwY9yVT0PkC4tjw5q+s+QLi2PDmr6z4AiwY9OavrPkC4tjw5q+s+AIsGPTmr6z4AiwY9yVT0PgCLBj05q+s+AIsGPclU9D4AiwY9yVT0PkC4tjw5q+s+QLi2PMlU9D5AuLY8OavrPkC4tjwRz+s+AOICPTmr6z5AuLY8OavrPgCLBj0Rz+s+gAq+PO8w9D4A4gI9yVT0PkC4tjzJVPQ+AIsGPfEw9D6ACr48"),
+"format": 34359742487,
+"index_count": 48,
+"index_data": PackedByteArray("AAABAAIAAAADAAEABAAFAAYABAAHAAUACAAJAAoACAALAAkADAANAA4ADAAPAA0AEAARABIAEAATABEAFAAQABIAEwAVABEAFAASABYAEwAXABUAFwAUABYAFwAWABUA"),
+"material": ExtResource("1_n0i3a"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("NDOtP+CTtz1IIIQ+NDOtPwAAgDRMIIS+NDOtPwAAgDRIIIQ+NDOtP+CTtz1MIIS+NDOtv+CTtz1MIIS+NDOtvwAAgDRIIIQ+NDOtvwAAgDRMIIS+NDOtv+CTtz1IIIQ+NDOtv+CTtz1IIIQ+NDOtPwAAgDRIIIQ+NDOtvwAAgDRIIIQ+NDOtP+CTtz1IIIQ+NDOtP+CTtz1MIIS+NDOtvwAAgDRMIIS+NDOtPwAAgDRMIIS+NDOtv+CTtz1MIIS+p5mnvwAAgDQwdFs+NDOtvwAAgDRMIIS+NDOtvwAAgDRIIIQ+p5mnvwAAgDQwdFu+p5mnPwAAgDQwdFs+NDOtPwAAgDRMIIS+NDOtPwAAgDRIIIQ+p5mnPwAAgDQwdFu+////f////7////9/////v////3////+/////f////78AAP9/////vwAA/3////+/AAD/f////78AAP9/////v/9//3////8//3//f////z//f/9/////P/9//3////8//////////7//////////v/////////+//////////7//fwAA////P/9/AAD///8//38AAP///z//fwAA////P/9/AAD9//8//38AAP3//z//fwAA/f//P/9/AAD9//8/")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_gb6jb")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tpny6"]
+size = Vector3(2.7062502, 0.08963728, 0.5161177)
+
+[node name="Ceiling_Lamp" type="Node3D" unique_id=843992252]
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1257013077]
+mesh = SubResource("ArrayMesh_xwlgu")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=541201563]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=187194163]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04481888, -5.9604645e-08)
+shape = SubResource("BoxShape3D_tpny6")

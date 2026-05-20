@@ -1,0 +1,137 @@
+[gd_scene format=3]
+
+[ext_resource type="MeshLibrary" path="res://levels/interiors/lowpoly_interiors/gridmap/lowpoly_interiors_building_mesh_library.tres" id="1_p8n6q"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_bed.tscn" id="2_hyynn"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_shelf_small.tscn" id="3_qqsd1"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/lighting/m_lamp_small.tscn" id="4_sd3ut"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_bookshelf.tscn" id="5_60pb2"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_wardrobe.tscn" id="6_a0n75"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/books/m_book_closed_1.tscn" id="7_pds2h"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/school/m_school_table.tscn" id="8_6gssn"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/school/m_school_chair.tscn" id="9_srolj"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/school/m_black_board.tscn" id="10_qki7l"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_retro_tv.tscn" id="11_xk6hn"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/bedroom/m_room_desk.tscn" id="12_wgrfw"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/lighting/m_ceiling_lamp.tscn" id="13_7cd1g"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/decor/m_scienctific_poster_1.tscn" id="14_ugkkk"]
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/props/windows/m_window_1.tscn" id="15_gvbpy"]
+
+[node name="LowpolyInteriorGridmapTest" type="Node3D" unique_id=1607281668]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=833299897]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2133302345]
+transform = Transform3D(0.81915206, 0.46984634, -0.32898995, 0, 0.57357645, 0.81915206, 0.57357645, -0.6710101, 0.46984634, 0, 0, 0)
+light_energy = 1.25
+
+[node name="SoftInteriorFillLight" type="OmniLight3D" parent="." unique_id=1940164221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4, 8)
+light_energy = 2.2
+omni_range = 20.0
+
+[node name="GridMapLayers" type="Node3D" parent="." unique_id=1881115121]
+
+[node name="FloorGridMap" type="GridMap" parent="GridMapLayers" unique_id=1369700603]
+mesh_library = ExtResource("1_p8n6q")
+cell_size = Vector3(2, 3, 2)
+cell_center_x = false
+cell_center_y = false
+cell_center_z = false
+data = {
+"cells": PackedInt32Array(0, 0, 6, 0, 1, 6, 0, 2, 6, 0, 3, 6, 0, 4, 6, 0, 5, 6, 1, 0, 6, 1, 1, 6, 1, 2, 6, 1, 3, 6, 1, 4, 6, 1, 5, 6, 2, 0, 6, 2, 1, 6, 2, 2, 6, 2, 3, 6, 2, 4, 6, 2, 5, 6, 3, 0, 6, 3, 1, 6, 3, 2, 6, 3, 3, 6, 3, 4, 6, 3, 5, 6, 4, 0, 6, 4, 1, 6, 4, 2, 6, 4, 3, 6, 4, 4, 6, 4, 5, 6, 5, 0, 6, 5, 1, 6, 5, 2, 6, 5, 3, 6, 5, 4, 6, 5, 5, 6, 6, 0, 6, 6, 1, 6, 6, 2, 6, 6, 3, 6, 6, 4, 6, 6, 5, 6, 7, 0, 6, 7, 1, 6, 7, 2, 6, 7, 3, 6, 7, 4, 6, 7, 5, 6)
+}
+
+[node name="WallXGridMap" type="GridMap" parent="GridMapLayers" unique_id=768086981]
+mesh_library = ExtResource("1_p8n6q")
+cell_size = Vector3(2, 3, 2)
+cell_center_x = false
+cell_center_y = false
+cell_center_z = false
+data = {
+"cells": PackedInt32Array(0, 0, 0, 0, 6, 0, 1, 0, 0, 1, 6, 0, 2, 0, 0, 2, 6, 0, 3, 0, 0, 3, 6, 0, 4, 0, 0, 4, 6, 0, 5, 0, 0, 5, 6, 0, 6, 0, 0, 6, 6, 0, 7, 0, 0, 7, 6, 0, 0, 3, 0, 1, 3, 0, 2, 3, 0, 5, 3, 0, 6, 3, 0, 7, 3, 0)
+}
+
+[node name="WallZGridMap" type="GridMap" parent="GridMapLayers" unique_id=277511555]
+mesh_library = ExtResource("1_p8n6q")
+cell_size = Vector3(2, 3, 2)
+cell_center_x = false
+cell_center_y = false
+cell_center_z = false
+data = {
+"cells": PackedInt32Array(0, 0, 1441792, 8, 0, 1441792, 0, 1, 1441792, 8, 1, 1441792, 0, 2, 1441792, 8, 2, 1441792, 0, 3, 1441792, 8, 3, 1441792, 0, 4, 1441792, 8, 4, 1441792, 0, 5, 1441792, 8, 5, 1441792, 3, 0, 1441793, 5, 0, 1441793, 3, 1, 1441795, 5, 1, 1441795, 3, 2, 1441793, 5, 2, 1441793, 3, 3, 1441793, 5, 3, 1441793, 3, 4, 1441795, 5, 4, 1441795, 3, 5, 1441793, 5, 5, 1441793)
+}
+
+[node name="CeilingGridMap" type="GridMap" parent="GridMapLayers" unique_id=1595616793]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+mesh_library = ExtResource("1_p8n6q")
+cell_size = Vector3(2, 3, 2)
+cell_center_x = false
+cell_center_y = false
+cell_center_z = false
+data = {
+"cells": PackedInt32Array(0, 0, 9, 0, 1, 9, 0, 2, 9, 0, 3, 9, 0, 4, 9, 0, 5, 9, 1, 0, 9, 1, 1, 9, 1, 2, 9, 1, 3, 9, 1, 4, 9, 1, 5, 9, 2, 0, 9, 2, 1, 9, 2, 2, 9, 2, 3, 9, 2, 4, 9, 2, 5, 9, 3, 0, 9, 3, 1, 9, 3, 2, 9, 3, 3, 9, 3, 4, 9, 3, 5, 9, 4, 0, 9, 4, 1, 9, 4, 2, 9, 4, 3, 9, 4, 4, 9, 4, 5, 9, 5, 0, 9, 5, 1, 9, 5, 2, 9, 5, 3, 9, 5, 4, 9, 5, 5, 9, 6, 0, 9, 6, 1, 9, 6, 2, 9, 6, 3, 9, 6, 4, 9, 6, 5, 9, 7, 0, 9, 7, 1, 9, 7, 2, 9, 7, 3, 9, 7, 4, 9, 7, 5, 9)
+}
+
+[node name="Props" type="Node3D" parent="." unique_id=957753395]
+
+[node name="Bed_01" type="Node3D" parent="Props" unique_id=117181523 instance=ExtResource("2_hyynn")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2, 0, 2)
+
+[node name="shelf_small_01" type="Node3D" parent="Props" unique_id=627773133 instance=ExtResource("3_qqsd1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.2, 0, 4.4)
+
+[node name="LampSmall_01" type="Node3D" parent="Props" unique_id=952823478 instance=ExtResource("4_sd3ut")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, 4.4)
+
+[node name="Bookshelf_01" type="Node3D" parent="Props" unique_id=1448170519 instance=ExtResource("5_60pb2")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 12, 0, 1.1)
+
+[node name="Wardrobe_01" type="Node3D" parent="Props" unique_id=1169789029 instance=ExtResource("6_a0n75")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 14.2, 0, 4.4)
+
+[node name="BookClosed_1_01" type="Node3D" parent="Props" unique_id=236734156 instance=ExtResource("7_pds2h")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.2, 1, 3)
+
+[node name="SchoolTable_01" type="Node3D" parent="Props" unique_id=490972343 instance=ExtResource("8_6gssn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 8.4)
+
+[node name="SchoolChair_01" type="Node3D" parent="Props" unique_id=1369433284 instance=ExtResource("9_srolj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 7.2)
+
+[node name="BlackBoard_01" type="Node3D" parent="Props" unique_id=1066667919 instance=ExtResource("10_qki7l")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 1, 11.85)
+
+[node name="retroTV_01" type="Node3D" parent="Props" unique_id=1380225718 instance=ExtResource("11_xk6hn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 11)
+
+[node name="room_desk_01" type="Node3D" parent="Props" unique_id=1702791937 instance=ExtResource("12_wgrfw")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 14, 0, 8.5)
+
+[node name="Ceiling_Lamp_01" type="Node3D" parent="Props" unique_id=843992252 instance=ExtResource("13_7cd1g")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2.9, 6)
+
+[node name="scienctific_poster_1_01" type="Node3D" parent="Props" unique_id=758938709 instance=ExtResource("14_ugkkk")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 6.1, 1.4, 9)
+
+[node name="Window_1_01" type="Node3D" parent="Props" unique_id=86831752 instance=ExtResource("15_gvbpy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, -0.21)
+
+[node name="Window_1_02" type="Node3D" parent="Props" unique_id=2063487228 instance=ExtResource("15_gvbpy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -0.21)
+
+[node name="Window_1_03" type="Node3D" parent="Props" unique_id=452076451 instance=ExtResource("15_gvbpy")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 16.21, 0, 8)
+
+[node name="Markers" type="Node3D" parent="." unique_id=918422817]
+
+[node name="MirdoSpawn" type="Marker3D" parent="Markers" unique_id=248342603]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 0, 6)
+
+[node name="Entrance" type="Marker3D" parent="Markers" unique_id=1732075174]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0.5)
+
+[node name="BedroomDoor" type="Marker3D" parent="Markers" unique_id=1175826859]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 2)
+
+[node name="ResourceRoomDoor" type="Marker3D" parent="Markers" unique_id=1501340603]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 2)

@@ -17,6 +17,7 @@ var outing_return_scene_path: String = ""
 var _shelter_inventory_runtime: Resource
 var _outing_map_progress_runtime: Resource
 var _shelter_storage_runtime_by_source_id: Dictionary = {}
+var _time_state_runtime: Dictionary = {}
 var _outing_transition_busy: bool = false
 var _pending_scene_change_path: String = ""
 var _last_scene_change_error: int = OK
@@ -27,6 +28,7 @@ signal close_loot_ui()
 signal xiaokong_seat_state_changed(state: Dictionary)
 signal xiaokong_dialogue_requested(payload: Dictionary)
 signal xiaokong_status_requested(payload: Dictionary)
+signal character_inventory_use_requested(payload: Dictionary)
 signal loot_container_switch_requested(container: Node, player: Node)
 signal shelter_inventory_changed()
 
@@ -113,11 +115,13 @@ func notify_shelter_inventory_changed() -> void:
 
 
 func build_global_save_payload() -> Dictionary:
+	capture_time_state_from_current_scene()
 	return {
-		"version": 2,
+		"version": 3,
 		"outing_return_scene_path": outing_return_scene_path,
 		"shelter_inventory": _build_shelter_inventory_save_payload(),
 		"outing_map_progress": _build_outing_map_progress_save_payload(),
+		"time_state": _build_time_state_save_payload(),
 	}
 
 
@@ -129,6 +133,24 @@ func apply_global_save_payload(payload: Dictionary) -> void:
 		_apply_shelter_inventory_save_payload(payload["shelter_inventory"])
 	if payload.has("outing_map_progress") and payload["outing_map_progress"] is Dictionary:
 		_apply_outing_map_progress_save_payload(payload["outing_map_progress"])
+	if payload.has("time_state") and payload["time_state"] is Dictionary:
+		_apply_time_state_save_payload(payload["time_state"])
+
+
+func apply_runtime_state_to_current_scene() -> void:
+	_bind_shelter_inventory_sources_to_runtime()
+	apply_time_state_to_current_scene()
+
+
+func get_save_scene_path_override(current_scene_path: String = "") -> String:
+	var current := current_scene_path.strip_edges()
+	if current == OUTING_MAP_SCENE_PATH:
+		var target := outing_return_scene_path.strip_edges()
+		if not target.is_empty() and ResourceLoader.exists(target):
+			return target
+		if ResourceLoader.exists(OUTING_RETURN_FALLBACK_SCENE_PATH):
+			return OUTING_RETURN_FALLBACK_SCENE_PATH
+	return current
 
 
 func go_to_outing_map_from_current_scene() -> void:
@@ -142,6 +164,7 @@ func go_to_outing_map_from_current_scene() -> void:
 	if current_scene != null:
 		current_path = current_scene.scene_file_path.strip_edges()
 	if not current_path.is_empty() and current_path != OUTING_MAP_SCENE_PATH:
+		capture_time_state_from_current_scene()
 		outing_return_scene_path = current_path
 	elif outing_return_scene_path.strip_edges().is_empty():
 		outing_return_scene_path = OUTING_RETURN_FALLBACK_SCENE_PATH
@@ -156,6 +179,7 @@ func return_from_outing_map() -> void:
 		target_path = OUTING_RETURN_FALLBACK_SCENE_PATH
 	await _change_scene_with_transition(target_path, false)
 	if _last_scene_change_error == OK:
+		apply_runtime_state_to_current_scene()
 		outing_return_scene_path = ""
 		_save_game_deferred()
 
@@ -283,6 +307,52 @@ func _save_game_deferred() -> void:
 		save_manager.call_deferred("save_game")
 
 
+func capture_time_state_from_current_scene() -> Dictionary:
+	var time_component := _find_time_component_in_tree()
+	if time_component == null:
+		return _time_state_runtime.duplicate(true)
+	_time_state_runtime = _build_time_state_from_component(time_component)
+	return _time_state_runtime.duplicate(true)
+
+
+func apply_time_state_to_current_scene() -> void:
+	if _time_state_runtime.is_empty():
+		return
+	var time_component := _find_time_component_in_tree()
+	if time_component == null:
+		return
+	_apply_time_state_to_component(time_component, _time_state_runtime)
+
+
+func advance_outing_time_minutes(minutes: int, reason: String = "outing_map") -> Dictionary:
+	var safe_minutes := maxi(0, minutes)
+	var time_component := _find_time_component_in_tree()
+	if time_component != null:
+		if time_component.has_method("pass_minutes"):
+			var result = time_component.call("pass_minutes", float(safe_minutes), reason)
+			_time_state_runtime = _build_time_state_from_component(time_component)
+			return result as Dictionary if result is Dictionary else _time_state_runtime.duplicate(true)
+	_time_state_runtime = _advance_time_state_payload(_ensure_time_state_runtime(), safe_minutes, reason)
+	return _time_state_runtime.duplicate(true)
+
+
+func _build_time_state_save_payload() -> Dictionary:
+	var state := _ensure_time_state_runtime()
+	return state.duplicate(true)
+
+
+func _apply_time_state_save_payload(payload: Dictionary) -> void:
+	var state := _default_time_state()
+	for key in payload.keys():
+		state[key] = payload[key]
+	state["version"] = 1
+	state["current_day"] = maxi(1, int(state.get("current_day", 1)))
+	state["day_length_hours"] = clampf(float(state.get("day_length_hours", 24.0)), 1.0, 48.0)
+	state["current_hour"] = clampf(float(state.get("current_hour", 8.0)), 0.0, maxf(float(state.get("day_length_hours", 24.0)) - 0.0001, 0.0))
+	state["realtime_enabled"] = bool(state.get("realtime_enabled", false))
+	_time_state_runtime = state
+
+
 func _build_shelter_inventory_save_payload() -> Dictionary:
 	var inventory := get_shelter_inventory_runtime()
 	var source_payloads: Array[Dictionary] = []
@@ -352,6 +422,10 @@ func _build_storage_save_payload(storage: InventoryStorageResource) -> Dictionar
 		"version": 1,
 		"slot_count": int(storage.slot_count),
 		"slots": slots_payload,
+		# 空柜不再自动写成“权威清空”。
+		# 之前的实现会在场景绑定/过滤异常时把食品柜保存成 authoritative_empty=true，
+		# 下次读档就把 .tres 默认库存永久覆盖为空。
+		"is_empty_snapshot": slots_payload.is_empty(),
 	}
 
 
@@ -387,20 +461,50 @@ func _apply_storage_save_payload(storage: InventoryStorageResource, payload: Dic
 func _should_ignore_legacy_empty_storage_payload(storage: InventoryStorageResource, payload: Dictionary) -> bool:
 	if payload.is_empty():
 		return false
-	var version_value: int = int(payload.get("version", 0))
-	if version_value > 0:
-		return false
 	var source_id := String(storage.source_id).strip_edges()
-	if source_id != "food_cabinet" and source_id != "food_cabinet_2":
+	if not _is_default_preserved_storage_source(source_id):
 		return false
 	var slots_payload: Array = payload.get("slots", [])
 	if not slots_payload.is_empty():
 		return false
+	if bool(payload.get("allow_default_clear", false)):
+		return false
+	if _default_storage_has_items(source_id):
+		return true
 	storage.ensure_capacity()
 	for i in range(storage.slot_count):
 		var slot := storage.get_slot(i) as InventorySlotStackResource
 		if slot != null and not slot.is_empty():
 			return true
+	return false
+
+
+func _is_default_preserved_storage_source(source_id: String) -> bool:
+	# 食品柜是场景内可视化实体柜，默认 .tres 里应始终带初始水/罐头。
+	# 没有显式 allow_default_clear 的空存档一律按旧/异常存档处理，避免再次把默认物资读没。
+	return source_id == "food_cabinet" or source_id == "food_cabinet_2"
+
+
+func _default_storage_has_items(source_id: String) -> bool:
+	var template := load(SHELTER_INVENTORY_DEFAULT_PATH) as Resource
+	if template == null:
+		return false
+	template = template.duplicate(true) as Resource
+	if template == null:
+		return false
+	var sources: Array = template.get("storage_sources")
+	for source_raw in sources:
+		var source := source_raw as Resource
+		if source == null or String(source.get("source_id")).strip_edges() != source_id:
+			continue
+		var storage := source as InventoryStorageResource
+		if storage == null:
+			return false
+		storage.ensure_capacity()
+		for i in range(storage.slot_count):
+			var slot := storage.get_slot(i) as InventorySlotStackResource
+			if slot != null and not slot.is_empty():
+				return true
 	return false
 
 
@@ -449,3 +553,101 @@ func _bind_storage_to_shelter_source(source: Resource, runtime_storage: Inventor
 		return
 	storage.slot_count = runtime_storage.slot_count
 	storage.slots = runtime_storage.slots
+
+
+func _ensure_time_state_runtime() -> Dictionary:
+	if _time_state_runtime.is_empty():
+		var time_component := _find_time_component_in_tree()
+		if time_component != null:
+			_time_state_runtime = _build_time_state_from_component(time_component)
+		else:
+			_time_state_runtime = _default_time_state()
+	return _time_state_runtime.duplicate(true)
+
+
+func _default_time_state() -> Dictionary:
+	return {
+		"version": 1,
+		"current_day": 1,
+		"current_hour": 8.0,
+		"day_length_hours": 24.0,
+		"realtime_enabled": false,
+		"reason": "default",
+	}
+
+
+func _find_time_component_in_tree() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	for node_raw in tree.get_nodes_in_group("TimeSource"):
+		var node := node_raw as Node
+		if _is_time_component(node):
+			return node
+	var current_scene := tree.current_scene
+	return _find_time_component_recursive(current_scene)
+
+
+func _find_time_component_recursive(root_node: Node) -> Node:
+	if root_node == null:
+		return null
+	if _is_time_component(root_node):
+		return root_node
+	for child_raw in root_node.get_children():
+		var child := child_raw as Node
+		var found := _find_time_component_recursive(child)
+		if found != null:
+			return found
+	return null
+
+
+func _is_time_component(node: Node) -> bool:
+	return node != null and node.has_method("get_day_time_text") and node.has_method("pass_minutes")
+
+
+func _build_time_state_from_component(time_component: Node) -> Dictionary:
+	var day_length := 24.0
+	var current_hour := 8.0
+	if time_component != null:
+		day_length = clampf(float(time_component.get("day_length_hours")), 1.0, 48.0)
+		current_hour = clampf(float(time_component.get("current_hour")), 0.0, maxf(day_length - 0.0001, 0.0))
+	return {
+		"version": 1,
+		"current_day": maxi(1, int(time_component.get("current_day")) if time_component != null else 1),
+		"current_hour": current_hour,
+		"day_length_hours": day_length,
+		"realtime_enabled": bool(time_component.get("realtime_enabled")) if time_component != null else false,
+		"reason": "scene_capture",
+	}
+
+
+func _apply_time_state_to_component(time_component: Node, state: Dictionary) -> void:
+	if time_component == null or state.is_empty():
+		return
+	var day_length := clampf(float(state.get("day_length_hours", time_component.get("day_length_hours"))), 1.0, 48.0)
+	var hour_value := clampf(float(state.get("current_hour", time_component.get("current_hour"))), 0.0, maxf(day_length - 0.0001, 0.0))
+	var hour_int := int(floor(hour_value))
+	var minute_int := clampi(int(round((hour_value - float(hour_int)) * 60.0)), 0, 59)
+	time_component.set("day_length_hours", day_length)
+	if time_component.has_method("set_day_time"):
+		time_component.call("set_day_time", maxi(1, int(state.get("current_day", 1))), hour_int, minute_int, "global_save_restore")
+	else:
+		time_component.set("current_day", maxi(1, int(state.get("current_day", 1))))
+		time_component.set("current_hour", hour_value)
+	if time_component.has_method("set_realtime_enabled"):
+		time_component.call("set_realtime_enabled", bool(state.get("realtime_enabled", time_component.get("realtime_enabled"))))
+	else:
+		time_component.set("realtime_enabled", bool(state.get("realtime_enabled", false)))
+
+
+func _advance_time_state_payload(state: Dictionary, minutes: int, reason: String) -> Dictionary:
+	var next := _default_time_state()
+	for key in state.keys():
+		next[key] = state[key]
+	var day_length := clampf(float(next.get("day_length_hours", 24.0)), 1.0, 48.0)
+	var total_hours := float(next.get("current_hour", 8.0)) + (float(maxi(0, minutes)) / 60.0)
+	var day_wraps := int(floor(total_hours / day_length))
+	next["current_day"] = maxi(1, int(next.get("current_day", 1)) + day_wraps)
+	next["current_hour"] = fposmod(total_hours, day_length)
+	next["reason"] = reason
+	return next

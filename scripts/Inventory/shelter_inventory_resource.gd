@@ -194,7 +194,9 @@ func _source_can_accept_item(source: Resource, item: ItemData) -> bool:
 	var kind := String(source.get("source_kind"))
 	match kind:
 		"food":
-			return item.outing_category == "food" and item.inventory_tags.has("食品柜")
+			# 食品柜只接收食物类。inventory_tags 用作额外语义标签，
+			# 但老资源/基础资源（水、罐头）可能没有补齐“食品柜”标签，不能因此丢弃外出收益。
+			return item.outing_category == "food"
 		"medical":
 			return item.outing_category == "medical"
 		"equipment":

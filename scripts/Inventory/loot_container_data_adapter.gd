@@ -26,6 +26,17 @@ func get_bound_container() -> LootContainerComponent:
 	return _resolve_container()
 
 
+func should_save_inventory_in_scene() -> bool:
+	# 这个节点只是 UI/拖拽系统访问 LootContainerComponent 的适配器，
+	# 真实库存由容器本体或 Global.shelter_inventory 保存。
+	# 旧逻辑会把未绑定/空适配器保存进 SaveComponent，读档时反向清空柜子。
+	return false
+
+
+func should_load_inventory_from_scene() -> bool:
+	return false
+
+
 func get_slot_count() -> int:
 	var container := _resolve_container()
 	if container == null:

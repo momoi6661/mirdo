@@ -18,6 +18,7 @@ extends CharacterBody3D
 @export var dual_inventory_panel: Node
 @export var xiaokong_dialogue_panel: Node
 @export var xiaokong_status_panel: Node
+@export var player_status_screen: Node
 @export var xiaokong_control_component_path: NodePath = NodePath("Components/XiaokongControlComponent")
 @export var player_interaction_component_path: NodePath = NodePath("Components/PlayerInteractionComponent")
 @export_range(0.5, 10.0, 0.1) var inventory_drop_distance: float = 2.5
@@ -73,6 +74,9 @@ var _camera_rotation : Vector3
 
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
+func _resolve_global_node() -> Node:
+	return get_node_or_null(NodePath("/root/Global"))
+
 func _unhandled_input(event: InputEvent) -> void:
 	if is_ui_text_input_focused() or _is_custom_text_input_active():
 		if event is InputEventKey:
@@ -107,6 +111,11 @@ func _input(event):
 
 	if event.is_action_pressed("inventory"):
 		_toggle_inventory_panel()
+		get_viewport().set_input_as_handled()
+		return
+
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_H:
+		_toggle_player_status_screen()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -181,7 +190,7 @@ func _toggle_inventory_panel() -> void:
 	_set_inventory_panel_open(not _is_inventory_panel_open())
 
 
-func _set_inventory_panel_open(should_open: bool) -> void:
+func _set_inventory_panel_open(should_open: bool, preserve_use_context: bool = false) -> void:
 	var was_open: bool = _is_single_inventory_panel_open()
 	if _is_dual_inventory_panel_open():
 		if not should_open:
@@ -189,6 +198,8 @@ func _set_inventory_panel_open(should_open: bool) -> void:
 		return
 
 	if inventory_panel_3d and is_instance_valid(inventory_panel_3d):
+		if inventory_panel_3d.has_method("clear_use_target_context") and (not should_open or not preserve_use_context):
+			inventory_panel_3d.call("clear_use_target_context")
 		if should_open:
 			inventory_panel_3d.show_panel()
 		else:
@@ -297,6 +308,68 @@ func _on_loot_container_switch_requested(container: Node, player_node: Node) -> 
 
 func _on_inventory_drop_requested(item: ItemData, amount: int) -> void:
 	_spawn_dropped_inventory_item(item, amount)
+
+
+func _on_global_character_inventory_use_requested(payload: Dictionary) -> void:
+	var target_state := _resolve_inventory_use_target_state(payload)
+	if target_state == null:
+		push_warning("找不到 Mirdo 状态组件，无法打开物品使用背包。")
+		return
+	if inventory_panel_3d == null or not is_instance_valid(inventory_panel_3d):
+		push_warning("找不到玩家背包面板，无法给 Mirdo 使用物品。")
+		return
+
+	if _is_dual_inventory_panel_open():
+		_close_dual_inventory_panel()
+
+	var target_label := _resolve_inventory_use_target_label(payload, target_state)
+	if inventory_panel_3d.has_method("set_use_target_context"):
+		inventory_panel_3d.call("set_use_target_context", target_state, target_label)
+	_set_inventory_panel_open(true, true)
+
+
+func _resolve_inventory_use_target_state(payload: Dictionary) -> Node:
+	var state_path := String(payload.get("state_component_path", "")).strip_edges()
+	if not state_path.is_empty():
+		var by_state_path := get_node_or_null(NodePath(state_path))
+		if by_state_path != null and by_state_path.has_method("apply_item_effect"):
+			return by_state_path
+
+	var character := _resolve_inventory_use_character(payload)
+	if character == null:
+		return null
+	var by_components := character.get_node_or_null("Components/StateComponent")
+	if by_components != null and by_components.has_method("apply_item_effect"):
+		return by_components
+	var by_root := character.get_node_or_null("StateComponent")
+	if by_root != null and by_root.has_method("apply_item_effect"):
+		return by_root
+	return null
+
+
+func _resolve_inventory_use_character(payload: Dictionary) -> Node:
+	var character_path := String(payload.get("character_path", payload.get("xiaokong_path", ""))).strip_edges()
+	if character_path.is_empty():
+		return null
+	return get_node_or_null(NodePath(character_path))
+
+
+func _resolve_inventory_use_target_label(payload: Dictionary, target_state: Node) -> String:
+	var speaker_name := String(payload.get("speaker_name", "")).strip_edges()
+	if not speaker_name.is_empty():
+		return speaker_name
+	var character := _resolve_inventory_use_character(payload)
+	if character != null:
+		var display_name := String(character.get("display_name")).strip_edges()
+		if not display_name.is_empty() and display_name != "<null>":
+			return display_name
+		if not String(character.name).strip_edges().is_empty():
+			return String(character.name).strip_edges()
+	if target_state != null:
+		var state_display_name := String(target_state.get("display_name")).strip_edges()
+		if not state_display_name.is_empty() and state_display_name != "<null>":
+			return state_display_name
+	return "Mirdo"
 
 
 func _spawn_dropped_inventory_item(item: ItemData, amount: int) -> void:
@@ -437,32 +510,24 @@ func _is_dialogue_panel_open() -> bool:
 	return false
 
 func _resolve_xiaokong_status_panel(payload: Dictionary = {}) -> Node:
-	if xiaokong_status_panel != null and is_instance_valid(xiaokong_status_panel):
-		return xiaokong_status_panel
-
-	var xiaokong_path: String = String(payload.get("xiaokong_path", "")).strip_edges()
-	if not xiaokong_path.is_empty():
-		var xiaokong_root: Node = get_node_or_null(NodePath(xiaokong_path))
-		if xiaokong_root != null:
-			var by_payload: Node = xiaokong_root.get_node_or_null("StatusPanel")
-			if by_payload != null and is_instance_valid(by_payload):
-				xiaokong_status_panel = by_payload
-				return xiaokong_status_panel
-
-	var tree: SceneTree = get_tree()
-	if tree != null:
-		for entry in tree.get_nodes_in_group("Xiaokong"):
-			var xiaokong_node := entry as Node
-			if xiaokong_node == null or not is_instance_valid(xiaokong_node):
-				continue
-			var by_group: Node = xiaokong_node.get_node_or_null("StatusPanel")
-			if by_group != null and is_instance_valid(by_group):
-				xiaokong_status_panel = by_group
-				return xiaokong_status_panel
-
-	return null
+	var character_path := String(payload.get("character_path", payload.get("xiaokong_path", ""))).strip_edges()
+	if not character_path.is_empty():
+		var character_root := get_node_or_null(NodePath(character_path))
+		if character_root != null and is_instance_valid(character_root):
+			var direct_panel := character_root.get_node_or_null("StatusPanel")
+			if direct_panel != null and is_instance_valid(direct_panel):
+				return direct_panel
+	if not character_path.is_empty() and character_path != String(get_path()):
+		return xiaokong_status_panel if xiaokong_status_panel != null and is_instance_valid(xiaokong_status_panel) else null
+	if player_status_screen != null and is_instance_valid(player_status_screen):
+		return player_status_screen
+	player_status_screen = get_node_or_null("PlayerStatusScreen2D")
+	if player_status_screen != null and is_instance_valid(player_status_screen):
+		return player_status_screen
+	return xiaokong_status_panel if xiaokong_status_panel != null and is_instance_valid(xiaokong_status_panel) else null
 
 func _is_status_panel_open() -> bool:
+	player_status_screen = get_node_or_null("PlayerStatusScreen2D")
 	var status_panel := _resolve_xiaokong_status_panel()
 	if status_panel == null or not is_instance_valid(status_panel):
 		return false
@@ -517,20 +582,25 @@ func _send_dialogue_to_xiaokong(text: String, payload: Dictionary) -> bool:
 	if clean_text.is_empty():
 		return false
 
-	var xiaokong_path: String = String(payload.get("xiaokong_path", "")).strip_edges()
+	var xiaokong_path: String = String(payload.get("xiaokong_path", payload.get("character_path", ""))).strip_edges()
 	var controller_node := _resolve_xiaokong_control_component()
 	if controller_node != null and is_instance_valid(controller_node):
+		var controller_bound := xiaokong_path.is_empty()
 		if not xiaokong_path.is_empty() and controller_node.has_method("bind_target_by_path"):
-			controller_node.call("bind_target_by_path", xiaokong_path)
-		if controller_node.has_method("send_dialogue_text"):
+			controller_bound = bool(controller_node.call("bind_target_by_path", xiaokong_path))
+		if controller_bound and controller_node.has_method("send_dialogue_text"):
 			return bool(controller_node.call("send_dialogue_text", clean_text))
 
-	if xiaokong_path.is_empty():
+	return _send_dialogue_direct_to_payload_target(clean_text, xiaokong_path)
+
+func _send_dialogue_direct_to_payload_target(clean_text: String, character_path: String) -> bool:
+	var target_path := character_path.strip_edges()
+	if target_path.is_empty():
 		return false
-	var xiaokong_root: Node = get_node_or_null(NodePath(xiaokong_path))
-	if xiaokong_root == null:
+	var character_root: Node = get_node_or_null(NodePath(target_path))
+	if character_root == null:
 		return false
-	var dialogue_component := _find_dialogue_component_recursive(xiaokong_root)
+	var dialogue_component := _find_dialogue_component_recursive(character_root)
 	if dialogue_component == null:
 		return false
 	var result: Variant = dialogue_component.call("send_player_text", clean_text)
@@ -573,6 +643,20 @@ func _on_global_xiaokong_status_requested(payload: Dictionary) -> void:
 	_set_world_interaction_blocked(true)
 	if status_panel.has_method("open_for_payload"):
 		status_panel.call("open_for_payload", payload)
+	elif status_panel.has_method("open_panel"):
+		status_panel.call("open_panel")
+
+
+func _toggle_player_status_screen() -> void:
+	var status_panel := _resolve_xiaokong_status_panel({"character_path": String(get_path())})
+	if status_panel == null or not is_instance_valid(status_panel):
+		return
+	if status_panel.has_method("is_panel_open") and bool(status_panel.call("is_panel_open")):
+		if status_panel.has_method("hide_panel"):
+			status_panel.call("hide_panel")
+		return
+	if status_panel.has_method("open_for_payload"):
+		status_panel.call("open_for_payload", {"character_path": String(get_path())})
 	elif status_panel.has_method("open_panel"):
 		status_panel.call("open_panel")
 
@@ -749,19 +833,25 @@ func _ready():
 		add_to_group("Player")
 		
 	shape_cast_3d.position.y=1.7
-	Global.player=self
-	if Global != null and Global.has_signal("loot_container_switch_requested"):
+	var global_node := _resolve_global_node()
+	if global_node != null:
+		global_node.set("player", self)
+	if global_node != null and global_node.has_signal("loot_container_switch_requested"):
 		var switch_callable := Callable(self, "_on_loot_container_switch_requested")
-		if not Global.is_connected("loot_container_switch_requested", switch_callable):
-			Global.connect("loot_container_switch_requested", switch_callable)
-	if Global != null and Global.has_signal("xiaokong_dialogue_requested"):
+		if not global_node.is_connected("loot_container_switch_requested", switch_callable):
+			global_node.connect("loot_container_switch_requested", switch_callable)
+	if global_node != null and global_node.has_signal("xiaokong_dialogue_requested"):
 		var xk_dialogue_callable := Callable(self, "_on_global_xiaokong_dialogue_requested")
-		if not Global.is_connected("xiaokong_dialogue_requested", xk_dialogue_callable):
-			Global.connect("xiaokong_dialogue_requested", xk_dialogue_callable)
-	if Global != null and Global.has_signal("xiaokong_status_requested"):
+		if not global_node.is_connected("xiaokong_dialogue_requested", xk_dialogue_callable):
+			global_node.connect("xiaokong_dialogue_requested", xk_dialogue_callable)
+	if global_node != null and global_node.has_signal("xiaokong_status_requested"):
 		var xk_status_callable := Callable(self, "_on_global_xiaokong_status_requested")
-		if not Global.is_connected("xiaokong_status_requested", xk_status_callable):
-			Global.connect("xiaokong_status_requested", xk_status_callable)
+		if not global_node.is_connected("xiaokong_status_requested", xk_status_callable):
+			global_node.connect("xiaokong_status_requested", xk_status_callable)
+	if global_node != null and global_node.has_signal("character_inventory_use_requested"):
+		var character_inventory_use_callable := Callable(self, "_on_global_character_inventory_use_requested")
+		if not global_node.is_connected("character_inventory_use_requested", character_inventory_use_callable):
+			global_node.connect("character_inventory_use_requested", character_inventory_use_callable)
 	
 	print("step_handler: ", step_handler)
 	if !step_handler:
@@ -838,15 +928,15 @@ func _load_custom_save_data(data: Dictionary) -> void:
 	set_physics_process(false) 
 	
 	# 2. 恢复旋转和视角
-	_mouse_rotation = data.mouse_rotation
+	_mouse_rotation = data.get("mouse_rotation", _mouse_rotation)
 	_player_rotation = Vector3(0, _mouse_rotation.y, 0)
 	_camera_rotation = Vector3(_mouse_rotation.x, 0, 0)
 	global_transform.basis = Basis.from_euler(_player_rotation)
 	marker_3d.transform.basis = Basis.from_euler(_camera_rotation)
 	
 	# 3. 恢复基础变量并压制状态机
-	is_crouching = data.is_crouching
-	_is_sprinting = data.is_sprinting
+	is_crouching = bool(data.get("is_crouching", is_crouching))
+	_is_sprinting = bool(data.get("is_sprinting", _is_sprinting))
 	velocity = Vector3.ZERO
 	
 	# 恢复背包数据
@@ -858,14 +948,15 @@ func _load_custom_save_data(data: Dictionary) -> void:
 	sm._init_states()
 	
 	# 4. 恢复状态并强制同步变量（解决恢复到 Idle 的关键）
-	var target_state = sm.states.get(data.state)
+	var state_name: StringName = data.get("state", &"IdleState")
+	var target_state = sm.states.get(state_name)
 	if target_state:
 		if sm.CURRENT_STATE:
 			sm.CURRENT_STATE.exit()
 		sm.CURRENT_STATE = target_state
 		
 		# 强制设置状态相关变量，不完全依赖 enter() 的自动处理
-		if data.state == "CrouchState":
+		if state_name == &"CrouchState":
 			_speed = SPEED_CROUCH
 			is_crouching = true
 			shape_cast_3d.position.y = 1.5

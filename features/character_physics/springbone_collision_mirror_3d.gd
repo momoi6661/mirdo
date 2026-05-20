@@ -9,6 +9,7 @@ extends Node3D
 
 const GENERATED_META := "SpringBoneCollisionMirror3D"
 const GENERATED_PREFIX := "SoftBodyCollider_"
+const PREVIEW_NAME := "DebugPreview"
 
 @export var enabled: bool = true:
 	set(value):
@@ -42,6 +43,26 @@ const GENERATED_PREFIX := "SoftBodyCollider_"
 	set(value):
 		use_static_body = value
 		_queue_rebuild()
+@export_range(0.05, 2.0, 0.01) var radius_scale: float = 1.0:
+	set(value):
+		radius_scale = value
+		_sync_all_shapes()
+@export_range(0.05, 2.0, 0.01) var height_scale: float = 1.0:
+	set(value):
+		height_scale = value
+		_sync_all_shapes()
+@export var position_offset_scale: Vector3 = Vector3.ONE:
+	set(value):
+		position_offset_scale = value
+		_update_bodies()
+@export var show_debug_preview: bool = false:
+	set(value):
+		show_debug_preview = value
+		_queue_rebuild()
+@export var debug_preview_color: Color = Color(1.0, 0.08, 0.02, 0.28):
+	set(value):
+		debug_preview_color = value
+		_apply_preview_materials()
 
 var _skeleton: Skeleton3D
 var _source_to_body: Dictionary = {}
@@ -57,8 +78,6 @@ func _exit_tree() -> void:
 	_clear_generated()
 
 func _process(_delta: float) -> void:
-	if not Engine.is_editor_hint():
-		return
 	if not enabled:
 		_clear_generated()
 		return
@@ -118,18 +137,25 @@ func _create_body_for_source(source: SpringBoneCollision3D) -> CollisionObject3D
 	shape_node.set_meta("generated_by", GENERATED_META)
 	body.add_child(shape_node, false, Node.INTERNAL_MODE_BACK)
 	shape_node.shape = _make_shape(source)
+	if show_debug_preview:
+		var preview := MeshInstance3D.new()
+		preview.name = PREVIEW_NAME
+		preview.set_meta("generated_by", GENERATED_META)
+		body.add_child(preview, false, Node.INTERNAL_MODE_BACK)
+		preview.material_override = _make_preview_material()
+		_sync_preview(preview, shape_node.shape)
 	return body
 
 func _make_shape(source: SpringBoneCollision3D) -> Shape3D:
 	if source is SpringBoneCollisionSphere3D:
 		var sphere := SphereShape3D.new()
-		sphere.radius = maxf(0.001, (source as SpringBoneCollisionSphere3D).radius)
+		sphere.radius = _scaled_radius((source as SpringBoneCollisionSphere3D).radius)
 		return sphere
 	if source is SpringBoneCollisionCapsule3D:
 		var capsule_source := source as SpringBoneCollisionCapsule3D
 		var capsule := CapsuleShape3D.new()
-		capsule.radius = maxf(0.001, capsule_source.radius)
-		capsule.height = maxf(capsule.radius * 2.0, capsule_source.height)
+		capsule.radius = _scaled_radius(capsule_source.radius)
+		capsule.height = _scaled_height(capsule_source.height, capsule.radius)
 		return capsule
 	return SphereShape3D.new()
 
@@ -184,20 +210,55 @@ func _update_bodies() -> void:
 			_queue_rebuild()
 			return
 		_sync_shape(shape_node, source)
+		_update_preview(body, shape_node.shape)
 
 func _sync_shape(shape_node: CollisionShape3D, source: SpringBoneCollision3D) -> void:
 	if source is SpringBoneCollisionSphere3D:
 		if not shape_node.shape is SphereShape3D:
 			shape_node.shape = SphereShape3D.new()
 		var sphere := shape_node.shape as SphereShape3D
-		sphere.radius = maxf(0.001, (source as SpringBoneCollisionSphere3D).radius)
+		sphere.radius = _scaled_radius((source as SpringBoneCollisionSphere3D).radius)
 	elif source is SpringBoneCollisionCapsule3D:
 		if not shape_node.shape is CapsuleShape3D:
 			shape_node.shape = CapsuleShape3D.new()
 		var capsule_source := source as SpringBoneCollisionCapsule3D
 		var capsule := shape_node.shape as CapsuleShape3D
-		capsule.radius = maxf(0.001, capsule_source.radius)
-		capsule.height = maxf(capsule.radius * 2.0, capsule_source.height)
+		capsule.radius = _scaled_radius(capsule_source.radius)
+		capsule.height = _scaled_height(capsule_source.height, capsule.radius)
+
+func _update_preview(body: CollisionObject3D, shape: Shape3D) -> void:
+	var preview := body.get_node_or_null(PREVIEW_NAME) as MeshInstance3D
+	if show_debug_preview:
+		if preview == null:
+			preview = MeshInstance3D.new()
+			preview.name = PREVIEW_NAME
+			preview.set_meta("generated_by", GENERATED_META)
+			body.add_child(preview, false, Node.INTERNAL_MODE_BACK)
+			preview.material_override = _make_preview_material()
+		_sync_preview(preview, shape)
+	elif preview != null:
+		body.remove_child(preview)
+		preview.queue_free()
+
+func _sync_preview(preview: MeshInstance3D, shape: Shape3D) -> void:
+	if shape is SphereShape3D:
+		var sphere_shape := shape as SphereShape3D
+		var sphere_mesh := preview.mesh as SphereMesh
+		if sphere_mesh == null:
+			sphere_mesh = SphereMesh.new()
+			preview.mesh = sphere_mesh
+		sphere_mesh.radius = sphere_shape.radius
+		sphere_mesh.height = sphere_shape.radius * 2.0
+		preview.transform = Transform3D.IDENTITY
+	elif shape is CapsuleShape3D:
+		var capsule_shape := shape as CapsuleShape3D
+		var capsule_mesh := preview.mesh as CapsuleMesh
+		if capsule_mesh == null:
+			capsule_mesh = CapsuleMesh.new()
+			preview.mesh = capsule_mesh
+		capsule_mesh.radius = capsule_shape.radius
+		capsule_mesh.height = capsule_shape.height
+		preview.transform = Transform3D.IDENTITY
 
 func _get_source_world_transform(source: SpringBoneCollision3D) -> Transform3D:
 	var bone_idx := source.bone
@@ -205,7 +266,7 @@ func _get_source_world_transform(source: SpringBoneCollision3D) -> Transform3D:
 		bone_idx = _skeleton.find_bone(source.bone_name)
 	if bone_idx >= 0:
 		var bone_world := _skeleton.global_transform * _skeleton.get_bone_global_pose(bone_idx)
-		return bone_world * Transform3D(Basis(source.rotation_offset), source.position_offset)
+		return bone_world * Transform3D(Basis(source.rotation_offset), source.position_offset * position_offset_scale)
 	return source.global_transform
 
 func _apply_layers() -> void:
@@ -213,3 +274,37 @@ func _apply_layers() -> void:
 		if body is CollisionObject3D:
 			(body as CollisionObject3D).collision_layer = collision_layer
 			(body as CollisionObject3D).collision_mask = collision_mask
+
+func _sync_all_shapes() -> void:
+	if not is_inside_tree():
+		return
+	for source_path in _source_to_body.keys():
+		var source := get_node_or_null(NodePath(String(source_path))) as SpringBoneCollision3D
+		var body := _source_to_body[source_path] as CollisionObject3D
+		if source == null or body == null:
+			continue
+		var shape_node := body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if shape_node != null:
+			_sync_shape(shape_node, source)
+			_update_preview(body, shape_node.shape)
+
+func _scaled_radius(source_radius: float) -> float:
+	return maxf(0.001, source_radius * radius_scale)
+
+func _scaled_height(source_height: float, scaled_radius: float) -> float:
+	return maxf(scaled_radius * 2.0, source_height * height_scale)
+
+func _make_preview_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = debug_preview_color
+	material.no_depth_test = true
+	return material
+
+func _apply_preview_materials() -> void:
+	for body in _source_to_body.values():
+		if body is Node:
+			var preview := (body as Node).get_node_or_null(PREVIEW_NAME) as MeshInstance3D
+			if preview != null:
+				preview.material_override = _make_preview_material()

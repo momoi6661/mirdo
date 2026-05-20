@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://bkt2b3xik1gda" path="res://controllers/scripts/pause_menu.gd" id="1_script"]
 [ext_resource type="Shader" uid="uid://1nay0wyo4yvl" path="res://controllers/ui/shaders/cyber_glitch_transition.gdshader" id="2_rmx5d"]
 [ext_resource type="PackedScene" path="res://controllers/ui/AISettingsPanel.tscn" id="3_ai_settings_panel"]
+[ext_resource type="PackedScene" path="res://controllers/ui/SaveSlotMenu.tscn" id="4_save_slot_menu"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8747e"]
 shader = ExtResource("2_rmx5d")
@@ -326,6 +327,7 @@ text = "继续任务"
 alignment = 0
 
 [node name="DebugLoadButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1096618873]
+visible = false
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
@@ -337,7 +339,7 @@ theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "加载进度"
+text = "读取进度"
 alignment = 0
 
 [node name="SaveGameButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1549748530]
@@ -352,7 +354,7 @@ theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "保存进度"
+text = "游戏进度"
 alignment = 0
 
 [node name="OptionsButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1816499980]
@@ -429,6 +431,10 @@ text = "[ESC] 返回"
 
 
 [node name="AISettingsPanel" parent="." instance=ExtResource("3_ai_settings_panel")]
+unique_name_in_owner = true
+visible = false
+
+[node name="SaveSlotMenu" parent="." instance=ExtResource("4_save_slot_menu")]
 unique_name_in_owner = true
 visible = false
 

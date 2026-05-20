@@ -13,6 +13,7 @@ signal exit_requested
 @onready var exit_button = %ExitGameButton
 @onready var animation_player = %AnimationPlayer
 @onready var ai_settings_panel = get_node_or_null("%AISettingsPanel")
+@onready var save_slot_menu = get_node_or_null("%SaveSlotMenu")
 
 @onready var ui_sound_player=%UISoundPlayer
 
@@ -47,6 +48,7 @@ func _ready() -> void:
 	
 	_connect_button_hover_sounds()
 	_connect_ai_settings_panel()
+	_connect_save_slot_menu()
 	
 	if get_parent() == get_tree().root:
 		show_menu()
@@ -83,6 +85,8 @@ func hide_menu() -> void:
 	
 	_play_ui_sound("menu_close")
 	
+	if save_slot_menu != null and save_slot_menu.visible:
+		save_slot_menu.hide()
 	if ai_settings_panel != null and ai_settings_panel.visible:
 		if ai_settings_panel.has_method("_flush_auto_save"):
 			ai_settings_panel.call("_flush_auto_save")
@@ -105,7 +109,20 @@ func _connect_ai_settings_panel() -> void:
 	if ai_settings_panel.has_signal("back_requested") and not ai_settings_panel.back_requested.is_connected(_on_ai_settings_back_requested):
 		ai_settings_panel.back_requested.connect(_on_ai_settings_back_requested)
 
+
+func _connect_save_slot_menu() -> void:
+	if save_slot_menu == null:
+		return
+	if save_slot_menu.has_signal("back_requested") and not save_slot_menu.back_requested.is_connected(_on_save_slot_back_requested):
+		save_slot_menu.back_requested.connect(_on_save_slot_back_requested)
+
+
 func _on_ai_settings_back_requested() -> void:
+	if visible:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _on_save_slot_back_requested() -> void:
 	if visible:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -131,25 +148,31 @@ func _on_button_hover() -> void:
 
 func _on_continue_pressed() -> void:
 	_play_ui_sound("button_click")
+	_auto_save_current_progress()
 	emit_signal("continue_requested")
 	hide_menu()
 
 func _on_save_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("save_requested")
+	if save_slot_menu != null and save_slot_menu.has_method("open_panel"):
+		save_slot_menu.call("open_panel", "progress")
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
 	var save_manager := get_tree().root.get_node_or_null("SaveManager")
 	if save_manager != null and save_manager.has_method("save_game"):
-		save_manager.call("save_game", "manual_save")
+		save_manager.call("save_game")
 
 func _on_debug_load_pressed() -> void:
 	_play_ui_sound("button_click")
-	
-	# 如果你在 UI 层面有动画或菜单隐藏逻辑，先关闭暂停菜单，恢复时间
-	hide_menu()
-	
+	if save_slot_menu != null and save_slot_menu.has_method("open_panel"):
+		save_slot_menu.call("open_panel", "progress")
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
+
 	var save_manager := get_tree().root.get_node_or_null("SaveManager")
 	if save_manager != null and save_manager.has_method("auto_load_game"):
-		save_manager.call("auto_load_game", "manual_save")
+		save_manager.call("auto_load_game")
 	else:
 		print("[PauseMenu] 找不到 SaveManager！")
 
@@ -162,19 +185,32 @@ func _on_options_pressed() -> void:
 func _on_main_menu_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("main_menu_requested")
-	hide_menu()
+	_auto_save_current_progress()
+	await hide_menu()
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file("res://controllers/ui/MainMenu.tscn")
 
 func _on_exit_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("exit_requested")
+	_auto_save_current_progress()
 	get_tree().quit()
 
 func _input(event: InputEvent) -> void:
 	if _is_ui_text_input_focused():
 		return
 	if event.is_action_pressed("ui_cancel"):
+		if save_slot_menu != null and save_slot_menu.visible:
+			if save_slot_menu.has_method("close_panel"):
+				save_slot_menu.call("close_panel")
+			else:
+				save_slot_menu.hide()
+			get_viewport().set_input_as_handled()
+			return
 		if visible:
 			emit_signal("continue_requested")
+			_auto_save_current_progress()
 			hide_menu()
 		else:
 			if _close_world_panel_before_pause():
@@ -182,6 +218,14 @@ func _input(event: InputEvent) -> void:
 				return
 			# 允许在测试时按 ESC 呼出菜单
 			show_menu()
+
+
+func _auto_save_current_progress() -> void:
+	var save_manager := get_tree().root.get_node_or_null("SaveManager")
+	if save_manager != null and save_manager.has_method("auto_save_current_game"):
+		save_manager.call("auto_save_current_game")
+	elif save_manager != null and save_manager.has_method("save_current_game"):
+		save_manager.call("save_current_game")
 
 func _close_world_panel_before_pause() -> bool:
 	var tree := get_tree()

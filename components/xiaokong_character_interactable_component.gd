@@ -7,12 +7,15 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 const SIGNAL_XIAOKONG_SEAT_STATE_CHANGED: StringName = &"xiaokong_seat_state_changed"
 const SIGNAL_XIAOKONG_DIALOGUE_REQUESTED: StringName = &"xiaokong_dialogue_requested"
 const SIGNAL_XIAOKONG_STATUS_REQUESTED: StringName = &"xiaokong_status_requested"
+const SIGNAL_CHARACTER_INVENTORY_USE_REQUESTED: StringName = &"character_inventory_use_requested"
 const OPTION_ID_DIALOGUE: String = "dialogue"
 const OPTION_LABEL_DIALOGUE: String = "对话"
 const OPTION_ID_VIEW_STATUS: String = "view_status"
 const OPTION_LABEL_VIEW_STATUS: String = "查看"
+const OPTION_ID_USE_ITEM: String = "use_item"
+const OPTION_LABEL_USE_ITEM: String = "使用物品"
 const OPTION_ID_EAT: String = "eat"
-const OPTION_LABEL_EAT: String = "让小空食用"
+const OPTION_LABEL_EAT: String = "让 Mirdo 食用"
 
 @export_category("Composition")
 @export var xiaokong_root_path: NodePath = NodePath("../..")
@@ -21,8 +24,19 @@ const OPTION_LABEL_EAT: String = "让小空食用"
 @export var table_context_group: StringName = TABLE_CONTEXT_GROUP
 
 @export_category("Display")
-@export var panel_title: String = "小空"
+@export var panel_title: String = "Mirdo"
+@export var show_dialogue_option: bool = true
+@export var show_status_option: bool = true
+@export var show_inventory_use_option: bool = true
+@export var show_eat_option: bool = true
 @export var consume_reason: String = "xiaokong_table_meal"
+@export var dialogue_options: PackedStringArray = PackedStringArray([
+	"你现在感觉怎么样？",
+	"你能看看附近有什么吗？",
+	"我们接下来做什么？",
+	"你可以去看看食物柜吗？",
+	"先跟着我走。",
+])
 
 var _global_node: Node = null
 var _seat_signal_is_seated: bool = false
@@ -30,6 +44,8 @@ var _seat_signal_marker_path: String = ""
 var _seat_signal_xiaokong_path: String = ""
 
 func _ready() -> void:
+	add_to_group(&"character_interactable")
+	add_to_group(&"xiaokong_interactable")
 	_bind_global_signals()
 	_sync_seat_state_from_router()
 
@@ -47,28 +63,42 @@ func build_world_panel_model(_helper: Node, _context: Dictionary) -> WorldIntera
 	var model := WorldInteractionPanelModel.new()
 	model.title = ""
 
-	model.options.append(
-		WorldInteractionOption.create(
-			OPTION_ID_DIALOGUE,
-			OPTION_LABEL_DIALOGUE,
-			"",
-			WorldInteractionOption.TRIGGER_TAP,
-			0.0,
-			true
+	if show_dialogue_option:
+		model.options.append(
+			WorldInteractionOption.create(
+				OPTION_ID_DIALOGUE,
+				OPTION_LABEL_DIALOGUE,
+				"",
+				WorldInteractionOption.TRIGGER_TAP,
+				0.0,
+				true
+			)
 		)
-	)
-	model.options.append(
-		WorldInteractionOption.create(
-			OPTION_ID_VIEW_STATUS,
-			OPTION_LABEL_VIEW_STATUS,
-			"",
-			WorldInteractionOption.TRIGGER_TAP,
-			0.0,
-			true
+	if show_status_option:
+		model.options.append(
+			WorldInteractionOption.create(
+				OPTION_ID_VIEW_STATUS,
+				OPTION_LABEL_VIEW_STATUS,
+				"",
+				WorldInteractionOption.TRIGGER_TAP,
+				0.0,
+				true
+			)
 		)
-	)
 
-	if _can_show_eat_option(xiaokong_root):
+	if show_inventory_use_option:
+		model.options.append(
+			WorldInteractionOption.create(
+				OPTION_ID_USE_ITEM,
+				OPTION_LABEL_USE_ITEM,
+				"",
+				WorldInteractionOption.TRIGGER_TAP,
+				0.0,
+				true
+			)
+		)
+
+	if show_eat_option and _can_show_eat_option(xiaokong_root):
 		model.options.append(
 			WorldInteractionOption.create(
 				OPTION_ID_EAT,
@@ -91,13 +121,15 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 			_emit_global_interaction_request(SIGNAL_XIAOKONG_DIALOGUE_REQUESTED, OPTION_ID_DIALOGUE, xiaokong_root)
 		OPTION_ID_VIEW_STATUS:
 			_open_status_panel_direct(xiaokong_root)
+		OPTION_ID_USE_ITEM:
+			_emit_global_interaction_request(SIGNAL_CHARACTER_INVENTORY_USE_REQUESTED, OPTION_ID_USE_ITEM, xiaokong_root)
 		OPTION_ID_EAT:
 			_execute_eat_option(xiaokong_root)
 		_:
 			return
 
 func should_clear_world_panel_after_execute(option_id: String) -> bool:
-	return option_id == OPTION_ID_DIALOGUE or option_id == OPTION_ID_VIEW_STATUS
+	return option_id == OPTION_ID_DIALOGUE or option_id == OPTION_ID_VIEW_STATUS or option_id == OPTION_ID_USE_ITEM
 
 func _open_status_panel_direct(xiaokong_root: Node) -> void:
 	if xiaokong_root == null:
@@ -214,12 +246,49 @@ func _emit_global_interaction_request(signal_name: StringName, request_type: Str
 	_global_node.emit_signal(signal_name, _build_interaction_payload(request_type, xiaokong_root))
 
 func _build_interaction_payload(request_type: String, xiaokong_root: Node) -> Dictionary:
-	return {
+	var payload := {
 		"type": request_type,
 		"xiaokong_path": String(xiaokong_root.get_path()),
+		"character_path": String(xiaokong_root.get_path()),
 		"seat_marker_path": _seat_signal_marker_path,
 		"source_path": String(get_path()),
+		"speaker_name": panel_title.strip_edges(),
 	}
+	var state_component := _resolve_state_component_node()
+	if state_component != null:
+		payload["state_component_path"] = String(state_component.get_path())
+	if request_type == OPTION_ID_DIALOGUE:
+		var options := _build_dialogue_option_payload()
+		if not options.is_empty():
+			payload["options"] = options
+	return payload
+
+func _resolve_state_component_node() -> Node:
+	if state_component_path != NodePath():
+		var by_path: Node = get_node_or_null(state_component_path)
+		if by_path != null:
+			return by_path
+	var xiaokong_root: Node = _resolve_xiaokong_root()
+	if xiaokong_root != null:
+		var by_components: Node = xiaokong_root.get_node_or_null("Components/StateComponent")
+		if by_components != null:
+			return by_components
+		var by_root: Node = xiaokong_root.get_node_or_null("StateComponent")
+		if by_root != null:
+			return by_root
+	return null
+
+func _build_dialogue_option_payload() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for i in range(dialogue_options.size()):
+		var text := String(dialogue_options[i]).strip_edges()
+		if text.is_empty():
+			continue
+		out.append({
+			"id": "dialogue_option_%02d" % (i + 1),
+			"text": text,
+		})
+	return out
 
 func _resolve_current_table_context() -> XiaokongTableContextComponent:
 	var tree: SceneTree = get_tree()

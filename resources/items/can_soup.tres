@@ -11,11 +11,13 @@ hunger_delta = 25
 [resource]
 script = ExtResource("3_g1nii")
 ItemName = "罐头"
-Description = "一罐能直接食用的罐头。适合给小空补充饱食度。"
+Description = "一罐能直接食用的罐头。适合给 Mirdo 补充饱食度。"
 Icon = ExtResource("1_bq181")
 ItemModelScenePath = "res://resources/items/models/food/can_soup_model.tscn"
 MaxStackSize = 5
 consumable_effect = SubResource("Resource_5xh6h")
+hunger_delta = 25
 outing_category = "food"
 can_take_outing = true
+can_use = true
 ai_rule_hint = "适合中长距离探索前携带，可作为稳定饱食补给。"

@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("食物", "水", "日用品")
 recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "地图册")
 detail_notes = PackedStringArray("货架遮挡视线", "基础物资收益高", "购物车区域会制造噪声")
-ai_exploration_rule = "AI 应围绕超市货架、冷柜、仓储间和购物车路障生成搜索叙事。收益偏食物、水、日用品；手电减少遗漏，近战武器处理近距离威胁。不可向外发现新区域，不可变成庇护所。"
+ai_exploration_rule = "丧尸末世探索：小型超市货架遮挡多，冷柜腐败、购物车路障和仓储间都可能藏丧尸。AI 应描写压低声音穿过货架、判断能否进入仓储间、被尸群堵住通道时放弃部分物资。收益偏食物、水、日用品；手电减少遗漏，近战武器处理近距离威胁。不可向外发现新区域，不可变成庇护所。"

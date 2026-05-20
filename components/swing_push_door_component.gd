@@ -25,6 +25,7 @@ enum OpenDirectionMode {
 @export var prevent_close_if_player_near: bool = true
 @export var close_block_distance: float = 1.15
 @export var disable_collision_while_moving: bool = true
+@export var disable_collision_while_opening: bool = true
 @export var disable_collision_while_closing: bool = true
 @export var closing_collision_mask: int = 0
 @export var reenable_collision_delay: float = 0.02
@@ -48,6 +49,7 @@ var _tween: Tween
 var _default_collision_layer: int = 0
 var _default_collision_mask: int = 0
 var _closing_collision_temporarily_disabled: bool = false
+var _opening_collision_temporarily_disabled: bool = false
 var _is_closing_motion: bool = false
 var _closing_tween_paused_by_blocker: bool = false
 var _close_blocker_elapsed: float = 0.0
@@ -85,6 +87,12 @@ func _physics_process(delta: float) -> void:
 func get_interaction_time() -> float:
 	return interaction_time
 
+func is_open() -> bool:
+	return _is_open
+
+func get_navigation_open_wait_time() -> float:
+	return maxf(0.05, open_duration)
+
 func get_prompt_text() -> String:
 	return "Close" if _is_open else "Open"
 
@@ -115,6 +123,22 @@ func interact(player: Node) -> void:
 
 func short_interact(player: Node) -> void:
 	_toggle_door(player)
+
+func request_navigation_open(actor: Node) -> bool:
+	if _door_node == null:
+		return false
+
+	var open_sign: float = _compute_open_sign(actor)
+	if _is_open:
+		# Navigation requests are one-way "make passable" requests, not user toggles.
+		# Do not flip an already-open two-way door while an NPC is passing through.
+		return false
+
+	_current_open_sign = open_sign
+	_animate_to(open_angle_degrees * open_sign, false)
+	_play_door_sound(false)
+	_is_open = true
+	return true
 
 func _toggle_door(player: Node) -> void:
 	if _door_node == null:
@@ -199,6 +223,18 @@ func _set_closing_collision_disabled(disabled: bool) -> void:
 		# Keep collision layer unchanged so RayCast/line-of-sight still hits the door.
 		collision_layer = _default_collision_layer
 		collision_mask = closing_collision_mask
+		return
+	collision_layer = _default_collision_layer
+	collision_mask = _default_collision_mask
+
+func _set_opening_collision_disabled(disabled: bool) -> void:
+	_opening_collision_temporarily_disabled = disabled
+	if disabled:
+		# While opening, the door is intentionally becoming passable.
+		# Move the body out of character collision so NavigationAgent movement
+		# does not keep pushing into a still-animating StaticBody.
+		collision_layer = 0
+		collision_mask = 0
 		return
 	collision_layer = _default_collision_layer
 	collision_mask = _default_collision_mask
@@ -305,6 +341,15 @@ func _update_close_blocker_state() -> void:
 func _on_motion_finished() -> void:
 	_stop_closing_monitor()
 
+	if _opening_collision_temporarily_disabled:
+		if reenable_collision_delay <= 0.0:
+			_set_opening_collision_disabled(false)
+		else:
+			var opening_timer: SceneTreeTimer = get_tree().create_timer(reenable_collision_delay)
+			await opening_timer.timeout
+			if _opening_collision_temporarily_disabled:
+				_set_opening_collision_disabled(false)
+
 	if not _closing_collision_temporarily_disabled:
 		return
 	if reenable_collision_delay <= 0.0:
@@ -325,8 +370,14 @@ func _animate_to(target_angle_degrees: float, is_closing: bool) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 
-	var should_disable_collision: bool = disable_collision_while_moving and disable_collision_while_closing and is_closing
-	if should_disable_collision:
+	var should_disable_opening_collision: bool = disable_collision_while_moving and disable_collision_while_opening and not is_closing
+	var should_disable_closing_collision: bool = disable_collision_while_moving and disable_collision_while_closing and is_closing
+	if should_disable_opening_collision:
+		_set_opening_collision_disabled(true)
+	elif _opening_collision_temporarily_disabled:
+		_set_opening_collision_disabled(false)
+
+	if should_disable_closing_collision:
 		_set_closing_collision_disabled(true)
 	elif _closing_collision_temporarily_disabled:
 		_set_closing_collision_disabled(false)

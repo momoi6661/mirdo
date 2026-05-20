@@ -11,6 +11,9 @@ func _run_tests() -> void:
 	_test_energy_bar_can_deposit_to_food_storage()
 	await _test_empty_food_save_payload_does_not_wipe_shelter_runtime_defaults()
 	_test_legacy_empty_food_global_payload_preserves_defaults()
+	_test_versioned_empty_food_payload_without_authoritative_flag_preserves_defaults()
+	_test_stale_authoritative_empty_food_payload_preserves_defaults()
+	_test_explicit_default_clear_food_payload_can_clear_storage()
 	if _failures.is_empty():
 		print("[PASS] outing save persistence")
 		quit(0)
@@ -125,6 +128,80 @@ func _test_legacy_empty_food_global_payload_preserves_defaults() -> void:
 	})
 	var after := _count_storage_item(_get_storage(global_node, "food_cabinet"), water)
 	_expect(after == before, "legacy empty global food cabinet payload should preserve template defaults")
+	global_node.queue_free()
+
+
+func _test_versioned_empty_food_payload_without_authoritative_flag_preserves_defaults() -> void:
+	var global_script := load("res://scripts/global.gd") as Script
+	var global_node := global_script.new() as Node
+	root.add_child(global_node)
+	global_node.reset_shelter_inventory_runtime()
+	var water := load("res://resources/items/water_bottle.tres") as ItemData
+	var before := _count_storage_item(_get_storage(global_node, "food_cabinet"), water)
+	_expect(before > 0, "food_cabinet default should contain water before versioned empty payload migration")
+	global_node.apply_global_save_payload({
+		"version": 3,
+		"shelter_inventory": {
+			"version": 1,
+			"sources": [{
+				"source_id": "food_cabinet",
+				"display_name": "食品柜",
+				"source_kind": "food",
+				"include_in_outing_pool": true,
+				"storage": {"version": 1, "slot_count": 16, "slots": []},
+			}],
+		},
+	})
+	var after := _count_storage_item(_get_storage(global_node, "food_cabinet"), water)
+	_expect(after == before, "versioned empty food cabinet payload without authoritative flag should preserve defaults")
+	global_node.queue_free()
+
+
+func _test_stale_authoritative_empty_food_payload_preserves_defaults() -> void:
+	var global_script := load("res://scripts/global.gd") as Script
+	var global_node := global_script.new() as Node
+	root.add_child(global_node)
+	global_node.reset_shelter_inventory_runtime()
+	var water := load("res://resources/items/water_bottle.tres") as ItemData
+	var before := _count_storage_item(_get_storage(global_node, "food_cabinet"), water)
+	_expect(before > 0, "food_cabinet default should contain water before stale authoritative empty migration")
+	global_node.apply_global_save_payload({
+		"version": 3,
+		"shelter_inventory": {
+			"version": 1,
+			"sources": [{
+				"source_id": "food_cabinet",
+				"display_name": "食品柜",
+				"source_kind": "food",
+				"include_in_outing_pool": true,
+				"storage": {"version": 1, "slot_count": 16, "slots": [], "authoritative_empty": true},
+			}],
+		},
+	})
+	_expect(_count_storage_item(_get_storage(global_node, "food_cabinet"), water) == before, "stale authoritative empty food payload should preserve template defaults")
+	global_node.queue_free()
+
+
+func _test_explicit_default_clear_food_payload_can_clear_storage() -> void:
+	var global_script := load("res://scripts/global.gd") as Script
+	var global_node := global_script.new() as Node
+	root.add_child(global_node)
+	global_node.reset_shelter_inventory_runtime()
+	global_node.apply_global_save_payload({
+		"version": 3,
+		"shelter_inventory": {
+			"version": 1,
+			"sources": [{
+				"source_id": "food_cabinet",
+				"display_name": "食品柜",
+				"source_kind": "food",
+				"include_in_outing_pool": true,
+				"storage": {"version": 1, "slot_count": 16, "slots": [], "allow_default_clear": true},
+			}],
+		},
+	})
+	var water := load("res://resources/items/water_bottle.tres") as ItemData
+	_expect(_count_storage_item(_get_storage(global_node, "food_cabinet"), water) == 0, "explicit allow_default_clear payload should allow a genuinely emptied food cabinet")
 	global_node.queue_free()
 
 func _count_item(shelter: ShelterInventoryResource, item: ItemData) -> int:

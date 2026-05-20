@@ -8,7 +8,45 @@ signal body_state_requested(state_name: StringName, resolved_action_name: String
 signal selected_state_applied(state_name: StringName, resolved_action_name: StringName)
 
 @export_node_path("AnimationTree") var animation_tree_path: NodePath = NodePath("../../AnimationTree")
-@export var default_action: StringName = &"idle_normal"
+@export_enum(
+	"idle_normal",
+	"idle_relaxed",
+	"idle_sleepy",
+	"idle_alert",
+	"idle_fidget",
+	"listen",
+	"happy_bounce",
+	"stand",
+	"walk",
+	"run",
+	"seated_idle",
+	"seated_sleepy",
+	"work_inspect_cabinet",
+	"work_check_shelf",
+	"work_check_lower",
+	"work_count_supplies",
+	"work_reach",
+	"work_take_item",
+	"work_place_item",
+	"work_drink",
+	"work_explain",
+	"react_nod",
+	"react_wave",
+	"tiny_wave",
+	"rub_eye",
+	"sleepy_yawn",
+	"cute_startle",
+	"curious_peek",
+	"tilt_head_cute",
+	"look_back",
+	"look_around",
+	"turn_left",
+	"turn_right",
+	"turn_180"
+) var default_action_name: String = "idle_normal":
+	set = set_default_action_name,
+	get = get_default_action_name
+var default_action: StringName = &"idle_normal"
 @export var mode_transition_node: StringName = &"Mode"
 @export var auto_start_default: bool = true
 @export var apply_selected_state_on_ready: bool = false
@@ -58,6 +96,7 @@ signal selected_state_applied(state_name: StringName, resolved_action_name: Stri
 @export var debug_log_actions: bool = false
 @export var move_blend_lerp_speed: float = 2.0
 @export var stop_to_action_xfade_trigger_time: float = 0.42
+@export var stand_up_to_action_trigger_time: float = 1.15
 
 var _animation_tree: AnimationTree
 var _playbacks: Dictionary = {}
@@ -76,8 +115,15 @@ var _pending_stop_action: StringName = &""
 var _pending_stop_entered: bool = false
 var _pending_stop_elapsed: float = 0.0
 var _pending_stop_phase_elapsed: float = 0.0
+var _pending_state_after_stand_up: StringName = &""
+var _pending_action_after_stand_up: StringName = &""
+var _pending_stand_up_elapsed: float = 0.0
 var _move_blend_amount: float = 0.0
 var _target_move_blend_amount: float = 0.0
+var _pending_cross_mode_mode: StringName = &""
+var _pending_cross_mode_state: StringName = &""
+var _pending_cross_mode_sub_state: StringName = &""
+var _pending_cross_mode_frames: int = 0
 
 const MODE_LOCOMOTION := &"Locomotion"
 const MODE_POSTURE := &"Posture"
@@ -96,6 +142,17 @@ const ACTION_ALIASES := {
 	&"idle_fidget_loop": &"idle_fidget",
 	&"fidget": &"idle_fidget",
 	&"listen_loop": &"listen",
+	&"work_inspect_cabinet": &"inspect_cabinet",
+	&"work_check_shelf": &"check_shelf",
+	&"work_check_lower": &"check_lower",
+	&"work_count_supplies": &"count_supplies",
+	&"work_reach": &"stand_to_reach",
+	&"work_take_item": &"take_item",
+	&"work_place_item": &"place_item",
+	&"work_drink": &"drink",
+	&"work_explain": &"cute_explain",
+	&"react_nod": &"small_nod",
+	&"react_wave": &"small_wave",
 	&"walk": &"walk_forward",
 	&"walk_loop": &"walk_loop",
 	&"walk_forward_loop": &"walk_loop",
@@ -152,7 +209,7 @@ const STATE_ALIASES := {
 	&"run_forward": &"run",
 	&"run_loop": &"run",
 	&"sit": &"seated_idle",
-	&"sit_down": &"seated_idle",
+	&"sit_down": &"sit_down",
 	&"seat_idle": &"seated_idle",
 	&"sleep_in_chair": &"seated_sleepy",
 	&"inspect_cabinet": &"work_inspect_cabinet",
@@ -221,6 +278,11 @@ const ACTION_ROUTES := {
 func _ready() -> void:
 	_initialize_tree()
 	_locomotion_intent = &"idle"
+	_current_mode = MODE_LOCOMOTION
+	_current_state = &"IdleNormal"
+	_current_sub_state = &""
+	_set_target_move_blend(0.0)
+	_force_safe_tree_entry()
 	if Engine.is_editor_hint():
 		if apply_selected_state_on_ready:
 			call_deferred("apply_selected_state")
@@ -236,7 +298,9 @@ func _process(delta: float) -> void:
 	if not is_equal_approx(_move_blend_amount, _target_move_blend_amount):
 		_move_blend_amount = move_toward(_move_blend_amount, _target_move_blend_amount, move_blend_lerp_speed * delta)
 		_animation_tree.set("parameters/LocomotionSM/MoveLoop/WalkRunBlend/blend_amount", _move_blend_amount)
+	_update_pending_cross_mode_state()
 	_update_pending_after_locomotion_stop(delta)
+	_update_pending_after_stand_up(delta)
 
 func is_ready() -> bool:
 	return _animation_tree != null and not _playbacks.is_empty()
@@ -249,6 +313,8 @@ func request_action(action_name: StringName, _return_loop: StringName = &"") -> 
 		return true
 	if not ACTION_ROUTES.has(action):
 		return _fail(action_name, "unknown action")
+	if _should_stand_up_before_action(action):
+		return _queue_after_stand_up(&"", action)
 	if _should_stop_locomotion_before_action(action):
 		return _queue_after_locomotion_stop(&"", action)
 	var route: Dictionary = ACTION_ROUTES[action]
@@ -264,6 +330,8 @@ func request_state(state_name: StringName) -> bool:
 	var action := _resolve_state_to_action(state)
 	if action == &"":
 		return _fail(state_name, "unknown state")
+	if _should_stand_up_before_action(action):
+		return _queue_after_stand_up(state, action)
 	if _should_stop_locomotion_before_action(action):
 		return _queue_after_locomotion_stop(state, action)
 	var ok := request_action(action)
@@ -296,6 +364,13 @@ func set_selected_state_name(state_name: String) -> void:
 
 func get_selected_state_name() -> String:
 	return String(_desired_state)
+
+func set_default_action_name(action_name: String) -> void:
+	default_action = _normalize_state(StringName(action_name))
+	default_action_name = String(default_action)
+
+func get_default_action_name() -> String:
+	return String(default_action)
 
 func set_desired_action(action_name: StringName) -> void:
 	set_selected_state_name(String(action_name))
@@ -405,12 +480,15 @@ func _travel(mode_name: StringName, state_name: StringName, action_name: StringN
 		return _fail(action_name, "missing playback for mode %s" % String(mode_name))
 	var is_cross_mode := mode_name != _current_mode
 	if is_cross_mode:
-		# Cross-group blend is handled by Mode, but the target group should still use its own entry transition.
-		# Start from the group's Start pseudo-state, then travel to the requested state instead of jumping directly.
-		playback.start("Start", true)
-		playback.travel(String(state_name))
 		if not _set_mode(mode_name):
 			return false
+		# Mode switches can reset the inactive subtree to Start in the same
+		# frame. Defer the target travel one frame so we still only request the
+		# semantic state, while the authored state machine owns all transitions.
+		_pending_cross_mode_mode = mode_name
+		_pending_cross_mode_state = state_name
+		_pending_cross_mode_sub_state = sub_state
+		_pending_cross_mode_frames = 2
 	else:
 		# Same-group changes must not touch Mode; Mode self-transition can reset/override the group's xfade.
 		playback.travel(String(state_name))
@@ -426,6 +504,33 @@ func _travel(mode_name: StringName, state_name: StringName, action_name: StringN
 	_schedule_pending_after_locomotion_stop(action_name)
 	return true
 
+func _update_pending_cross_mode_state() -> void:
+	if _pending_cross_mode_state == &"":
+		return
+	if _pending_cross_mode_frames > 0:
+		_pending_cross_mode_frames -= 1
+		return
+	_apply_pending_cross_mode_state()
+
+func _apply_pending_cross_mode_state() -> void:
+	if _pending_cross_mode_state == &"":
+		return
+	var mode_name := _pending_cross_mode_mode
+	var state_name := _pending_cross_mode_state
+	var sub_state := _pending_cross_mode_sub_state
+	_pending_cross_mode_mode = &""
+	_pending_cross_mode_state = &""
+	_pending_cross_mode_sub_state = &""
+	_pending_cross_mode_frames = 0
+	var playback := _playbacks.get(mode_name) as AnimationNodeStateMachinePlayback
+	if playback == null:
+		return
+	playback.travel(String(state_name))
+	_current_mode = mode_name
+	_current_state = state_name
+	_current_sub_state = &""
+	if sub_state != &"":
+		_travel_nested(mode_name, state_name, sub_state)
 
 func _travel_nested(mode_name: StringName, state_name: StringName, sub_state: StringName) -> void:
 	if _animation_tree == null:
@@ -455,6 +560,17 @@ func _initialize_tree() -> bool:
 		if playback != null:
 			_playbacks[mode] = playback
 	return not _playbacks.is_empty()
+
+
+func _force_safe_tree_entry() -> void:
+	if _animation_tree == null:
+		return
+	_set_mode(MODE_LOCOMOTION)
+	var locomotion_playback := _playbacks.get(MODE_LOCOMOTION) as AnimationNodeStateMachinePlayback
+	if locomotion_playback != null:
+		locomotion_playback.start("IdleNormal", true)
+		_current_mode = MODE_LOCOMOTION
+		_current_state = &"IdleNormal"
 
 func _ensure_ready() -> bool:
 	if is_ready():
@@ -553,6 +669,38 @@ func _resolve_contextual_locomotion_action(action_name: StringName) -> StringNam
 	if action_name == &"walk_forward" and _current_mode == MODE_LOCOMOTION and (actual_state in [&"WalkStart", &"MoveLoop"] or _locomotion_intent == &"walk"):
 		return &"walk_loop"
 	return action_name
+
+
+func _should_stand_up_before_action(action_name: StringName) -> bool:
+	if _pending_action_after_stand_up != &"":
+		return false
+	if _posture_intent != &"seated":
+		return false
+	return not action_name in [&"sit_down", &"seated_idle", &"seated_sleepy", &"stand_up"]
+
+func _queue_after_stand_up(state_name: StringName, action_name: StringName) -> bool:
+	_pending_state_after_stand_up = state_name
+	_pending_action_after_stand_up = action_name
+	_pending_stand_up_elapsed = 0.0
+	var ok := request_action(&"stand_up")
+	if ok:
+		body_state_requested.emit(state_name, _last_requested_action)
+	return ok
+
+func _update_pending_after_stand_up(delta: float) -> void:
+	if _pending_action_after_stand_up == &"":
+		return
+	_pending_stand_up_elapsed += delta
+	if _pending_stand_up_elapsed >= stand_up_to_action_trigger_time:
+		_play_pending_after_stand_up(_pending_state_after_stand_up, _pending_action_after_stand_up)
+
+func _play_pending_after_stand_up(state_name: StringName, action_name: StringName) -> void:
+	_pending_action_after_stand_up = &""
+	_pending_state_after_stand_up = &""
+	_pending_stand_up_elapsed = 0.0
+	request_action(action_name)
+	if state_name != &"":
+		body_state_requested.emit(state_name, _last_requested_action)
 
 func _should_stop_locomotion_before_action(action_name: StringName) -> bool:
 	if _pending_action_after_locomotion_stop != &"":

@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("高级零件", "燃料", "工具")
 recommended_auxiliary_tools = PackedStringArray("手枪", "撬棍", "医疗包")
 detail_notes = PackedStringArray("外缘工业方向", "需要先发现路线", "建议携带防身装备")
-ai_exploration_rule = "AI 应强调高架桥阴影、废车掩体、锁住的工具柜和高威胁遭遇。携带手枪可降低高威胁叙事惩罚；撬棍可打开工具柜；医疗包可缓解事故。该地点只能产生资源和路线线索，不能成为庇护所。"
+ai_exploration_rule = "丧尸末世探索：高架桥维修车库阴影重、废车密集、工具柜上锁，噪音会在桥下聚集尸群。AI 应描写高威胁遭遇、废车掩体、撬柜/撤退取舍；携带武器降低受伤，撬棍提高工具收益，医疗包缓解事故。只能产生资源和路线线索，不能成为庇护所。"

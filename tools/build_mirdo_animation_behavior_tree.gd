@@ -121,12 +121,22 @@ func _build_posture_sm() -> AnimationNodeStateMachine:
 	_add_loop_state(sm, &"SeatedIdle", &"seated_idle_loop", Vector2(280, 0), _loop_xfade(&"seated_idle_loop"))
 	_add_loop_state(sm, &"SeatedSleepy", &"seated_sleepy_loop", Vector2(560, 0), _loop_xfade(&"seated_sleepy_loop"))
 	_add_anim_state(sm, &"StandUp", &"stand_up", Vector2(840, 0))
-	_add_transition(sm, &"Start", &"SeatedIdle", _auto_transition(0.10, false))
+	for entry_state in [&"SitDown", &"SeatedIdle", &"SeatedSleepy", &"StandUp"]:
+		_add_transition(sm, &"Start", entry_state, _manual_transition(0.18))
+	# SitDown is a transition action: after it finishes, settle into seated idle.
 	_add_transition(sm, &"SitDown", &"SeatedIdle", _auto_transition(0.26, false))
-	_add_transition(sm, &"SeatedIdle", &"SeatedSleepy", _manual_transition(0.48))
-	_add_transition(sm, &"SeatedSleepy", &"SeatedIdle", _manual_transition(0.48))
-	_add_transition(sm, &"SeatedIdle", &"StandUp", _manual_transition(0.30))
+	# Explicit requests should always have a direct path instead of waiting for an auto-return.
+	_add_transition(sm, &"SitDown", &"SeatedSleepy", _manual_transition(0.30))
+	_add_transition(sm, &"SitDown", &"StandUp", _manual_transition(0.24))
+	_add_transition(sm, &"SeatedIdle", &"SitDown", _manual_transition(0.22))
+	_add_transition(sm, &"SeatedIdle", &"SeatedSleepy", _manual_transition(0.42))
+	_add_transition(sm, &"SeatedIdle", &"StandUp", _manual_transition(0.32))
+	_add_transition(sm, &"SeatedSleepy", &"SitDown", _manual_transition(0.24))
+	_add_transition(sm, &"SeatedSleepy", &"SeatedIdle", _manual_transition(0.42))
 	_add_transition(sm, &"SeatedSleepy", &"StandUp", _manual_transition(0.34))
+	_add_transition(sm, &"StandUp", &"SitDown", _manual_transition(0.24))
+	_add_transition(sm, &"StandUp", &"SeatedIdle", _manual_transition(0.30))
+	_add_transition(sm, &"StandUp", &"SeatedSleepy", _manual_transition(0.32))
 	return sm
 
 func _build_work_sm() -> AnimationNodeStateMachine:

@@ -83,6 +83,10 @@ func get_provider_settings() -> Dictionary:
 	}
 
 
+func has_complete_provider() -> bool:
+	return not base_url.strip_edges().is_empty() and not model.strip_edges().is_empty()
+
+
 func get_masked_api_key() -> String:
 	if api_key.is_empty():
 		return ""
@@ -112,4 +116,3 @@ func _normalize_base_url(value: String) -> String:
 	while normalized.length() > 1 and normalized.ends_with("/"):
 		normalized = normalized.substr(0, normalized.length() - 1)
 	return normalized
-

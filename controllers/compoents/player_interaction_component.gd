@@ -6,7 +6,8 @@ const MODE_NONE: StringName = &""
 const MODE_WORLD: StringName = &"world"
 const MODE_LEGACY_WORLD: StringName = &"legacy_world"
 const XIAOKONG_GROUP: StringName = &"Xiaokong"
-const XIAOKONG_CHARACTER_INTERACTABLE_PATH: NodePath = NodePath("Components/CharacterInteractable")
+const CHARACTER_INTERACTABLE_PATH: NodePath = NodePath("Components/CharacterInteractable")
+const XIAOKONG_CHARACTER_INTERACTABLE_PATH: NodePath = CHARACTER_INTERACTABLE_PATH
 
 @export_category("References")
 @export var interaction_ray: RayCast3D
@@ -22,7 +23,7 @@ const XIAOKONG_CHARACTER_INTERACTABLE_PATH: NodePath = NodePath("Components/Char
 @export_category("Settings")
 @export var interact_key: Key = KEY_E
 @export var fallback_group_search_enabled: bool = true
-@export var fallback_interactable_groups: PackedStringArray = PackedStringArray([&"xiaokong_interactable"])
+@export var fallback_interactable_groups: PackedStringArray = PackedStringArray([&"character_interactable", &"xiaokong_interactable"])
 @export_range(0.1, 3.0, 0.05) var fallback_interactable_max_distance: float = 0.6
 @export_range(0, 8, 1) var world_interactable_descendant_search_depth: int = 4
 @export_range(0, 8, 1) var world_interactable_parent_search_depth: int = 6
@@ -46,6 +47,13 @@ var _world_panel_selected_option_id: String = ""
 var _world_panel_hold_executed: bool = false
 var _ignored_held_collision: CollisionObject3D = null
 var _external_ui_blocked: bool = false
+
+func _get_global_player() -> Node:
+	var global_node := get_node_or_null(NodePath("/root/Global"))
+	if global_node == null:
+		return null
+	var value: Variant = global_node.get("player")
+	return value as Node
 
 func _ready() -> void:
 	set_process_unhandled_input(true)
@@ -142,6 +150,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _resolve_interaction_target(collider: Node, hit_position: Vector3) -> Dictionary:
+	var character_target: Node = _resolve_character_interactable_target(collider)
+	if character_target != null and not _is_target_held_object(character_target):
+		return {"target": character_target, "mode": MODE_WORLD}
+
 	var xiaokong_target: Node = _resolve_xiaokong_interactable_target(collider)
 	if xiaokong_target != null and not _is_target_held_object(xiaokong_target):
 		return {"target": xiaokong_target, "mode": MODE_WORLD}
@@ -163,6 +175,15 @@ func _resolve_interaction_target(collider: Node, hit_position: Vector3) -> Dicti
 
 	return {"target": null, "mode": MODE_NONE}
 
+func _resolve_character_interactable_target(collider: Node) -> Node:
+	var root := _find_root_by_interactable_path(collider, CHARACTER_INTERACTABLE_PATH)
+	if root == null:
+		return null
+	var interactable: Node = root.get_node_or_null(CHARACTER_INTERACTABLE_PATH)
+	if _is_world_interactable_candidate(interactable):
+		return interactable
+	return _find_world_interactable_recursive(root, world_interactable_descendant_search_depth + 2)
+
 func _resolve_xiaokong_interactable_target(collider: Node) -> Node:
 	var xiaokong_root: Node = _find_xiaokong_root(collider)
 	if xiaokong_root == null:
@@ -183,9 +204,12 @@ func _find_xiaokong_root(from_node: Node) -> Node:
 	return null
 
 func _find_xiaokong_root_by_interactable_path(from_node: Node) -> Node:
+	return _find_root_by_interactable_path(from_node, XIAOKONG_CHARACTER_INTERACTABLE_PATH)
+
+func _find_root_by_interactable_path(from_node: Node, interactable_path: NodePath) -> Node:
 	var current: Node = from_node
 	while current != null:
-		var interactable: Node = current.get_node_or_null(XIAOKONG_CHARACTER_INTERACTABLE_PATH)
+		var interactable: Node = current.get_node_or_null(interactable_path)
 		if _is_world_interactable_candidate(interactable):
 			return current
 		current = current.get_parent()
@@ -644,29 +668,30 @@ func _build_legacy_world_panel_model(target: Node) -> WorldInteractionPanelModel
 func _execute_legacy_world_panel_option(target: Node, option_id: String, completed_by_hold: bool, _hold_time: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
-	if Global.player == null:
+	var global_player := _get_global_player()
+	if global_player == null:
 		return
 
 	match option_id:
 		"legacy_pickup_or_stash":
 			if completed_by_hold:
 				if target.has_method("interact"):
-					target.call("interact", Global.player)
+					target.call("interact", global_player)
 			elif target.has_method("short_interact"):
-				target.call("short_interact", Global.player)
+				target.call("short_interact", global_player)
 			elif target.has_method("interact"):
-				target.call("interact", Global.player)
+				target.call("interact", global_player)
 		"legacy_pickup_only":
 			if target.has_method("short_interact"):
-				target.call("short_interact", Global.player)
+				target.call("short_interact", global_player)
 			elif target.has_method("interact"):
-				target.call("interact", Global.player)
+				target.call("interact", global_player)
 		"legacy_stash_only":
 			if target.has_method("interact"):
-				target.call("interact", Global.player)
+				target.call("interact", global_player)
 		_:
 			if target.has_method("interact"):
-				target.call("interact", Global.player)
+				target.call("interact", global_player)
 
 func _get_legacy_hold_duration(target: Node) -> float:
 	if target == null or not is_instance_valid(target):
@@ -698,10 +723,11 @@ func _legacy_can_stash_now(target: Node) -> bool:
 	var item_data: ItemData = _extract_item_data_from_legacy_target(target)
 	if item_data == null:
 		return false
-	if Global.player == null:
+	var global_player := _get_global_player()
+	if global_player == null:
 		return false
 
-	var inventory_handler: Object = Global.player.get("inventory_handler") as Object
+	var inventory_handler: Object = global_player.get("inventory_handler") as Object
 	if inventory_handler == null:
 		return true
 	if inventory_handler.has_method("CanPickupItem"):
@@ -790,9 +816,10 @@ func _sync_held_object_exception() -> void:
 		interaction_ray.add_exception(_ignored_held_collision)
 
 func _get_held_collision_object() -> CollisionObject3D:
-	if Global.player == null:
+	var global_player := _get_global_player()
+	if global_player == null:
 		return null
-	var pickup_handler: Object = Global.player.get("pickup_handler") as Object
+	var pickup_handler: Object = global_player.get("pickup_handler") as Object
 	if pickup_handler == null:
 		return null
 
@@ -879,9 +906,10 @@ func is_external_ui_blocked() -> bool:
 	return _external_ui_blocked
 
 func _is_inventory_open() -> bool:
-	if Global.player == null:
+	var global_player := _get_global_player()
+	if global_player == null:
 		return false
-	var inventory: Object = Global.player.get("inventory_handler") as Object
+	var inventory: Object = global_player.get("inventory_handler") as Object
 	if inventory == null:
 		return false
 	return bool(inventory.get("inventory_visible"))
@@ -908,9 +936,10 @@ func _is_local_inventory_panel_open() -> bool:
 	return false
 
 func _is_holding_object() -> bool:
-	if Global.player == null:
+	var global_player := _get_global_player()
+	if global_player == null:
 		return false
-	var pickup_handler: Object = Global.player.get("pickup_handler") as Object
+	var pickup_handler: Object = global_player.get("pickup_handler") as Object
 	if pickup_handler == null:
 		return false
 	if pickup_handler.has_method("is_holding_object"):
@@ -919,7 +948,7 @@ func _is_holding_object() -> bool:
 
 func _build_interaction_context() -> Dictionary:
 	return FPSWorldPanelContext.build(
-		Global.player,
+		_get_global_player(),
 		self,
 		current_interactable,
 		String(current_interaction_mode),

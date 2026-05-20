@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray("garage", "gas_station")
 loot_bias_tags = PackedStringArray("燃料", "零件", "地图线索")
 recommended_auxiliary_tools = PackedStringArray("手电", "近战武器")
 detail_notes = PackedStringArray("空旷区域视野好", "车辆残骸可快速搜刮", "可能沿西侧道路发现更远地点")
-ai_exploration_rule = "AI 应把这里描述为开阔出租车调度点和车辆残骸搜索。重点生成燃料、工具、路线图线索；风险来自空旷地带的游荡者和车辆警报。成功时沿西侧道路向外发现 garage 或 gas_station 路线。禁止生成可定居地点。"
+ai_exploration_rule = "丧尸末世探索：废弃出租车站开阔但车辆残骸多，车门警报和调度室噪音会吸引游荡者。AI 应描写快速搜刮油箱、工具箱、路线图和车站办公室。风险来自空旷地带被包围；成功时沿西侧道路向外发现 garage 或 gas_station 路线。禁止生成可定居地点。"

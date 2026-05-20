@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("滤芯", "管线", "净水剂")
 recommended_auxiliary_tools = PackedStringArray("撬棍", "手电", "消毒药")
 detail_notes = PackedStringArray("河岸深处设施", "路程远且撤退困难", "水处理收益高")
-ai_exploration_rule = "AI 应生成净水站、管线、设备间和潮湿环境风险。收益偏滤芯、管线、净水剂；不能生成新庇护所。"
+ai_exploration_rule = "丧尸末世探索：小型净水站位于河岸深处，设备间潮湿、管线复杂、回程最慢。AI 应描写水泵房、滤芯、管线、净水剂和潮湿环境导致的滑倒/感染风险。收益偏滤芯、管线、净水剂；高威胁下可以受伤或只拿到少量物资。不能生成新庇护所。"

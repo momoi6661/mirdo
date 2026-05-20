@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://features/anime_toon/anime_outline.gdshader" id="1_outline"]
+
+[resource]
+render_priority = -1
+shader = ExtResource("1_outline")
+shader_parameter/outline_color = Color(0.045, 0.038, 0.045, 1)
+shader_parameter/outline_width = 0.0022
+shader_parameter/normal_smooth_blend = 0.72
+shader_parameter/min_direction_length = 0.002
+shader_parameter/distance_fade_start = 5.0
+shader_parameter/distance_fade_end = 28.0
+shader_parameter/alpha = 0.9

@@ -235,6 +235,8 @@ func _sanitize_runtime_storage_items() -> void:
 		if stack == null or stack.is_empty():
 			continue
 		if not _is_item_allowed_by_filters(stack.item):
+			if _should_preserve_default_food_item(stack.item):
+				continue
 			stack.clear()
 
 
@@ -281,6 +283,17 @@ func _normalize_slot_amount(item: ItemData, amount: int) -> int:
 	if not enable_item_stacking:
 		return 1
 	return clampi(amount, 1, maxi(1, item.MaxStackSize))
+
+
+func _should_preserve_default_food_item(item: ItemData) -> bool:
+	if item == null:
+		return false
+	if not _uses_shelter_runtime_storage():
+		return false
+	var source_id := String(shelter_source_id).strip_edges()
+	if source_id != "food_cabinet" and source_id != "food_cabinet_2":
+		return false
+	return item.outing_category == "food"
 
 
 func _uses_shelter_runtime_storage() -> bool:

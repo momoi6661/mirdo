@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray("warehouse")
 loot_bias_tags = PackedStringArray("燃料", "电池", "零食")
 recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "地图册")
 detail_notes = PackedStringArray("油气味重，禁止明火", "便利店货架可能有残余补给", "可继续向河岸外缘发现仓库路线")
-ai_exploration_rule = "AI 应围绕废弃加油站、便利店货架、地下油罐、车辆残骸生成探索。燃料收益高，但需强调易燃和噪声风险。携带手电可检查后仓；武器降低遭遇风险。成功时沿西北道路向外发现 warehouse。禁止生成庇护所。"
+ai_exploration_rule = "丧尸末世探索：锈蚀加油站包含便利店货架、地下油罐、车辆残骸和易燃泄漏区。AI 应描写燃料气味、玻璃碎裂、车辆警报和丧尸被噪声吸引。燃料收益高但风险高；手电可检查后仓，武器降低遭遇损伤。成功时沿西北道路向外发现 warehouse 线索。禁止生成庇护所。"

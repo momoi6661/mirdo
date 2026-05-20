@@ -1,0 +1,194 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://controllers/scripts/save_slot_menu.gd" id="1_save_slot_menu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_drawer"]
+bg_color = Color(0.014, 0.014, 0.017, 0.985)
+border_width_left = 3
+border_color = Color(0.78, 0.28, 0.08, 0.82)
+corner_radius_top_left = 42
+corner_radius_bottom_left = 8
+corner_detail = 1
+shadow_color = Color(0, 0, 0, 0.52)
+shadow_size = 18
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header_line"]
+bg_color = Color(0.82, 0.36, 0.08, 0.90)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button"]
+bg_color = Color(0.9, 0.3, 0.05, 0.14)
+border_width_left = 4
+border_color = Color(0.9, 0.3, 0.05, 0.95)
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button_hover"]
+bg_color = Color(0.9, 0.3, 0.05, 0.28)
+border_width_left = 4
+border_color = Color(1, 0.45, 0.12, 1)
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+
+[node name="SaveSlotMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 80
+script = ExtResource("1_save_slot_menu")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.20)
+
+[node name="DrawerPanel" type="Panel" parent="Root"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(720, 0)
+layout_mode = 1
+anchors_preset = 11
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 720.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_drawer")
+
+[node name="Margin" type="MarginContainer" parent="Root/DrawerPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 62.0
+offset_right = -42.0
+offset_bottom = -38.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainRows" type="VBoxContainer" parent="Root/DrawerPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Header" type="HBoxContainer" parent="Root/DrawerPanel/Margin/MainRows"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="HeaderLine" type="Panel" parent="Root/DrawerPanel/Margin/MainRows/Header"]
+custom_minimum_size = Vector2(8, 64)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_styles/panel = SubResource("StyleBoxFlat_header_line")
+
+[node name="TitleStack" type="VBoxContainer" parent="Root/DrawerPanel/Margin/MainRows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TitleLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows/Header/TitleStack"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 34
+text = "游戏进度"
+
+[node name="SubtitleLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows/Header/TitleStack"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.52)
+theme_override_font_sizes/font_size = 15
+text = "选择进度槽位，管理当前游戏进度"
+autowrap_mode = 3
+
+[node name="Toolbar" type="HBoxContainer" parent="Root/DrawerPanel/Margin/MainRows/Header"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 10
+
+[node name="RefreshButton" type="Button" parent="Root/DrawerPanel/Margin/MainRows/Header/Toolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(86, 42)
+layout_mode = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+text = "刷新"
+alignment = 0
+
+[node name="BackButton" type="Button" parent="Root/DrawerPanel/Margin/MainRows/Header/Toolbar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(86, 42)
+layout_mode = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+text = "返回"
+alignment = 0
+
+[node name="CurrentSlotLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.50)
+theme_override_font_sizes/font_size = 15
+text = "当前进度槽：进度槽 01"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Root/DrawerPanel/Margin/MainRows"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="SlotList" type="VBoxContainer" parent="Root/DrawerPanel/Margin/MainRows/ScrollContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="StatusLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.46)
+theme_override_font_sizes/font_size = 15
+text = "保存会覆盖目标槽位；读取会切换当前进度。"
+autowrap_mode = 3
+
+[node name="ConfirmDeleteDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+process_mode = 3
+title = "清理进度"
+dialog_text = "确定清理这个进度槽吗？"
+ok_button_text = "清理"
+cancel_button_text = "取消"
+
+[node name="UISoundPlayer" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+process_mode = 3

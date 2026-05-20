@@ -16,5 +16,5 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("通讯零件", "电池", "线缆")
 recommended_auxiliary_tools = PackedStringArray("手电", "近战武器", "医疗包")
 detail_notes = PackedStringArray("北侧外缘高点", "可获得远距地图情报", "机房狭窄且噪声明显")
-ai_exploration_rule = "AI 应生成旧广播塔、机房、电缆井和高处眺望的探索叙事。成功后可根据解锁资源向更远地区提供线索；不能生成庇护所。"
+ai_exploration_rule = "丧尸末世探索：旧广播塔高处可观察远方，但机房、电缆井和塔梯都有跌落与丧尸围堵风险。AI 应描写爬升前侦查、机房搜索、电池/线缆拆取和高处看到的尸群流向。成功后可根据解锁资源提供更远地区线索；不能生成庇护所。"
 

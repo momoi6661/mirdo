@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("药品", "绷带", "消毒物")
 recommended_auxiliary_tools = PackedStringArray("撬棍", "手电", "消毒药")
 detail_notes = PackedStringArray("住宅区外缘医疗点", "柜台后方可能被锁", "适合补医疗物资")
-ai_exploration_rule = "AI 应生成药房柜台、药柜、破碎玻璃和粉尘风险。收益偏医疗物资；禁止庇护所相关展开。"
+ai_exploration_rule = "丧尸末世探索：转角药房玻璃破碎、柜台后方上锁，药柜和小仓库可能残留感染者。AI 应描写粉尘、药瓶碎片、过期药筛选和被丧尸堵门的风险。收益偏药品、绷带、消毒物；可以因尸群靠近而只拿到少量物资或空手撤退。禁止庇护所相关展开。"

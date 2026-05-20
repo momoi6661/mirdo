@@ -16,4 +16,4 @@ neighbor_location_ids = PackedStringArray()
 loot_bias_tags = PackedStringArray("弹药", "防具", "通讯零件")
 recommended_auxiliary_tools = PackedStringArray("手枪", "医疗包", "撬棍")
 detail_notes = PackedStringArray("最高威胁区域", "可能有防具或弹药", "建议准备充分后再去")
-ai_exploration_rule = "AI 应生成高压警戒点、废弃警车、路障、帐篷和高威胁遭遇。携带手枪和医疗包会显著改善叙事结果；收益偏弹药、防具、通讯零件。绝不能生成占领警戒点作为新庇护所。"
+ai_exploration_rule = "丧尸末世探索：临时警戒点是高威胁区域，废弃警车、路障、帐篷和弹药箱周围有密集丧尸。AI 应生成压迫感强的接近、观察、短促搜索和撤退。携带手枪/近战武器/医疗包会显著改善结果；收益偏弹药、防具、通讯零件。可以受伤或无收益撤退；绝不能占领警戒点作为新庇护所。"

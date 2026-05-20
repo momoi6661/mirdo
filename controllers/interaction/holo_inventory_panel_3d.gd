@@ -116,6 +116,9 @@ var _drag_amount: int = 0
 var _drag_item: ItemData
 var _panel_transform_initialized: bool = false
 var _hint_mouse_free_mode: bool = false
+var _use_target_state: Node = null
+var _use_target_label: String = ""
+var _last_use_feedback: String = ""
 var _missing_anchor_warned: bool = false
 var _open_face_camera_basis: Basis
 var _open_face_camera_basis_valid: bool = false
@@ -165,14 +168,17 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not _drag_active and allow_item_dragging:
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and not _drag_active:
 			var press_hit := _get_mouse_local_hit_info(mb.position)
 			if bool(press_hit.get("hit", false)):
 				var press_local: Vector3 = press_hit.get("local", Vector3.ZERO) as Vector3
 				if _is_local_point_inside_panel(press_local):
 					var press_slot: int = _slot_index_from_local_point(press_local)
 					if press_slot >= 0:
-						_handle_left_press(press_slot, mb.shift_pressed, mb.ctrl_pressed)
+						if mb.double_click:
+							_try_use_slot_item(press_slot)
+						elif allow_item_dragging:
+							_handle_left_press(press_slot, mb.shift_pressed, mb.ctrl_pressed)
 						get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and _drag_active:
 			var release_hit := _get_mouse_local_hit_info(mb.position)
@@ -196,6 +202,15 @@ func _input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and _drag_active:
 			_cancel_drag()
 			get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and not _drag_active:
+			var right_hit := _get_mouse_local_hit_info(mb.position)
+			if bool(right_hit.get("hit", false)):
+				var right_local: Vector3 = right_hit.get("local", Vector3.ZERO) as Vector3
+				if _is_local_point_inside_panel(right_local):
+					var right_slot: int = _slot_index_from_local_point(right_local)
+					if right_slot >= 0:
+						_try_use_slot_item(right_slot)
+						get_viewport().set_input_as_handled()
 	elif event is InputEventKey:
 		var key_event := event as InputEventKey
 		if key_event.pressed and key_event.keycode == KEY_ESCAPE and _drag_active:
@@ -317,6 +332,32 @@ func set_alt_hint_state(is_mouse_free_mode: bool) -> void:
 
 func get_inventory_data_source() -> InventoryDataService:
 	return _inventory_data
+
+
+func set_use_target_context(target_state: Node, target_label: String = "") -> void:
+	_use_target_state = target_state
+	_use_target_label = String(target_label).strip_edges()
+	_last_use_feedback = ""
+	_refresh_hint_text_for_use_context()
+
+
+func clear_use_target_context() -> void:
+	_use_target_state = null
+	_use_target_label = ""
+	_last_use_feedback = ""
+	_refresh_hint_text_for_use_context()
+
+
+func get_use_target_label() -> String:
+	if _use_target_state != null and is_instance_valid(_use_target_state):
+		if not _use_target_label.is_empty():
+			return _use_target_label
+		return String(_use_target_state.name).strip_edges()
+	return ""
+
+
+func use_slot_item_for_tests(slot_index: int) -> bool:
+	return _try_use_slot_item(slot_index)
 
 
 func is_mouse_over_panel() -> bool:
@@ -884,7 +925,20 @@ func _build_hint_text() -> String:
 	var override_text := _get_hint_text_override()
 	if not override_text.is_empty():
 		return override_text
-	return "Alt: 锁定视角" if _hint_mouse_free_mode else "Alt: 自由鼠标"
+	var mouse_hint := "Alt: 锁定视角" if _hint_mouse_free_mode else "Alt: 自由鼠标"
+	var target_label := get_use_target_label()
+	var use_hint := "双击/右键: 使用"
+	if not target_label.is_empty():
+		use_hint = "双击/右键: 给 %s 使用" % target_label
+	if not _last_use_feedback.is_empty():
+		return "%s · %s" % [_last_use_feedback, mouse_hint]
+	return "%s · %s" % [use_hint, mouse_hint]
+
+
+func _refresh_hint_text_for_use_context() -> void:
+	if _hint_label == null and _hint_label_back == null:
+		return
+	_set_hint_text(_build_hint_text())
 
 
 func _get_hint_text_override() -> String:
@@ -1079,6 +1133,32 @@ func _on_hit_area_input_event(_camera_node: Node, event: InputEvent, hit_positio
 		if _drag_active:
 			_update_drag_ghost_position(hit_position, true)
 		return
+
+
+func _try_use_slot_item(slot_index: int) -> bool:
+	if _inventory_data == null or not is_instance_valid(_inventory_data):
+		return false
+	if not _inventory_data.has_method("use_item_in_slot"):
+		return false
+	var target_state: Node = null
+	if _use_target_state != null and is_instance_valid(_use_target_state):
+		target_state = _use_target_state
+	elif _use_target_state != null:
+		clear_use_target_context()
+	var used := false
+	if target_state != null:
+		used = bool(_inventory_data.call("use_item_in_slot", slot_index, target_state))
+	else:
+		used = bool(_inventory_data.call("use_item_in_slot", slot_index))
+	if used:
+		var target_label := get_use_target_label()
+		_last_use_feedback = "已给 %s 使用" % target_label if not target_label.is_empty() else "已使用"
+		_refresh_all_slot_visuals()
+	else:
+		var fail_target_label := get_use_target_label()
+		_last_use_feedback = "%s 当前不需要这个" % fail_target_label if not fail_target_label.is_empty() else "当前不需要使用"
+	_refresh_hint_text_for_use_context()
+	return used
 
 
 func _handle_left_press(slot_index: int, shift_pressed: bool, ctrl_pressed: bool) -> void:

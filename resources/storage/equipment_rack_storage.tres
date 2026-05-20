@@ -4,9 +4,9 @@
 [ext_resource type="Script" uid="uid://dve7olat70ar3" path="res://scripts/Inventory/inventory_slot_stack_resource.gd" id="2_slot_script"]
 [ext_resource type="Resource" path="res://resources/items/crowbar.tres" id="3_crowbar"]
 [ext_resource type="Resource" path="res://resources/items/flashlight.tres" id="4_flashlight"]
-[ext_resource type="Resource" path="res://resources/items/knife.tres" id="5_knife"]
-[ext_resource type="Resource" path="res://resources/items/fire_axe.tres" id="6_fire_axe"]
-[ext_resource type="Resource" path="res://resources/items/metal_pipe.tres" id="7_pipe"]
+[ext_resource type="Resource" uid="uid://gvwxupyenixm" path="res://resources/items/knife.tres" id="5_knife"]
+[ext_resource type="Resource" uid="uid://bth7ju4ow373m" path="res://resources/items/fire_axe.tres" id="6_fire_axe"]
+[ext_resource type="Resource" uid="uid://de45w0gbqfelv" path="res://resources/items/metal_pipe.tres" id="7_pipe"]
 [ext_resource type="Resource" path="res://resources/items/map_atlas.tres" id="8_map"]
 [ext_resource type="Resource" path="res://resources/items/portable_generator.tres" id="9_generator_item"]
 

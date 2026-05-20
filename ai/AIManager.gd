@@ -84,6 +84,7 @@ var _event_reconnect_left_sec: float = -1.0
 var _event_last_turn_id: int = 0
 
 func _ready() -> void:
+	add_to_group("ai_manager")
 	_resolve_settings_service()
 	_ensure_http_request()
 	_ensure_history_request()

@@ -22,7 +22,14 @@ signal model_probe_failed(error_text: String)
 @export var fallback_reply_text: String = "信号不稳定，我们先留在避难所，稳住状态再行动。"
 @export_range(-20.0, 20.0, 0.5) var fallback_mood_delta: float = 1.0
 @export var session_id: String = "default_session"
-@export var save_slot_name: String = "manual_save"
+@export var save_slot_name: String = ""
+@export_category("NPC Contract")
+@export var npc_display_name: String = "小空"
+@export_multiline var npc_role_prompt: String = "末日避难所便利站的少女 NPC，谨慎、温和、可靠，会把玩家称为老师。"
+@export var available_body_actions: PackedStringArray = PackedStringArray(["Idle", "Talk", "Follow", "Navigate", "GiveItem", "Rest", "Alert"])
+@export var available_expressions: PackedStringArray = PackedStringArray(["neutral", "joy", "fun", "angry", "sorrow", "surprised"])
+@export var available_visemes: PackedStringArray = PackedStringArray(["aa", "ih", "ou", "E", "oh"])
+@export_category("Debug")
 @export var always_log: bool = true
 @export var transparent_request_debug: bool = true
 @export var external_history_poll_enabled: bool = false
@@ -141,7 +148,7 @@ func send_subtitle_test(test_text: String = "Subtitle debug test") -> Dictionary
 		"given_item": "",
 		"context": {
 			"session_id": clean_session_id,
-			"save_slot": save_slot_name.strip_edges(),
+			"save_slot": _resolve_save_slot_name(),
 			"debug_subtitle_test": true,
 			"debug_transparent": transparent_request_debug,
 			"request_source": "godot_debug_subtitle_test",
@@ -239,9 +246,10 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 
 	var context_data := {
 		"session_id": clean_session_id,
-		"save_slot": save_slot_name.strip_edges(),
+		"save_slot": _resolve_save_slot_name(),
 		"debug_transparent": transparent_request_debug,
 		"request_source": "godot_runtime",
+		"npc": _build_npc_contract_context(),
 	}
 	var perception_snapshot: Dictionary = _build_compact_perception_context()
 	if not perception_snapshot.is_empty():
@@ -269,6 +277,24 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 		"given_item": given_item.strip_edges(),
 		"context": context_data,
 	}
+
+func _build_npc_contract_context() -> Dictionary:
+	var npc := {
+		"name": npc_display_name.strip_edges(),
+		"role_prompt": npc_role_prompt.strip_edges(),
+		"available_body_actions": _packed_to_clean_array(available_body_actions),
+		"available_expressions": _packed_to_clean_array(available_expressions),
+		"available_visemes": _packed_to_clean_array(available_visemes),
+	}
+	return npc
+
+func _packed_to_clean_array(values: PackedStringArray) -> Array:
+	var out: Array = []
+	for value in values:
+		var clean := String(value).strip_edges()
+		if not clean.is_empty():
+			out.append(clean)
+	return out
 
 func _bind_ai_signals() -> void:
 	if _ai_manager == null:
@@ -638,7 +664,22 @@ func _load_custom_save_data(data: Dictionary) -> void:
 	if data.has("session_id"):
 		session_id = String(data["session_id"]).strip_edges()
 	if data.has("save_slot_name"):
-		save_slot_name = String(data["save_slot_name"]).strip_edges()
+		var loaded_slot := String(data["save_slot_name"]).strip_edges()
+		# 旧存档会把 AI 上下文固定到 manual_save；迁移后留空，跟随 SaveManager 当前槽位。
+		save_slot_name = "" if loaded_slot == "manual_save" else loaded_slot
+
+
+func _resolve_save_slot_name() -> String:
+	var explicit_slot := save_slot_name.strip_edges()
+	if not explicit_slot.is_empty():
+		return explicit_slot
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_slot"):
+		var current_slot := String(save_manager.call("get_current_slot")).strip_edges()
+		if not current_slot.is_empty():
+			return current_slot
+	return "manual_save"
+
 
 func _extract_dialogue(data: Dictionary) -> String:
 	for key in ["dialogue", "reply", "text", "message", "summary"]:

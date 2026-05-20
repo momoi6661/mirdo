@@ -43,6 +43,8 @@ const MIN_SEARCH_MINUTES := 25
 const MAX_SEARCH_MINUTES := 120
 const UI_CLICK_AUDIO_PATH := "res://Audio/pausemenu/click2.ogg"
 const UI_HOVER_AUDIO_PATH := "res://Audio/pausemenu/hover.ogg"
+const OUTING_AI_ENDPOINT_PATH := "/outing/resolve"
+const OUTING_AI_TIMEOUT_SEC := 100.0
 const MODAL_SHOW_TIME := 0.22
 const MODAL_HIDE_TIME := 0.14
 const LOOT_ITEM_PATHS := {
@@ -107,6 +109,8 @@ const LOOT_ITEM_PATHS := {
 @onready var result_panel: Control = %ResultPanel
 @onready var result_label: RichTextLabel = %ResultLabel
 @onready var result_return_button: Button = %ResultReturnButton
+@onready var result_title_label: Label = get_node_or_null("%ResultTitleLabel") as Label
+@onready var result_subtitle_label: Label = get_node_or_null("%ResultSubtitleLabel") as Label
 
 var _pan := Vector2.ZERO
 var _zoom := FIXED_MAP_ZOOM
@@ -127,8 +131,14 @@ var _detail_panel_base_offsets := Vector4.ZERO
 var _detail_panel_layout_captured := false
 var _ui_click_audio: AudioStreamPlayer
 var _ui_hover_audio: AudioStreamPlayer
+var _outing_ai_request: HTTPRequest
+var _outing_ai_waiting := false
+var _outing_ai_response: Dictionary = {}
+var _outing_ai_error := ""
+var _outing_ai_last_url := ""
 var _modal_tweens: Dictionary = {}
 var _expedition_resolving := false
+var _result_button_returns_to_bunker := true
 
 
 func _ready() -> void:
@@ -158,7 +168,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if result_overlay != null and result_overlay.visible and not _expedition_resolving:
 			_play_ui_click()
-			_close_result_panel()
+			_return_to_bunker_after_result()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -227,12 +237,13 @@ func _wire_ui() -> void:
 		return
 	_ui_wired = true
 	_ensure_ui_click_audio()
+	_ensure_outing_ai_request()
 	map_viewport.gui_input.connect(_on_map_gui_input)
 	_connect_button_click(prepare_button, _open_prepare_panel)
 	_connect_button_click(close_button, _return_to_bunker)
 	_connect_button_click(%PrepareCancelButton, _close_prepare_panel)
 	_connect_button_click(%PrepareConfirmButton, _confirm_expedition)
-	_connect_button_click(%ResultReturnButton, _close_result_panel)
+	_connect_button_click(%ResultReturnButton, _return_to_bunker_after_result)
 	prepare_overlay.visible = false
 	result_overlay.visible = false
 	right_panel.visible = false
@@ -260,6 +271,17 @@ func _ensure_ui_click_audio() -> void:
 		if hover_stream != null:
 			_ui_hover_audio.stream = hover_stream
 		add_child(_ui_hover_audio)
+
+
+func _ensure_outing_ai_request() -> void:
+	if _outing_ai_request != null and is_instance_valid(_outing_ai_request):
+		return
+	_outing_ai_request = HTTPRequest.new()
+	_outing_ai_request.name = "OutingAIRequest"
+	_outing_ai_request.timeout = OUTING_AI_TIMEOUT_SEC
+	add_child(_outing_ai_request)
+	if not _outing_ai_request.request_completed.is_connected(_on_outing_ai_request_completed):
+		_outing_ai_request.request_completed.connect(_on_outing_ai_request_completed)
 
 
 func _connect_button_click(button: Button, action: Callable) -> void:
@@ -315,6 +337,15 @@ func _close_result_panel() -> void:
 	if _expedition_resolving:
 		return
 	_hide_modal_overlay(result_overlay, result_panel)
+
+
+func _return_to_bunker_after_result() -> void:
+	if _expedition_resolving:
+		return
+	if not _result_button_returns_to_bunker:
+		_close_result_panel()
+		return
+	_return_to_bunker()
 
 
 func _show_modal_overlay(overlay: CanvasItem, panel: Control) -> void:
@@ -695,7 +726,7 @@ func _open_prepare_panel() -> void:
 		return
 	prepare_title_label.text = "准备外出：" + rule.get("display_name")
 	if prepare_intro_label != null:
-		prepare_intro_label.text = "从庇护所库存选择本次要带的东西。点击左侧加入1件；食物/药品/材料会在同一格叠加，武器和大型工具仍然单独占格。"
+		prepare_intro_label.text = "可以空手探索，也可以从庇护所库存带辅助物资。AI 会根据地点规则、威胁、路线和携带物生成经历与带回物资。"
 	if base_carry_label != null:
 		base_carry_label.text = "地点建议：%s    预计用时：路程%s + 搜索%s = 总计%s" % [
 			_format_recommended_tools(rule),
@@ -756,8 +787,6 @@ func _rebuild_tool_list() -> void:
 
 func _add_loadout_entry(entry_key: String) -> void:
 	if _loadout == null or _shelter_inventory == null:
-		return
-	if int(_loadout.call("get_used_slots")) >= OUTING_LOADOUT_CAPACITY:
 		return
 	var entry: Dictionary = _shelter_inventory.call("get_entry_by_key", entry_key)
 	if entry.is_empty():
@@ -820,11 +849,12 @@ func _get_capacity_used() -> int:
 func _update_capacity_label() -> void:
 	var available_count: int = int(_shelter_inventory.call("count_total_outing_items")) if _shelter_inventory != null else 0
 	var item_count: int = int(_loadout.call("get_total_item_count")) if _loadout != null else 0
-	capacity_label.text = "携带格：%d/%d    已带件数：%d    庇护所可带：%d    已选：%s" % [_get_capacity_used(), OUTING_LOADOUT_CAPACITY, item_count, available_count, _get_selected_tool_names()]
+	var mode_text := "轻装探索" if item_count <= 0 else "携带探索"
+	capacity_label.text = "模式：%s    携带格：%d/%d    已带件数：%d    庇护所可带：%d    已选：%s" % [mode_text, _get_capacity_used(), OUTING_LOADOUT_CAPACITY, item_count, available_count, _get_selected_tool_names()]
 	var confirm_button := get_node_or_null("%PrepareConfirmButton") as Button
 	if confirm_button != null:
-		confirm_button.disabled = item_count <= 0
-		confirm_button.text = "确认外出" if item_count > 0 else "至少携带1件物资"
+		confirm_button.disabled = false
+		confirm_button.text = "轻装探索" if item_count <= 0 else "确认外出"
 
 
 func _get_selected_tool_names() -> String:
@@ -908,6 +938,7 @@ func _commit_loadout_to_shelter_inventory() -> Dictionary:
 		"carried_names": {},
 		"returned_names": {},
 		"consumed_names": {},
+		"carried_items": [],
 	}
 	if _loadout == null or _shelter_inventory == null:
 		return summary
@@ -920,6 +951,7 @@ func _commit_loadout_to_shelter_inventory() -> Dictionary:
 			continue
 		_increment_dict_count(summary["carried_by_category"], _category_label(item.outing_category), 1)
 		_increment_dict_count(summary["carried_names"], item.ItemName, 1)
+		(summary["carried_items"] as Array).append(item)
 		if not bool(_shelter_inventory.call("remove_one_from_entry", source_key)):
 			continue
 		summary["committed"] = int(summary["committed"]) + 1
@@ -954,36 +986,47 @@ func _confirm_expedition() -> void:
 	if rule == null:
 		return
 	var item_count: int = int(_loadout.call("get_total_item_count")) if _loadout != null else 0
-	if item_count <= 0:
-		_update_capacity_label()
-		return
 
 	_expedition_resolving = true
 	_hide_modal_overlay(prepare_overlay, prepare_panel, 0.10)
-	_show_expedition_stage(rule, "出发", "正在离开庇护所，按地图路线确认往返距离……", 0.18)
+	var start_detail := "轻装离开庇护所，不携带辅助物资，优先保持机动。" if item_count <= 0 else "正在离开庇护所，核对携带物资并确认往返距离……"
+	_show_expedition_stage(rule, "出发", start_detail, 0.18)
 	await get_tree().create_timer(0.22).timeout
-	_show_expedition_stage(rule, "搜索", "进入目标区域，按地点规则检查高概率物资与风险事件……", 0.52)
+	_show_expedition_stage(rule, "AI结算", "正在请求后端 AI：根据地点内置探索规则、携带物、威胁和可用物资生成本次经历……", 0.42)
 	await get_tree().create_timer(0.28).timeout
-	_show_expedition_stage(rule, "返程", "整理带回物资，武器/工具归位，消耗品从库存扣除……", 0.82)
-	await get_tree().create_timer(0.24).timeout
 
+	var preview_commit_summary := _build_loadout_commit_preview_summary()
+	var preview_unlocked_locations := _get_preview_unlocks_for_rule(rule)
+	var ai_result := await _request_ai_expedition_result(rule, preview_commit_summary, preview_unlocked_locations)
+	if _is_backend_ai_failure(ai_result):
+		_show_ai_failure_result(rule, ai_result)
+		_expedition_resolving = false
+		return
+	_show_expedition_stage(rule, "返程", "整理带回物资，武器/工具归位，消耗品从库存扣除，写入庇护所库存……", 0.86)
+	await get_tree().create_timer(0.18).timeout
 	var commit_summary := _commit_loadout_to_shelter_inventory()
-	var unlocked_locations: Array[String] = _unlock_neighbors_list(rule) if bool(rule.get("discoverable")) else []
-	var loot_entries := _generate_expedition_loot(rule, commit_summary)
+	var unlocked_locations := _commit_unlocks_for_rule(rule)
+	var loot_entries := _loot_entries_from_ai_result(ai_result)
+	if loot_entries.is_empty():
+		loot_entries = _generate_expedition_loot(rule, commit_summary)
 	var deposit_summary := _deposit_loot_entries(loot_entries)
+	var status_cost := _apply_expedition_status_cost(rule, commit_summary, ai_result)
 	var payload := {
 		"rule": rule,
 		"commit": commit_summary,
 		"loot": loot_entries,
 		"deposit": deposit_summary,
+		"status_cost": status_cost,
 		"unlocked": unlocked_locations,
-		"risk": _build_risk_result(rule, commit_summary),
+		"risk": String(ai_result.get("risk_result", "")).strip_edges() if not String(ai_result.get("risk_result", "")).strip_edges().is_empty() else _build_risk_result(rule, commit_summary),
+		"ai": ai_result,
 		"time": {
 			"route": _get_round_trip_minutes(rule),
 			"search": _get_search_minutes(rule),
 			"total": _get_total_expedition_minutes(rule),
 		},
 	}
+	_advance_global_time_after_expedition(int(payload["time"].get("total", 0)))
 	result_label.text = _build_expedition_result_report(payload)
 	if result_label.has_method("scroll_to_line"):
 		result_label.call("scroll_to_line", 0)
@@ -993,9 +1036,123 @@ func _confirm_expedition() -> void:
 	_sync_map()
 	_save_after_expedition_state_change()
 	_expedition_resolving = false
-	if result_return_button != null:
-		result_return_button.disabled = false
-		result_return_button.text = "确认并返回地图"
+	_set_result_return_button("返回庇护所", false, true)
+	if result_subtitle_label != null:
+		result_subtitle_label.text = "探索完成，物资和地图进展已保存。确认后返回庇护所。"
+
+
+func _empty_string_array() -> Array[String]:
+	var result: Array[String] = []
+	return result
+
+
+func _get_preview_unlocks_for_rule(rule: Resource) -> Array[String]:
+	if rule == null or not bool(rule.get("discoverable")):
+		return _empty_string_array()
+	return _preview_unlock_neighbors_list(rule)
+
+
+func _commit_unlocks_for_rule(rule: Resource) -> Array[String]:
+	if rule == null or not bool(rule.get("discoverable")):
+		return _empty_string_array()
+	return _unlock_neighbors_list(rule)
+
+
+func _set_result_return_button(text: String, disabled: bool, returns_to_bunker: bool) -> void:
+	_result_button_returns_to_bunker = returns_to_bunker
+	if result_return_button == null:
+		return
+	result_return_button.disabled = disabled
+	result_return_button.text = text
+
+
+func _build_loadout_commit_preview_summary() -> Dictionary:
+	var summary := {
+		"committed": 0,
+		"returned": 0,
+		"consumed": 0,
+		"carried_by_category": {},
+		"returned_by_category": {},
+		"consumed_by_category": {},
+		"carried_names": {},
+		"returned_names": {},
+		"consumed_names": {},
+		"carried_items": [],
+	}
+	if _loadout == null:
+		return summary
+	var commit_entries: Array = _loadout.call("get_commit_entries")
+	for commit_entry_raw in commit_entries:
+		var commit_entry := commit_entry_raw as Dictionary
+		var item := commit_entry.get("item", null) as ItemData
+		if item == null:
+			continue
+		(summary["carried_items"] as Array).append(item)
+		summary["committed"] = int(summary["committed"]) + 1
+		_increment_dict_count(summary["carried_by_category"], _category_label(item.outing_category), 1)
+		_increment_dict_count(summary["carried_names"], item.ItemName, 1)
+		if _should_return_carried_item(item):
+			summary["returned"] = int(summary["returned"]) + 1
+			_increment_dict_count(summary["returned_by_category"], _category_label(item.outing_category), 1)
+			_increment_dict_count(summary["returned_names"], item.ItemName, 1)
+		else:
+			summary["consumed"] = int(summary["consumed"]) + 1
+			_increment_dict_count(summary["consumed_by_category"], _category_label(item.outing_category), 1)
+			_increment_dict_count(summary["consumed_names"], item.ItemName, 1)
+	return summary
+
+
+func _is_backend_ai_failure(ai_result: Dictionary) -> bool:
+	if ai_result.is_empty():
+		return false
+	if bool(ai_result.get("local_backend_unreachable_fallback", false)):
+		return false
+	if bool(ai_result.get("fallback", false)):
+		return true
+	if ai_result.has("ok") and not bool(ai_result.get("ok", true)):
+		return true
+	var error_text := String(ai_result.get("error", "")).strip_edges()
+	return not error_text.is_empty()
+
+
+func _show_ai_failure_result(rule: Resource, ai_result: Dictionary) -> void:
+	_result_button_returns_to_bunker = false
+	if result_overlay != null and not result_overlay.visible:
+		_show_modal_overlay(result_overlay, result_panel)
+	if result_overlay != null:
+		result_overlay.move_to_front()
+	var title := String(ai_result.get("title", "外出 AI 结算失败")).strip_edges()
+	if title.is_empty():
+		title = "外出 AI 结算失败"
+	if result_title_label != null:
+		result_title_label.text = title
+	if result_subtitle_label != null:
+		result_subtitle_label.text = "后端已连接，但模型/API 没有返回可用结算；本次不消耗物资、不保存地图进展。"
+	_set_result_return_button("关闭并重试", false, false)
+	var error_text := String(ai_result.get("error", "unknown_backend_ai_error")).strip_edges()
+	var summary := String(ai_result.get("summary", "后端 AI 结算没有完成。")).strip_edges()
+	var experience: Array = ai_result.get("experience", []) if ai_result.get("experience", []) is Array else []
+	var text := ""
+	text += _bb_section("AI 结算失败")
+	text += "[color=#f0e0bb]%s[/color]\n" % summary
+	text += "[color=#ff765d]错误：%s[/color]\n\n" % error_text
+	text += _bb_section("本次未写入")
+	text += "• 未扣除外出携带物。\n"
+	text += "• 未加入带回物资。\n"
+	text += "• 未解锁新地点，也未推进外出时间。\n\n"
+	text += _bb_section("后端返回记录")
+	if experience.is_empty():
+		text += "• 后端没有返回可用经历文本。\n"
+	else:
+		for line_raw in experience:
+			var line := String(line_raw).strip_edges()
+			if not line.is_empty():
+				text += "• %s\n" % line
+	text += "\n[color=#8f8674]目标：%s。请检查 API base_url / model / key，或稍后重试。[/color]" % String(rule.get("display_name"))
+	if result_label != null:
+		result_label.text = text
+		if result_label.has_method("scroll_to_line"):
+			result_label.call("scroll_to_line", 0)
 
 
 func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: String, progress: float) -> void:
@@ -1004,15 +1161,17 @@ func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: St
 	if not result_overlay.visible:
 		_show_modal_overlay(result_overlay, result_panel)
 	result_overlay.move_to_front()
-	if result_return_button != null:
-		result_return_button.disabled = true
-		result_return_button.text = "行动结算中……"
+	_set_result_return_button("行动结算中……", true, true)
+	if result_title_label != null:
+		result_title_label.text = "外出行动进行中"
+	if result_subtitle_label != null:
+		result_subtitle_label.text = "正在整理路线、风险和现场记录。"
 	var bar := _build_text_progress_bar(progress)
 	result_label.text = "[center][color=#ffb529][font_size=28]外出行动进行中[/font_size][/color][/center]\n\n"
 	result_label.text += "[color=#d8c790]目标[/color]  %s\n" % String(rule.get("display_name"))
 	result_label.text += "[color=#d8c790]阶段[/color]  %s\n%s\n\n" % [stage_name, stage_detail]
 	result_label.text += "[color=#ffd447]%s[/color]  %d%%\n\n" % [bar, int(round(progress * 100.0))]
-	result_label.text += "系统正在按：路程耗时、现场搜索、携带物资、地点威胁、外缘发现规则生成本次报告。"
+	result_label.text += "后端 AI 正在按：地点内置探索规则、路程耗时、现场搜索、携带物资、地点威胁、外缘发现规则生成本次报告。"
 
 
 func _build_text_progress_bar(progress: float) -> String:
@@ -1029,22 +1188,50 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	var deposit := payload.get("deposit", {}) as Dictionary
 	var time_info := payload.get("time", {}) as Dictionary
 	var unlocked: Array = payload.get("unlocked", [])
-	var text := "[center][color=#ffb529][font_size=29]外出行动报告[/font_size][/color][/center]\n"
-	text += "[center][color=#8f8674]本次结果已写入庇护所库存，并触发自动保存。[/color][/center]\n\n"
+	var ai := payload.get("ai", {}) as Dictionary
+	var title := String(ai.get("title", "外出行动报告")).strip_edges() if ai != null else "外出行动报告"
+	if title.is_empty():
+		title = "外出行动报告"
+	var ai_fallback := bool(ai.get("fallback", false)) if ai != null else false
+	var local_fallback := bool(ai.get("local_backend_unreachable_fallback", false)) if ai != null else false
+	if result_title_label != null:
+		result_title_label.text = title
+	if result_subtitle_label != null:
+		result_subtitle_label.text = "连接不到后端，使用本地保守结算；结果仍会保存。" if local_fallback else "后端 AI 已生成经历；物资写入庇护所库存。"
+	var text := ""
 	text += _bb_section("行动概览")
-	text += "[color=#d8c790]地点[/color]  %s    [color=#d8c790]威胁[/color]  %d/5\n" % [String(rule.get("display_name")), int(rule.get("threat_level"))]
-	text += "[color=#d8c790]耗时[/color]  总计%s（路程%s / 搜索%s）\n" % [
+	text += "[table=2][cell][color=#d8c790]地点[/color][/cell][cell]%s[/cell]" % String(rule.get("display_name"))
+	text += "[cell][color=#d8c790]威胁[/color][/cell][cell]%d/5[/cell]" % int(rule.get("threat_level"))
+	text += "[cell][color=#d8c790]耗时[/color][/cell][cell]总计%s（路程%s / 搜索%s）[/cell]" % [
 		_format_duration(int(time_info.get("total", 0))),
 		_format_duration(int(time_info.get("route", 0))),
 		_format_duration(int(time_info.get("search", 0))),
 	]
-	text += "[color=#d8c790]行动判断[/color]  %s\n\n" % String(payload.get("risk", "未记录异常。"))
+	text += "[cell][color=#d8c790]判断[/color][/cell][cell]%s[/cell][/table]\n\n" % String(payload.get("risk", "未记录异常。"))
+
+	var summary := String(ai.get("summary", "")).strip_edges() if ai != null else ""
+	var experience: Array = ai.get("experience", []) if ai != null and ai.get("experience", []) is Array else []
+	text += _bb_section("外出经历")
+	if not summary.is_empty():
+		text += "[color=#f0e0bb]%s[/color]\n" % summary
+	if experience.is_empty():
+		text += "• 没有额外经历记录。\n"
+	else:
+		for line_raw in experience:
+			var line := String(line_raw).strip_edges()
+			if not line.is_empty():
+				text += "• %s\n" % line
+	text += "\n"
+
+	text += _bb_section("角色状态消耗")
+	text += _format_status_cost(payload.get("status_cost", {}))
+	text += "\n"
 
 	text += _bb_section("携带与消耗")
-	text += "携带：%s\n" % _format_count_dictionary(commit.get("carried_names", {}), "无")
-	text += "归还：%s\n" % _format_count_dictionary(commit.get("returned_names", {}), "无")
-	text += "消耗：%s\n" % _format_count_dictionary(commit.get("consumed_names", {}), "无")
-	text += "分类：取出%d件 / 归还%d件 / 消耗%d件\n\n" % [
+	text += "[color=#d8c790]携带[/color]  %s\n" % _format_count_dictionary(commit.get("carried_names", {}), "无")
+	text += "[color=#d8c790]归还[/color]  %s\n" % _format_count_dictionary(commit.get("returned_names", {}), "无")
+	text += "[color=#d8c790]消耗[/color]  %s\n" % _format_count_dictionary(commit.get("consumed_names", {}), "无")
+	text += "[color=#8f8674]取出%d件 / 归还%d件 / 消耗%d件[/color]\n\n" % [
 		int(commit.get("committed", 0)),
 		int(commit.get("returned", 0)),
 		int(commit.get("consumed", 0)),
@@ -1070,6 +1257,367 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 
 func _bb_section(title: String) -> String:
 	return "[color=#ffd447][font_size=21]◆ %s[/font_size][/color]\n" % title
+
+
+func _build_backend_ai_error_response(error_code: String, summary: String, experience: Array) -> Dictionary:
+	return {
+		"ok": false,
+		"fallback": false,
+		"error": error_code,
+		"title": "外出 AI 结算失败",
+		"summary": summary,
+		"experience": experience,
+		"risk_result": "后端连接成功，但 AI 结果不可用于结算。",
+		"loot": [],
+		"discovered_clues": [],
+		"mood": "中断",
+		"health_damage": 0,
+	}
+
+
+func _request_ai_expedition_result(rule: Resource, commit_summary: Dictionary, unlocked_locations: Array[String]) -> Dictionary:
+	_ensure_outing_ai_request()
+	if _outing_ai_request == null:
+		_outing_ai_error = "request_node_missing"
+		push_warning("[OutingAI] HTTPRequest 节点不可用，无法连接后端，改用本地保守结算。")
+		return _build_local_ai_expedition_fallback(rule, commit_summary)
+	await _ensure_ai_service_running_for_outing()
+	_outing_ai_waiting = true
+	_outing_ai_response = {}
+	_outing_ai_error = ""
+	_refresh_ai_settings_for_outing()
+	var payload := _build_ai_expedition_payload(rule, commit_summary, unlocked_locations)
+	var url := _build_outing_ai_url()
+	_outing_ai_last_url = url
+	print("[OutingAI] POST ", url)
+	var headers := PackedStringArray(["Content-Type: application/json", "Accept: application/json"])
+	var err := _outing_ai_request.request(url, headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	if err != OK:
+		_outing_ai_waiting = false
+		_outing_ai_error = "request_failed_%d" % err
+		push_warning("[OutingAI] 请求发送失败 %s err=%d，无法连接后端，改用本地保守结算。" % [url, err])
+		return _build_local_ai_expedition_fallback(rule, commit_summary)
+	while _outing_ai_waiting:
+		await get_tree().process_frame
+	if _outing_ai_response.is_empty():
+		push_warning("[OutingAI] 未收到后端响应 url=%s error=%s，改用本地保守结算。" % [_outing_ai_last_url, _outing_ai_error])
+		return _build_local_ai_expedition_fallback(rule, commit_summary)
+	if _is_backend_ai_failure(_outing_ai_response):
+		push_warning("[OutingAI] 后端已连接但 AI 结算失败 url=%s error=%s" % [url, String(_outing_ai_response.get("error", ""))])
+		return _outing_ai_response
+	print("[OutingAI] 后端结算完成 url=%s loot=%d" % [url, (Array(_outing_ai_response.get("loot", []))).size()])
+	return _outing_ai_response
+
+
+func _on_outing_ai_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	_outing_ai_waiting = false
+	_outing_ai_response = {}
+	var body_text := body.get_string_from_utf8()
+	if result != HTTPRequest.RESULT_SUCCESS:
+		_outing_ai_error = "network_error_%d" % result
+		push_warning("[OutingAI] 网络错误 url=%s result=%d code=%d body=%s" % [_outing_ai_last_url, result, response_code, _shorten(body_text, 240)])
+		return
+	if response_code < 200 or response_code >= 300:
+		_outing_ai_error = "http_%d" % response_code
+		push_warning("[OutingAI] HTTP 错误 url=%s code=%d body=%s" % [_outing_ai_last_url, response_code, _shorten(body_text, 360)])
+		_outing_ai_response = _build_backend_ai_error_response(
+			_outing_ai_error,
+			"后端已响应，但 HTTP 状态不是成功。",
+			["后端返回 HTTP %d。" % response_code]
+		)
+		return
+	var parser := JSON.new()
+	if parser.parse(body_text) != OK or parser.data is not Dictionary:
+		_outing_ai_error = "invalid_ai_json"
+		push_warning("[OutingAI] JSON 解析失败 url=%s body=%s" % [_outing_ai_last_url, _shorten(body_text, 360)])
+		_outing_ai_response = _build_backend_ai_error_response(
+			_outing_ai_error,
+			"后端已响应，但返回内容不是有效 JSON。",
+			["请检查后端 /outing/resolve 返回格式。"]
+		)
+		return
+	_outing_ai_response = (parser.data as Dictionary).duplicate(true)
+
+
+func _refresh_ai_settings_for_outing() -> void:
+	var settings := get_node_or_null("/root/AISettings")
+	if settings != null and settings.has_method("load_settings"):
+		settings.call("load_settings")
+
+
+func _ensure_ai_service_running_for_outing() -> void:
+	var supervisor := get_node_or_null("/root/AIServiceSupervisor")
+	if supervisor == null or not supervisor.has_method("ensure_service_running"):
+		return
+	supervisor.call("ensure_service_running")
+	var start_msec := Time.get_ticks_msec()
+	var max_wait_msec := 1800
+	var ready_signal_seen := false
+	var failed_signal_seen := false
+	if supervisor.has_signal("service_ready"):
+		supervisor.connect("service_ready", func() -> void:
+			ready_signal_seen = true
+		, CONNECT_ONE_SHOT)
+	if supervisor.has_signal("service_start_failed"):
+		supervisor.connect("service_start_failed", func(_message: String) -> void:
+			failed_signal_seen = true
+		, CONNECT_ONE_SHOT)
+	while Time.get_ticks_msec() - start_msec < max_wait_msec:
+		if ready_signal_seen:
+			print("[OutingAI] AIServiceSupervisor ready.")
+			return
+		if failed_signal_seen:
+			push_warning("[OutingAI] AIServiceSupervisor 启动失败，稍后请求会回退本地结算。")
+			return
+		await get_tree().process_frame
+	push_warning("[OutingAI] 等待 AIServiceSupervisor 超时，继续尝试请求后端。")
+
+
+func _build_ai_expedition_payload(rule: Resource, commit_summary: Dictionary, unlocked_locations: Array[String]) -> Dictionary:
+	return {
+		"session_id": "outing_%s" % String(rule.get("location_id")),
+		"location": {
+			"id": String(rule.get("location_id")),
+			"name": String(rule.get("display_name")),
+			"description": String(rule.get("description")),
+			"route_hint": String(rule.get("route_hint")),
+			"threat_level": int(rule.get("threat_level")),
+			"loot_bias_tags": _string_array_from_variant(rule.get("loot_bias_tags")),
+			"recommended_tools": _string_array_from_variant(rule.get("recommended_auxiliary_tools")),
+			"detail_notes": _string_array_from_variant(rule.get("detail_notes")),
+			"ai_exploration_rule": String(rule.get("ai_exploration_rule")),
+			"discoverable": bool(rule.get("discoverable")),
+		},
+		"loadout": _build_ai_loadout_items(commit_summary),
+		"time": {
+			"route_minutes": _get_round_trip_minutes(rule),
+			"search_minutes": _get_search_minutes(rule),
+			"total_minutes": _get_total_expedition_minutes(rule),
+		},
+		"available_loot": _build_available_loot_payload(),
+		"unlocked_neighbors": unlocked_locations,
+		"provider": _build_provider_from_ai_settings(),
+	}
+
+
+func _build_ai_loadout_items(commit_summary: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if _loadout == null:
+		return result
+	var entries: Array = _loadout.get("entries")
+	for entry_raw in entries:
+		var entry := entry_raw as Resource
+		if entry == null or entry.is_empty():
+			continue
+		var item := entry.get("item") as ItemData
+		if item == null:
+			continue
+		result.append({
+			"item_id": item.resource_path,
+			"name": item.ItemName,
+			"category": item.outing_category,
+			"amount": int(entry.get("amount")),
+			"tags": _string_array_from_variant(item.inventory_tags),
+			"ai_rule_hint": item.ai_rule_hint,
+		})
+	return result
+
+
+func _build_available_loot_payload() -> Dictionary:
+	var result := {}
+	for tag in LOOT_ITEM_PATHS.keys():
+		var paths: Array = LOOT_ITEM_PATHS.get(tag, [])
+		var clean_paths: Array[String] = []
+		for path_raw in paths:
+			var path := String(path_raw).strip_edges()
+			if not path.is_empty() and ResourceLoader.exists(path):
+				clean_paths.append(path)
+		result[String(tag)] = clean_paths
+	return result
+
+
+func _build_provider_from_ai_settings() -> Dictionary:
+	var settings := get_node_or_null("/root/AISettings")
+	if settings == null:
+		return {}
+	var base_url := String(settings.get("base_url")).strip_edges()
+	while base_url.length() > 1 and base_url.ends_with("/"):
+		base_url = base_url.substr(0, base_url.length() - 1)
+	var model := String(settings.get("model")).strip_edges()
+	if base_url.is_empty() or model.is_empty():
+		return {}
+	return {
+		"base_url": base_url,
+		"api_key": String(settings.get("api_key")).strip_edges(),
+		"model": model,
+	}
+
+
+func _build_outing_ai_url() -> String:
+	var supervisor := get_node_or_null("/root/AIServiceSupervisor")
+	if supervisor != null:
+		var supervisor_protocol := "https" if bool(supervisor.get("use_https")) else "http"
+		var supervisor_host := String(supervisor.get("server_host")).strip_edges()
+		var supervisor_port := int(supervisor.get("server_port"))
+		if not supervisor_host.is_empty() and supervisor_port > 0:
+			return "%s://%s:%d%s" % [supervisor_protocol, supervisor_host, supervisor_port, OUTING_AI_ENDPOINT_PATH]
+	var manager := _find_any_ai_manager()
+	if manager != null:
+		var protocol := "https" if bool(manager.get("use_https")) else "http"
+		return "%s://%s:%d%s" % [protocol, String(manager.get("server_host")), int(manager.get("server_port")), OUTING_AI_ENDPOINT_PATH]
+	return "http://127.0.0.1:5678%s" % OUTING_AI_ENDPOINT_PATH
+
+
+func _find_any_ai_manager() -> AIManager:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	for node in tree.get_nodes_in_group("ai_manager"):
+		if node is AIManager:
+			return node as AIManager
+	var current := tree.current_scene
+	if current != null:
+		for child in current.find_children("*", "AIManager", true, false):
+			if child is AIManager:
+				return child as AIManager
+	return null
+
+
+func _loot_entries_from_ai_result(ai_result: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var loot_raw: Array = ai_result.get("loot", []) if ai_result.get("loot", []) is Array else []
+	for entry_raw in loot_raw:
+		var entry := entry_raw as Dictionary
+		if entry.is_empty():
+			continue
+		var item_path := String(entry.get("item_path", "")).strip_edges()
+		if item_path.is_empty() or not ResourceLoader.exists(item_path):
+			continue
+		var item := load(item_path) as ItemData
+		if item == null:
+			continue
+		result.append({
+			"item": item,
+			"amount": clampi(int(entry.get("amount", 1)), 1, 99),
+			"tag": String(entry.get("tag", "AI线索")),
+			"added": 0,
+		})
+	return result
+
+
+func _build_local_ai_expedition_fallback(rule: Resource, commit_summary: Dictionary) -> Dictionary:
+	var item_count: int = int(commit_summary.get("committed", 0))
+	var summary := "轻装探索完成，收益保守。" if item_count <= 0 else "携带物资发挥作用，搜索完成度提高。"
+	var experience := [
+		"沿着路线靠近%s，先在入口外确认声音和退路。" % String(rule.get("display_name")),
+		"根据地点规则检查：%s。" % _get_focus_summary(rule),
+		"没有后端 AI 响应，本地系统按威胁和携带物生成保守结果。",
+		"返程时沿原路撤回，并把能确认的物资带回庇护所。",
+	]
+	return {
+		"ok": true,
+		"title": "外出行动报告",
+		"summary": summary,
+		"experience": experience,
+		"risk_result": _build_risk_result(rule, commit_summary),
+		"loot": [],
+		"discovered_clues": [],
+		"mood": "谨慎",
+		"fallback": true,
+		"local_backend_unreachable_fallback": true,
+		"error": _outing_ai_error,
+	}
+
+
+func _string_array_from_variant(values: Variant) -> Array[String]:
+	var result: Array[String] = []
+	for value in values:
+		var text := String(value).strip_edges()
+		if not text.is_empty():
+			result.append(text)
+	return result
+
+
+func _apply_expedition_status_cost(rule: Resource, commit_summary: Dictionary, ai_result: Dictionary) -> Dictionary:
+	var total_minutes := _get_total_expedition_minutes(rule)
+	var threat := int(rule.get("threat_level"))
+	var hunger_cost: float = ceil(float(total_minutes) / 60.0 * 4.0 + max(0, threat - 1) * 1.5)
+	var thirst_cost: float = ceil(float(total_minutes) / 60.0 * 5.0 + max(0, threat - 1) * 2.0)
+	var base_damage: float = maxf(0.0, float(threat - 2) * 7.0)
+	var ai_damage: float = _extract_ai_health_damage(ai_result)
+	if ai_damage >= 0.0:
+		base_damage = ai_damage
+	var reduction: float = _calculate_loadout_damage_reduction(commit_summary)
+	var final_damage: int = int(round(base_damage * (1.0 - reduction)))
+	var state_component := _resolve_player_state_component()
+	var applied := {}
+	if state_component != null and state_component.has_method("apply_outing_cost"):
+		applied = state_component.call("apply_outing_cost", hunger_cost, thirst_cost, final_damage, "outing_expedition")
+	return {
+		"hunger_cost": int(hunger_cost),
+		"thirst_cost": int(thirst_cost),
+		"base_health_damage": int(round(base_damage)),
+		"health_damage": int(final_damage),
+		"damage_reduction": reduction,
+		"applied": applied,
+	}
+
+
+func _extract_ai_health_damage(ai_result: Dictionary) -> float:
+	if ai_result == null or ai_result.is_empty():
+		return -1.0
+	for key in ["health_damage", "damage", "life_damage"]:
+		if ai_result.has(key):
+			return maxf(0.0, float(ai_result.get(key, 0.0)))
+	var status_cost := ai_result.get("status_cost", {}) as Dictionary
+	if status_cost != null and status_cost.has("health_damage"):
+		return maxf(0.0, float(status_cost.get("health_damage", 0.0)))
+	return -1.0
+
+
+func _calculate_loadout_damage_reduction(commit_summary: Dictionary) -> float:
+	var items: Array = commit_summary.get("carried_items", []) if commit_summary.get("carried_items", []) is Array else []
+	var total := 0.0
+	for item_raw in items:
+		var item := item_raw as ItemData
+		if item == null:
+			continue
+		if item.outing_category == "weapon":
+			total += maxf(0.12, item.outing_damage_reduction)
+		elif item.outing_category == "tool":
+			total += maxf(0.0, item.outing_damage_reduction)
+	return clampf(total, 0.0, 0.65)
+
+
+func _resolve_player_state_component() -> Node:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null:
+		var player_node := global_node.get("player") as Node
+		if player_node != null and is_instance_valid(player_node):
+			var state := player_node.get_node_or_null("Components/StateComponent")
+			if state != null:
+				return state
+	var tree := get_tree()
+	if tree != null:
+		for player in tree.get_nodes_in_group("Player"):
+			var state := (player as Node).get_node_or_null("Components/StateComponent")
+			if state != null:
+				return state
+	return null
+
+
+func _format_status_cost(cost_variant: Variant) -> String:
+	var cost := cost_variant as Dictionary
+	if cost == null or cost.is_empty():
+		return "[color=#8f8674]未找到角色状态组件，本次未写入生命/饥饿/口渴。[/color]\n"
+	var reduction_percent := int(round(float(cost.get("damage_reduction", 0.0)) * 100.0))
+	return "[color=#d8c790]饥饿[/color] -%d  [color=#d8c790]口渴[/color] -%d  [color=#d8c790]生命[/color] -%d\n[color=#8f8674]武器/工具减伤：%d%%（原始生命风险 %d）[/color]\n" % [
+		int(cost.get("hunger_cost", 0)),
+		int(cost.get("thirst_cost", 0)),
+		int(cost.get("health_damage", 0)),
+		reduction_percent,
+		int(cost.get("base_health_damage", 0)),
+	]
 
 
 func _build_risk_result(rule: Resource, commit_summary: Dictionary) -> String:
@@ -1160,6 +1708,14 @@ func _save_after_expedition_state_change() -> void:
 	save_manager.call_deferred("save_game")
 
 
+func _advance_global_time_after_expedition(total_minutes: int) -> void:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null:
+		return
+	if global_node.has_method("advance_outing_time_minutes"):
+		global_node.call("advance_outing_time_minutes", maxi(0, total_minutes), "outing_map")
+
+
 func _format_loot_entries(entries: Array) -> String:
 	if entries.is_empty():
 		return "• 没有找到可带回的物资。\n"
@@ -1198,6 +1754,28 @@ func _notify_shelter_inventory_changed() -> void:
 	var global_node := get_node_or_null("/root/Global")
 	if global_node != null and global_node.has_method("notify_shelter_inventory_changed"):
 		global_node.call("notify_shelter_inventory_changed")
+
+
+func _preview_unlock_neighbors_list(rule: Resource) -> Array[String]:
+	var names: Array[String] = []
+	if rule == null:
+		return names
+	_ensure_unlock_links_loaded()
+	var current_success_count := 1
+	if _progress != null:
+		current_success_count = int(_progress.get("successful_explore_counts").get(String(rule.get("location_id")), 0)) + 1
+	for link in _unlock_links:
+		if String(link.get("from_location_id")) != String(rule.get("location_id")):
+			continue
+		var id := String(link.get("to_location_id"))
+		if _unlocked_ids.has(id):
+			continue
+		if current_success_count < int(link.get("required_success_count")):
+			continue
+		var neighbor := _get_rule(id)
+		if neighbor != null:
+			names.append(neighbor.get("display_name"))
+	return names
 
 
 func _unlock_neighbors(rule: Resource) -> String:

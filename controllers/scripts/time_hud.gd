@@ -4,6 +4,7 @@ class_name TimeHud
 @export var time_component_path: NodePath
 @export var target_group_name: StringName = &"Xiaokong"
 @export var auto_retry_bind: bool = true
+@export var fallback_to_current_scene: bool = true
 
 @onready var _day_label: Label = $Margin/VBox/DayLabel
 @onready var _arc_time_view: Node = $Margin/VBox/ArcTimeView
@@ -45,6 +46,13 @@ func _resolve_time_component() -> Node:
 		var resolved := _find_time_component_recursive(node)
 		if resolved != null:
 			return resolved
+
+	if fallback_to_current_scene:
+		var current_scene := get_tree().current_scene
+		var scene_resolved := _find_time_component_recursive(current_scene)
+		if scene_resolved != null:
+			return scene_resolved
+
 	return null
 
 func _find_time_component_recursive(root_node: Node) -> Node:

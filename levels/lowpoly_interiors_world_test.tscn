@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://levels/interiors/lowpoly_interiors/interior_gridmap_test.tscn" id="1_hv3od"]
+
+[node name="LowpolyInteriorsWorldTest" type="Node3D" unique_id=1488643277]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1079781607]
+
+[node name="SunLight" type="DirectionalLight3D" parent="." unique_id=1429282031]
+transform = Transform3D(0.81915206, 0.43938506, -0.36868784, 0, 0.64278764, 0.76604444, 0.57357645, -0.62750685, 0.5265408, 0, 0, 0)
+light_energy = 1.2
+
+[node name="LowpolyInteriorMap" type="Node3D" parent="." unique_id=1607281668 instance=ExtResource("1_hv3od")]
+
+[node name="PreviewCamera" type="Camera3D" parent="." unique_id=1395469483]
+transform = Transform3D(0.81915206, -0.32898995, 0.46984634, 0, 0.81915206, 0.57357645, -0.57357645, -0.46984634, 0.6710101, 15, 12, 22)
+current = true

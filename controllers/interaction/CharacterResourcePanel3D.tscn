@@ -1,0 +1,302 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" uid="uid://1v25xr3ly7eg" path="res://controllers/interaction/character_resource_panel_3d.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://quiwc66dkftp" path="res://controllers/interaction/character_resource_status_text_resolver.gd" id="2_resolver"]
+[ext_resource type="Resource" uid="uid://jl8kcm21samx" path="res://resources/character_resources/status/default_status_rule_set.tres" id="2_u6pps"]
+[ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="4_46gjo"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_close_range"]
+radius = 2.0070784
+
+[sub_resource type="Animation" id="Animation_rqjm0"]
+length = 0.18
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:panel_alpha_anim")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.18),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [0.0, 1.0]
+}
+
+[sub_resource type="Animation" id="Animation_ucpm1"]
+length = 0.18
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:panel_alpha_anim")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.18),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [1.0, 0.0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_tefht"]
+_data = {
+&"fade_in": SubResource("Animation_rqjm0"),
+&"fade_out": SubResource("Animation_ucpm1")
+}
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_vkj0j"]
+viewport_path = NodePath("Viewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_r12bv"]
+transparency = 1
+cull_mode = 2
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0)
+albedo_texture = SubResource("ViewportTexture_vkj0j")
+albedo_texture_force_srgb = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_v7sgd"]
+size = Vector2(0.82, 0.58)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_kxml8"]
+bg_color = Color(0.86, 0.94, 1, 0.18)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.92, 0.98, 1, 0.42)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mjppp"]
+bg_color = Color(1, 1, 1, 0.14)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nfbw7"]
+bg_color = Color(0.63, 0.83, 1, 0.92)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rfmtv"]
+bg_color = Color(1, 1, 1, 0.14)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f8h84"]
+bg_color = Color(0.63, 0.83, 1, 0.92)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qglam"]
+bg_color = Color(1, 1, 1, 0.14)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vrwwp"]
+bg_color = Color(0.63, 0.83, 1, 0.92)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_17tca"]
+bg_color = Color(1, 1, 1, 0.14)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0ivea"]
+bg_color = Color(0.63, 0.83, 1, 0.92)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="CharacterResourcePanel3D" type="Node3D" unique_id=76270886]
+top_level = true
+script = ExtResource("1_script")
+rule_set = ExtResource("2_u6pps")
+
+[node name="StatusTextResolver" type="Node" parent="." unique_id=1821534264]
+script = ExtResource("2_resolver")
+rule_set = ExtResource("2_u6pps")
+
+[node name="CloseRangeArea" type="Area3D" parent="." unique_id=2022533172]
+collision_mask = 4
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CloseRangeArea" unique_id=991090969]
+shape = SubResource("SphereShape3D_close_range")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1359393556]
+libraries/visibility = SubResource("AnimationLibrary_tefht")
+
+[node name="Pivot" type="Node3D" parent="." unique_id=1327979381]
+
+[node name="PanelQuad" type="MeshInstance3D" parent="Pivot" unique_id=91951922]
+material_override = SubResource("StandardMaterial3D_r12bv")
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("QuadMesh_v7sgd")
+
+[node name="Viewport" type="SubViewport" parent="." unique_id=228207794]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(720, 460)
+render_target_update_mode = 4
+
+[node name="CanvasRoot" type="Control" parent="Viewport" unique_id=1575700267]
+custom_minimum_size = Vector2(720, 460)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Background" type="Panel" parent="Viewport/CanvasRoot" unique_id=1016402117]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_kxml8")
+
+[node name="Margin" type="MarginContainer" parent="Viewport/CanvasRoot/Background" unique_id=945955130]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = 28.0
+offset_right = -34.0
+offset_bottom = -28.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Content" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin" unique_id=635543023]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+
+[node name="StatRows" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content" unique_id=1671817505]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="HungerRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=1581435048]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow" unique_id=2121587558]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 28
+text = "饱食度"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow" unique_id=1962386088]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_mjppp")
+theme_override_styles/fill = SubResource("StyleBoxFlat_nfbw7")
+value = 45.0
+show_percentage = false
+
+[node name="ThirstRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=1795317095]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow" unique_id=91793793]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 28
+text = "水分"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow" unique_id=1935044063]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_rfmtv")
+theme_override_styles/fill = SubResource("StyleBoxFlat_f8h84")
+value = 40.0
+show_percentage = false
+
+[node name="MoodRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=743605694]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow" unique_id=1631356276]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 28
+text = "心情"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow" unique_id=862920597]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_qglam")
+theme_override_styles/fill = SubResource("StyleBoxFlat_vrwwp")
+value = 68.0
+show_percentage = false
+
+[node name="FavorRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=1549381413]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/FavorRow" unique_id=254554400]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 28
+text = "好感度"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/FavorRow" unique_id=1550968030]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_17tca")
+theme_override_styles/fill = SubResource("StyleBoxFlat_0ivea")
+value = 28.0
+show_percentage = false
+
+[node name="StatusList" type="VBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content" unique_id=638151724]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="StatusText" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatusList" unique_id=1561727922]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.98, 1, 0.98)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 24
+autowrap_mode = 3
+
+

@@ -5,8 +5,12 @@
 [ext_resource type="PackedScene" uid="uid://c3ffql15mo0aj" path="res://controllers/fps_controller.tscn" id="3_suxrs"]
 [ext_resource type="PackedScene" uid="uid://csgpjgy6o5cv7" path="res://controllers/ui/pause_menu.tscn" id="4_u5pho"]
 [ext_resource type="PackedScene" uid="uid://c0s86a8rn2pbm" path="res://resources/items/models/legacy/water_bottle.tscn" id="6_2kvbe"]
-[ext_resource type="PackedScene" uid="uid://b76364weqvdpn" path="res://characters/mirdo/mirdo_character.tscn" id="7_2kvbe"]
+[ext_resource type="PackedScene" uid="uid://dxmx4jtcksvg0" path="res://characters/mirdo/mirdo_character.tscn" id="7_2kvbe"]
 [ext_resource type="PackedScene" uid="uid://cqwb5ngi64ksv" path="res://resources/items/models/legacy/can_soup.tscn" id="7_b0r85"]
+[ext_resource type="Script" uid="uid://lyruy2adi3b" path="res://scripts/character_ai/components/character_ai_nav_point_3d.gd" id="8_ai_nav_point"]
+[ext_resource type="Script" uid="uid://bahf71hqwcbb1" path="res://scripts/xiaokong/components/game_time_component.gd" id="9_time_component"]
+[ext_resource type="Resource" path="res://resources/time/time_profile_default.tres" id="10_time_profile"]
+[ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="11_save_comp"]
 
 [sub_resource type="FogMaterial" id="FogMaterial_main_haze"]
 density = 0.014
@@ -36,6 +40,196 @@ agent_radius = 0.1
 agent_max_climb = 0.16
 region_min_size = 1.0
 edge_max_error = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_b0r85"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_3spkf"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sclt7"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_8u5no"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ywdsp"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_xrlwt"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_disq2"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_wsgwl"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uc5yd"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_50bx2"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_c5ptj"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_dgfd6"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f3db8"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_6770r"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5bhwm"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_4gqlu"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lan62"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_ocqb4"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hkh2j"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_noukk"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x71qa"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_unjla"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n361d"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_kljuq"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h5xwa"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_cdoy8"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i6lx0"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_amlq8"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_46f52"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_34iiy"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4eqlm"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_ergk8"]
+radius = 0.42
+height = 0.84
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ywyy5"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_c45f4"]
+radius = 0.42
+height = 0.84
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_siprh"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_2ea7w"]
+radius = 0.42
+height = 0.84
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gy2b7"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_5b7e4"]
+radius = 0.42
+height = 0.84
 
 [node name="LevelBunkerRender" type="Node3D" unique_id=876028361]
 
@@ -201,6 +395,14 @@ affect_navigation_mesh = true
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0093768, -0.011259079, -0.037202716)
 
+[node name="TimeComponent" type="Node" parent="." unique_id=1795443122 groups=["TimeSource"]]
+script = ExtResource("9_time_component")
+time_flow_profile = ExtResource("10_time_profile")
+
+[node name="SaveComponent" type="Node" parent="TimeComponent" unique_id=581410479]
+script = ExtResource("11_save_comp")
+unique_id = "global_time_component"
+
 [node name="water_bottle" parent="." unique_id=2119110613 instance=ExtResource("6_2kvbe")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3309464, 1.1920929e-07, -0.95876676)
 
@@ -209,4 +411,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9284813, 0.015239999, -0.1
 highlight_meshes = [NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_01 - Default_0"), NodePath("CanSoupModel/Sketchfab_model/Can Soup_FBX/RootNode/Soup Can/Soup Can_02 - Default_0"), null, null]
 
 [node name="MirdoCharacter" parent="." unique_id=2096496898 instance=ExtResource("7_2kvbe")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5628496, -0.011102285, -0.67850924)
+transform = Transform3D(1.4, 0, 0, 0, 1.4, 0, 0, 0, 1.4, -1.5628496, -0.011102285, -0.67850924)

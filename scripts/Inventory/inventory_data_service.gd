@@ -3,6 +3,7 @@ class_name InventoryDataService
 
 signal inventory_changed
 signal slot_changed(slot_index: int)
+signal item_used(item: ItemData, amount: int, effect: Dictionary)
 
 const SAVE_VERSION := 3
 const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_storage_resource.gd")
@@ -11,6 +12,7 @@ const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_sto
 @export var initial_slot_configs: Array[SlotConfig] = []
 @export var allow_saved_slot_count_override: bool = false
 @export var enable_item_stacking: bool = true
+@export var state_component_path: NodePath = NodePath("../StateComponent")
 
 var inventory_visible: bool = false
 var _storage_runtime_initialized: bool = false
@@ -187,6 +189,32 @@ func remove_from_slot(slot_index: int, amount: int = 0) -> Dictionary:
 	return {"item": removed_item, "amount": take_amount}
 
 
+func use_item_in_slot(slot_index: int, target_state: Node = null) -> bool:
+	var slot = _get_slot(slot_index)
+	if slot == null or slot.is_empty() or slot.item == null:
+		return false
+	var item: ItemData = slot.item
+	if not item.is_usable():
+		return false
+	var state_component := target_state
+	if state_component == null:
+		state_component = _resolve_state_component()
+	if state_component == null or not state_component.has_method("apply_item_effect"):
+		return false
+	var effect: Dictionary = state_component.call("apply_item_effect", item, "inventory_use")
+	if effect.is_empty():
+		return false
+	remove_from_slot(slot_index, 1)
+	item_used.emit(item, 1, effect)
+	_auto_save_after_item_use()
+	return true
+
+
+func can_use_item_in_slot(slot_index: int) -> bool:
+	var slot = _get_slot(slot_index)
+	return slot != null and not slot.is_empty() and slot.item != null and slot.item.is_usable()
+
+
 func set_slot_data(slot_index: int, item: ItemData, amount: int) -> void:
 	var slot = _get_slot(slot_index)
 	if slot == null:
@@ -230,7 +258,6 @@ func get_inventory_data() -> Dictionary:
 
 
 func load_inventory_data(data: Variant) -> void:
-	clear_inventory()
 	_ensure_storage()
 
 	if data is Dictionary:
@@ -242,12 +269,18 @@ func load_inventory_data(data: Variant) -> void:
 			inventory_storage.ensure_capacity()
 
 		var slots_data: Array = dict_data.get("slots", [])
+		begin_batch_update()
+		clear_inventory()
 		_load_slot_array_data(slots_data)
+		end_batch_update()
 		_emit_inventory_changed()
 		return
 
 	if data is Array:
+		begin_batch_update()
+		clear_inventory()
 		_load_slot_array_data(data)
+		end_batch_update()
 		_emit_inventory_changed()
 
 
@@ -287,6 +320,7 @@ func end_batch_update() -> void:
 
 
 func _load_slot_array_data(slots_data: Array) -> void:
+	var overflow_entries: Array[Dictionary] = []
 	for slot_data_raw in slots_data:
 		if not (slot_data_raw is Dictionary):
 			continue
@@ -295,14 +329,20 @@ func _load_slot_array_data(slots_data: Array) -> void:
 		var item_path: String = String(slot_data.get("item_path", "")).strip_edges()
 		var amount: int = int(slot_data.get("amount", 0))
 
-		if not _is_valid_slot(slot_id):
-			continue
 		if item_path.is_empty() or amount <= 0:
+			continue
+		if not _is_valid_slot(slot_id):
+			overflow_entries.append(slot_data)
 			continue
 		var item_resource := load(item_path) as ItemData
 		if item_resource == null:
 			continue
 		set_slot_data(slot_id, item_resource, amount)
+	for slot_data in overflow_entries:
+		var overflow_item := load(String(slot_data.get("item_path", "")).strip_edges()) as ItemData
+		var overflow_amount := int(slot_data.get("amount", 0))
+		if overflow_item != null and overflow_amount > 0:
+			pickup_item(overflow_item, overflow_amount)
 
 
 func _ensure_storage() -> void:
@@ -360,6 +400,30 @@ func _available_stack_space(slot) -> int:
 
 func _make_empty_slot_data() -> Dictionary:
 	return {"item": null, "amount": 0}
+
+
+func _resolve_state_component() -> Node:
+	if state_component_path != NodePath():
+		var by_path := get_node_or_null(state_component_path)
+		if by_path != null:
+			return by_path
+	var parent_node := get_parent()
+	if parent_node != null:
+		var by_parent := parent_node.get_node_or_null("StateComponent")
+		if by_parent != null:
+			return by_parent
+		var owner := parent_node.get_parent()
+		if owner != null:
+			var by_owner := owner.get_node_or_null("Components/StateComponent")
+			if by_owner != null:
+				return by_owner
+	return null
+
+
+func _auto_save_after_item_use() -> void:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("save_game"):
+		save_manager.call_deferred("save_game")
 
 
 func _emit_slot_changed(slot_index: int) -> void:
