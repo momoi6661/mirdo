@@ -1,0 +1,29 @@
+Candidate music gathered for the Mirdo-style cute/dreamy electronic direction.
+
+1) flowerbed_fields.ogg
+- Source: https://opengameart.org/content/flowerbed-fields-loop
+- Title: Flowerbed Fields [Loop]
+- Author: Zane Little Music
+- License: CC0
+- Fit: cute cheerful chiptune; good candidate for bright menus or mini-game/world-map moments.
+
+2) keep_your_dream_alive.ogg
+- Source: https://opengameart.org/content/keep-your-dream-alive-seamless-loop
+- Title: Keep your dream alive! (seamless loop)
+- Author: congusbongus
+- License: CC0
+- Fit: upbeat retro/chiptune; more energetic than current menu loop, useful for positive game state.
+
+3) talking_cute_chiptune.mp3
+- Source: https://opengameart.org/content/talking-cute-chiptune
+- Title: Talking Cute (Chiptune)
+- Author: Pro Sensory / Alex McCulloch
+- License: CC0; attribution appreciated but not required
+- Fit: cute/jazzy chiptune; possible dialogue/character screen music.
+
+4) s31_robotic_city_v2.ogg
+- Source: https://opengameart.org/content/robotic-city-v2
+- Title: Robotic City V2
+- Author: section31
+- License: CC0
+- Fit: electronic/sci-fi/room ambience; candidate for cyber/AI/terminal scenes.

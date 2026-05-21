@@ -14,4 +14,4 @@ health_delta = 8
 outing_category = "medical"
 can_take_outing = true
 can_use = true
-ai_rule_hint = "污水区、诊所、破旧住宅等地点受伤时可降低感染叙事风险。"
+ai_rule_hint = "污水、诊所、腐败超市、破旧住宅等地点受伤时可消耗，降低感染风险和坏结局倾向。"

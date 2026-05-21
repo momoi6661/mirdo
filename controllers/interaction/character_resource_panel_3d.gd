@@ -27,6 +27,7 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 @export_range(0.01, 1.0, 0.01) var fade_duration: float = 0.18
 @export_range(0.0, 0.25, 0.005) var fade_offset_y: float = 0.03
 @export_range(0.85, 1.0, 0.005) var fade_start_scale: float = 0.96
+@export_range(0.0, 0.5, 0.01) var open_auto_close_grace_sec: float = 0.12
 
 @export_category("Display")
 @export var panel_world_size: Vector2 = Vector2(0.82, 0.58)
@@ -37,6 +38,7 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 @export_category("Preview")
 @export_range(0.0, 100.0, 0.1) var preview_hunger: float = 45.0
 @export_range(0.0, 100.0, 0.1) var preview_thirst: float = 40.0
+@export_range(0.0, 100.0, 0.1) var preview_energy: float = 78.0
 @export_range(0.0, 100.0, 0.1) var preview_mood: float = 68.0
 @export_range(0.0, 100.0, 0.1) var preview_favor: float = 28.0
 
@@ -52,6 +54,9 @@ const GLOBAL_PATH: NodePath = NodePath("/root/Global")
 @onready var _hunger_bar: ProgressBar = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/HungerRow/Bar
 @onready var _thirst_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow/Label
 @onready var _thirst_bar: ProgressBar = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/ThirstRow/Bar
+@onready var _energy_row: HBoxContainer = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/EnergyRow
+@onready var _energy_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/EnergyRow/Label
+@onready var _energy_bar: ProgressBar = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/EnergyRow/Bar
 @onready var _mood_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow/Label
 @onready var _mood_bar: ProgressBar = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/MoodRow/Bar
 @onready var _favor_label: Label = $Viewport/CanvasRoot/Background/Margin/Content/StatRows/FavorRow/Label
@@ -64,6 +69,7 @@ var _target_root: Node3D
 var _current_payload: Dictionary = {}
 var _is_open: bool = false
 var _player_inside_close_area: bool = false
+var _open_auto_close_grace_left: float = 0.0
 var _transform_initialized: bool = false
 var _preview_labels: Array[Node] = []
 var _panel_alpha: float = 1.0
@@ -115,6 +121,10 @@ func _process(delta: float) -> void:
 		return
 
 	_update_follow_transform(delta)
+	if _open_auto_close_grace_left > 0.0:
+		_open_auto_close_grace_left = maxf(0.0, _open_auto_close_grace_left - delta)
+		_refresh_player_in_close_area()
+		return
 	if auto_close_with_area and _is_using_close_area() and not _player_inside_close_area:
 		hide_panel()
 		return
@@ -150,9 +160,10 @@ func open_for_payload(payload: Dictionary) -> void:
 		_set_panel_open(true)
 		return
 	_bind_state_component()
-	_refresh_player_in_close_area()
 	_render_current_snapshot()
 	_set_panel_open(true)
+	_update_follow_transform(0.0)
+	_refresh_player_in_close_area()
 
 
 func open_panel() -> void:
@@ -175,6 +186,7 @@ func _set_panel_open(next_open: bool) -> void:
 	_transform_initialized = false
 	_set_world_interaction_blocked_for_status(next_open)
 	if next_open:
+		_open_auto_close_grace_left = open_auto_close_grace_sec
 		visible = true
 		_set_panel_alpha(0.0 if not Engine.is_editor_hint() else 1.0)
 		panel_visibility_changed.emit(true)
@@ -184,6 +196,7 @@ func _set_panel_open(next_open: bool) -> void:
 			_animation_player.play("visibility/fade_in")
 		return
 	if not next_open:
+		_open_auto_close_grace_left = 0.0
 		_current_payload.clear()
 	panel_visibility_changed.emit(false)
 	if Engine.is_editor_hint():
@@ -308,10 +321,12 @@ func _apply_ui_style() -> void:
 	_apply_background_style()
 	_apply_label_style(_hunger_label, 28, Color(0.96, 0.99, 1.0, 1.0))
 	_apply_label_style(_thirst_label, 28, Color(0.96, 0.99, 1.0, 1.0))
+	_apply_label_style(_energy_label, 28, Color(0.96, 0.99, 1.0, 1.0))
 	_apply_label_style(_mood_label, 28, Color(0.96, 0.99, 1.0, 1.0))
 	_apply_label_style(_favor_label, 28, Color(0.96, 0.99, 1.0, 1.0))
 	_apply_bar_style(_hunger_bar)
 	_apply_bar_style(_thirst_bar)
+	_apply_bar_style(_energy_bar)
 	_apply_bar_style(_mood_bar)
 	_apply_bar_style(_favor_bar)
 	_apply_status_label_style(_status_text_label)
@@ -425,6 +440,7 @@ func _render_current_snapshot() -> void:
 	_render_snapshot({
 		"hunger": 0.0,
 		"thirst": 0.0,
+		"energy": 0.0,
 		"mood": 0.0,
 		"favor": 0.0,
 	})
@@ -435,6 +451,7 @@ func _render_preview() -> void:
 	_render_snapshot({
 		"hunger": preview_hunger,
 		"thirst": preview_thirst,
+		"energy": preview_energy,
 		"mood": preview_mood,
 		"favor": preview_favor,
 	})
@@ -443,6 +460,7 @@ func _render_preview() -> void:
 func _render_snapshot(snapshot: Dictionary) -> void:
 	_set_bar_value(_hunger_bar, float(snapshot.get("hunger", 0.0)))
 	_set_bar_value(_thirst_bar, float(snapshot.get("thirst", 0.0)))
+	_set_bar_value(_energy_bar, float(snapshot.get("energy", 0.0)))
 	_set_bar_value(_mood_bar, float(snapshot.get("mood", 0.0)))
 	_set_bar_value(_favor_bar, float(snapshot.get("favor", 0.0)))
 	_update_status_text(snapshot)

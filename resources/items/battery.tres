@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="ItemData" format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://3s18bonyedks"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
-[ext_resource type="Texture2D" path="res://resources/items/icons/battery_ui.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" uid="uid://dniwvnkbhmje5" path="res://resources/items/icons/battery_ui.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_item_script")
@@ -10,7 +10,5 @@ Description = "还能使用的通用电池，主要给手电和小设备供电�
 Icon = ExtResource("2_icon")
 ItemModelScenePath = "res://resources/items/models/physical/battery_item.tscn"
 MaxStackSize = 6
-outing_category = "material"
 can_take_outing = true
-inventory_tags = PackedStringArray("电力", "消耗品")
-ai_rule_hint = "携带手电时可作为备用电源，允许延长黑暗区域搜索时间。"
+ai_rule_hint = "手电、广播、电子门或小设备的备用电源；可延长黑暗区域搜索，也可能被设备测试或照明消耗。"

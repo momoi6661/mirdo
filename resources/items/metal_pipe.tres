@@ -12,4 +12,4 @@ ItemModelScenePath = "res://resources/items/models/physical/metal_pipe_item.tscn
 outing_category = "weapon"
 can_take_outing = true
 outing_damage_reduction = 0.24
-ai_rule_hint = "中低威胁遭遇中降低伤害概率，但会增加噪声和负重感。"
+ai_rule_hint = "简易近战武器，可挡开单个丧尸并降低中低威胁伤害；敲击噪声明显，连续战斗可能弯折损坏。"

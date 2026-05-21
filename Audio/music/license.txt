@@ -1,0 +1,13 @@
+Audio/music/menu_mita_dream_loop.wav
+- Original generated loop for this project.
+- Style target: cute/dreamy electronic menu ambience, light pink visual-novel/game menu feel.
+- Author: OpenAI/Codex generated procedural synth, 2026-05-21.
+- Intended use: menu BGM, loop enabled in Godot import settings.
+
+Audio/music/game_mita_room_loop.wav
+- Original generated loop for this project.
+- Style target: cute electronic in-game room/interaction ambience with realistic SFX remaining separate.
+- Author: OpenAI/Codex generated procedural synth, 2026-05-21.
+- Intended use: gameplay BGM, loop enabled in Godot import settings.
+
+Footsteps remain sourced separately under Audio/footsteps/concrete/license.txt and are used as realistic recorded concrete footstep SFX.

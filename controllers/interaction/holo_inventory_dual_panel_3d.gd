@@ -457,22 +457,64 @@ func _resolve_release_target(screen_pos: Vector2, source_panel: HoloInventoryPan
 		query.exclude = exclude_rids
 	var space_state := camera.get_world_3d().direct_space_state
 	var hit: Dictionary = space_state.intersect_ray(query)
-	if hit.is_empty():
-		return {"panel": null, "slot": -1}
+	if not hit.is_empty():
+		var collider: Object = hit.get("collider", null) as Object
+		var hit_position: Vector3 = hit.get("position", Vector3.ZERO) as Vector3
+		if _matches_panel_collider(_active_left_panel, collider):
+			return {
+				"panel": _active_left_panel,
+				"slot": _active_left_panel.get_slot_index_from_world_hit(hit_position),
+			}
+		if _matches_panel_collider(_right_panel, collider):
+			return {
+				"panel": _right_panel,
+				"slot": _right_panel.get_slot_index_from_world_hit(hit_position),
+			}
+	return _resolve_release_target_by_panel_plane(screen_pos, source_panel)
 
-	var collider: Object = hit.get("collider", null) as Object
-	var hit_position: Vector3 = hit.get("position", Vector3.ZERO) as Vector3
-	if _matches_panel_collider(_active_left_panel, collider):
-		return {
-			"panel": _active_left_panel,
-			"slot": _active_left_panel.get_slot_index_from_world_hit(hit_position),
-		}
-	if _matches_panel_collider(_right_panel, collider):
-		return {
-			"panel": _right_panel,
-			"slot": _right_panel.get_slot_index_from_world_hit(hit_position),
-		}
+
+func _resolve_release_target_by_panel_plane(screen_pos: Vector2, source_panel: HoloInventoryPanel3D = null) -> Dictionary:
+	var right_target := _resolve_panel_plane_target(_right_panel, screen_pos)
+	var left_target := _resolve_panel_plane_target(_active_left_panel, screen_pos)
+	var best_panel: HoloInventoryPanel3D = null
+	var best_slot: int = -1
+	var best_distance: float = INF
+	if right_target.get("panel", null) != source_panel and int(right_target.get("slot", -1)) >= 0:
+		best_panel = right_target.get("panel", null) as HoloInventoryPanel3D
+		best_slot = int(right_target.get("slot", -1))
+		best_distance = float(right_target.get("distance", INF))
+	if left_target.get("panel", null) != source_panel and int(left_target.get("slot", -1)) >= 0:
+		var left_distance := float(left_target.get("distance", INF))
+		if left_distance < best_distance:
+			best_panel = left_target.get("panel", null) as HoloInventoryPanel3D
+			best_slot = int(left_target.get("slot", -1))
+			best_distance = left_distance
+	if best_panel != null:
+		return {"panel": best_panel, "slot": best_slot}
+	if right_target.get("panel", null) != source_panel and bool(right_target.get("over_panel", false)):
+		return {"panel": right_target.get("panel", null), "slot": -1}
+	if left_target.get("panel", null) != source_panel and bool(left_target.get("over_panel", false)):
+		return {"panel": left_target.get("panel", null), "slot": -1}
 	return {"panel": null, "slot": -1}
+
+
+func _resolve_panel_plane_target(panel: HoloInventoryPanel3D, screen_pos: Vector2) -> Dictionary:
+	if panel == null or not is_instance_valid(panel):
+		return {"panel": null, "slot": -1, "over_panel": false, "distance": INF}
+	if not panel.is_panel_open():
+		return {"panel": panel, "slot": -1, "over_panel": false, "distance": INF}
+	var slot := panel.get_slot_index_at_screen_position(screen_pos)
+	var over_panel := panel.is_mouse_over_panel_at(screen_pos)
+	var distance := INF
+	var camera := _resolve_release_camera()
+	if camera != null:
+		var from := camera.project_ray_origin(screen_pos)
+		var dir := camera.project_ray_normal(screen_pos)
+		var panel_normal := panel.global_basis.z.normalized()
+		var denom := panel_normal.dot(dir)
+		if absf(denom) > 0.00001:
+			distance = (panel_normal.dot(panel.global_position) - panel_normal.dot(from)) / denom
+	return {"panel": panel, "slot": slot, "over_panel": over_panel, "distance": distance}
 
 
 func _matches_panel_collider(panel: HoloInventoryPanel3D, collider: Object) -> bool:

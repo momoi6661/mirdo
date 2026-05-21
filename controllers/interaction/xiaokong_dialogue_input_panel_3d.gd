@@ -36,6 +36,7 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export var auto_close_on_submit: bool = false
 @export var auto_focus_input_on_open: bool = false
 @export var fill_input_on_option_click: bool = true
+@export var show_quick_options: bool = true
 @export var enable_multiline_wrap: bool = true
 @export_range(1, 8, 1) var input_max_lines: int = 4
 @export var submit_on_enter: bool = true
@@ -512,6 +513,8 @@ func _bind_fixed_events() -> void:
 			_send_pick_area.input_event.connect(send_click)
 
 func _extract_options(payload: Dictionary) -> Array[Dictionary]:
+	if not show_quick_options:
+		return []
 	var out: Array[Dictionary] = []
 	if payload.has("options") and payload.options is Array:
 		var raw: Array = payload.options

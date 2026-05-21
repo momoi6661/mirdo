@@ -7,6 +7,7 @@ class_name AnimeToonApplier
 @export var target_root: NodePath = NodePath("../VisualRoot/Model")
 @export var toon_material_template: ShaderMaterial = preload("res://features/anime_toon/anime_toon_material.tres")
 @export var outline_material_template: ShaderMaterial = preload("res://features/anime_toon/anime_outline_material.tres")
+@export var occluded_outline_material_template: ShaderMaterial = preload("res://features/anime_toon/anime_occluded_visible_material.tres")
 @export var include_mesh_name_filters: PackedStringArray = PackedStringArray()
 @export var exclude_mesh_name_filters: PackedStringArray = PackedStringArray(["collider", "collision"])
 
@@ -15,14 +16,26 @@ class_name AnimeToonApplier
 @export var outline_color: Color = Color(0.055, 0.043, 0.055, 1.0)
 @export_range(0.0, 1.0, 0.01) var normal_smooth_blend: float = 0.65
 
+@export_group("Occluded Outline")
+@export var occluded_outline_enabled: bool = true
+@export var occluded_outline_color: Color = Color(0.78, 0.55, 1.0, 0.78)
+@export_range(0.0, 0.04, 0.0005) var occluded_outline_width: float = 0.006
+@export_range(0.0, 1.0, 0.01) var occluded_outline_alpha: float = 0.82
+@export_range(0.0, 2.0, 0.01) var occluded_outline_emission_strength: float = 0.35
+@export_range(-0.02, 0.02, 0.0005) var occluded_outline_depth_offset: float = -0.001
+@export_range(0.0, 1.0, 0.01) var occluded_outline_radial_blend: float = 0.85
+
 @export_group("Toon Lighting")
 @export var shade_color: Color = Color(0.58, 0.50, 0.58, 1.0)
 @export var shade_threshold: float = 0.42
 @export var shade_softness: float = 0.06
+@export_range(0.0, 1.0, 0.01) var shadow_hardness: float = 0.80
 @export var shadow_level: float = 0.42
 @export var max_light_level: float = 0.68
 @export var light_wrap: float = 0.18
 @export var light_contribution: float = 0.78
+@export_range(0.0, 1.0, 0.01) var received_shadow_strength: float = 0.45
+@export_range(0.0, 1.0, 0.01) var shadow_tint_strength: float = 0.70
 @export var ambient_lift: float = 0.04
 @export var rim_strength: float = 0.03
 
@@ -82,7 +95,11 @@ func _apply_to_mesh_instance(mesh_instance: MeshInstance3D) -> void:
 			source_material = mesh_instance.mesh.surface_get_material(surface_index)
 		var toon := toon_material_template.duplicate(true) as ShaderMaterial
 		var outline := outline_material_template.duplicate(true) as ShaderMaterial
+		var occluded_outline := occluded_outline_material_template.duplicate(true) as ShaderMaterial
+		_configure_occluded_outline(occluded_outline)
 		_configure_outline(outline)
+		if occluded_outline_enabled:
+			outline.next_pass = occluded_outline
 		toon.next_pass = outline
 		_configure_toon(toon, source_material)
 		mesh_instance.set_surface_override_material(surface_index, toon)
@@ -91,10 +108,13 @@ func _configure_toon(toon: ShaderMaterial, source_material: Material) -> void:
 	toon.set_shader_parameter("shade_color", shade_color)
 	toon.set_shader_parameter("shade_threshold", shade_threshold)
 	toon.set_shader_parameter("shade_softness", shade_softness)
+	toon.set_shader_parameter("shadow_hardness", shadow_hardness)
 	toon.set_shader_parameter("shadow_level", shadow_level)
 	toon.set_shader_parameter("max_light_level", max_light_level)
 	toon.set_shader_parameter("light_wrap", light_wrap)
 	toon.set_shader_parameter("light_contribution", light_contribution)
+	toon.set_shader_parameter("received_shadow_strength", received_shadow_strength)
+	toon.set_shader_parameter("shadow_tint_strength", shadow_tint_strength)
 	toon.set_shader_parameter("ambient_lift", ambient_lift)
 	toon.set_shader_parameter("rim_strength", rim_strength)
 	toon.set_shader_parameter("bright_luma_start", bright_luma_start)
@@ -118,6 +138,15 @@ func _configure_outline(outline: ShaderMaterial) -> void:
 	outline.set_shader_parameter("outline_color", outline_color)
 	outline.set_shader_parameter("outline_width", outline_width)
 	outline.set_shader_parameter("normal_smooth_blend", normal_smooth_blend)
+
+func _configure_occluded_outline(occluded_outline: ShaderMaterial) -> void:
+	occluded_outline.set_shader_parameter("outline_color", occluded_outline_color)
+	occluded_outline.set_shader_parameter("outline_width", occluded_outline_width)
+	occluded_outline.set_shader_parameter("alpha", occluded_outline_alpha)
+	occluded_outline.set_shader_parameter("pulse_strength", 0.0)
+	occluded_outline.set_shader_parameter("emission_strength", occluded_outline_emission_strength)
+	occluded_outline.set_shader_parameter("depth_offset", occluded_outline_depth_offset)
+	occluded_outline.set_shader_parameter("radial_blend", occluded_outline_radial_blend)
 
 func _extract_albedo_texture(material: Material) -> Texture2D:
 	if material == null:

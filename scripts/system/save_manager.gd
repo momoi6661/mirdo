@@ -103,16 +103,20 @@ func start_or_load_game(new_game_scene_path: String = "") -> bool:
 
 
 func start_new_game(new_game_scene_path: String = "") -> bool:
+	var use_external_cover := bool(get_meta(EXTERNAL_LOAD_COVER_META, false))
 	_start_new_game_runtime()
 	var target_scene := new_game_scene_path.strip_edges()
 	if target_scene.is_empty():
 		target_scene = "res://levels/level_bunker_render.tscn"
 	if not ResourceLoader.exists(target_scene):
 		last_error = "新游戏场景不存在: " + target_scene
+		await _release_external_load_cover_if_needed(use_external_cover)
 		return false
 	var changed: bool = await _change_scene_after_threaded_load(target_scene, "进入新游戏场景失败")
 	if not changed:
+		await _release_external_load_cover_if_needed(use_external_cover)
 		return false
+	await _release_external_load_cover_if_needed(use_external_cover)
 	current_slot_name = _resolve_slot_name(current_slot_name)
 	last_loaded_slot_name = current_slot_name
 	_save_profile(current_slot_name)

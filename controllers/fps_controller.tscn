@@ -31,7 +31,7 @@
 [ext_resource type="Script" path="res://scripts/character_resources/character_resource_time_decay_component.gd" id="30_resource_decay"]
 
 [ext_resource type="PackedScene" path="res://controllers/ui/CharacterStatusBars2D.tscn" id="29_status_bars"]
-[ext_resource type="Script" path="res://features/anime_toon/mita_world_renderer.gd" id="31_mita_world"]
+[ext_resource type="Script" path="res://features/anime_toon/mita_warm_particles_3d.gd" id="32_warm_particles"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -211,9 +211,9 @@ unique_id = "player_001"
 
 [node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=630296697]
 stream = ExtResource("22_step_sfx")
-volume_db = -16.0
-unit_size = 2.0
-max_distance = 10.0
+volume_db = -17.0
+unit_size = 0.75
+max_distance = 9.0
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]
 collision_layer = 0
@@ -325,6 +325,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3412707, 0)
 top_level = true
 cull_mask = 1
 
+
+[node name="MitaWarmParticles" type="Node3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=510205205]
+script = ExtResource("32_warm_particles")
+auto_setup_on_ready = true
+particle_count = 80
+forward_offset = -2.2
+dust_size = 0.014
+sparkle_size = 0.02
+drift_speed = 0.045
+
 [node name="PickUpRayCast" type="RayCast3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=1410065399]
 target_position = Vector3(0, 0, -3)
 collision_mask = 291
@@ -371,6 +381,12 @@ auto_place_hint_below_second_row = false
 [node name="HoloInventoryDualPanel3D" type="Node" parent="." unique_id=1389069987]
 script = ExtResource("25_dual_inv")
 close_check_interval_sec = 0.12
+
+[node name="XiaokongDialogueInputPanel3D" parent="." unique_id=467270216 instance=ExtResource("26_xk_dialogue_panel")]
+anchor_mark_path = NodePath("../Marker3D/CameraOffset/Camera3D/InteractionPanelMark3D")
+auto_focus_input_on_open = true
+show_quick_options = false
+preview_options = PackedStringArray()
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1882923, 0)
@@ -657,20 +673,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52246094, 0)
 shape = SubResource("CylinderShape3D_kick")
 
 
-[node name="MitaWorldRenderer" type="Node" parent="." unique_id=510205202]
-script = ExtResource("31_mita_world")
-auto_apply_on_ready = true
-target_scene_root = NodePath("..")
-include_characters = false
-include_player_children = false
-outline_width = 0.0014
-texture_smoothing = 0.45
-flatness = 0.62
-shadow_cleanliness = 0.72
-shadow_floor = 0.66
-light_wrap = 0.58
-ambient_lift = 0.24
-tune_world_environment = true
+
 
 [connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
 [connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]

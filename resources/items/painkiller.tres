@@ -14,4 +14,4 @@ health_delta = 18
 outing_category = "medical"
 can_take_outing = true
 can_use = true
-ai_rule_hint = "受伤后仍需完成撤离时可降低行动惩罚，但不能替代正式治疗。"
+ai_rule_hint = "受伤后仍需撤离或搬运时可消耗，降低行动惩罚和痛感叙事；不能替代正式治疗。"

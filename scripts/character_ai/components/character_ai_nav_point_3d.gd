@@ -5,10 +5,16 @@ class_name CharacterAINavPoint3D
 @export var enabled: bool = true
 @export var data: Resource
 @export var point_id: String = ""
+@export var id_suffix_from_owner: bool = true
 @export var display_name: String = ""
 @export var point_type: String = "wander"
 @export_multiline var description: String = ""
 @export var tags: PackedStringArray = PackedStringArray(["wander", "idle"])
+@export_enum("approach", "sit", "stand", "inspect", "look", "use", "wander") var marker_role: String = "approach"
+@export_group("Linked Semantic Points")
+@export_node_path("Marker3D") var approach_marker_path: NodePath
+@export_node_path("Marker3D") var sit_marker_path: NodePath
+@export_node_path("Marker3D") var stand_marker_path: NodePath
 
 @export_group("AI Action Contract")
 @export var arrival_action: StringName = &"idle_fidget"
@@ -37,15 +43,14 @@ func build_ai_nav_point_summary(observer: Node3D = null) -> Dictionary:
 	var summary: Dictionary = data.call("build_summary", observer, self) if data != null and data.has_method("build_summary") else _build_inline_summary(observer)
 	summary["path"] = String(get_path())
 	summary["enabled"] = enabled
+	_apply_node_semantics(summary, observer)
 	return summary
 
 func get_marker() -> Marker3D:
 	return self
 
 func _build_inline_summary(observer: Node3D = null) -> Dictionary:
-	var id := point_id.strip_edges()
-	if id.is_empty():
-		id = String(name)
+	var id := _resolve_point_id()
 	var distance := 0.0
 	if observer != null:
 		distance = observer.global_position.distance_to(global_position)
@@ -70,13 +75,96 @@ func _build_inline_summary(observer: Node3D = null) -> Dictionary:
 		"face_mode": face_mode,
 		"face_target_path": String(face_target_path),
 		"forward": _vector3_to_dict(forward),
-		"marker_role": "approach",
+		"marker_role": marker_role,
+		"approach_marker_path": String(approach_marker_path),
+		"sit_marker_path": String(sit_marker_path),
+		"stand_marker_path": String(stand_marker_path),
+		"marker_roles": _build_marker_roles(),
 		"priority": priority,
 		"cooldown_sec": cooldown_sec,
 		"dwell_time_sec": dwell_time_sec,
 		"distance": distance,
 		"mood_weights": _infer_mood_weights(),
 	}
+
+func _apply_node_semantics(summary: Dictionary, observer: Node3D = null) -> void:
+	var id := String(summary.get("id", "")).strip_edges()
+	if id.is_empty():
+		summary["id"] = _resolve_point_id()
+	if not display_name.strip_edges().is_empty():
+		summary["name"] = display_name
+	if not description.strip_edges().is_empty():
+		summary["description"] = description
+	if not point_type.strip_edges().is_empty():
+		summary["type"] = point_type
+	summary["tags"] = Array(tags)
+	summary["marker_role"] = marker_role
+	summary["approach_marker_path"] = String(approach_marker_path)
+	summary["sit_marker_path"] = String(sit_marker_path)
+	summary["stand_marker_path"] = String(stand_marker_path)
+	summary["marker_roles"] = _build_marker_roles()
+	summary["arrival_action"] = String(arrival_action)
+	summary["arrival_expression"] = arrival_expression
+	summary["action_options"] = _build_action_options()
+	summary["expression_options"] = _build_expression_options()
+	summary["action_hint"] = action_hint
+	summary["target_object_id"] = target_object_id
+	summary["face_mode"] = face_mode
+	summary["face_target_path"] = String(face_target_path)
+	summary["forward"] = _vector3_to_dict(global_transform.basis.z.normalized())
+	summary["priority"] = priority
+	summary["cooldown_sec"] = cooldown_sec
+	summary["dwell_time_sec"] = dwell_time_sec
+	if observer != null:
+		summary["distance"] = observer.global_position.distance_to(global_position)
+
+func _build_marker_roles() -> Dictionary:
+	var roles := {}
+	var own_path := String(get_path()) if is_inside_tree() else ""
+	var clean_role := marker_role.strip_edges().to_lower()
+	if not clean_role.is_empty() and not own_path.is_empty():
+		roles[clean_role] = own_path
+	if approach_marker_path != NodePath():
+		roles["approach"] = _resolve_linked_path_text(approach_marker_path)
+	if sit_marker_path != NodePath():
+		roles["sit"] = _resolve_linked_path_text(sit_marker_path)
+	if stand_marker_path != NodePath():
+		roles["stand"] = _resolve_linked_path_text(stand_marker_path)
+	return roles
+
+func _resolve_point_id() -> String:
+	var clean := point_id.strip_edges()
+	if clean.is_empty():
+		clean = String(name)
+	if not id_suffix_from_owner:
+		return clean
+	var owner_node := _find_semantic_owner()
+	if owner_node == null:
+		return clean
+	var owner_id := ""
+	if "object_id" in owner_node:
+		owner_id = String(owner_node.get("object_id")).strip_edges()
+	if owner_id.is_empty():
+		owner_id = String(owner_node.name).strip_edges()
+	if owner_id.is_empty() or clean.begins_with(owner_id):
+		return clean
+	return "%s_%s" % [owner_id, clean]
+
+func _find_semantic_owner() -> Node:
+	var current := get_parent()
+	while current != null:
+		if current.is_in_group("ai_world_object") or "object_id" in current:
+			return current
+		current = current.get_parent()
+	return null
+
+func _resolve_linked_path_text(path: NodePath) -> String:
+	if path == NodePath():
+		return ""
+	var node := get_node_or_null(path)
+	if node != null and node.is_inside_tree():
+		return String(node.get_path())
+	return String(path)
 
 func _build_action_options() -> Array[String]:
 	var result: Array[String] = []

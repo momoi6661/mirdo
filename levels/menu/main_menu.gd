@@ -30,6 +30,7 @@ const DEFAULT_GAME_SCENE := "res://levels/level_bunker_render.tscn"
 @onready var base_url_line_edit: LineEdit = %BaseUrlLineEdit
 @onready var model_line_edit: LineEdit = %ModelLineEdit
 @onready var api_key_line_edit: LineEdit = %ApiKeyLineEdit
+@onready var proxy_url_line_edit: LineEdit = %ProxyUrlLineEdit
 @onready var settings_status_label: Label = %StatusLabelSettings
 @onready var auto_save_timer: Timer = %AutoSaveTimer
 @onready var save_slot_menu: SaveSlotMenu = %SaveSlotMenu
@@ -43,8 +44,11 @@ var _background_intro_tween: Tween
 var _main_page_home_position := Vector2.ZERO
 var _settings_page_home_position := Vector2.ZERO
 var _settings_page_offscreen_position := Vector2.ZERO
+var _main_page_settings_position := Vector2.ZERO
 var _is_loading_ai_fields := false
 var _loading_tween: Tween
+var _menu_hide_tween: Tween
+var _button_tweens: Dictionary = {}
 var _sound_library: Dictionary = {
 	"button_hover": "uid://bcmrth5ffkdj1",
 	"button_click": "uid://b0e7nekr1tt3k",
@@ -56,6 +60,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_play_menu_bgm()
 	_capture_page_positions()
 	_connect_buttons()
 	_update_continue_state()
@@ -64,6 +69,17 @@ func _ready() -> void:
 	if auto_continue_when_save_exists:
 		call_deferred("_auto_start_or_new_game")
 
+
+func _play_menu_bgm() -> void:
+	var audio_manager := get_tree().root.get_node_or_null("AudioManager")
+	if audio_manager != null and audio_manager.has_method("play_menu_music"):
+		audio_manager.call("play_menu_music")
+
+
+func _play_game_bgm() -> void:
+	var audio_manager := get_tree().root.get_node_or_null("AudioManager")
+	if audio_manager != null and audio_manager.has_method("play_game_music"):
+		audio_manager.call("play_game_music")
 
 func _connect_buttons() -> void:
 	_connect_button(continue_button, Callable(self, "_on_continue_pressed"))
@@ -84,6 +100,10 @@ func _connect_button(button: Button, pressed_callable: Callable) -> void:
 		button.pressed.connect(pressed_callable)
 	if not button.mouse_entered.is_connected(_on_button_hover.bind(button)):
 		button.mouse_entered.connect(_on_button_hover.bind(button))
+	if not button.mouse_exited.is_connected(_on_button_exit.bind(button)):
+		button.mouse_exited.connect(_on_button_exit.bind(button))
+	if not button.button_down.is_connected(_on_button_down.bind(button)):
+		button.button_down.connect(_on_button_down.bind(button))
 
 
 func _update_continue_state() -> void:
@@ -148,6 +168,7 @@ func _start_or_load_game(status_text: String) -> void:
 		return
 	await _hold_pink_transition_cover()
 	_set_external_load_cover(true)
+	_play_game_bgm()
 	var started: bool = await save_manager.call("start_or_load_game", new_game_scene_path)
 	if not started:
 		await _release_pink_transition_cover()
@@ -177,8 +198,13 @@ func _on_new_game_pressed() -> void:
 		_hide_loading_overlay()
 		_set_status("主场景加载失败。", true)
 		return
+	await _hold_pink_transition_cover()
+	_set_external_load_cover(true)
+	_play_game_bgm()
 	var started: bool = await save_manager.call("start_new_game", new_game_scene_path)
 	if not started:
+		await _release_pink_transition_cover()
+		_set_external_load_cover(false)
 		_busy = false
 		_set_buttons_disabled(false)
 		_hide_loading_overlay()
@@ -248,7 +274,7 @@ func _on_progress_panel_back() -> void:
 
 
 func _connect_ai_settings_fields() -> void:
-	for line_edit in [base_url_line_edit, model_line_edit, api_key_line_edit]:
+	for line_edit in [base_url_line_edit, model_line_edit, api_key_line_edit, proxy_url_line_edit]:
 		if line_edit != null and not line_edit.text_changed.is_connected(_on_ai_field_text_changed):
 			line_edit.text_changed.connect(_on_ai_field_text_changed)
 	if auto_save_timer != null:
@@ -262,12 +288,17 @@ func _connect_ai_settings_fields() -> void:
 func _load_ai_fields_from_settings() -> void:
 	_is_loading_ai_fields = true
 	var settings := _get_ai_settings()
+	if settings != null and settings.has_method("load_settings"):
+		settings.call("load_settings")
+	var provider := settings.call("get_provider_settings") as Dictionary if settings != null and settings.has_method("get_provider_settings") else {}
 	if base_url_line_edit != null:
-		base_url_line_edit.text = String(settings.get("base_url")) if settings != null else ""
+		base_url_line_edit.text = String(provider.get("base_url", settings.get("base_url") if settings != null else ""))
 	if model_line_edit != null:
-		model_line_edit.text = String(settings.get("model")) if settings != null else ""
+		model_line_edit.text = String(provider.get("model", settings.get("model") if settings != null else ""))
 	if api_key_line_edit != null:
-		api_key_line_edit.text = String(settings.get("api_key")) if settings != null else ""
+		api_key_line_edit.text = String(provider.get("api_key", settings.get("api_key") if settings != null else ""))
+	if proxy_url_line_edit != null:
+		proxy_url_line_edit.text = String(provider.get("proxy_url", settings.get("proxy_url") if settings != null else ""))
 	_is_loading_ai_fields = false
 	_set_settings_status("设置会自动保存")
 
@@ -296,8 +327,9 @@ func _flush_ai_settings() -> void:
 	var base_url := "" if base_url_line_edit == null else base_url_line_edit.text
 	var model := "" if model_line_edit == null else model_line_edit.text
 	var api_key := "" if api_key_line_edit == null else api_key_line_edit.text
-	var ok := bool(settings.call("set_provider_settings", base_url, api_key, model, true))
-	_set_settings_status("已自动保存" if ok else "设置无变化")
+	var proxy_url := "" if proxy_url_line_edit == null else proxy_url_line_edit.text
+	var ok := bool(settings.call("set_provider_settings_with_proxy", base_url, api_key, model, proxy_url, true)) if settings.has_method("set_provider_settings_with_proxy") else bool(settings.call("set_provider_settings", base_url, api_key, model, true))
+	_set_settings_status("已保存大模型配置" if ok else "设置无变化")
 
 
 func _set_settings_status(text: String) -> void:
@@ -311,6 +343,7 @@ func _get_ai_settings() -> Node:
 
 func _capture_page_positions() -> void:
 	var viewport_width := get_viewport().get_visible_rect().size.x
+	_main_page_settings_position = Vector2(-viewport_width, 0.0)
 	if main_page != null:
 		_main_page_home_position = Vector2.ZERO
 		main_page.position = _main_page_home_position
@@ -334,14 +367,15 @@ func _slide_to_settings_page() -> void:
 	_settings_page_home_position = Vector2.ZERO
 	_settings_page_offscreen_position = Vector2(viewport_width, 0.0)
 	main_page.position = _main_page_home_position
+	_reset_menu_button_offsets()
 	settings_page.position = _settings_page_offscreen_position
 	settings_page.visible = true
 	settings_page.modulate.a = 1.0
 	if menu_highlight != null:
 		menu_highlight.visible = false
 	_page_tween = create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_page_tween.tween_property(main_page, "position", Vector2(-viewport_width, 0.0), 0.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_page_tween.tween_property(settings_page, "position", Vector2.ZERO, 0.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_page_tween.tween_property(main_page, "position", _main_page_settings_position, 0.46).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_page_tween.tween_property(settings_page, "position", Vector2.ZERO, 0.46).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	await _page_tween.finished
 	main_page.visible = false
 	_busy = false
@@ -353,16 +387,20 @@ func _slide_to_main_page() -> void:
 	_busy = true
 	_flush_ai_settings()
 	_kill_page_tween()
-	var viewport_width := get_viewport().get_visible_rect().size.x
 	main_page.visible = true
-	main_page.position = Vector2(-viewport_width, 0.0)
+	_reset_menu_button_offsets()
+	main_page.position = _main_page_settings_position
+	main_page.modulate.a = 1.0
 	settings_page.position = Vector2.ZERO
 	_page_tween = create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_page_tween.tween_property(settings_page, "position", Vector2(viewport_width, 0.0), 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_page_tween.tween_property(main_page, "position", Vector2.ZERO, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_page_tween.tween_property(settings_page, "position", _settings_page_offscreen_position, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_page_tween.tween_property(main_page, "position", Vector2.ZERO, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	await _page_tween.finished
 	settings_page.visible = false
 	settings_page.position = _settings_page_offscreen_position
+	main_page.modulate.a = 1.0
+	main_page.position = Vector2.ZERO
+	_reset_menu_button_offsets()
 	_settings_open = false
 	_busy = false
 	_set_buttons_disabled(false)
@@ -378,9 +416,9 @@ func _kill_page_tween() -> void:
 func _set_buttons_disabled(disabled: bool) -> void:
 	for button in [continue_button, new_game_button, progress_button, settings_button, quit_button]:
 		if button != null:
-			button.disabled = disabled
+			button.mouse_filter = Control.MOUSE_FILTER_IGNORE if disabled else Control.MOUSE_FILTER_STOP
 	_update_continue_state()
-	if disabled:
+	if disabled and false:
 		for button in [continue_button, new_game_button, progress_button, settings_button, quit_button]:
 			if button != null:
 				button.disabled = true
@@ -390,7 +428,7 @@ func _set_status(text: String, is_error: bool = false) -> void:
 	if status_label == null:
 		return
 	status_label.text = text
-	status_label.add_theme_color_override("font_color", Color(1.0, 0.42, 0.24, 1.0) if is_error else Color(0.42, 0.27, 0.17, 0.78))
+	status_label.add_theme_color_override("font_color", Color(1.0, 0.42, 0.24, 1.0) if is_error else Color(0.90, 0.86, 0.82, 0.86))
 
 
 func _slot_display_name(slot_name: String) -> String:
@@ -492,7 +530,9 @@ func _show_loading_overlay(message: String) -> void:
 		return
 	if loading_label != null:
 		loading_label.text = message
-	if menu_buttons != null:
+	_animate_menu_buttons_out()
+	if false and menu_buttons != null:
+		menu_buttons.visible = true
 		var menu_tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 		menu_tween.tween_property(menu_buttons, "modulate:a", 0.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		menu_tween.tween_property(menu_buttons, "position:x", menu_buttons.position.x + 18.0, 0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -512,11 +552,51 @@ func _show_loading_overlay(message: String) -> void:
 func _hide_loading_overlay() -> void:
 	if loading_overlay != null:
 		loading_overlay.visible = false
-	if menu_buttons != null:
-		menu_buttons.visible = true
-		var menu_tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		menu_tween.tween_property(menu_buttons, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		menu_tween.tween_property(menu_buttons, "position:x", 0.0, 0.20).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_animate_menu_buttons_in()
+
+
+func _animate_menu_buttons_out() -> void:
+	if menu_buttons == null:
+		return
+	if _menu_hide_tween != null and _menu_hide_tween.is_valid():
+		_menu_hide_tween.kill()
+	menu_buttons.visible = true
+	_menu_hide_tween = create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	var index := 0
+	for child in menu_buttons.get_children():
+		var control := child as Control
+		if control == null:
+			continue
+		_kill_button_tween(control)
+		var delay := float(index) * 0.035
+		_menu_hide_tween.tween_property(control, "modulate:a", 0.0, 0.16).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_menu_hide_tween.tween_property(control, "position:x", 34.0, 0.20).set_delay(delay).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		index += 1
+	_menu_hide_tween.finished.connect(func() -> void:
+		if menu_buttons != null and _busy:
+			menu_buttons.visible = false
+	)
+
+
+func _animate_menu_buttons_in() -> void:
+	if menu_buttons == null:
+		return
+	if _menu_hide_tween != null and _menu_hide_tween.is_valid():
+		_menu_hide_tween.kill()
+	menu_buttons.visible = true
+	_menu_hide_tween = create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	var index := 0
+	for child in menu_buttons.get_children():
+		var control := child as Control
+		if control == null:
+			continue
+		control.position.x = 34.0
+		control.scale = Vector2(0.985, 0.985)
+		var delay := float(index) * 0.035
+		_menu_hide_tween.tween_property(control, "modulate:a", 1.0, 0.20).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_menu_hide_tween.tween_property(control, "position:x", 0.0, 0.30).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_menu_hide_tween.tween_property(control, "scale", Vector2.ONE, 0.32).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		index += 1
 
 
 func _preload_scene_resource(scene_path: String) -> bool:
@@ -553,13 +633,63 @@ func _fade_out_left_menu() -> void:
 	await tween.finished
 
 
+func _reset_menu_button_offsets() -> void:
+	if menu_buttons == null:
+		return
+	for child in menu_buttons.get_children():
+		var control := child as Control
+		if control == null:
+			continue
+		_kill_button_tween(control)
+		control.position.x = 0.0
+		control.scale = Vector2.ONE
+		control.modulate = Color.WHITE
+
+
+func _kill_button_tween(control: Control) -> void:
+	if control == null:
+		return
+	var id := control.get_instance_id()
+	if _button_tweens.has(id):
+		var old_tween := _button_tweens[id] as Tween
+		if old_tween != null and old_tween.is_valid():
+			old_tween.kill()
+		_button_tweens.erase(id)
+
+
 func _on_button_hover(button: Button) -> void:
 	_play_ui_sound("button_hover")
+	if button == null or button.disabled or _busy:
+		return
+	_kill_button_tween(button)
+	button.pivot_offset = button.size * 0.5
+	var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_button_tweens[button.get_instance_id()] = tween
+	tween.tween_property(button, "modulate", Color(1.16, 1.08, 1.12, 1.0), 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "position:x", 12.0, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "scale", Vector2(1.045, 1.045), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _on_button_exit(button: Button) -> void:
+	if button == null or _busy:
+		return
+	_kill_button_tween(button)
+	var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_button_tweens[button.get_instance_id()] = tween
+	tween.tween_property(button, "modulate", Color.WHITE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "position:x", 0.0, 0.20).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(button, "scale", Vector2.ONE, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _on_button_down(button: Button) -> void:
 	if button == null or button.disabled:
 		return
-	button.modulate = Color(1.08, 1.08, 1.05, 1.0)
-	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.tween_property(button, "modulate", Color.WHITE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_kill_button_tween(button)
+	button.pivot_offset = button.size * 0.5
+	var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_button_tweens[button.get_instance_id()] = tween
+	tween.tween_property(button, "scale", Vector2(0.985, 0.985), 0.055).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_property(button, "scale", Vector2(1.035, 1.035), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _play_ui_sound(sound_type: String) -> void:
@@ -568,11 +698,15 @@ func _play_ui_sound(sound_type: String) -> void:
 	var stream := load(String(_sound_library[sound_type]))
 	if stream == null:
 		return
+	ui_sound_player.bus = "UI" if AudioServer.get_bus_index("UI") != -1 else "Master"
 	ui_sound_player.stream = stream
 	ui_sound_player.play()
 
 
 func _get_save_manager() -> Node:
 	return get_tree().root.get_node_or_null("SaveManager")
+
+
+
 
 

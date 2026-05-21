@@ -23,5 +23,5 @@ thirst_delta = 30
 outing_category = "food"
 can_take_outing = true
 can_use = true
-ai_rule_hint = "长时间外出和高温/粉尘环境中可消耗，降低口渴和返程失误风险。"
+ai_rule_hint = "可作为外出途中的饮水补给，高温、粉尘、奔跑撤离或长距离返程时会被消耗；降低口渴和失误风险。"
 metadata/_custom_type_script = "uid://bdhapua5nkgw8"

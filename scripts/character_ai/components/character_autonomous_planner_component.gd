@@ -146,6 +146,7 @@ func _add_nav_point_candidates(out: Array, mind: Dictionary, context: Dictionary
 			"kind": "go_to_nav_point",
 			"target_nav_point": point_id,
 			"target_path": String(entry.get("path", "")),
+			"marker_role": String(entry.get("marker_role", "approach")),
 			"arrival_action": String(entry.get("arrival_action", "idle_fidget")),
 			"arrival_expression": String(entry.get("arrival_expression", _expression_for_entry(entry, String(entry.get("arrival_action", "idle_fidget"))))),
 			"action_options": entry.get("action_options", []),
@@ -164,9 +165,11 @@ func _add_nav_point_candidates(out: Array, mind: Dictionary, context: Dictionary
 func _score_nav_point(entry: Dictionary, mind: Dictionary, context: Dictionary) -> float:
 	var score := float(entry.get("priority", 1.0)) * 0.35 + movement_bias
 	var energy := float(mind.get("energy", 70.0))
-	if _has_any_tag(entry, sit_tags) and float(mind.get("tiredness", 0.0)) < 0.55 and energy > 35.0:
+	var role := String(entry.get("marker_role", "")).strip_edges().to_lower()
+	var is_sit_point := role == "sit" or _has_any_tag(entry, sit_tags)
+	if is_sit_point and float(mind.get("tiredness", 0.0)) < 0.55 and energy > 35.0:
 		score -= 1.0
-	if _has_any_tag(entry, sit_tags) and energy < 35.0:
+	if is_sit_point and energy < 35.0:
 		score += (35.0 - energy) / 35.0 * 1.3
 	if _has_any_tag(entry, supply_tags):
 		score += float(mind.get("duty", 0.0)) * 0.45 + float(mind.get("curiosity", 0.0)) * 0.12

@@ -4,6 +4,7 @@ shader_type spatial;
 // MToon-like idea: real lights affect the model, but bright/white texels are not allowed
 // to blow out to pure white. This helps mouth interior, eye whites, and white cloth areas.
 render_mode cull_disabled, depth_prepass_alpha;
+stencil_mode write, compare_always, 1;
 
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap, repeat_enable;
 uniform bool use_texture = true;
@@ -12,10 +13,13 @@ uniform vec4 base_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 shade_color : source_color = vec4(0.58, 0.50, 0.58, 1.0);
 uniform float shade_threshold : hint_range(0.0, 1.0, 0.01) = 0.42;
 uniform float shade_softness : hint_range(0.001, 0.5, 0.001) = 0.06;
+uniform float shadow_hardness : hint_range(0.0, 1.0, 0.01) = 0.80;
 uniform float shadow_level : hint_range(0.0, 1.0, 0.01) = 0.42;
 uniform float max_light_level : hint_range(0.2, 1.0, 0.01) = 0.82;
 uniform float light_wrap : hint_range(0.0, 1.0, 0.01) = 0.18;
 uniform float light_contribution : hint_range(0.0, 2.0, 0.01) = 0.92;
+uniform float received_shadow_strength : hint_range(0.0, 1.0, 0.01) = 0.45;
+uniform float shadow_tint_strength : hint_range(0.0, 1.0, 0.01) = 0.70;
 
 uniform vec4 ambient_color : source_color = vec4(0.72, 0.68, 0.76, 1.0);
 uniform float ambient_lift : hint_range(0.0, 1.0, 0.01) = 0.08;
@@ -91,17 +95,21 @@ void light() {
 	float wrapped = clamp((ndotl + light_wrap) / (1.0 + light_wrap), 0.0, 1.0);
 	float attenuated = wrapped * ATTENUATION;
 
-	float band = smoothstep(shade_threshold - shade_softness, shade_threshold + shade_softness, attenuated);
+	float soft_band = smoothstep(shade_threshold - shade_softness, shade_threshold + shade_softness, attenuated);
+	float hard_band = step(shade_threshold, attenuated);
+	float band = mix(soft_band, hard_band, shadow_hardness);
+	float received_shadow = 1.0 - clamp(ATTENUATION, 0.0, 1.0);
 	float bright_mask = bright_mask_of(ALBEDO);
 
 	// Bright texels receive less full-light and are biased slightly toward the shade band.
 	float damped_max_light = max_light_level * mix(1.0, 1.0 - bright_light_damping, bright_mask);
-	float pushed_shadow = clamp(shadow_level + bright_shadow_push * bright_mask, 0.0, 1.0);
+	float received_shadow_darken = mix(1.0, 1.0 - received_shadow_strength, received_shadow);
+	float pushed_shadow = clamp(shadow_level + bright_shadow_push * bright_mask, 0.0, 1.0) * received_shadow_darken;
 	float toon_light = mix(pushed_shadow, damped_max_light, band);
 
 	vec3 lit_tint = mix(vec3(1.0), bright_tint.rgb, bright_mask * bright_tint_strength);
 	vec3 shade_tint = mix(shade_color.rgb, bright_tint.rgb, bright_mask * 0.45);
-	vec3 toon_tint = mix(shade_tint, lit_tint, toon_light);
+	vec3 toon_tint = mix(mix(vec3(1.0), shade_tint, shadow_tint_strength), lit_tint, toon_light);
 
 	DIFFUSE_LIGHT += ALBEDO * toon_tint * LIGHT_COLOR * light_contribution / PI;
 

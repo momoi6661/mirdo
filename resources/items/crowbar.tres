@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="ItemData" format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://of5njrh8g2uw"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
-[ext_resource type="Texture2D" path="res://resources/items/icons/crowbar_ui.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" uid="uid://c542ynyi5413l" path="res://resources/items/icons/crowbar_ui.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_item_script")
@@ -9,8 +9,6 @@ ItemName = "撬棍"
 Description = "沉重但可靠的撬棍，适合撬门、打开箱体，也能防身。"
 Icon = ExtResource("2_icon")
 ItemModelScenePath = "res://resources/items/models/physical/crowbar_item.tscn"
-MaxStackSize = 1
 outing_category = "tool"
 can_take_outing = true
-inventory_tags = PackedStringArray("工具", "破拆")
-ai_rule_hint = "遇到锁门、卷帘门、后仓或车辆后备箱时可开启额外搜索分支。"
+ai_rule_hint = "用于撬开锁门、卷帘门、车辆后备箱和工具柜，开启额外搜索分支；用力破拆会制造噪声并可能损坏。"

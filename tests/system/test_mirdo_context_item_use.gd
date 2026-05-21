@@ -13,6 +13,7 @@ func _run() -> void:
 	_switch_to_test_save_slot()
 	await _test_character_interactable_emits_inventory_use_request()
 	await _test_holo_panel_uses_target_state_context()
+	await _test_holo_panel_medical_item_ignores_target_context_and_uses_self()
 	await _test_holo_panel_without_context_uses_inventory_default_state()
 	await _test_holo_panel_right_hold_uses_target_state_context()
 	await _test_holo_panel_right_hold_cancel_does_not_use_item()
@@ -128,6 +129,45 @@ func _test_holo_panel_uses_target_state_context() -> void:
 	await process_frame
 
 
+func _test_holo_panel_medical_item_ignores_target_context_and_uses_self() -> void:
+	var panel_script := load("res://controllers/interaction/holo_inventory_panel_3d.gd") as Script
+	var inventory_script := load("res://scripts/Inventory/inventory_data_service.gd") as Script
+	var item := load("res://resources/items/medkit.tres") as ItemData
+	_expect(panel_script != null, "HoloInventoryPanel3D script should load for medical self-use test")
+	_expect(inventory_script != null, "InventoryDataService script should load for medical self-use test")
+	_expect(item != null, "medkit item should load")
+	if panel_script == null or inventory_script == null or item == null:
+		return
+
+	var host := Node3D.new()
+	root.add_child(host)
+	var target_state := _FakeItemTargetState.new()
+	target_state.name = "MirdoState"
+	host.add_child(target_state)
+	var self_state := _FakeItemTargetState.new()
+	self_state.name = "PlayerState"
+	host.add_child(self_state)
+	var inventory := Node.new()
+	inventory.set_script(inventory_script)
+	host.add_child(inventory)
+	inventory.set("state_component_path", inventory.get_path_to(self_state))
+	inventory.call("pickup_item", item, 1)
+	var panel := Node3D.new()
+	panel.set_script(panel_script)
+	host.add_child(panel)
+	panel.call("set_inventory_data", inventory)
+	panel.call("set_use_target_context", target_state, "Mirdo")
+
+	var used := bool(panel.call("use_slot_item_for_tests", 0))
+	_expect(used, "medical item should still be usable while Mirdo context is open")
+	_expect(target_state.applied_items.is_empty(), "medical item should not be applied to Mirdo target context")
+	_expect(self_state.applied_items.size() == 1, "medical item should apply to player self state")
+	_expect(not inventory.call("has_item_in_slot", 0), "medical self-use should consume the item")
+
+	host.queue_free()
+	await process_frame
+
+
 func _test_holo_panel_without_context_uses_inventory_default_state() -> void:
 	var panel_script := load("res://controllers/interaction/holo_inventory_panel_3d.gd") as Script
 	var inventory_script := load("res://scripts/Inventory/inventory_data_service.gd") as Script
@@ -195,6 +235,7 @@ func _test_holo_panel_right_hold_uses_target_state_context() -> void:
 	_expect(panel.has_method("get_use_hold_progress_for_tests"), "panel should expose get_use_hold_progress_for_tests")
 	_expect(panel.has_method("get_use_hold_indicator_mode_for_tests"), "panel should expose get_use_hold_indicator_mode_for_tests")
 	_expect(panel.has_method("is_use_hold_tween_running_for_tests"), "panel should expose is_use_hold_tween_running_for_tests")
+	_expect(panel.has_method("calculate_use_hold_indicator_screen_position_for_tests"), "panel should expose calculate_use_hold_indicator_screen_position_for_tests")
 	if not panel.has_method("begin_use_hold_for_tests") or not panel.has_method("advance_use_hold_for_tests"):
 		host.queue_free()
 		await process_frame
@@ -203,6 +244,11 @@ func _test_holo_panel_right_hold_uses_target_state_context() -> void:
 	_expect(bool(panel.call("begin_use_hold_for_tests", 0)), "right-hold should start on a usable item")
 	_expect(String(panel.call("get_use_hold_indicator_mode_for_tests")) == "mouse_circle", "right-hold progress should be a mouse-following circular indicator")
 	_expect(bool(panel.call("is_use_hold_tween_running_for_tests")), "right-hold progress should be driven by a Tween")
+	if panel.has_method("calculate_use_hold_indicator_screen_position_for_tests"):
+		var mouse_screen := Vector2(320, 240)
+		var indicator_screen := panel.call("calculate_use_hold_indicator_screen_position_for_tests", mouse_screen) as Vector2
+		_expect(absf(indicator_screen.x - mouse_screen.x) <= 1.0, "right-hold indicator should stay horizontally aligned with mouse")
+		_expect(indicator_screen.y < mouse_screen.y, "right-hold indicator should be above mouse in screen space")
 	panel.call("advance_use_hold_for_tests", 0.2)
 	_expect(target_state.applied_items.is_empty(), "short right-hold should not use item before progress completes")
 	_expect(float(panel.call("get_use_hold_progress_for_tests")) > 0.0, "right-hold should expose visible progress")

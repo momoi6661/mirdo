@@ -6,6 +6,7 @@ signal ai_response_application_finished(report: Dictionary)
 signal navigation_started(target_marker_path: NodePath, arrival_action: StringName)
 signal navigation_finished(arrival_action: StringName)
 signal navigation_cancelled()
+signal stand_up_finished()
 
 @export var intent_interpreter_path: NodePath
 @export var perception_component_path: NodePath
@@ -30,13 +31,21 @@ signal navigation_cancelled()
 @export_range(0.0, 3.0, 0.01) var stand_relocate_delay_sec: float = 0.92
 @export_range(0.0, 1.0, 0.01) var stand_relocate_duration_sec: float = 0.16
 @export_range(0.0, 2.0, 0.01) var stand_relocate_max_planar_distance: float = 1.25
+@export_range(0.0, 4.0, 0.01) var stand_root_motion_wait_sec: float = 1.15
+@export_range(0.0, 1.0, 0.01) var stand_root_motion_end_margin_sec: float = 0.08
+@export var stand_align_after_root_motion: bool = true
+@export var stand_snap_after_root_motion_if_far: bool = false
 @export_category("Seat Pose")
 @export var seat_use_root_motion: bool = true
 @export_range(0.0, 1.0, 0.01) var seat_pre_align_duration_sec: float = 0.12
-@export_range(0.0, 1.0, 0.01) var seat_pre_align_max_planar_distance: float = 0.45
+@export_range(0.0, 3.0, 0.01) var seat_pre_align_max_planar_distance: float = 1.6
+@export_range(0.0, 2.0, 0.01) var seat_exact_navigation_min_distance: float = 0.28
+@export var seat_force_attach_before_action: bool = true
+@export var require_semantic_sit_marker: bool = true
 @export var seat_snap_if_no_root_motion: bool = false
 @export var stand_use_root_motion: bool = true
 @export var stand_snap_if_no_root_motion: bool = false
+@export var auto_stand_before_navigation: bool = true
 @export var debug_log: bool = false
 
 var _intent_interpreter: Node
@@ -56,7 +65,12 @@ var _active_sit_marker_path: NodePath
 var _active_stand_marker_path: NodePath
 var _pending_seat_marker_after_approach_path: NodePath
 var _pending_seat_action_after_approach: StringName = &""
+var _seat_exact_navigation_active: bool = false
+var _seat_alignment_active: bool = false
+var _stand_transition_active: bool = false
+var _seat_alignment_serial: int = 0
 var _stand_relocate_serial: int = 0
+var _queued_navigation_after_stand: Dictionary = {}
 
 func _ready() -> void:
 	_refresh_refs()
@@ -182,7 +196,7 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 
 func is_navigating() -> bool:
 	var motor_active := _navigation_motor != null and _navigation_motor.has_method("is_navigating") and bool(_navigation_motor.call("is_navigating"))
-	return motor_active or _navigation_active or _follow_active
+	return motor_active or _navigation_active or _follow_active or _seat_exact_navigation_active or _seat_alignment_active or _stand_transition_active
 
 func is_busy() -> bool:
 	return is_navigating()
@@ -259,6 +273,8 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 		marker = target.call("get_marker_for_role", role) as Marker3D
 	if marker == null and target.has_method("get_nav_marker"):
 		marker = target.call("get_nav_marker") as Marker3D
+	if _is_sit_action(StringName(String(intent.get("action", "")))) or role.to_lower() == "sit":
+		marker = _resolve_sit_marker_for_point(marker) if marker != null else null
 	if marker == null:
 		report["errors"].append("target_marker_not_found")
 		return
@@ -268,6 +284,7 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 	report["target_object_type"] = String(summary.get("type", _safe_get(target, "object_type", ""))).strip_edges()
 	report["target_object_tags"] = _to_string_array(summary.get("tags", _safe_get(target, "tags", [])))
 	report["target_marker_path"] = String(marker.get_path())
+	report["marker_role"] = _get_marker_role(marker)
 
 func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
 	var target_ref := String(intent.get("target_nav_point", intent.get("target_ref", ""))).strip_edges()
@@ -278,11 +295,13 @@ func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
 	if marker == null:
 		report["errors"].append("target_nav_point_not_found")
 		return
+	var marker_role := String(_safe_get(marker, "marker_role", "")).strip_edges()
 	report["ok"] = true
 	report["target_object_id"] = target_ref
 	report["target_object_type"] = String(_safe_get(marker, "point_type", "")).strip_edges()
 	report["target_object_tags"] = _to_string_array(_safe_get(marker, "tags", []))
 	report["target_marker_path"] = String(marker.get_path())
+	report["marker_role"] = marker_role
 	var action := String(intent.get("action", "")).strip_edges()
 	if action.is_empty():
 		action = String(_safe_get(marker, "arrival_action", "")).strip_edges()
@@ -300,6 +319,7 @@ func _resolve_direct_marker_from_intent(intent: Dictionary, report: Dictionary) 
 	report["target_object_type"] = "seat" if String(intent.get("intent", "")) == "sit_down" else "marker"
 	report["target_object_tags"] = ["seat"] if String(intent.get("intent", "")) == "sit_down" else []
 	report["target_marker_path"] = String(marker.get_path())
+	report["marker_role"] = _get_marker_role(marker)
 	return true
 
 func _resolve_stand_marker_from_active_seat(intent: Dictionary, report: Dictionary) -> bool:
@@ -311,11 +331,16 @@ func _resolve_stand_marker_from_active_seat(intent: Dictionary, report: Dictiona
 		report["ok"] = true
 		report["chosen_action"] = &"stand_up"
 		return false
+	var stand_marker := marker
+	if _get_marker_role(marker) == "sit" or _has_tag(_to_string_array(_safe_get(marker, "tags", [])), "seat"):
+		var resolved := _resolve_stand_marker_for_seat(marker)
+		if resolved != null:
+			stand_marker = resolved
 	report["ok"] = true
-	report["target_object_id"] = raw_path
+	report["target_object_id"] = String(stand_marker.get_path())
 	report["target_object_type"] = "stand_marker"
 	report["target_object_tags"] = ["stand"]
-	report["target_marker_path"] = String(marker.get_path())
+	report["target_marker_path"] = String(stand_marker.get_path())
 	report["chosen_action"] = &"stand_up"
 	return true
 
@@ -349,6 +374,11 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	_refresh_refs()
 	if marker_path == NodePath():
 		return false
+	if auto_stand_before_navigation and _should_stand_before_navigation(arrival_action):
+		_queue_navigation_after_stand(marker_path, arrival_action)
+		return true
+	_seat_alignment_serial += 1
+	_seat_alignment_active = false
 	var marker := _get_marker_from_path(String(marker_path))
 	if marker == null:
 		_log("navigation marker missing: %s" % String(marker_path))
@@ -356,17 +386,24 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	var actual_marker := marker
 	var actual_arrival_action := arrival_action
 	if _is_sit_action(arrival_action):
-		var approach_marker := _resolve_approach_marker_for_seat(marker)
-		if approach_marker != null and approach_marker != marker:
+		var seat_marker := _resolve_sit_marker_for_point(marker)
+		if seat_marker == null:
+			_log("sit navigation skipped: semantic sit marker missing for %s" % String(marker.get_path()))
+			return false
+		var approach_marker := _resolve_approach_marker_for_seat(seat_marker)
+		if approach_marker == null and seat_marker != marker:
+			approach_marker = marker
+		if approach_marker != null and approach_marker != seat_marker:
 			actual_marker = approach_marker
 			actual_arrival_action = &""
-			_pending_seat_marker_after_approach_path = marker.get_path()
+			_pending_seat_marker_after_approach_path = seat_marker.get_path()
 			_pending_seat_action_after_approach = arrival_action
 		else:
+			actual_marker = seat_marker
 			_pending_seat_marker_after_approach_path = NodePath()
 			_pending_seat_action_after_approach = &""
-		_pending_sit_marker_path = marker.get_path()
-		var stand_marker := _resolve_stand_marker_for_seat(marker)
+		_pending_sit_marker_path = seat_marker.get_path()
+		var stand_marker := _resolve_stand_marker_for_seat(seat_marker)
 		_active_stand_marker_path = stand_marker.get_path() if stand_marker != null else NodePath()
 	else:
 		_pending_sit_marker_path = NodePath()
@@ -382,6 +419,7 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 		if not bool(_navigation_motor.call("move_to_marker", actual_marker, actual_arrival_action, false)):
 			_navigation_active = false
 			_navigation_target_marker_path = NodePath()
+			_seat_exact_navigation_active = false
 			return false
 	elif _navigation_agent != null:
 		_navigation_agent.target_desired_distance = arrival_distance
@@ -428,7 +466,7 @@ func _finish_navigation() -> void:
 	var finished_marker_path := _navigation_target_marker_path
 	_stop_navigation(false)
 	if _pending_seat_marker_after_approach_path != NodePath():
-		_start_seat_after_approach()
+		_start_seat_exact_navigation_after_approach()
 		return
 	if finished_action != &"":
 		_request_body_action(finished_action)
@@ -457,8 +495,12 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 	_pending_arrival_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation"):
 		_navigation_motor.call("stop_navigation", false)
-	if _pending_seat_marker_after_approach_path != NodePath():
+	if _seat_exact_navigation_active:
+		_seat_exact_navigation_active = false
 		_start_seat_after_approach()
+		return
+	if _pending_seat_marker_after_approach_path != NodePath():
+		_start_seat_exact_navigation_after_approach()
 		return
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	navigation_finished.emit(finished_action)
@@ -466,15 +508,25 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 func _on_motor_navigation_cancelled() -> void:
 	_navigation_active = false
 	_follow_active = false
+	_seat_alignment_active = false
+	_seat_exact_navigation_active = false
+	_stand_transition_active = false
+	_seat_alignment_serial += 1
 	_navigation_target_marker_path = NodePath()
 	_moving_action = &""
 	navigation_cancelled.emit()
 
 func _stop_navigation(play_stop: bool = true) -> void:
+	if play_stop:
+		_queued_navigation_after_stand = {}
 	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation") and bool(_navigation_motor.call("is_navigating") if _navigation_motor.has_method("is_navigating") else true):
 		_navigation_motor.call("stop_navigation", play_stop)
 	_navigation_active = false
 	_follow_active = false
+	_seat_alignment_active = false
+	_seat_exact_navigation_active = false
+	_stand_transition_active = false
+	_seat_alignment_serial += 1
 	_navigation_target_marker_path = NodePath()
 	_moving_action = &""
 	if play_stop:
@@ -636,7 +688,7 @@ func _expression_from_emotion(emotion: String) -> String:
 	return "neutral"
 
 func _choose_body_action_for_target(report: Dictionary, intent: Dictionary) -> StringName:
-	var role := String(intent.get("marker_role", "approach")).strip_edges().to_lower()
+	var role := String(intent.get("marker_role", report.get("marker_role", "approach"))).strip_edges().to_lower()
 	var object_type := String(report.get("target_object_type", "")).strip_edges().to_lower()
 	var tags := _to_string_array(report.get("target_object_tags", []))
 	var tag_text := ",".join(tags).to_lower()
@@ -759,9 +811,12 @@ func _update_seat_state_after_arrival(finished_action: StringName, fallback_mark
 		_clear_active_sit_marker()
 
 func _start_stand_up_from_active_seat(stand_marker_path: NodePath = NodePath()) -> void:
+	if _stand_transition_active:
+		return
 	_stop_navigation(false)
 	_stand_relocate_serial += 1
 	var serial := _stand_relocate_serial
+	_stand_transition_active = true
 	var seat_path := _active_sit_marker_path
 	var resolved_stand_path := stand_marker_path
 	if resolved_stand_path == NodePath():
@@ -772,68 +827,153 @@ func _start_stand_up_from_active_seat(stand_marker_path: NodePath = NodePath()) 
 		if stand_marker != null:
 			resolved_stand_path = stand_marker.get_path()
 			_active_stand_marker_path = resolved_stand_path
-	_request_body_action(&"stand_up")
-	call_deferred("_relocate_to_stand_marker_after_delay", resolved_stand_path, seat_path, serial)
+	var ok := _request_body_action(&"stand_up")
+	_log("stand up requested ok=%s seat=%s stand=%s" % [str(ok), String(seat_path), String(resolved_stand_path)])
+	call_deferred("_finish_stand_up_after_root_motion", resolved_stand_path, seat_path, serial)
 
-func _relocate_to_stand_marker_after_delay(stand_marker_path: NodePath, seat_marker_path: NodePath, serial: int) -> void:
+func _finish_stand_up_after_root_motion(stand_marker_path: NodePath, seat_marker_path: NodePath, serial: int) -> void:
 	var tree := get_tree()
-	if tree != null and stand_relocate_delay_sec > 0.0:
-		await tree.create_timer(stand_relocate_delay_sec).timeout
+	var wait_time := _resolve_stand_root_motion_wait_time()
+	if tree != null and wait_time > 0.0:
+		await tree.create_timer(wait_time).timeout
 	if serial != _stand_relocate_serial:
 		return
 	_refresh_refs()
 	var stand_marker := _get_marker_from_path(String(stand_marker_path))
-	if stand_marker != null and not stand_use_root_motion:
-		_face_marker_forward(stand_marker)
-		var relocated := false
-		if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
-			relocated = bool(_navigation_motor.call("align_to_marker", stand_marker, true, stand_relocate_duration_sec))
+	if stand_marker != null and stand_align_after_root_motion:
+		var relocated := await _relocate_actor_to_stand_marker(stand_marker)
 		if not relocated:
-			if _actor != null:
-				var planar := stand_marker.global_position - _actor.global_position
-				planar.y = 0.0
-				if stand_relocate_max_planar_distance <= 0.0 or planar.length() <= stand_relocate_max_planar_distance:
-					if _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
-						relocated = bool(_navigation_motor.call("snap_to_marker", stand_marker, true))
-					if not relocated:
-						_snap_actor_to_marker(stand_marker, true)
-						relocated = true
-				elif _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
-					relocated = bool(_navigation_motor.call("snap_to_marker", stand_marker, true))
-		if not relocated:
-			_log("stand relocate skipped: too far from stand marker %s" % String(stand_marker_path))
+			_log("stand relocate skipped: %s" % String(stand_marker_path))
 	_set_marker_seat_occupied_state(_get_marker_from_path(String(seat_marker_path)), false)
 	_active_sit_marker_path = NodePath()
 	_active_stand_marker_path = NodePath()
 	_pending_sit_marker_path = NodePath()
-	if _animation_behavior != null and _animation_behavior.has_method("get_current_mode"):
-		if StringName(_animation_behavior.call("get_current_mode")) == &"Posture":
-			_request_body_action(default_idle_action)
+	_stand_transition_active = false
+	_request_body_action(default_idle_action)
+	if _navigation_motor != null and _navigation_motor.has_method("reset_navigation_state"):
+		_navigation_motor.call("reset_navigation_state")
+	stand_up_finished.emit()
+	_start_queued_navigation_after_stand()
+
+func _relocate_actor_to_stand_marker(stand_marker: Marker3D) -> bool:
+	if stand_marker == null:
+		return false
+	if _navigation_motor != null and _navigation_motor.has_method("align_position_to_marker_async"):
+		var ok := bool(await _navigation_motor.call("align_position_to_marker_async", stand_marker, true, stand_relocate_duration_sec))
+		if ok:
+			return true
+	if _actor == null:
+		return false
+	var planar := stand_marker.global_position - _actor.global_position
+	planar.y = 0.0
+	if stand_relocate_max_planar_distance <= 0.0 or planar.length() <= stand_relocate_max_planar_distance:
+		_snap_actor_position_to_marker(stand_marker, true)
+		return true
+	if stand_snap_after_root_motion_if_far:
+		_snap_actor_position_to_marker(stand_marker, true)
+		return true
+	return false
+
+func _should_stand_before_navigation(arrival_action: StringName) -> bool:
+	if _is_sit_action(arrival_action):
+		return false
+	if _active_sit_marker_path != NodePath():
+		return true
+	return _stand_transition_active
+
+func _queue_navigation_after_stand(marker_path: NodePath, arrival_action: StringName) -> void:
+	_queued_navigation_after_stand = {
+		"marker_path": marker_path,
+		"arrival_action": arrival_action,
+	}
+	if not _stand_transition_active:
+		_start_stand_up_from_active_seat()
+	_log("queued navigation after stand marker=%s arrival=%s" % [String(marker_path), String(arrival_action)])
+
+func _start_queued_navigation_after_stand() -> void:
+	if _queued_navigation_after_stand.is_empty():
+		return
+	var queued := _queued_navigation_after_stand.duplicate(true)
+	_queued_navigation_after_stand = {}
+	var marker_path: NodePath = queued.get("marker_path", NodePath()) as NodePath
+	var arrival_action := StringName(String(queued.get("arrival_action", "")))
+	if marker_path == NodePath():
+		return
+	call_deferred("_start_navigation_to_marker", marker_path, arrival_action)
+
+func _resolve_stand_root_motion_wait_time() -> float:
+	var fallback := maxf(stand_root_motion_wait_sec, stand_relocate_delay_sec)
+	if _animation_behavior != null and _animation_behavior.has_method("get_action_duration"):
+		var duration := float(_animation_behavior.call("get_action_duration", &"stand_up", fallback))
+		if duration > 0.0:
+			return maxf(0.0, duration - stand_root_motion_end_margin_sec)
+	return fallback
 
 func _start_seat_after_approach() -> void:
 	var seat_path := _pending_seat_marker_after_approach_path
 	var sit_action := _pending_seat_action_after_approach
 	_pending_seat_marker_after_approach_path = NodePath()
 	_pending_seat_action_after_approach = &""
+	_seat_alignment_serial += 1
+	var serial := _seat_alignment_serial
+	_seat_alignment_active = true
 	var seat_marker := _get_marker_from_path(String(seat_path))
 	if seat_marker == null:
 		_request_body_action(sit_action)
 		_update_seat_state_after_arrival(sit_action, seat_path)
+		_seat_alignment_active = false
 		navigation_finished.emit(sit_action)
 		return
-	_face_marker_forward(seat_marker)
 	if not seat_use_root_motion:
 		if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
-			_navigation_motor.call("align_to_marker", seat_marker, true)
+			if _navigation_motor.has_method("align_to_marker_async"):
+				await _navigation_motor.call("align_to_marker_async", seat_marker, true, -1.0, seat_force_attach_before_action)
+			else:
+				_navigation_motor.call("align_to_marker", seat_marker, true, -1.0, seat_force_attach_before_action)
 		elif seat_snap_if_no_root_motion and _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
 			_navigation_motor.call("snap_to_marker", seat_marker, true)
 		elif seat_snap_if_no_root_motion:
 			_snap_actor_to_marker(seat_marker, true)
 	else:
-		_pre_align_for_root_motion_seat(seat_marker)
+		await _pre_align_for_root_motion_seat(seat_marker)
+	if serial != _seat_alignment_serial:
+		return
 	_request_body_action(sit_action)
 	_update_seat_state_after_arrival(sit_action, seat_path)
+	_seat_alignment_active = false
 	navigation_finished.emit(sit_action)
+
+func _start_seat_exact_navigation_after_approach() -> void:
+	var seat_path := _pending_seat_marker_after_approach_path
+	var sit_action := _pending_seat_action_after_approach
+	var seat_marker := _get_marker_from_path(String(seat_path))
+	if seat_marker == null:
+		_start_seat_after_approach()
+		return
+	if _actor == null:
+		_refresh_refs()
+	if _actor == null:
+		_start_seat_after_approach()
+		return
+	var delta := seat_marker.global_position - _actor.global_position
+	delta.y = 0.0
+	if delta.length() <= seat_exact_navigation_min_distance:
+		_start_seat_after_approach()
+		return
+	if _navigation_motor != null and _navigation_motor.has_method("move_to_marker"):
+		_seat_exact_navigation_active = true
+		_navigation_target_marker_path = seat_marker.get_path()
+		_pending_arrival_action = sit_action
+		var moved := false
+		if _navigation_motor.has_method("move_to_seat_marker_precise"):
+			moved = bool(_navigation_motor.call("move_to_seat_marker_precise", seat_marker, &"", false))
+		else:
+			moved = bool(_navigation_motor.call("move_to_marker", seat_marker, &"", false))
+		if moved:
+			_log("seat exact navigation started marker=%s distance=%.2f" % [String(seat_marker.get_path()), delta.length()])
+			return
+	_seat_exact_navigation_active = false
+	_start_seat_after_approach()
 
 func _pre_align_for_root_motion_seat(seat_marker: Marker3D) -> void:
 	if seat_marker == null or _actor == null:
@@ -841,24 +981,59 @@ func _pre_align_for_root_motion_seat(seat_marker: Marker3D) -> void:
 	var delta := seat_marker.global_position - _actor.global_position
 	delta.y = 0.0
 	if delta.length() > seat_pre_align_max_planar_distance:
+		if _navigation_motor != null and _navigation_motor.has_method("align_yaw_to_marker_async"):
+			await _navigation_motor.call("align_yaw_to_marker_async", seat_marker, seat_pre_align_duration_sec)
+		else:
+			_face_marker_forward(seat_marker)
 		return
 	if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
-		_navigation_motor.call("align_to_marker", seat_marker, true, seat_pre_align_duration_sec)
+		if _navigation_motor.has_method("align_to_marker_async"):
+			await _navigation_motor.call("align_to_marker_async", seat_marker, true, seat_pre_align_duration_sec, seat_force_attach_before_action)
+		else:
+			_navigation_motor.call("align_to_marker", seat_marker, true, seat_pre_align_duration_sec, seat_force_attach_before_action)
 	else:
 		_snap_actor_to_marker(seat_marker, true)
+
+func _resolve_sit_marker_for_point(marker: Marker3D) -> Marker3D:
+	if marker == null:
+		return null
+	var linked := _linked_marker_from_nav_point(marker, "sit_marker_path")
+	if linked != null:
+		return linked
+	var meta_value: Variant = marker.get_meta("sit_marker_path", NodePath())
+	linked = _marker_from_meta_or_sibling(meta_value, marker, "Sit_Mark3D")
+	if linked != null:
+		return linked
+	var role := _get_marker_role(marker)
+	if role == "sit" or role == "seat":
+		return marker
+	if not require_semantic_sit_marker and _has_tag(_to_string_array(_safe_get(marker, "tags", [])), "seat"):
+		return marker
+	return null
 
 func _resolve_approach_marker_for_seat(seat_marker: Marker3D) -> Marker3D:
 	if seat_marker == null:
 		return null
+	var linked := _linked_marker_from_nav_point(seat_marker, "approach_marker_path")
+	if linked != null:
+		return linked
 	var from_meta: Variant = seat_marker.get_meta("approach_marker_path", NodePath())
 	var marker := _marker_from_meta_or_sibling(from_meta, seat_marker, "Approach_Mark3D")
+	if marker == null:
+		marker = _find_named_nav_point_near_seat(seat_marker, ["approach", "side", "near"])
 	return marker
 
 func _resolve_stand_marker_for_seat(seat_marker: Marker3D) -> Marker3D:
 	if seat_marker == null:
 		return null
+	var linked := _linked_marker_from_nav_point(seat_marker, "stand_marker_path")
+	if linked != null:
+		return linked
 	var from_meta: Variant = seat_marker.get_meta("stand_marker_path", NodePath())
-	return _marker_from_meta_or_sibling(from_meta, seat_marker, "Stand_Mark3D")
+	var marker := _marker_from_meta_or_sibling(from_meta, seat_marker, "Stand_Mark3D")
+	if marker == null:
+		marker = _find_named_nav_point_near_seat(seat_marker, ["stand", "side", "near", "approach"])
+	return marker
 
 func _marker_from_meta_or_sibling(value: Variant, base_marker: Marker3D, sibling_name: String) -> Marker3D:
 	var path_text := ""
@@ -879,6 +1054,82 @@ func _marker_from_meta_or_sibling(value: Variant, base_marker: Marker3D, sibling
 		if sibling != null:
 			return sibling
 	return null
+
+func _linked_marker_from_nav_point(marker: Marker3D, property_name: String) -> Marker3D:
+	if marker == null or property_name.is_empty():
+		return null
+	if not property_name in marker:
+		return null
+	var value: Variant = marker.get(property_name)
+	var path_text := String(value).strip_edges()
+	if path_text.is_empty():
+		return null
+	var by_path := marker.get_node_or_null(NodePath(path_text)) as Marker3D
+	if by_path != null:
+		return by_path
+	return _get_marker_from_path(path_text)
+
+func _get_marker_role(marker: Marker3D) -> String:
+	if marker == null:
+		return ""
+	if "marker_role" in marker:
+		return String(marker.get("marker_role")).strip_edges().to_lower()
+	return String(marker.get_meta("marker_role", "")).strip_edges().to_lower()
+
+func _find_named_nav_point_near_seat(seat_marker: Marker3D, name_tokens: Array) -> Marker3D:
+	if seat_marker == null:
+		return null
+	var seat_name := String(seat_marker.name).to_lower()
+	var seat_id := ""
+	if "point_id" in seat_marker:
+		seat_id = String(seat_marker.get("point_id")).to_lower()
+	var best: Marker3D = null
+	var best_score := -INF
+	for node in get_tree().get_nodes_in_group(ai_nav_point_group):
+		var marker := node as Marker3D
+		if marker == null or marker == seat_marker:
+			continue
+		var marker_name := String(marker.name).to_lower()
+		var marker_id := ""
+		if "point_id" in marker:
+			marker_id = String(marker.get("point_id")).to_lower()
+		var text := "%s %s" % [marker_name, marker_id]
+		var token_match := false
+		for token in name_tokens:
+			if text.find(String(token).to_lower()) >= 0:
+				token_match = true
+				break
+		if not token_match:
+			continue
+		var semantic_match := false
+		for stem in _seat_name_stems(seat_name, seat_id):
+			if not stem.is_empty() and text.find(stem) >= 0:
+				semantic_match = true
+				break
+		if not semantic_match and marker.global_position.distance_to(seat_marker.global_position) > 2.0:
+			continue
+		var distance := marker.global_position.distance_to(seat_marker.global_position)
+		var score := -distance
+		if semantic_match:
+			score += 3.0
+		if best == null or score > best_score:
+			best = marker
+			best_score = score
+	return best
+
+func _seat_name_stems(seat_name: String, seat_id: String) -> Array[String]:
+	var result: Array[String] = []
+	for raw in [seat_name, seat_id]:
+		var text := String(raw).to_lower()
+		if text.is_empty():
+			continue
+		for suffix in ["seat", "sit", "bench", "chair", "point", "marker", "mark", "side", "approach", "_", "-"]:
+			text = text.replace(suffix, " ")
+		for part in text.split(" ", false):
+			var stem := String(part).strip_edges()
+			if stem.length() >= 4 and not result.has(stem):
+				result.append(stem)
+	return result
 
 func _face_marker_forward(marker: Marker3D) -> void:
 	if marker == null:
@@ -905,6 +1156,16 @@ func _snap_actor_to_marker(marker: Marker3D, preserve_height: bool) -> void:
 	if preserve_height:
 		origin.y = _actor.global_position.y
 	_actor.global_transform = Transform3D(basis, origin)
+	_actor.velocity = Vector3.ZERO
+
+func _snap_actor_position_to_marker(marker: Marker3D, preserve_height: bool) -> void:
+	if marker == null or _actor == null:
+		return
+	var next := _actor.global_transform
+	next.origin = marker.global_position
+	if preserve_height:
+		next.origin.y = _actor.global_position.y
+	_actor.global_transform = next
 	_actor.velocity = Vector3.ZERO
 
 func _set_marker_seat_occupied_state(marker: Marker3D, occupied: bool) -> void:

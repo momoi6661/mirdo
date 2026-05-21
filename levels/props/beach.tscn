@@ -1,7 +1,8 @@
 [gd_scene format=4 uid="uid://c8j0kbeach01"]
-[ext_resource type="Script" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [ext_resource type="PackedScene" path="res://scenes/interactables/character_seat_interactable.tscn" id="1_seat"]
+[ext_resource type="Script" uid="uid://lyruy2adi3b" path="res://scripts/character_ai/components/character_ai_nav_point_3d.gd" id="ai_nav_point"]
+[ext_resource type="Script" uid="uid://dq4drjvlf4qv0" path="res://components/ai_world_object_component.gd" id="ai_world_object"]
 
 [sub_resource type="CompressedTexture2D" id="CompressedTexture2D_7kxt7"]
 load_path = "res://.godot/imported/table_bench.png-076992c657b1d44d8d22ad5d6fa100a7.s3tc.ctex"
@@ -49,7 +50,37 @@ shadow_mesh = SubResource("ArrayMesh_5lman")
 [sub_resource type="BoxShape3D" id="BoxShape3D_beach"]
 size = Vector3(0.56, 0.38, 1.84)
 
-[node name="beach" type="Node3D" unique_id=716639732 groups=["nav_source_bunker", "ai_world_object"]]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4cyv7"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_i1onm"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j8qkm"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_opaq8"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i1we0"]
+transparency = 1
+no_depth_test = true
+shading_mode = 0
+albedo_color = Color(0.2, 1, 0.45, 0.25)
+
+[sub_resource type="SphereMesh" id="SphereMesh_uo867"]
+radius = 0.35
+height = 0.7
+
+[node name="beach" type="Node3D" unique_id=716639732 groups=["ai_world_object"]]
 script = ExtResource("ai_world_object")
 object_id = &"bench_seat"
 display_name = "长凳座位"
@@ -58,8 +89,11 @@ object_type = "seat"
 tags = PackedStringArray("seat", "bench", "rest")
 supported_actions = PackedStringArray("go_to", "sit", "stand")
 nav_marker_path = NodePath("Approach_Mark3D")
-marker_roles = {"approach": NodePath("Approach_Mark3D"), "sit": NodePath("Sit_Mark3D"), "stand": NodePath("Stand_Mark3D")}
-
+marker_roles = {
+"approach": NodePath("Approach_Mark3D"),
+"sit": NodePath("Sit_Mark3D"),
+"stand": NodePath("Stand_Mark3D")
+}
 
 [node name="bench" type="MeshInstance3D" parent="." unique_id=1325852330]
 mesh = SubResource("ArrayMesh_xggeu")
@@ -74,22 +108,79 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, 0)
 shape = SubResource("BoxShape3D_beach")
 
 [node name="SeatInteractable" parent="bench_col" unique_id=1045320476 instance=ExtResource("1_seat")]
-prompt_text = "让 Mirdo 坐下"
-occupied_prompt_text = "让 Mirdo 起身"
 interaction_time = 0.3
 approach_marker_path = NodePath("../../Approach_Mark3D")
 target_marker_path = NodePath("../../Sit_Mark3D")
 stand_marker_path = NodePath("../../Stand_Mark3D")
-stand_toggle_distance = 1.2
 
 [node name="Sit_Mark3D" type="Marker3D" parent="." unique_id=284447878]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.22, 0.41, 0)
+script = ExtResource("ai_nav_point")
+point_id = "sit"
+display_name = "长凳坐下点"
+point_type = "seat"
+description = "长凳真实坐下位置。这个点可以不在 NavMesh 上，角色会先走到 Approach/Stand 小球，再精确贴到这里并播放 sit_down。"
+tags = PackedStringArray("seat", "bench", "rest", "dining", "social")
+marker_role = "sit"
+approach_marker_path = NodePath("../Approach_Mark3D")
+stand_marker_path = NodePath("../Stand_Mark3D")
+arrival_action = &"sit_down"
+action_options = PackedStringArray("sit_down", "seated_idle", "seated_sleepy", "small_nod")
+expression_options = PackedStringArray("neutral", "joy", "sorrow")
+action_hint = "坐下最终锚点：先走 approach/stand，再对齐此点。起身后回 Stand_Mark3D，避免卡在 NavMesh 外。"
+target_object_id = "bench_seat"
+priority = 0.35
+cooldown_sec = 180.0
+dwell_time_sec = 6.0
 metadata/character_action = "seated_idle"
 metadata/stand_marker_path = NodePath("../Stand_Mark3D")
 
+[node name="DebugSphere" type="MeshInstance3D" parent="Sit_Mark3D" unique_id=1663119903]
+material_override = SubResource("StandardMaterial3D_4cyv7")
+mesh = SubResource("SphereMesh_i1onm")
+
 [node name="Approach_Mark3D" type="Marker3D" parent="." unique_id=961143284]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.33, 0.05, 0.02)
+script = ExtResource("ai_nav_point")
+point_id = "approach"
+display_name = "长凳接近点"
+point_type = "seat_approach"
+description = "长凳前方可通行站位，应该放在 NavMesh 上。角色收到坐下命令时先走到这里，再进入真实坐点。"
+tags = PackedStringArray("seat", "bench", "approach", "stand", "dining", "social")
+sit_marker_path = NodePath("../Sit_Mark3D")
+stand_marker_path = NodePath("../Stand_Mark3D")
+action_options = PackedStringArray("idle_fidget", "listen", "small_nod")
+expression_options = PackedStringArray("neutral", "joy")
+action_hint = "座位接近点：必须在导航网格内，负责正常路径寻找。"
+target_object_id = "bench_seat"
+priority = 0.7
+cooldown_sec = 90.0
+dwell_time_sec = 1.0
+
+[node name="DebugSphere" type="MeshInstance3D" parent="Approach_Mark3D" unique_id=1327327740]
+material_override = SubResource("StandardMaterial3D_j8qkm")
+mesh = SubResource("SphereMesh_opaq8")
 
 [node name="Stand_Mark3D" type="Marker3D" parent="." unique_id=1943835057]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.3089893, 0.05, 0.065800786)
+script = ExtResource("ai_nav_point")
+point_id = "stand"
+display_name = "长凳起身点"
+point_type = "seat_stand"
+description = "长凳起身后的安全站位，必须在 NavMesh 上。角色 stand_up 完成后会回到这里，再恢复普通导航。"
+tags = PackedStringArray("bench", "stand", "approach", "dining", "social")
+marker_role = "stand"
+sit_marker_path = NodePath("../Sit_Mark3D")
+arrival_action = &"idle_normal"
+action_options = PackedStringArray("idle_normal", "look_around", "small_nod")
+expression_options = PackedStringArray("neutral", "joy")
+action_hint = "起身回网格点：用于把角色从可能离开 NavMesh 的坐点带回可导航区域。"
+target_object_id = "bench_seat"
+priority = 0.65
+cooldown_sec = 90.0
+dwell_time_sec = 1.0
 metadata/character_action = "idle_normal"
+
+[node name="DebugSphere" type="MeshInstance3D" parent="Stand_Mark3D" unique_id=1918510928]
+material_override = SubResource("StandardMaterial3D_i1we0")
+mesh = SubResource("SphereMesh_uo867")

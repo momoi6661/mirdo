@@ -22,38 +22,42 @@ class_name MitaWorldRenderer
 ])
 
 @export_group("World Toon")
-@export var outline_width: float = 0.0018
-@export var outline_color: Color = Color(0.155, 0.105, 0.135, 0.72)
-@export_range(0.0, 1.0, 0.01) var normal_smooth_blend: float = 0.82
-@export var warm_light_color: Color = Color(1.0, 0.88, 0.84, 1.0)
-@export var cool_shadow_color: Color = Color(0.78, 0.70, 0.80, 1.0)
-@export var cream_highlight_color: Color = Color(1.0, 0.93, 0.88, 1.0)
-@export_range(0.0, 1.0, 0.01) var texture_smoothing: float = 0.45
-@export_range(2.0, 16.0, 1.0) var color_steps: float = 7.0
-@export_range(0.0, 1.0, 0.01) var flatness: float = 0.62
-@export_range(0.0, 1.0, 0.01) var warmth: float = 0.34
-@export var saturation: float = 0.88
-@export var value_boost: float = 1.06
-@export_range(0.0, 1.0, 0.01) var shadow_cleanliness: float = 0.72
-@export var shadow_floor: float = 0.66
-@export var light_wrap: float = 0.58
-@export var shade_threshold: float = 0.36
-@export var shade_softness: float = 0.22
-@export var light_contribution: float = 0.62
-@export var ambient_lift: float = 0.24
-@export_range(0.0, 1.0, 0.01) var highlight_compress: float = 0.46
-@export var highlight_start: float = 0.68
-@export var edge_softness: float = 0.55
+@export var outline_width: float = 0.0015
+@export var outline_color: Color = Color(0.13, 0.09, 0.12, 0.55)
+@export_range(0.0, 1.0, 0.01) var normal_smooth_blend: float = 0.86
+@export var warm_light_color: Color = Color(1.0, 0.90, 0.80, 1.0)
+@export var cool_shadow_color: Color = Color(0.58, 0.54, 0.66, 1.0)
+@export var cream_highlight_color: Color = Color(0.90, 0.84, 0.76, 1.0)
+@export_range(0.0, 1.0, 0.01) var texture_smoothing: float = 0.22
+@export_range(2.0, 16.0, 1.0) var color_steps: float = 8.0
+@export_range(0.0, 1.0, 0.01) var flatness: float = 0.48
+@export_range(0.0, 1.0, 0.01) var warmth: float = 0.16
+@export var saturation: float = 0.96
+@export var value_boost: float = 0.96
+@export_range(0.0, 1.0, 0.01) var shadow_cleanliness: float = 0.50
+@export var shadow_floor: float = 0.42
+@export var light_wrap: float = 0.20
+@export var shade_threshold: float = 0.43
+@export var shade_softness: float = 0.10
+@export var light_contribution: float = 0.82
+@export var ambient_lift: float = 0.02
+@export_range(0.0, 1.0, 0.01) var highlight_compress: float = 0.72
+@export var highlight_start: float = 0.62
+@export var highlight_ceiling: float = 0.82
+@export var form_shadow_strength: float = 0.28
+@export var shadow_receive_strength: float = 0.92
+@export var self_lit_amount: float = 0.0
+@export var edge_softness: float = 0.35
 
 @export_group("Warm Environment")
 @export var tune_world_environment: bool = true
-@export var ambient_light_color: Color = Color(1.0, 0.88, 0.84, 1.0)
-@export var ambient_light_energy: float = 1.15
-@export var background_color: Color = Color(0.98, 0.86, 0.90, 1.0)
-@export var tonemap_exposure: float = 1.05
-@export var tonemap_white: float = 3.2
+@export var ambient_light_color: Color = Color(0.66, 0.62, 0.68, 1.0)
+@export var ambient_light_energy: float = 0.46
+@export var background_color: Color = Color(0.12, 0.10, 0.13, 1.0)
+@export var tonemap_exposure: float = 0.92
+@export var tonemap_white: float = 5.8
 @export var disable_harsh_ssao: bool = true
-@export var soft_glow_enabled: bool = true
+@export var soft_glow_enabled: bool = false
 
 var _applied_count: int = 0
 
@@ -171,6 +175,10 @@ func _configure_toon(toon: ShaderMaterial, source_material: Material) -> void:
 	toon.set_shader_parameter("ambient_lift", ambient_lift)
 	toon.set_shader_parameter("highlight_compress", highlight_compress)
 	toon.set_shader_parameter("highlight_start", highlight_start)
+	toon.set_shader_parameter("highlight_ceiling", highlight_ceiling)
+	toon.set_shader_parameter("form_shadow_strength", form_shadow_strength)
+	toon.set_shader_parameter("shadow_receive_strength", shadow_receive_strength)
+	toon.set_shader_parameter("self_lit_amount", self_lit_amount)
 	toon.set_shader_parameter("edge_softness", edge_softness)
 	var tex := _extract_albedo_texture(source_material)
 	if tex != null:
@@ -215,7 +223,7 @@ func _tune_environment(root: Node) -> void:
 	var env := world_env.environment.duplicate(true) as Environment
 	if env == null:
 		return
-	# Make lighting clean and high-key instead of noisy/PBR contrasty.
+	# Keep the room clean, but do not wash it out: shadows and white-surface volume must survive.
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = background_color
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -230,13 +238,15 @@ func _tune_environment(root: Node) -> void:
 		env.ssil_enabled = false
 	if soft_glow_enabled:
 		env.glow_enabled = true
-		env.glow_intensity = 0.035
-		env.glow_strength = 0.22
-		env.glow_bloom = 0.025
+		env.glow_intensity = 0.018
+		env.glow_strength = 0.14
+		env.glow_bloom = 0.008
+	else:
+		env.glow_enabled = false
 	env.adjustment_enabled = true
-	env.adjustment_brightness = 1.02
-	env.adjustment_contrast = 0.88
-	env.adjustment_saturation = 0.94
+	env.adjustment_brightness = 0.96
+	env.adjustment_contrast = 1.08
+	env.adjustment_saturation = 0.98
 	world_env.environment = env
 
 func _find_world_environment(root: Node) -> WorldEnvironment:

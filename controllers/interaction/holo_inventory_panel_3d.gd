@@ -23,6 +23,7 @@ const USE_HOLD_RING_SEGMENTS := 48
 const USE_HOLD_RING_RADIUS_WORLD := 0.034
 const USE_HOLD_RING_THICKNESS_WORLD := 0.006
 const USE_HOLD_RING_MOUSE_OFFSET_WORLD := Vector2(0.0, 0.075)
+const USE_HOLD_RING_SCREEN_OFFSET_PX := Vector2(0.0, -42.0)
 
 enum PanelAnchorMode {
 	MARK_ONLY,
@@ -208,7 +209,7 @@ func _input(event: InputEvent) -> void:
 					if slot_index >= 0:
 						_resolve_drag_to_slot(slot_index)
 					else:
-						_cancel_drag()
+						_release_drag_outside(mb.position)
 				else:
 					_release_drag_outside(mb.position)
 			else:
@@ -409,6 +410,10 @@ func is_use_hold_tween_running_for_tests() -> bool:
 	return _use_hold_tween != null and _use_hold_tween.is_valid() and _use_hold_tween.is_running()
 
 
+func calculate_use_hold_indicator_screen_position_for_tests(mouse_screen_pos: Vector2) -> Vector2:
+	return _get_use_hold_indicator_screen_position(mouse_screen_pos)
+
+
 func is_mouse_over_panel() -> bool:
 	var viewport := get_viewport()
 	if viewport == null:
@@ -451,6 +456,8 @@ func get_slot_index_from_world_hit(hit_world_position: Vector3) -> int:
 	if not _is_open:
 		return -1
 	var local_point: Vector3 = to_local(hit_world_position)
+	if absf(local_point.z) > 0.0001:
+		local_point = _project_local_hit_to_slot_plane(local_point)
 	if not _is_local_point_inside_panel(local_point):
 		return -1
 	return _slot_index_from_local_point(local_point)
@@ -1222,25 +1229,49 @@ func _try_use_slot_item(slot_index: int) -> bool:
 		return false
 	if not _inventory_data.has_method("use_item_in_slot"):
 		return false
+	var item := _get_slot_item_for_use(slot_index)
+	var force_self_use := _should_force_self_use(item)
 	var target_state: Node = null
 	if _use_target_state != null and is_instance_valid(_use_target_state):
 		target_state = _use_target_state
 	elif _use_target_state != null:
 		clear_use_target_context()
 	var used := false
-	if target_state != null:
+	if target_state != null and not force_self_use:
 		used = bool(_inventory_data.call("use_item_in_slot", slot_index, target_state))
 	else:
 		used = bool(_inventory_data.call("use_item_in_slot", slot_index))
 	if used:
 		var target_label := get_use_target_label()
-		_last_use_feedback = "已给 %s 使用" % target_label if not target_label.is_empty() else "已使用"
+		if force_self_use:
+			_last_use_feedback = "已自己使用医疗物品"
+		else:
+			_last_use_feedback = "已给 %s 使用" % target_label if not target_label.is_empty() else "已使用"
 		_refresh_all_slot_visuals()
 	else:
 		var fail_target_label := get_use_target_label()
-		_last_use_feedback = "%s 当前不需要这个" % fail_target_label if not fail_target_label.is_empty() else "当前不需要使用"
+		if force_self_use and not fail_target_label.is_empty():
+			_last_use_feedback = "医疗物品只能自己使用；当前不需要使用"
+		else:
+			_last_use_feedback = "%s 当前不需要这个" % fail_target_label if not fail_target_label.is_empty() else "当前不需要使用"
 	_refresh_hint_text_for_use_context()
 	return used
+
+
+func _get_slot_item_for_use(slot_index: int) -> ItemData:
+	if _inventory_data == null or not is_instance_valid(_inventory_data):
+		return null
+	if not _inventory_data.has_method("get_slot_data"):
+		return null
+	var slot_value: Variant = _inventory_data.call("get_slot_data", slot_index)
+	if not (slot_value is Dictionary):
+		return null
+	var slot_data := slot_value as Dictionary
+	return slot_data.get("item", null) as ItemData
+
+
+func _should_force_self_use(item: ItemData) -> bool:
+	return item != null and String(item.outing_category).strip_edges().to_lower() == "medical"
 
 
 func _begin_use_hold(slot_index: int) -> bool:
@@ -1317,24 +1348,26 @@ func _cancel_use_hold() -> void:
 func _update_use_hold_indicator_from_mouse() -> void:
 	if not _use_hold_active or _use_hold_indicator == null:
 		return
-	var hit_info := _get_mouse_local_hit_info()
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var mouse_screen_pos := viewport.get_mouse_position()
+	var indicator_screen_pos := _get_use_hold_indicator_screen_position(mouse_screen_pos)
+	var hit_info := _get_mouse_local_hit_info(indicator_screen_pos)
 	if bool(hit_info.get("hit", false)):
 		var local_point: Vector3 = hit_info.get("local", Vector3.ZERO) as Vector3
 		_use_hold_indicator.global_basis = global_basis
-		_use_hold_indicator.global_position = to_global(Vector3(
-			local_point.x + USE_HOLD_RING_MOUSE_OFFSET_WORLD.x,
-			local_point.y + USE_HOLD_RING_MOUSE_OFFSET_WORLD.y,
-			0.036
-		))
+		_use_hold_indicator.global_position = to_global(Vector3(local_point.x, local_point.y, 0.036))
 		return
 	if _camera != null and is_instance_valid(_camera):
-		var viewport := get_viewport()
-		if viewport != null:
-			var mouse_pos := viewport.get_mouse_position()
-			var from := _camera.project_ray_origin(mouse_pos)
-			var to := from + _camera.project_ray_normal(mouse_pos) * distance_from_camera
-			_use_hold_indicator.global_basis = _camera.global_basis
-			_use_hold_indicator.global_position = to + _camera.global_basis.y * USE_HOLD_RING_MOUSE_OFFSET_WORLD.y
+		var from := _camera.project_ray_origin(indicator_screen_pos)
+		var to := from + _camera.project_ray_normal(indicator_screen_pos) * distance_from_camera
+		_use_hold_indicator.global_basis = _camera.global_basis
+		_use_hold_indicator.global_position = to
+
+
+func _get_use_hold_indicator_screen_position(mouse_screen_pos: Vector2) -> Vector2:
+	return mouse_screen_pos + USE_HOLD_RING_SCREEN_OFFSET_PX
 
 
 func _update_use_hold_ring_mesh() -> void:
@@ -1386,11 +1419,18 @@ func _resolve_drag_to_slot(target_slot: int) -> void:
 		_cancel_drag()
 		return
 	if target_slot < 0:
-		_cancel_drag()
+		_release_drag_outside(_get_current_pointer_screen_position())
 		return
 	if target_slot != _drag_from_slot:
 		_inventory_data.move_item_between_slots(_drag_from_slot, target_slot, _drag_amount)
 	_end_drag()
+
+
+func _get_current_pointer_screen_position() -> Vector2:
+	var viewport := get_viewport()
+	if viewport == null:
+		return Vector2.ZERO
+	return viewport.get_mouse_position()
 
 
 func _release_drag_outside(pointer_screen_pos: Vector2) -> void:
@@ -1399,15 +1439,15 @@ func _release_drag_outside(pointer_screen_pos: Vector2) -> void:
 	if _inventory_data == null:
 		_cancel_drag()
 		return
-	if not allow_release_outside_panel:
-		_cancel_drag()
-		return
-
 	if INVENTORY_DRAG_DEBUG:
 		print("[InvPanelTransfer] panel=", name, " from_slot=", _drag_from_slot, " amount=", _drag_amount, " mouse=", pointer_screen_pos)
 	if transfer_requested.get_connections().size() > 0:
 		transfer_requested.emit(_drag_from_slot, _drag_item, _drag_amount, _inventory_data, pointer_screen_pos)
 		_end_drag()
+		return
+
+	if not allow_release_outside_panel:
+		_cancel_drag()
 		return
 
 	var removed := _inventory_data.remove_from_slot(_drag_from_slot, _drag_amount)
@@ -1508,6 +1548,19 @@ func _slot_index_from_local_point(local_point: Vector3) -> int:
 		if _slot_bounds[i].has_point(point):
 			return i
 	return -1
+
+
+func _project_local_hit_to_slot_plane(local_point: Vector3) -> Vector3:
+	if _camera == null or not is_instance_valid(_camera):
+		return Vector3(local_point.x, local_point.y, 0.0)
+	var camera_local := to_local(_camera.global_position)
+	var ray_local := local_point - camera_local
+	if absf(ray_local.z) < 0.00001:
+		return Vector3(local_point.x, local_point.y, 0.0)
+	var t := -camera_local.z / ray_local.z
+	if not is_finite(t):
+		return Vector3(local_point.x, local_point.y, 0.0)
+	return camera_local + ray_local * t
 
 
 func _is_local_point_inside_panel(local_point: Vector3) -> bool:

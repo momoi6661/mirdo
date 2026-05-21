@@ -23,4 +23,4 @@ hunger_delta = 25
 outing_category = "food"
 can_take_outing = true
 can_use = true
-ai_rule_hint = "适合中长距离探索前携带，可作为稳定饱食补给。"
+ai_rule_hint = "可作为外出途中的饱食补给，长距离或被困等待时会被消耗；故事里可描写开罐气味、节省体力和返程压力，但不能凭空增加收益。"

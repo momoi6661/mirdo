@@ -11,6 +11,7 @@ signal back_requested
 @onready var base_url_line_edit: LineEdit = %BaseUrlLineEdit
 @onready var api_key_line_edit: LineEdit = %ApiKeyLineEdit
 @onready var model_line_edit: LineEdit = %ModelLineEdit
+@onready var proxy_url_line_edit: LineEdit = %ProxyUrlLineEdit
 @onready var status_label: Label = %StatusLabel
 @onready var back_button: Button = %BackButton
 @onready var debounce_timer: Timer = %AutoSaveTimer
@@ -22,7 +23,7 @@ var _slide_tween: Tween = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 20
+	layer = 96
 	hide()
 	if drawer_panel != null:
 		drawer_panel.custom_minimum_size.x = drawer_width
@@ -66,7 +67,7 @@ func is_text_input_focused() -> bool:
 	if viewport == null:
 		return false
 	var focus_owner := viewport.gui_get_focus_owner()
-	return focus_owner == base_url_line_edit or focus_owner == api_key_line_edit or focus_owner == model_line_edit
+	return focus_owner == base_url_line_edit or focus_owner == api_key_line_edit or focus_owner == model_line_edit or focus_owner == proxy_url_line_edit
 
 
 func _reset_drawer_closed_position() -> void:
@@ -93,7 +94,7 @@ func _slide_drawer(open: bool) -> void:
 
 
 func _connect_ui_signals() -> void:
-	for line_edit in [base_url_line_edit, api_key_line_edit, model_line_edit]:
+	for line_edit in [base_url_line_edit, api_key_line_edit, model_line_edit, proxy_url_line_edit]:
 		if line_edit != null and not line_edit.text_changed.is_connected(_on_any_field_text_changed):
 			line_edit.text_changed.connect(_on_any_field_text_changed)
 	if back_button != null and not back_button.pressed.is_connected(_on_back_pressed):
@@ -125,10 +126,14 @@ func _load_fields_from_settings() -> void:
 		base_url_line_edit.text = String(_settings_service.get("base_url"))
 		api_key_line_edit.text = String(_settings_service.get("api_key"))
 		model_line_edit.text = String(_settings_service.get("model"))
+		if proxy_url_line_edit != null:
+			proxy_url_line_edit.text = String(_settings_service.get("proxy_url"))
 	else:
 		base_url_line_edit.text = "http://127.0.0.1:18080"
 		api_key_line_edit.text = ""
 		model_line_edit.text = ""
+		if proxy_url_line_edit != null:
+			proxy_url_line_edit.text = "http://127.0.0.1:7890"
 	_is_loading_fields = false
 	_set_status("设置会自动保存")
 
@@ -157,7 +162,8 @@ func _flush_auto_save() -> void:
 	var base_url := "" if base_url_line_edit == null else base_url_line_edit.text
 	var api_key := "" if api_key_line_edit == null else api_key_line_edit.text
 	var model := "" if model_line_edit == null else model_line_edit.text
-	var ok: bool = bool(_settings_service.call("set_provider_settings", base_url, api_key, model, true))
+	var proxy_url := "" if proxy_url_line_edit == null else proxy_url_line_edit.text
+	var ok: bool = bool(_settings_service.call("set_provider_settings_with_proxy", base_url, api_key, model, proxy_url, true)) if _settings_service.has_method("set_provider_settings_with_proxy") else bool(_settings_service.call("set_provider_settings", base_url, api_key, model, true))
 	if ok:
 		_set_status("已自动保存")
 	else:

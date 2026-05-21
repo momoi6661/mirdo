@@ -19,6 +19,9 @@ var _outing_map_progress_runtime: Resource
 var _shelter_storage_runtime_by_source_id: Dictionary = {}
 var _time_state_runtime: Dictionary = {}
 var _outing_transition_busy: bool = false
+var _outing_entry_snapshot_payload: Dictionary = {}
+var _outing_pending_delta_payload: Dictionary = {}
+var _outing_pending_status_cost: Dictionary = {}
 var _pending_scene_change_path: String = ""
 var _last_scene_change_error: int = OK
 
@@ -172,20 +175,110 @@ func go_to_outing_map_from_current_scene() -> void:
 		outing_return_scene_path = current_path
 	elif outing_return_scene_path.strip_edges().is_empty():
 		outing_return_scene_path = OUTING_RETURN_FALLBACK_SCENE_PATH
+
+	var save_manager := _get_save_manager()
+	if save_manager != null and save_manager.has_method("save_game"):
+		var saved: bool = await save_manager.call("save_game")
+		if not saved:
+			push_warning("进入外出地图前保存失败，已取消切换，避免角色位置丢失。")
+			return
+		_outing_entry_snapshot_payload = build_global_save_payload().duplicate(true)
+	else:
+		push_warning("找不到 SaveManager，无法在进入外出地图前保存。")
+		_outing_entry_snapshot_payload = build_global_save_payload().duplicate(true)
 	await _change_scene_with_transition(OUTING_MAP_SCENE_PATH, true)
 
 
 func return_from_outing_map() -> void:
 	if _outing_transition_busy:
 		return
+	_outing_pending_delta_payload = build_global_save_payload().duplicate(true)
+	var save_manager := _get_save_manager()
+	if save_manager != null and save_manager.has_method("load_game") and save_manager.has_method("save_game"):
+		var loaded: bool = await save_manager.call("load_game")
+		if loaded:
+			_apply_outing_delta_after_return()
+			await save_manager.call("save_game")
+			return
+		push_warning("退出外出地图时加载进入前存档失败，将使用场景切换兜底：" + String(save_manager.get("last_error")))
 	var target_path := outing_return_scene_path.strip_edges()
 	if target_path.is_empty() or not ResourceLoader.exists(target_path):
 		target_path = OUTING_RETURN_FALLBACK_SCENE_PATH
 	await _change_scene_with_transition(target_path, false)
 	if _last_scene_change_error == OK:
-		apply_runtime_state_to_current_scene()
-		outing_return_scene_path = ""
+		_apply_outing_delta_after_return()
 		_save_game_deferred()
+
+
+func _apply_outing_delta_after_return() -> void:
+	if _outing_pending_delta_payload.is_empty():
+		return
+	apply_global_save_payload(_outing_pending_delta_payload)
+	apply_runtime_state_to_current_scene()
+	_apply_pending_outing_status_cost_to_current_scene()
+	outing_return_scene_path = ""
+	_outing_pending_delta_payload.clear()
+	_outing_entry_snapshot_payload.clear()
+
+
+func record_pending_outing_status_cost(hunger_cost: float, thirst_cost: float, health_damage: float, reason: String = "outing_expedition") -> void:
+	_outing_pending_status_cost = {
+		"hunger_cost": float(hunger_cost),
+		"thirst_cost": float(thirst_cost),
+		"health_damage": float(health_damage),
+		"reason": reason,
+	}
+
+
+func _apply_pending_outing_status_cost_to_current_scene() -> void:
+	if _outing_pending_status_cost.is_empty():
+		return
+	var state_component := _resolve_player_state_component_in_current_scene()
+	if state_component == null or not state_component.has_method("apply_outing_cost"):
+		return
+	state_component.call(
+		"apply_outing_cost",
+		float(_outing_pending_status_cost.get("hunger_cost", 0.0)),
+		float(_outing_pending_status_cost.get("thirst_cost", 0.0)),
+		float(_outing_pending_status_cost.get("health_damage", 0.0)),
+		String(_outing_pending_status_cost.get("reason", "outing_expedition"))
+	)
+	_outing_pending_status_cost.clear()
+
+
+func _resolve_player_state_component_in_current_scene() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	for player_raw in tree.get_nodes_in_group("Player"):
+		if not is_instance_valid(player_raw) or player_raw is not Node:
+			continue
+		var state := _get_state_component_from_player(player_raw as Node)
+		if state != null:
+			return state
+	return _find_state_component_recursive(tree.current_scene)
+
+
+func _get_state_component_from_player(player_node: Node) -> Node:
+	if player_node == null or not is_instance_valid(player_node):
+		return null
+	var state := player_node.get_node_or_null("Components/StateComponent")
+	if state != null and is_instance_valid(state):
+		return state
+	return _find_state_component_recursive(player_node)
+
+
+func _find_state_component_recursive(root: Node) -> Node:
+	if root == null or not is_instance_valid(root):
+		return null
+	if root.has_method("apply_outing_cost"):
+		return root
+	for child_raw in root.get_children():
+		var child := child_raw as Node
+		var found := _find_state_component_recursive(child)
+		if found != null:
+			return found
+	return null
 
 
 func _change_scene_with_transition(scene_path: String, release_mouse_after_load: bool = false) -> void:
@@ -303,6 +396,10 @@ func _array_to_unique_packed_string_array(values: Variant) -> PackedStringArray:
 		if not text.is_empty() and not result.has(text):
 			result.append(text)
 	return result
+
+
+func _get_save_manager() -> Node:
+	return get_node_or_null("/root/SaveManager")
 
 
 func _save_game_deferred() -> void:

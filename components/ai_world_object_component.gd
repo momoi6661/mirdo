@@ -125,13 +125,28 @@ func _find_matching_ai_nav_point(role: String = "approach") -> Marker3D:
 			continue
 		if String(marker.get("target_object_id")).strip_edges() != id:
 			continue
-		if role_key == "sit" and not _nav_point_has_tag(marker, "rest") and not _nav_point_has_tag(marker, "seat") and not _nav_point_has_tag(marker, "bed"):
+		var marker_role := _nav_point_marker_role(marker)
+		if not role_key.is_empty() and marker_role != role_key:
+			if role_key == "approach" and marker_role.is_empty():
+				pass
+			else:
+				continue
+		if role_key == "sit" and marker_role != "sit":
 			continue
 		var distance := global_position.distance_squared_to(marker.global_position)
 		if distance < best_distance:
 			best_distance = distance
 			best = marker
 	return best
+
+func _nav_point_marker_role(marker: Marker3D) -> String:
+	if marker == null:
+		return ""
+	if "marker_role" in marker:
+		return String(marker.get("marker_role")).strip_edges().to_lower()
+	if marker.has_meta("marker_role"):
+		return String(marker.get_meta("marker_role")).strip_edges().to_lower()
+	return ""
 
 func _nav_point_has_tag(marker: Marker3D, tag: String) -> bool:
 	var values: Variant = marker.get("tags")

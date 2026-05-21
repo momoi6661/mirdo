@@ -26,12 +26,14 @@ extends CharacterBody3D
 
 @export_category("Footstep Audio")
 @export var footstep_player_path: NodePath = NodePath("FootstepAudio3D")
-@export var footstep_volume_db: float = -16.0
-@export var footstep_min_speed: float = 0.9
-@export var footstep_interval_walk: float = 0.45
-@export var footstep_interval_sprint: float = 0.33
-@export var footstep_pitch_min: float = 0.96
-@export var footstep_pitch_max: float = 1.06
+@export var footstep_volume_db: float = -17.0
+@export var footstep_min_speed: float = 0.65
+@export var footstep_interval_walk: float = 0.58
+@export var footstep_interval_sprint: float = 0.40
+@export var footstep_pitch_min: float = 0.985
+@export var footstep_pitch_max: float = 1.015
+@export var footstep_volume_jitter_db: float = 0.9
+@export var footstep_landing_min_fall_speed: float = 3.0
 @export var footstep_clips: Array[AudioStream] = []
 @export_dir var footstep_folder_path: String = "res://Audio/footsteps/concrete"
 
@@ -66,6 +68,9 @@ var is_on_crouching:bool=false
 var is_on_stand:bool=false
 var _footstep_player: AudioStreamPlayer3D
 var _footstep_elapsed: float = 0.0
+var _last_footstep_clip_index: int = -1
+var _was_grounded_for_footsteps: bool = false
+var _last_footstep_vertical_velocity: float = 0.0
 var _inventory_ui_sfx_player: AudioStreamPlayer
 
 var _mouse_rotation : Vector3
@@ -750,32 +755,59 @@ func _update_footstep_audio(delta: float) -> void:
 	if _footstep_player == null:
 		return
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
-	var should_play_step := is_on_floor() and horizontal_speed >= footstep_min_speed
+	var grounded := is_on_floor()
+	var should_play_step := grounded and horizontal_speed >= footstep_min_speed
+	var landing_fall_speed: float = maxf(0.0, -_last_footstep_vertical_velocity)
+
+	if grounded and not _was_grounded_for_footsteps and landing_fall_speed >= footstep_landing_min_fall_speed:
+		_play_footstep_audio(true)
+		_footstep_elapsed = -0.12
+
+	_was_grounded_for_footsteps = grounded
+	_last_footstep_vertical_velocity = velocity.y
+
 	if not should_play_step:
-		_footstep_elapsed = 0.0
+		if not grounded:
+			_footstep_elapsed = 0.0
 		return
 
 	var base_interval: float = footstep_interval_sprint if _is_sprinting else footstep_interval_walk
-	var speed_scale: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.75, 2.0)
-	var step_interval: float = maxf(0.08, base_interval / speed_scale)
+	if is_crouching or is_on_crouching:
+		base_interval *= 1.22
+	var speed_scale: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.85, 1.45)
+	var step_interval: float = maxf(0.26, base_interval / speed_scale)
 	_footstep_elapsed += delta
 	if _footstep_elapsed < step_interval:
 		return
 	_footstep_elapsed = 0.0
-	_play_footstep_audio()
+	_play_footstep_audio(false)
 
-func _play_footstep_audio() -> void:
+func _play_footstep_audio(is_landing_step: bool = false) -> void:
 	if _footstep_player == null:
 		return
 	if not footstep_clips.is_empty():
 		var clip_index: int = randi() % footstep_clips.size()
+		if footstep_clips.size() > 1:
+			var guard := 0
+			while clip_index == _last_footstep_clip_index and guard < 4:
+				clip_index = randi() % footstep_clips.size()
+				guard += 1
+		_last_footstep_clip_index = clip_index
 		var clip: AudioStream = footstep_clips[clip_index]
 		if clip != null:
 			_footstep_player.stream = clip
 	if _footstep_player.stream == null:
 		return
-	_apply_footstep_volume()
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	var speed_ratio: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.0, 1.6)
+	var speed_gain_db: float = lerpf(-2.2, 0.8, clampf(speed_ratio / 1.6, 0.0, 1.0))
+	var crouch_gain_db: float = -4.0 if is_crouching or is_on_crouching else 0.0
+	var landing_gain_db: float = 1.2 if is_landing_step else 0.0
+	_footstep_player.stop()
+	_footstep_player.volume_db = footstep_volume_db + speed_gain_db + crouch_gain_db + landing_gain_db + randf_range(-footstep_volume_jitter_db, footstep_volume_jitter_db)
 	_footstep_player.pitch_scale = randf_range(footstep_pitch_min, footstep_pitch_max)
+	_footstep_player.max_distance = 9.0
+	_footstep_player.unit_size = 0.75
 	_footstep_player.play()
 
 func _resolve_inventory_ui_sfx_player() -> void:

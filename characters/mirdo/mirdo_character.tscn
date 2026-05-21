@@ -4,6 +4,7 @@
 [ext_resource type="Shader" uid="uid://vm6bw28e1lgc" path="res://features/anime_toon/anime_outline.gdshader" id="2_87wd2"]
 [ext_resource type="Script" uid="uid://cd4u156gxir4" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
 [ext_resource type="Shader" uid="uid://cw7vfuhp4teqi" path="res://features/anime_toon/anime_toon.gdshader" id="3_bryac"]
+[ext_resource type="Shader" path="res://features/anime_toon/anime_occluded_visible.gdshader" id="4_occluded_shader"]
 [ext_resource type="Script" uid="uid://lwhwjw8o756g" path="res://features/character_face/blend_shape_face_component.gd" id="4_face_component"]
 [ext_resource type="Texture2D" uid="uid://dnwblq0cf4xco" path="res://characters/mirdo/mirdo_mirdo_BaseColor.png" id="4_ujsm0"]
 [ext_resource type="Animation" uid="uid://bkpfvl61k0fnw" path="res://resources/animate/Kimodo/check_shelf.res" id="5_kr56o"]
@@ -69,6 +70,8 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="70_save_comp"]
 [ext_resource type="Script" uid="uid://c47diqj7a287c" path="res://scripts/character_ai/components/character_action_expression_component.gd" id="71_action_expression"]
 [ext_resource type="Script" uid="uid://bgt005wgigo6p" path="res://scripts/character_resources/character_item_consumer_component.gd" id="72_item_consumer"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_action_scheduler_component.gd" id="73_action_scheduler"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_autonomous_supply_user_component.gd" id="74_supply_user"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
@@ -107,8 +110,21 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_re6qp")
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_debug"]
+render_priority = -2
+shader = ExtResource("4_occluded_shader")
+shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
+shader_parameter/outline_width = 0.006
+shader_parameter/alpha = 0.82
+shader_parameter/pulse_strength = 0.0
+shader_parameter/emission_strength = 0.35
+shader_parameter/depth_offset = -0.001
+shader_parameter/radial_blend = 0.85
+shader_parameter/min_direction_length = 0.002
+
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_u0baf"]
 render_priority = -1
+next_pass = SubResource("ShaderMaterial_occ_debug")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -127,10 +143,13 @@ shader_parameter/base_color = Color(0, 0.88082504, 1, 0.28)
 shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
 shader_parameter/shade_threshold = 0.42
 shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_hardness = 0.85
 shader_parameter/shadow_level = 0.42
 shader_parameter/max_light_level = 0.68
 shader_parameter/light_wrap = 0.18
 shader_parameter/light_contribution = 0.78
+shader_parameter/received_shadow_strength = 0.55
+shader_parameter/shadow_tint_strength = 0.78
 shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
 shader_parameter/ambient_lift = 0.04
 shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
@@ -639,8 +658,21 @@ bind/150/name = &"VSB_4"
 bind/150/bone = -1
 bind/150/pose = Transform3D(1, 4.177345e-09, 4.4052992e-08, -7.911808e-09, 0.9963709, 0.08511619, -4.3537565e-08, -0.085116185, 0.996371, 1.1727916e-07, -5.9604638e-08, -2.6077043e-08)
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_main"]
+render_priority = -2
+shader = ExtResource("4_occluded_shader")
+shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
+shader_parameter/outline_width = 0.006
+shader_parameter/alpha = 0.82
+shader_parameter/pulse_strength = 0.0
+shader_parameter/emission_strength = 0.35
+shader_parameter/depth_offset = -0.001
+shader_parameter/radial_blend = 0.85
+shader_parameter/min_direction_length = 0.002
+
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_x0obc"]
 render_priority = -1
+next_pass = SubResource("ShaderMaterial_occ_main")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -660,10 +692,13 @@ shader_parameter/base_color = Color(1, 1, 1, 1)
 shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
 shader_parameter/shade_threshold = 0.42
 shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_hardness = 0.85
 shader_parameter/shadow_level = 0.42
 shader_parameter/max_light_level = 0.68
 shader_parameter/light_wrap = 0.18
 shader_parameter/light_contribution = 0.78
+shader_parameter/received_shadow_strength = 0.55
+shader_parameter/shadow_tint_strength = 0.78
 shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
 shader_parameter/ambient_lift = 0.04
 shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
@@ -703,8 +738,21 @@ _surfaces = [{
 }]
 blend_shape_mode = 0
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_noblend"]
+render_priority = -2
+shader = ExtResource("4_occluded_shader")
+shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
+shader_parameter/outline_width = 0.006
+shader_parameter/alpha = 0.82
+shader_parameter/pulse_strength = 0.0
+shader_parameter/emission_strength = 0.35
+shader_parameter/depth_offset = -0.001
+shader_parameter/radial_blend = 0.85
+shader_parameter/min_direction_length = 0.002
+
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ass2d"]
 render_priority = -1
+next_pass = SubResource("ShaderMaterial_occ_noblend")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -724,10 +772,13 @@ shader_parameter/base_color = Color(1, 1, 1, 1)
 shader_parameter/shade_color = Color(0.58, 0.5, 0.58, 1)
 shader_parameter/shade_threshold = 0.42
 shader_parameter/shade_softness = 0.06
+shader_parameter/shadow_hardness = 0.85
 shader_parameter/shadow_level = 0.42
 shader_parameter/max_light_level = 0.68
 shader_parameter/light_wrap = 0.18
 shader_parameter/light_contribution = 0.78
+shader_parameter/received_shadow_strength = 0.55
+shader_parameter/shadow_tint_strength = 0.78
 shader_parameter/ambient_color = Color(0.72, 0.68, 0.76, 1)
 shader_parameter/ambient_lift = 0.04
 shader_parameter/rim_color = Color(0.72, 0.82, 1, 1)
@@ -921,6 +972,9 @@ node_connections = [&"output", 0, &"BlinkBlend", &"VisemeBlend", 0, &"Expression
 script = ExtResource("67_navigation_motor")
 arrival_distance = 0.42
 run_distance = 7.5
+off_navmesh_start_tolerance = 0.035
+off_navmesh_recovery_arrival_distance = 0.12
+off_navmesh_recovery_speed = 1.05
 door_open_check_distance = 1.35
 door_open_ray_height = 1.05
 
@@ -1713,6 +1767,12 @@ script = ExtResource("2_toon_applier")
 include_mesh_name_filters = PackedStringArray()
 exclude_mesh_name_filters = PackedStringArray("collider", "collision")
 outline_width = 0.003
+occluded_outline_width = 0.006
+occluded_outline_alpha = 0.82
+occluded_outline_radial_blend = 0.85
+shadow_hardness = 0.85
+received_shadow_strength = 0.55
+shadow_tint_strength = 0.78
 
 [node name="FaceAnimationPlayer" type="AnimationPlayer" parent="." unique_id=1273321005]
 root_node = NodePath("../VisualRoot/Model")
@@ -1764,6 +1824,7 @@ face_talk_blend_duration = 0.1
 blink_duration = 0.1
 blink_interval_min = 3.8
 blink_interval_max = 5.9
+disable_blink_on_joy = true
 
 [node name="WorldSubtitleComponent" parent="Components" unique_id=1273321004 instance=ExtResource("5_subtitle_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
@@ -1774,6 +1835,30 @@ queue_clear_delay = 2.8
 [node name="AnimationBehaviorTreeComponent" type="Node" parent="Components" unique_id=1326592975]
 script = ExtResource("54_1kdye")
 selected_state_name = "seated_idle"
+
+
+[node name="CharacterActionScheduler" type="Node" parent="Components" unique_id=815896318]
+script = ExtResource("73_action_scheduler")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+action_executor_path = NodePath("../CharacterAIActionExecutor")
+navigation_motor_path = NodePath("../..")
+default_return_action = &"idle_normal"
+seated_return_action = &"seated_idle"
+
+[node name="CharacterAutonomousSupplyUser" type="Node" parent="Components" unique_id=815896319]
+script = ExtResource("74_supply_user")
+state_component_path = NodePath("../StateComponent")
+action_executor_path = NodePath("../CharacterAIActionExecutor")
+action_scheduler_path = NodePath("../CharacterActionScheduler")
+item_consumer_path = NodePath("../ItemConsumer")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+face_component_path = NodePath("../FaceComponent")
+actor_path = NodePath("../..")
+thirst_trigger_threshold = 48.0
+hunger_trigger_threshold = 48.0
+check_interval_sec = 5.0
+success_cooldown_sec = 95.0
+failure_cooldown_sec = 28.0
 
 [node name="CharacterActionExpression" type="Node" parent="Components" unique_id=821712066]
 script = ExtResource("71_action_expression")
@@ -1870,6 +1955,8 @@ state_component_path = NodePath("../StateComponent")
 animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
 navigation_motor_path = NodePath("../..")
 action_executor_path = NodePath("../CharacterAIActionExecutor")
+action_scheduler_path = NodePath("../CharacterActionScheduler")
+supply_user_path = NodePath("../CharacterAutonomousSupplyUser")
 dialogue_component_path = NodePath("../AIDialogueComponent")
 face_component_path = NodePath("../FaceComponent")
 actor_path = NodePath("../..")

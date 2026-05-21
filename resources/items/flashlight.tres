@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="ItemData" format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://tvx5q30xr1ai"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
-[ext_resource type="Texture2D" path="res://resources/items/icons/flashlight_ui.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" uid="uid://l6d4cu1rqfhy" path="res://resources/items/icons/flashlight_ui.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_item_script")
@@ -9,8 +9,6 @@ ItemName = "手电"
 Description = "普通手电，黑暗室内搜索必备。"
 Icon = ExtResource("2_icon")
 ItemModelScenePath = "res://resources/items/models/physical/flashlight_item.tscn"
-MaxStackSize = 1
 outing_category = "tool"
 can_take_outing = true
-inventory_tags = PackedStringArray("工具", "照明")
-ai_rule_hint = "黑暗、地下、后仓、夜间场景中降低遗漏和惊吓风险；消耗电池叙事可选。"
+ai_rule_hint = "黑暗、地下、后仓、夜间或断电地点可降低遗漏和惊吓风险；可能暴露位置，需要电池支持。"

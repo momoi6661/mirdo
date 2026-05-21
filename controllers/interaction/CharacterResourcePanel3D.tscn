@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://1v25xr3ly7eg" path="res://controllers/interaction/character_resource_panel_3d.gd" id="1_script"]
-[ext_resource type="Script" uid="uid://quiwc66dkftp" path="res://controllers/interaction/character_resource_status_text_resolver.gd" id="2_resolver"]
+[ext_resource type="Script" uid="uid://cdfqsv1x6ee0e" path="res://controllers/interaction/character_resource_panel_3d.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dckcm8u72wf87" path="res://controllers/interaction/character_resource_status_text_resolver.gd" id="2_resolver"]
 [ext_resource type="Resource" uid="uid://jl8kcm21samx" path="res://resources/character_resources/status/default_status_rule_set.tres" id="2_u6pps"]
 [ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="4_46gjo"]
 
@@ -244,6 +244,27 @@ theme_override_styles/fill = SubResource("StyleBoxFlat_f8h84")
 value = 40.0
 show_percentage = false
 
+[node name="EnergyRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=1265109302]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/EnergyRow" unique_id=2035092261]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.99, 1, 1)
+theme_override_fonts/font = ExtResource("4_46gjo")
+theme_override_font_sizes/font_size = 28
+text = "精力"
+
+[node name="Bar" type="ProgressBar" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows/EnergyRow" unique_id=736759519]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/background = SubResource("StyleBoxFlat_rfmtv")
+theme_override_styles/fill = SubResource("StyleBoxFlat_f8h84")
+value = 78.0
+show_percentage = false
+
 [node name="MoodRow" type="HBoxContainer" parent="Viewport/CanvasRoot/Background/Margin/Content/StatRows" unique_id=743605694]
 layout_mode = 2
 theme_override_constants/separation = 14
@@ -298,5 +319,6 @@ theme_override_colors/font_color = Color(0.92, 0.98, 1, 0.98)
 theme_override_fonts/font = ExtResource("4_46gjo")
 theme_override_font_sizes/font_size = 24
 autowrap_mode = 3
+
 
 

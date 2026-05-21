@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="ItemData" format=3]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://dlmh2kgfuf7n8"]
 
-[ext_resource type="Script" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
-[ext_resource type="Texture2D" path="res://resources/items/icons/map_atlas_ui.png" id="2_icon"]
+[ext_resource type="Script" uid="uid://bdhapua5nkgw8" path="res://scripts/Inventory/ItemData.gd" id="1_item_script"]
+[ext_resource type="Texture2D" uid="uid://xfu7llg2kf1f" path="res://resources/items/icons/map_atlas_ui.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_item_script")
@@ -9,8 +9,6 @@ ItemName = "地图册"
 Description = "残旧城市地图册，标记了部分道路、商铺和公共设施。"
 Icon = ExtResource("2_icon")
 ItemModelScenePath = "res://resources/items/models/physical/map_atlas_item.tscn"
-MaxStackSize = 1
 outing_category = "special"
 can_take_outing = true
-inventory_tags = PackedStringArray("导航", "线索")
-ai_rule_hint = "成功探索后可更合理地发现外缘地点；适合让AI给出道路和方位描述。"
+ai_rule_hint = "辅助路线判断和外缘地点发现；让AI给出道路、方位和新地点线索，但不直接增加战斗能力。"

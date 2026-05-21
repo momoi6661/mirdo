@@ -12,4 +12,4 @@ ItemModelScenePath = "res://resources/items/models/physical/fire_axe_item.tscn"
 outing_category = "weapon"
 can_take_outing = true
 outing_damage_reduction = 0.35
-ai_rule_hint = "遇到木门、薄隔板、被困住的柜体或中等威胁遭遇时，消防斧可提供破拆和威慑分支；代价是噪声更高、动作更显眼。"
+ai_rule_hint = "强力近战武器和破拆工具，可降低丧尸近身伤害并打开木门/薄隔板；噪声很高，战斗或破拆后可能损坏。"

@@ -59,62 +59,74 @@ shader_parameter/side_falloff = 1.65
 shader_parameter/edge_darkness = 0.055
 shader_parameter/breath_strength = 0.10
 shader_parameter/spark_strength = 0.18
-shader_parameter/block_strength = 0.16
-shader_parameter/grain_strength = 0.012
+shader_parameter/block_strength = 0.095
+shader_parameter/grain_strength = 0.008
 shader_parameter/motion_speed = 0.36
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_button_normal"]
-content_margin_left = 40.0
-content_margin_top = 8.0
+content_margin_left = 34.0
+content_margin_top = 12.0
 content_margin_right = 24.0
-content_margin_bottom = 8.0
-bg_color = Color(0, 0, 0, 0)
+content_margin_bottom = 12.0
+bg_color = Color(0.95, 0.52, 0.72, 0.055)
 border_color = Color(0.72, 0.72, 0.68, 0)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_button_pressed"]
-content_margin_left = 40.0
-content_margin_top = 8.0
+content_margin_left = 38.0
+content_margin_top = 12.0
 content_margin_right = 24.0
-content_margin_bottom = 8.0
-bg_color = Color(0.055, 0.052, 0.045, 0.34)
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.48, 0.68, 0.25)
 border_width_left = 0
 border_color = Color(0.78, 0.75, 0.66, 0.0)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_button_hover"]
-content_margin_left = 40.0
-content_margin_top = 8.0
+content_margin_left = 42.0
+content_margin_top = 12.0
 content_margin_right = 24.0
-content_margin_bottom = 8.0
-bg_color = Color(0.048, 0.046, 0.04, 0.24)
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.62, 0.78, 0.20)
 border_width_left = 0
 border_color = Color(0.78, 0.75, 0.66, 0.0)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_settings_page"]
-bg_color = Color(0.004, 0.004, 0.004, 0.995)
+bg_color = Color(0, 0, 0, 0)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_field"]
-content_margin_left = 12.0
+content_margin_left = 14.0
 content_margin_top = 8.0
-content_margin_right = 12.0
+content_margin_right = 14.0
 content_margin_bottom = 8.0
-bg_color = Color(0.018, 0.018, 0.018, 0.96)
+bg_color = Color(0.58, 0.08, 0.33, 0.34)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.75, 0.75, 0.7, 0.22)
+border_color = Color(1.0, 0.78, 0.88, 0.24)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_field_focus"]
-content_margin_left = 12.0
+content_margin_left = 14.0
 content_margin_top = 8.0
-content_margin_right = 12.0
+content_margin_right = 14.0
 content_margin_bottom = 8.0
-bg_color = Color(0.035, 0.035, 0.033, 0.98)
+bg_color = Color(0.66, 0.10, 0.38, 0.42)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.86, 0.86, 0.8, 0.78)
+border_color = Color(1.0, 0.86, 0.94, 0.78)
 
 [node name="MainMenu" type="CanvasLayer" unique_id=929744421]
 process_mode = 3
@@ -354,18 +366,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.24, 0.02, 0.12, 0.035)
+color = Color(0.24, 0.02, 0.12, 0.018)
 
 [node name="SceneGlow" type="ColorRect" parent="Root" unique_id=1588433640]
-visible = false
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.56
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.48, 0.06, 0.28, 0.10)
+color = Color(0.92, 0.32, 0.56, 0.055)
 
 [node name="WindowFrame" type="ColorRect" parent="Root" unique_id=1142656171]
 visible = false
@@ -479,20 +491,20 @@ theme_override_constants/separation = 34
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 text = ""
 
 [node name="PlayersInfo" type="Label" parent="Root/MainPage/InfoRow" unique_id=493751262]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 
 [node name="RatingInfo" type="Label" parent="Root/MainPage/InfoRow" unique_id=925496754]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 text = ""
 
 [node name="MenuHeader" type="Label" parent="Root/MainPage" unique_id=1423917241]
@@ -500,9 +512,9 @@ unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.61
-anchor_top = 0.25
-anchor_right = 0.88
-anchor_bottom = 0.3
+anchor_top = 0.24
+anchor_right = 0.90
+anchor_bottom = 0.29
 theme_override_colors/font_color = Color(0.62, 0.60, 0.54, 0.54)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 16
@@ -525,23 +537,23 @@ color = Color(0, 0, 0, 0)
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.61
+anchor_left = 0.57
 anchor_top = 0.30
-anchor_right = 0.90
-anchor_bottom = 0.72
+anchor_right = 0.91
+anchor_bottom = 0.76
 grow_horizontal = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
 
 [node name="ContinueButton" type="Button" parent="Root/MainPage/MenuButtons" unique_id=1873050668]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
-theme_override_colors/font_disabled_color = Color(0.38, 0.38, 0.36, 0.75)
+theme_override_colors/font_disabled_color = Color(0.78, 0.70, 0.74, 0.56)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 23
+theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -551,13 +563,13 @@ alignment = 0
 
 [node name="NewGameButton" type="Button" parent="Root/MainPage/MenuButtons" unique_id=422844844]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 23
+theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -566,13 +578,13 @@ alignment = 0
 
 [node name="ProgressButton" type="Button" parent="Root/MainPage/MenuButtons" unique_id=1502768395]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 23
+theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -581,13 +593,13 @@ alignment = 0
 
 [node name="SettingsButton" type="Button" parent="Root/MainPage/MenuButtons" unique_id=1396711504]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 23
+theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -596,13 +608,13 @@ alignment = 0
 
 [node name="QuitButton" type="Button" parent="Root/MainPage/MenuButtons" unique_id=1406503058]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 focus_mode = 0
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 23
+theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -647,7 +659,7 @@ theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 26
 text = "正在加载..."
 
-[node name="SettingsPage" type="Panel" parent="Root" unique_id=1528371294]
+[node name="SettingsPage" type="Control" parent="Root" unique_id=1528371294]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -656,7 +668,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBox_settings_page")
+mouse_filter = 2
 
 [node name="SettingsScanLine" type="ColorRect" parent="Root/SettingsPage" unique_id=667381844]
 layout_mode = 1
@@ -674,28 +686,28 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 420.0
-offset_top = 150.0
-offset_right = -420.0
-offset_bottom = -120.0
+offset_top = 96.0
+offset_right = -360.0
+offset_bottom = -72.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Rows" type="VBoxContainer" parent="Root/SettingsPage/SettingsMargin" unique_id=1770324236]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 9
 
 [node name="SettingsTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1574871966]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.86, 0.86, 0.82, 1)
 theme_override_fonts/font = ExtResource("3_silver")
-theme_override_font_sizes/font_size = 54
+theme_override_font_sizes/font_size = 48
 text = "AI SETTINGS"
 
 [node name="SettingsHint" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1166921640]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.74, 0.74, 0.7, 0.66)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "配置大模型连接信息。修改后自动保存。"
 autowrap_mode = 3
 
@@ -703,17 +715,17 @@ autowrap_mode = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "Base URL"
 
 [node name="BaseUrlLineEdit" type="LineEdit" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=628753173]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_colors/caret_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_field")
 theme_override_styles/focus = SubResource("StyleBox_field_focus")
 placeholder_text = "http://127.0.0.1:18080 或 https://api.example.com/v1"
@@ -722,17 +734,17 @@ placeholder_text = "http://127.0.0.1:18080 或 https://api.example.com/v1"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "Model"
 
 [node name="ModelLineEdit" type="LineEdit" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1415226672]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_colors/caret_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_field")
 theme_override_styles/focus = SubResource("StyleBox_field_focus")
 placeholder_text = "例如 gpt-4.1-mini / qwen3 / local-model"
@@ -741,21 +753,42 @@ placeholder_text = "例如 gpt-4.1-mini / qwen3 / local-model"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "API Key"
 
 [node name="ApiKeyLineEdit" type="LineEdit" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1738005063]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 52)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_colors/caret_color = Color(0.9, 0.9, 0.86, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_field")
 theme_override_styles/focus = SubResource("StyleBox_field_focus")
 placeholder_text = "sk-..."
 secret = true
+
+
+[node name="ProxyUrlLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1893305101]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "Proxy URL"
+
+[node name="ProxyUrlLineEdit" type="LineEdit" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1893305102]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.86, 1)
+theme_override_colors/caret_color = Color(0.9, 0.9, 0.86, 1)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBox_field")
+theme_override_styles/focus = SubResource("StyleBox_field_focus")
+placeholder_text = "http://127.0.0.1:7890"
+text = "http://127.0.0.1:7890"
 
 [node name="StatusLabelSettings" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1144319744]
 unique_name_in_owner = true
@@ -777,7 +810,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
 theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
 theme_override_styles/hover = SubResource("StyleBox_button_hover")
@@ -796,3 +829,5 @@ visible = false
 [node name="UISoundPlayer" type="AudioStreamPlayer" parent="." unique_id=676416433]
 unique_name_in_owner = true
 process_mode = 3
+
+

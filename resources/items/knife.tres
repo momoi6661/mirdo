@@ -12,4 +12,4 @@ ItemModelScenePath = "res://resources/items/models/physical/knife_item.tscn"
 outing_category = "weapon"
 can_take_outing = true
 outing_damage_reduction = 0.18
-ai_rule_hint = "低威胁遭遇时提供防身选择，也可处理绳索、包装、布料。"
+ai_rule_hint = "轻型防身武器，可处理低威胁近身、绳索和包装；减伤有限，紧急格斗后较容易损坏或遗失。"

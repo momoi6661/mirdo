@@ -204,6 +204,8 @@ const STATE_ALIASES := {
 	&"standing": &"stand",
 	&"stop": &"stand",
 	&"locomotion_stop": &"stand",
+	&"stand_up": &"stand_up",
+	&"sit_to_stand": &"stand_up",
 	&"walk_forward": &"walk",
 	&"walk_loop": &"walk",
 	&"run_forward": &"run",
@@ -483,6 +485,13 @@ func get_current_sub_state() -> StringName:
 func get_last_requested_action() -> StringName:
 	return _last_requested_action
 
+func get_action_duration(action_name: StringName, fallback: float = 0.0) -> float:
+	var action := _normalize_action(action_name)
+	var length := _get_animation_length(action, fallback)
+	if length > 0.0:
+		return length
+	return fallback
+
 func _travel(mode_name: StringName, state_name: StringName, action_name: StringName, sub_state: StringName = &"") -> bool:
 	if not _ensure_ready():
 		return _fail(action_name, "animation tree is not ready")
@@ -623,6 +632,8 @@ func _resolve_state_to_action(state_name: StringName) -> StringName:
 			if _posture_intent == &"seated" or _current_mode == MODE_POSTURE:
 				return &"stand_up"
 			return &"locomotion_stop"
+		&"stand_up":
+			return &"stand_up"
 		&"walk":
 			return &"walk_forward"
 		&"run":

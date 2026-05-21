@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://c6hr4pgbbhywt"]
 
 [ext_resource type="Script" uid="uid://eruxegbfl6k0" path="res://levels/outing/outing_map_level_v3.gd" id="1_level"]
+[ext_resource type="Script" path="res://levels/outing/components/outing_result_page.gd" id="ResultPageScript"]
 [ext_resource type="Script" uid="uid://rsn1snfet7tx" path="res://levels/outing/components/outing_infinite_map_background.gd" id="2_bg"]
 [ext_resource type="PackedScene" path="res://levels/outing/components/OutingLocationMarker.tscn" id="3_marker"]
 [ext_resource type="Resource" path="res://levels/outing/location_rules/apartment.tres" id="rule_apartment"]
@@ -368,7 +369,7 @@ color = Color(0.52, 0.48, 0.38, 0.42)
 
 [node name="ThreatRow" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1792884322]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 16
 
 [node name="ThreatLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/ThreatRow" unique_id=1375951934]
 unique_name_in_owner = true
@@ -570,6 +571,12 @@ theme_override_styles/hover = SubResource("ButtonHover")
 text = "取消"
 
 [node name="ResultOverlay" type="ColorRect" parent="." unique_id=163593689]
+script = ExtResource("ResultPageScript")
+title_label_path = NodePath("ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox/ResultTitleLabel")
+subtitle_label_path = NodePath("ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox/ResultSubtitleLabel")
+body_label_path = NodePath("ResultPanel/ResultMargin/ResultBox/ResultBody/ResultBodyMargin/ResultLabel")
+return_button_path = NodePath("ResultPanel/ResultMargin/ResultBox/ResultReturnButton")
+panel_path = NodePath("ResultPanel")
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -583,25 +590,25 @@ color = Color(0, 0, 0, 0.62)
 [node name="ResultPanel" type="PanelContainer" parent="ResultOverlay" unique_id=1844850762]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
 anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -960.0
-offset_top = -360.0
-offset_right = -38.0
-offset_bottom = 360.0
+anchor_bottom = 1.0
+offset_left = 72.0
+offset_top = 54.0
+offset_right = -72.0
+offset_bottom = -54.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("PanelModal")
 
 [node name="ResultMargin" type="MarginContainer" parent="ResultOverlay/ResultPanel" unique_id=1373282983]
 layout_mode = 2
-theme_override_constants/margin_left = 30
-theme_override_constants/margin_top = 26
-theme_override_constants/margin_right = 30
-theme_override_constants/margin_bottom = 26
+theme_override_constants/margin_left = 42
+theme_override_constants/margin_top = 34
+theme_override_constants/margin_right = 42
+theme_override_constants/margin_bottom = 34
 
 [node name="ResultBox" type="VBoxContainer" parent="ResultOverlay/ResultPanel/ResultMargin" unique_id=1325065390]
 layout_mode = 2
@@ -626,13 +633,13 @@ theme_override_constants/separation = 3
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.76, 0.28, 0.86)
 theme_override_font_sizes/font_size = 14
-text = "EXPEDITION // AI FIELD REPORT"
+text = "EXPEDITION REPORT // AI NARRATIVE PAGE"
 
 [node name="ResultTitleLabel" type="Label" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.91, 0.72, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 34
 text = "外出行动报告"
 
 [node name="ResultSubtitleLabel" type="Label" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox"]
@@ -656,18 +663,18 @@ theme_override_constants/margin_bottom = 18
 
 [node name="ResultLabel" type="RichTextLabel" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultBody/ResultBodyMargin" unique_id=299446946]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 440)
+custom_minimum_size = Vector2(0, 620)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.9, 0.86, 0.76, 1)
-theme_override_font_sizes/normal_font_size = 17
+theme_override_font_sizes/normal_font_size = 19
 bbcode_enabled = true
 fit_content = false
 scroll_active = true
 
 [node name="ResultReturnButton" type="Button" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox" unique_id=1147305639]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
 theme_override_styles/normal = SubResource("ButtonDark")

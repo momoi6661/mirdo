@@ -186,10 +186,42 @@ func _on_main_menu_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("main_menu_requested")
 	_auto_save_current_progress()
-	await hide_menu()
+	await _return_to_main_menu_with_transition()
+
+func _return_to_main_menu_with_transition() -> void:
+	if is_transitioning:
+		return
+	is_transitioning = true
+	var transition_ui := _ensure_transition_ui()
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file("res://levels/menu/MainMenu.tscn")
+	if save_slot_menu != null and save_slot_menu.visible:
+		save_slot_menu.hide()
+	if ai_settings_panel != null and ai_settings_panel.visible:
+		if ai_settings_panel.has_method("_flush_auto_save"):
+			ai_settings_panel.call("_flush_auto_save")
+		ai_settings_panel.hide()
+	hide()
+	if transition_ui != null and transition_ui.has_method("change_scene_with_cover"):
+		transition_ui.call_deferred("change_scene_with_cover", "res://levels/menu/MainMenu.tscn", "a", 0.12)
+		return
+	var result := get_tree().change_scene_to_file("res://levels/menu/MainMenu.tscn")
+	if result != OK:
+		push_error("[PauseMenu] change to main menu failed: %d" % result)
+		is_transitioning = false
+
+
+func _ensure_transition_ui() -> Node:
+	var existing := get_tree().root.get_node_or_null("TransitionUI")
+	if existing != null:
+		return existing
+	var transition_scene := load("res://controllers/ui/transition_screen.tscn") as PackedScene
+	if transition_scene == null:
+		return null
+	var instance := transition_scene.instantiate()
+	instance.name = "TransitionUI"
+	get_tree().root.add_child(instance)
+	return instance
 
 func _on_exit_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -257,5 +289,3 @@ func _is_ui_text_input_focused() -> bool:
 	if focus_owner is CodeEdit:
 		return true
 	return false
-
-

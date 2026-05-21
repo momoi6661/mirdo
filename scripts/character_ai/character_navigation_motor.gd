@@ -21,19 +21,28 @@ signal navigation_failed(reason: String)
 @export var scale_navigation_by_actor_scale: bool = true
 @export var project_targets_to_navmesh: bool = true
 @export_range(0.0, 3.0, 0.01) var max_target_projection_distance: float = 2.0
+@export var preserve_raw_target_for_seat_precise: bool = true
 
 @export_category("Off NavMesh Recovery")
 @export var off_navmesh_recovery_enabled: bool = true
 @export_range(0.02, 2.0, 0.01) var off_navmesh_max_start_distance: float = 0.8
+@export_range(0.0, 0.25, 0.005) var off_navmesh_start_tolerance: float = 0.045
 @export_range(0.02, 0.8, 0.01) var off_navmesh_recovery_arrival_distance: float = 0.16
 @export_range(0.1, 4.0, 0.05) var off_navmesh_recovery_speed: float = 1.35
 @export_range(0.0, 1.0, 0.01) var off_navmesh_agent_resume_delay_sec: float = 0.08
 
 @export_category("Seat Arrival")
 @export var seat_arrival_align_enabled: bool = true
+@export_range(0.02, 0.5, 0.01) var seat_navigation_arrival_distance: float = 0.14
+@export var seat_precise_use_direct_motion: bool = true
+@export var seat_precise_direct_attach: bool = true
+@export_range(0.05, 2.0, 0.01) var seat_precise_direct_max_distance: float = 0.85
+@export_range(0.05, 2.0, 0.01) var seat_precise_direct_speed: float = 0.75
+@export_range(0.02, 1.0, 0.01) var seat_precise_direct_attach_duration_sec: float = 0.28
 @export_range(0.0, 1.0, 0.01) var seat_align_delay_sec: float = 0.18
 @export_range(0.0, 1.5, 0.01) var seat_attach_duration_sec: float = 0.26
 @export_range(0.0, 1.0, 0.01) var seat_attach_max_planar_distance: float = 0.75
+@export_range(0.0, 3.0, 0.01) var seat_force_attach_max_planar_distance: float = 2.0
 @export var seat_preserve_current_height: bool = true
 @export_range(-180.0, 180.0, 0.1) var seat_marker_yaw_offset_degrees: float = 0.0
 @export var keep_navigation_busy_until_seat_action: bool = true
@@ -103,6 +112,9 @@ var _pending_turn_action: StringName = &""
 var _navigation_start_grace_left: float = 0.0
 var _seat_attach_serial: int = 0
 var _seat_arrival_pending: bool = false
+var _seat_precise_navigation_active: bool = false
+var _seat_precise_direct_active: bool = false
+var _seat_precise_attach_active: bool = false
 var _turn_wait_left: float = 0.0
 var _turn_wait_elapsed: float = 0.0
 var _queued_move_action_after_turn: StringName = &""
@@ -141,15 +153,52 @@ func get_navigation_debug_snapshot() -> Dictionary:
 		"velocity": _actor.velocity if _actor != null else Vector3.ZERO,
 	}
 
-func align_to_marker(marker: Marker3D, preserve_current_height: bool = false, duration_sec: float = -1.0) -> bool:
+func align_to_marker(marker: Marker3D, preserve_current_height: bool = false, duration_sec: float = -1.0, force: bool = false) -> bool:
 	if marker == null or _actor == null:
 		return false
 	var target := _compute_body_transform_for_marker(marker, preserve_current_height)
 	var delta := target.origin - _actor.global_position
 	delta.y = 0.0
-	if delta.length() > maxf(0.05, seat_attach_max_planar_distance):
+	var max_distance := seat_force_attach_max_planar_distance if force else seat_attach_max_planar_distance
+	if delta.length() > maxf(0.05, max_distance):
 		return false
 	_smooth_attach_to_transform(target, seat_attach_duration_sec if duration_sec < 0.0 else duration_sec)
+	return true
+
+func align_to_marker_async(marker: Marker3D, preserve_current_height: bool = false, duration_sec: float = -1.0, force: bool = false) -> bool:
+	if marker == null or _actor == null:
+		return false
+	var target := _compute_body_transform_for_marker(marker, preserve_current_height)
+	var delta := target.origin - _actor.global_position
+	delta.y = 0.0
+	var max_distance := seat_force_attach_max_planar_distance if force else seat_attach_max_planar_distance
+	if delta.length() > maxf(0.05, max_distance):
+		return false
+	await _smooth_attach_to_transform(target, seat_attach_duration_sec if duration_sec < 0.0 else duration_sec)
+	return true
+
+func align_position_to_marker_async(marker: Marker3D, preserve_current_height: bool = false, duration_sec: float = -1.0, force: bool = false) -> bool:
+	if marker == null or _actor == null:
+		return false
+	var target := _actor.global_transform
+	target.origin = marker.global_position
+	if preserve_current_height:
+		target.origin.y = _actor.global_position.y
+	var delta := target.origin - _actor.global_position
+	delta.y = 0.0
+	var max_distance := seat_force_attach_max_planar_distance if force else seat_attach_max_planar_distance
+	if delta.length() > maxf(0.05, max_distance):
+		return false
+	await _smooth_attach_to_transform(target, seat_attach_duration_sec if duration_sec < 0.0 else duration_sec)
+	_reset_navigation_agent_to_actor()
+	return true
+
+func align_yaw_to_marker_async(marker: Marker3D, duration_sec: float = -1.0) -> bool:
+	if marker == null or _actor == null:
+		return false
+	var target := _compute_body_transform_for_marker(marker, true)
+	target.origin = _actor.global_position
+	await _smooth_attach_to_transform(target, seat_attach_duration_sec if duration_sec < 0.0 else duration_sec)
 	return true
 
 func snap_to_marker(marker: Marker3D, preserve_current_height: bool = false) -> bool:
@@ -158,12 +207,24 @@ func snap_to_marker(marker: Marker3D, preserve_current_height: bool = false) -> 
 	var target := _compute_body_transform_for_marker(marker, preserve_current_height)
 	_actor.global_transform = target
 	_actor.velocity = Vector3.ZERO
+	_reset_navigation_agent_to_actor()
 	return true
+
+func reset_navigation_state() -> void:
+	_reset_navigation_agent_to_actor()
 
 func move_to_marker(marker: Marker3D, arrival_action: StringName = &"", run: bool = false) -> bool:
 	if marker == null:
 		navigation_failed.emit("marker_missing")
 		return false
+	_seat_precise_navigation_active = false
+	return move_to_position(marker.global_position, arrival_action, marker.get_path(), run)
+
+func move_to_seat_marker_precise(marker: Marker3D, arrival_action: StringName = &"", run: bool = false) -> bool:
+	if marker == null:
+		navigation_failed.emit("marker_missing")
+		return false
+	_seat_precise_navigation_active = true
 	return move_to_position(marker.global_position, arrival_action, marker.get_path(), run)
 
 func move_to_position(target_position: Vector3, arrival_action: StringName = &"", target_path: NodePath = NodePath(), run: bool = false) -> bool:
@@ -175,7 +236,8 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 		navigation_failed.emit("actor_missing")
 		return false
 	_raw_target_position = target_position
-	_target_position = _project_target_to_navigation_map(target_position)
+	var seat_precise := _seat_precise_navigation_active
+	_target_position = target_position if seat_precise and preserve_raw_target_for_seat_precise else _project_target_to_navigation_map(target_position)
 	_target_path = target_path
 	_arrival_action = arrival_action
 	_follow_active = false
@@ -187,6 +249,7 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_force_repath_after_wait = false
 	_navigation_opened_doors.clear()
 	_forced_run = run
+	_seat_precise_navigation_active = seat_precise
 	_navigation_start_grace_left = 0.18
 	_turn_wait_left = 0.0
 	_turn_wait_elapsed = 0.0
@@ -195,15 +258,24 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_off_navmesh_resume_left = 0.0
 	_off_navmesh_recovery_action = &""
 	_seat_arrival_pending = false
+	_seat_precise_direct_active = seat_precise and seat_precise_use_direct_motion and _horizontal_distance(_actor.global_position, _target_position) <= seat_precise_direct_max_distance
+	_reset_navigation_agent_to_actor()
 	var recovering_from_off_navmesh := false
-	if _navigation_agent != null:
-		_navigation_agent.target_desired_distance = _scaled_distance(arrival_distance)
-		_navigation_agent.path_desired_distance = maxf(0.05, _scaled_distance(arrival_distance * 0.5))
+	if _navigation_agent != null and not _seat_precise_direct_active:
+		var desired_distance := seat_navigation_arrival_distance if seat_precise else _scaled_distance(arrival_distance)
+		_navigation_agent.target_desired_distance = desired_distance
+		_navigation_agent.path_desired_distance = maxf(0.04, desired_distance * 0.5)
 		_navigation_agent.target_position = _target_position
 		recovering_from_off_navmesh = _try_start_off_navmesh_recovery()
+	elif _navigation_agent != null:
+		_navigation_agent.target_position = _actor.global_position
 	var first_move_action := run_action if run else walk_action
 	if recovering_from_off_navmesh:
 		pass
+	elif _seat_precise_direct_active and seat_precise_direct_attach:
+		_seat_precise_attach_active = true
+		_set_moving_action(first_move_action)
+		call_deferred("_run_seat_precise_direct_attach", _target_path, _arrival_action, _target_position, _seat_attach_serial)
 	elif _request_turn_state_toward(_target_position):
 		_queued_move_action_after_turn = first_move_action
 	else:
@@ -243,6 +315,9 @@ func stop_navigation(play_stop: bool = true) -> void:
 	_moving_action = &""
 	_locomotion_velocity_gate_active = false
 	_forced_run = false
+	_seat_precise_navigation_active = false
+	_seat_precise_direct_active = false
+	_seat_precise_attach_active = false
 	_seat_attach_serial += 1
 	_seat_arrival_pending = false
 	_turn_wait_left = 0.0
@@ -301,6 +376,12 @@ func _physics_process(delta: float) -> void:
 		if _should_apply_root_motion_transition(false):
 			_apply_root_motion_transition(delta)
 		return
+	if _seat_precise_attach_active:
+		_apply_gravity(delta)
+		_actor.velocity.x = 0.0
+		_actor.velocity.z = 0.0
+		_actor.move_and_slide()
+		return
 	_refresh_refs()
 	if _actor == null:
 		stop_navigation(false)
@@ -309,11 +390,12 @@ func _physics_process(delta: float) -> void:
 	if _update_off_navmesh_recovery(delta):
 		return
 	var final_distance := _horizontal_distance(_actor.global_position, _target_position)
-	if final_distance <= _scaled_distance(arrival_distance):
+	var active_arrival_distance := seat_navigation_arrival_distance if _seat_precise_navigation_active else _scaled_distance(arrival_distance)
+	if final_distance <= active_arrival_distance:
 		_finish_navigation()
 		return
 	var next_position := _target_position
-	if _navigation_agent != null:
+	if _navigation_agent != null and not _seat_precise_direct_active:
 		_repath_left -= delta
 		if _repath_left <= 0.0:
 			_navigation_agent.target_position = _target_position
@@ -360,7 +442,7 @@ func _physics_process(delta: float) -> void:
 				return
 			direction = direction.normalized()
 	var want_run := _forced_run or final_distance >= _scaled_distance(run_distance)
-	var speed := run_speed if want_run else walk_speed
+	var speed := seat_precise_direct_speed if _seat_precise_direct_active else (run_speed if want_run else walk_speed)
 	var moving_action := run_action if want_run else walk_action
 	if moving_action != _moving_action:
 		_set_moving_action(moving_action)
@@ -404,6 +486,9 @@ func _finish_navigation() -> void:
 	_moving_action = &""
 	_locomotion_velocity_gate_active = false
 	_forced_run = false
+	_seat_precise_navigation_active = false
+	_seat_precise_direct_active = false
+	_seat_precise_attach_active = false
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
 	_navigation_opened_doors.clear()
@@ -446,9 +531,27 @@ func _run_seat_arrival_sequence(marker: Marker3D, finished_action: StringName, s
 	if not is_instance_valid(marker) or _actor == null:
 		_complete_seat_arrival_pending(finished_action, serial, false)
 		return
-	_smooth_attach_to_transform(_compute_body_transform_for_marker(marker, seat_preserve_current_height), seat_attach_duration_sec, false)
+	await _smooth_attach_to_transform(_compute_body_transform_for_marker(marker, seat_preserve_current_height), seat_attach_duration_sec, false)
+	if serial != _seat_attach_serial or not is_instance_valid(marker) or _actor == null:
+		return
 	_request_body_action(finished_action)
 	_complete_seat_arrival_pending(finished_action, serial, true)
+
+func _run_seat_precise_direct_attach(target_path: NodePath, finished_action: StringName, target_position: Vector3, serial: int) -> void:
+	await get_tree().process_frame
+	if serial != _seat_attach_serial or not _navigating or _actor == null:
+		return
+	var marker := _get_marker_from_path(target_path)
+	var target := _actor.global_transform
+	if marker != null:
+		target = _compute_body_transform_for_marker(marker, seat_preserve_current_height)
+	else:
+		target.origin = target_position
+		target.origin.y = _actor.global_position.y
+	await _smooth_attach_to_transform(target, seat_precise_direct_attach_duration_sec, false)
+	if serial != _seat_attach_serial or _actor == null:
+		return
+	_finish_navigation()
 
 func _complete_seat_arrival_pending(finished_action: StringName, serial: int, emit_finished: bool) -> void:
 	if serial != _seat_attach_serial:
@@ -583,6 +686,7 @@ func _smooth_attach_to_transform(target_transform: Transform3D, duration_sec: fl
 	if serial == _seat_attach_serial and _actor != null:
 		_actor.global_transform = target_transform
 		_actor.velocity = Vector3.ZERO
+	_reset_navigation_agent_to_actor()
 
 func _is_sit_action(action_name: StringName) -> bool:
 	var text := String(action_name).strip_edges().to_lower()
@@ -601,8 +705,11 @@ func _try_start_off_navmesh_recovery() -> bool:
 		return false
 	var offset := closest - _actor.global_position
 	offset.y = 0.0
-	if offset.length() <= _scaled_distance(off_navmesh_max_start_distance):
+	var recovery_distance := offset.length()
+	if recovery_distance <= _scaled_distance(off_navmesh_start_tolerance):
 		return false
+	if off_navmesh_max_start_distance > 0.0 and recovery_distance > _scaled_distance(off_navmesh_max_start_distance):
+		_log("off-navmesh recovery distance %.2f exceeds soft limit %.2f, recovering anyway" % [recovery_distance, _scaled_distance(off_navmesh_max_start_distance)])
 	_off_navmesh_recovering = true
 	_off_navmesh_recovery_target = closest
 	_off_navmesh_resume_left = 0.0
@@ -614,7 +721,7 @@ func _try_start_off_navmesh_recovery() -> bool:
 		_queued_move_action_after_turn = first_move_action
 	else:
 		_set_moving_action(first_move_action)
-	_log("off-navmesh recovery to %s distance=%.2f" % [str(_off_navmesh_recovery_target), offset.length()])
+	_log("off-navmesh recovery to %s distance=%.2f" % [str(_off_navmesh_recovery_target), recovery_distance])
 	return true
 
 func _project_target_to_navigation_map(world_position: Vector3) -> Vector3:
@@ -655,6 +762,7 @@ func _update_off_navmesh_recovery(delta: float) -> bool:
 		_actor.velocity.x = 0.0
 		_actor.velocity.z = 0.0
 		if _navigation_agent != null:
+			_reset_navigation_agent_to_actor()
 			_navigation_agent.target_position = _target_position
 		return true
 	var direction := to_recovery.normalized()
@@ -885,6 +993,14 @@ func _apply_root_motion_transition(delta: float) -> void:
 	var yaw_delta := local_rotation.get_euler().y * root_motion_rotation_scale
 	if absf(yaw_delta) > 0.0001:
 		_actor.rotate_y(yaw_delta)
+
+func _reset_navigation_agent_to_actor() -> void:
+	if _navigation_agent == null or _actor == null:
+		return
+	if not _navigation_agent.is_inside_tree():
+		return
+	_navigation_agent.target_position = _actor.global_position
+	_repath_left = 0.0
 
 func _refresh_refs() -> void:
 	_actor = self

@@ -18,6 +18,8 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var animation_behavior_path: NodePath
 @export var navigation_motor_path: NodePath
 @export var action_executor_path: NodePath
+@export var action_scheduler_path: NodePath
+@export var supply_user_path: NodePath
 @export var dialogue_component_path: NodePath
 @export var face_component_path: NodePath
 @export var actor_path: NodePath
@@ -85,6 +87,8 @@ var _state_component: Node
 var _animation_behavior: Node
 var _navigation_motor: Node
 var _action_executor: Node
+var _action_scheduler: Node
+var _supply_user: Node
 var _dialogue_component: Node
 var _face_component: Node
 var _actor: CharacterBody3D
@@ -219,6 +223,13 @@ func _dispatch_decision(decision: Dictionary) -> bool:
 	return true
 
 func _start_nav_point_navigation(decision: Dictionary) -> bool:
+	if _action_executor != null and _action_executor.has_method("apply_ai_response"):
+		var via_executor := _start_navigation_via_action_executor(decision, false)
+		if via_executor:
+			return true
+		if _decision_requests_seat(decision):
+			autonomous_decision_skipped.emit("seat_requires_semantic_executor")
+			return false
 	var target := String(decision.get("target_nav_point", "")).strip_edges()
 	if not target.is_empty() and _is_target_on_cooldown(target):
 		autonomous_decision_skipped.emit("nav_point_cooldown")
@@ -255,6 +266,13 @@ func _start_nav_point_navigation(decision: Dictionary) -> bool:
 	return true
 
 func _start_object_navigation(decision: Dictionary) -> bool:
+	if _action_executor != null and _action_executor.has_method("apply_ai_response"):
+		var via_executor := _start_navigation_via_action_executor(decision, true)
+		if via_executor:
+			return true
+		if _decision_requests_seat(decision):
+			autonomous_decision_skipped.emit("seat_requires_semantic_executor")
+			return false
 	var target := String(decision.get("target_object", "")).strip_edges()
 	if not target.is_empty() and _is_target_on_cooldown(target):
 		autonomous_decision_skipped.emit("target_cooldown")
@@ -290,6 +308,44 @@ func _start_object_navigation(decision: Dictionary) -> bool:
 	_notify_decision_executed(decision)
 	autonomous_decision_made.emit(decision.duplicate(true))
 	_log("navigate: %s" % str(decision))
+	return true
+
+func _start_navigation_via_action_executor(decision: Dictionary, is_object: bool) -> bool:
+	_refresh_refs()
+	if _action_executor == null or not _action_executor.has_method("apply_ai_response"):
+		return false
+	var intent_name := "go_to_object" if is_object else "go_to_nav_point"
+	var payload := {
+		"command": intent_name,
+		"intent": intent_name,
+		"target_object": String(decision.get("target_object", "")).strip_edges(),
+		"target_nav_point": String(decision.get("target_nav_point", "")).strip_edges(),
+		"target_marker_path": String(decision.get("target_path", "")).strip_edges(),
+		"marker_role": String(decision.get("marker_role", "approach")).strip_edges(),
+		"action": String(decision.get("arrival_action", String(idle_action))).strip_edges(),
+		"expression": String(decision.get("arrival_expression", "")).strip_edges(),
+	}
+	var target_ref := String(decision.get("target_object", decision.get("target_nav_point", ""))).strip_edges()
+	if not target_ref.is_empty() and _is_target_on_cooldown(target_ref):
+		autonomous_decision_skipped.emit("target_cooldown")
+		return false
+	var report_value: Variant = _action_executor.call("apply_ai_response", payload)
+	var report: Dictionary = report_value if report_value is Dictionary else {}
+	if not bool(report.get("navigation_started", false)):
+		return false
+	_navigation_active = false
+	_navigation_decision = {}
+	_arrival_action = &""
+	_movement_cooldown_left = movement_cooldown_sec
+	_apply_resource_delta_for_movement(decision)
+	if not target_ref.is_empty():
+		_target_cooldowns[target_ref] = float(decision.get("cooldown_sec", same_target_cooldown_sec))
+	if String(decision.get("marker_role", "")).to_lower() == sit_marker_role.to_lower():
+		_sit_cooldown_left = sit_cooldown_sec
+	_remember_local_decision(decision)
+	_notify_decision_executed(decision)
+	autonomous_decision_made.emit(decision.duplicate(true))
+	_log("executor navigate: %s" % str(decision))
 	return true
 
 func _update_navigation(delta: float) -> void:
@@ -608,7 +664,7 @@ func _resolve_decision_marker(decision: Dictionary) -> Marker3D:
 	var marker: Marker3D = null
 	if target.has_method("get_marker_for_role"):
 		marker = target.call("get_marker_for_role", role) as Marker3D
-	if marker == null and target.has_method("get_nav_marker"):
+	if marker == null and not _decision_requests_seat(decision) and target.has_method("get_nav_marker"):
 		marker = target.call("get_nav_marker") as Marker3D
 	return marker
 
@@ -734,6 +790,12 @@ func _apply_decision_face_target(decision: Dictionary, delta: float = 1.0) -> bo
 func _is_sit_action(action_name: StringName) -> bool:
 	var text := String(action_name).strip_edges().to_lower()
 	return text in ["sit", "sit_down", "seated_idle", "seated_sleepy", "sittingidle", "sitting_idle"]
+
+func _decision_requests_seat(decision: Dictionary) -> bool:
+	var role := String(decision.get("marker_role", "")).strip_edges().to_lower()
+	if role == sit_marker_role.to_lower() or role == "seat":
+		return true
+	return _is_sit_action(StringName(String(decision.get("arrival_action", decision.get("action", "")))))
 
 func _expression_for_action(action: String) -> String:
 	match action.strip_edges().to_lower():
@@ -923,12 +985,13 @@ func _find_player() -> Node3D:
 
 func _is_external_action_busy() -> bool:
 	_refresh_refs()
-	if _action_executor == null:
-		return false
-	if _action_executor.has_method("is_busy"):
-		return bool(_action_executor.call("is_busy"))
-	if _action_executor.has_method("is_navigating"):
-		return bool(_action_executor.call("is_navigating"))
+	for controller in [_supply_user, _action_scheduler, _action_executor]:
+		if controller == null:
+			continue
+		if controller.has_method("is_busy") and bool(controller.call("is_busy")):
+			return true
+		if controller.has_method("is_navigating") and bool(controller.call("is_navigating")):
+			return true
 	return false
 
 func _is_currently_seated() -> bool:
@@ -1039,6 +1102,8 @@ func _refresh_refs() -> void:
 	_animation_behavior = get_node_or_null(animation_behavior_path) if animation_behavior_path != NodePath() else null
 	_navigation_motor = get_node_or_null(navigation_motor_path) if navigation_motor_path != NodePath() else null
 	_action_executor = get_node_or_null(action_executor_path) if action_executor_path != NodePath() else null
+	_action_scheduler = get_node_or_null(action_scheduler_path) if action_scheduler_path != NodePath() else null
+	_supply_user = get_node_or_null(supply_user_path) if supply_user_path != NodePath() else null
 	_dialogue_component = get_node_or_null(dialogue_component_path) if dialogue_component_path != NodePath() else null
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
 	_actor = get_node_or_null(actor_path) as CharacterBody3D if actor_path != NodePath() else null
@@ -1057,6 +1122,10 @@ func _refresh_refs() -> void:
 		_navigation_motor = _find_sibling_with_method(&"move_to_marker")
 	if _action_executor == null:
 		_action_executor = _find_sibling_with_method(&"apply_ai_response")
+	if _action_scheduler == null:
+		_action_scheduler = _find_sibling_with_method(&"request_sequence")
+	if _supply_user == null:
+		_supply_user = _find_sibling_with_method(&"force_check_now")
 	if _dialogue_component == null:
 		_dialogue_component = _find_sibling_with_method(&"send_player_text")
 	if _face_component == null:

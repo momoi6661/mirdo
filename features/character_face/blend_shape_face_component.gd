@@ -18,7 +18,7 @@ class_name BlendShapeFaceComponent
 @export_range(1.0, 20.0, 0.1) var blink_interval_min: float = 2.6
 @export_range(1.0, 30.0, 0.1) var blink_interval_max: float = 5.2
 @export_range(0.05, 2.0, 0.01) var blink_resume_delay: float = 0.35
-@export var disable_blink_on_joy: bool = false
+@export var disable_blink_on_joy: bool = true
 @export_enum("neutral", "joy", "fun", "angry", "sorrow", "surprised") var inspector_expression: String = "neutral"
 @export var inspector_apply_expression: bool = false:
 	set(value):
@@ -313,7 +313,7 @@ func _stop_blink_now() -> void:
 		_face_animation_tree.set(BLINK_BLEND_PATH, 0.0)
 
 func _should_disable_blink_now() -> bool:
-	return disable_blink_on_joy and _current_expression == &"joy"
+	return disable_blink_on_joy and _normalize_expression_name(_current_expression) == &"joy"
 
 func _set_talk_blend_target(value: float, duration: float) -> void:
 	_talk_blend_from = _talk_blend_value

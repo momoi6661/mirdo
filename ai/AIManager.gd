@@ -1266,10 +1266,16 @@ func _build_provider_from_settings() -> Dictionary:
 		base_url = base_url.substr(0, base_url.length() - 1)
 	var api_key := String(_settings_service.get("api_key")).strip_edges()
 	var model := String(_settings_service.get("model")).strip_edges()
+	var proxy_url := ""
+	if _settings_service.get("proxy_url") != null:
+		proxy_url = String(_settings_service.get("proxy_url")).strip_edges()
 	if base_url.is_empty() or model.is_empty():
 		return {}
-	return {
+	var provider := {
 		"base_url": base_url,
 		"api_key": api_key,
 		"model": model,
 	}
+	if not proxy_url.is_empty():
+		provider["proxy_url"] = proxy_url
+	return provider

@@ -8,8 +8,11 @@ func _init() -> void:
 		"InteractBody",
 		"医疗柜",
 		"res://resources/storage/medical_cabinet_storage.tres",
-		PackedStringArray(["medical", "material"]),
-		"res://resources/items/bandage.tres"
+		PackedStringArray(["medical"]),
+		"res://resources/items/bandage.tres",
+		"res://resources/items/duct_tape.tres",
+		true,
+		true
 	)
 	_check_container(
 		"res://levels/props/weapon_equipment_cabinet_container.tscn",
@@ -17,7 +20,10 @@ func _init() -> void:
 		"武器/装备柜",
 		"res://resources/storage/equipment_rack_storage.tres",
 		PackedStringArray(["tool", "weapon", "special"]),
-		"res://resources/items/knife.tres"
+		"res://resources/items/knife.tres",
+		"res://resources/items/bandage.tres",
+		false,
+		false
 	)
 	if failures.is_empty():
 		print("[PASS] reusable cabinet props")
@@ -27,7 +33,7 @@ func _init() -> void:
 			push_error(failure)
 		quit(1)
 
-func _check_container(scene_path: String, interact_path: String, expected_name: String, storage_path: String, categories: PackedStringArray, accepted_category_item_path: String) -> void:
+func _check_container(scene_path: String, interact_path: String, expected_name: String, storage_path: String, categories: PackedStringArray, accepted_category_item_path: String, rejected_item_path: String, expected_show_player_inventory_panel: bool, expected_allow_incoming_items: bool) -> void:
 	var packed := load(scene_path) as PackedScene
 	if packed == null:
 		failures.append("LOAD_FAILED: " + scene_path)
@@ -43,8 +49,8 @@ func _check_container(scene_path: String, interact_path: String, expected_name: 
 		_expect(String(interact.get("container_name")) == expected_name, scene_path + " name mismatch")
 		_expect(int(interact.get("container_size")) >= 24, scene_path + " should provide expanded cabinet slots")
 		_expect(bool(interact.get("enable_item_stacking")), scene_path + " should enable stacking")
-		_expect(not bool(interact.get("show_player_inventory_panel")), scene_path + " should open cabinet-only panel, not backpack")
-		_expect(not bool(interact.get("allow_incoming_items")), scene_path + " should be read-only and reject player deposits")
+		_expect(bool(interact.get("show_player_inventory_panel")) == expected_show_player_inventory_panel, scene_path + " player inventory panel mode mismatch")
+		_expect(bool(interact.get("allow_incoming_items")) == expected_allow_incoming_items, scene_path + " incoming item mode mismatch")
 		_expect(not bool(interact.get("world_display_enabled")), scene_path + " should not spawn item display models")
 		var storage := interact.get("inventory_storage") as InventoryStorageResource
 		_expect(storage != null, scene_path + " storage missing")
@@ -56,7 +62,11 @@ func _check_container(scene_path: String, interact_path: String, expected_name: 
 		var test_item := load(accepted_category_item_path) as ItemData
 		_expect(test_item != null, scene_path + " missing test item " + accepted_category_item_path)
 		if test_item != null and interact.has_method("can_accept_item"):
-			_expect(not bool(interact.call("can_accept_item", test_item)), scene_path + " must reject deposits even for matching category")
+			_expect(bool(interact.call("can_accept_item", test_item)) == expected_allow_incoming_items, scene_path + " accepted-category deposit mode mismatch")
+		var rejected_item := load(rejected_item_path) as ItemData
+		_expect(rejected_item != null, scene_path + " missing rejected test item " + rejected_item_path)
+		if rejected_item != null and interact.has_method("can_accept_item"):
+			_expect(not bool(interact.call("can_accept_item", rejected_item)), scene_path + " should reject disallowed item deposits")
 	var panel := root.get_node_or_null("ContainerPanel3D")
 	if panel != null:
 		_expect(int(panel.get("slot_columns")) >= 6, scene_path + " panel should show more columns for expanded slots")

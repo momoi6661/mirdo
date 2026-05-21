@@ -137,6 +137,44 @@ func play_action_transition(action: Callable, preset: String = "a", hold_sec: fl
 	_set_progress(0.0)
 	transition_finished.emit()
 
+func change_scene_with_cover(scene_path: String, preset: String = "a", hold_sec: float = -1.0) -> void:
+	var safe_hold: float = default_hold_time if hold_sec < 0.0 else hold_sec
+	_apply_preset(preset)
+	visible = true
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
+	_start_time = Time.get_ticks_msec() / 1000.0
+	_is_transitioning = true
+	_is_covered = false
+
+	_play_animation("cover_in")
+	await animation_player.animation_finished
+	_is_covered = true
+	cover_reached.emit()
+
+	var tree := get_tree()
+	if tree == null:
+		force_release_cover()
+		return
+	var result := tree.change_scene_to_file(scene_path)
+	if result != OK:
+		push_error("TransitionUI scene change failed: %s (%d)" % [scene_path, result])
+		force_release_cover()
+		return
+	await tree.process_frame
+	await tree.process_frame
+
+	if safe_hold > 0.0:
+		await tree.create_timer(safe_hold).timeout
+
+	_play_animation("cover_out")
+	await animation_player.animation_finished
+	_is_transitioning = false
+	_is_covered = false
+	visible = false
+	control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_set_progress(0.0)
+	transition_finished.emit()
+
 func play_scene_transition(
 	action: Callable,
 	preset: String = "a",

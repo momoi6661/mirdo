@@ -14,4 +14,4 @@ health_delta = 12
 outing_category = "medical"
 can_take_outing = true
 can_use = true
-ai_rule_hint = "遭遇擦伤、破窗、攀爬失败等轻伤时可用于降低后果。"
+ai_rule_hint = "遭遇擦伤、破窗、攀爬失败或丧尸近身造成轻伤时可消耗，降低持续流血和后续生命损耗。"

@@ -62,7 +62,7 @@ content_margin_top = 8.0
 content_margin_bottom = 8.0
 
 [node name="AISettingsPanel" type="CanvasLayer"]
-layer = 20
+layer = 96
 process_mode = 3
 script = ExtResource("1_script")
 
@@ -110,15 +110,15 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 64.0
-offset_top = 72.0
+offset_top = 60.0
 offset_right = -56.0
-offset_bottom = -48.0
+offset_bottom = -40.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer"]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 
 [node name="TitleLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -185,6 +185,24 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_field")
 theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
 placeholder_text = "例如 gpt-4.1-mini / qwen3 / local-model"
 
+[node name="ProxyUrlLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.78)
+theme_override_font_sizes/font_size = 20
+text = "Proxy URL"
+
+[node name="ProxyUrlLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_field")
+theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
+placeholder_text = "http://127.0.0.1:7890"
+text = "http://127.0.0.1:7890"
+
 [node name="StatusLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -213,3 +231,4 @@ alignment = 0
 unique_name_in_owner = true
 wait_time = 0.35
 one_shot = true
+

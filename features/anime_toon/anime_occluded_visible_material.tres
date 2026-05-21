@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://features/anime_toon/anime_occluded_visible.gdshader" id="1_occluded"]
+
+[resource]
+render_priority = -2
+shader = ExtResource("1_occluded")
+shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
+shader_parameter/outline_width = 0.006
+shader_parameter/alpha = 0.82
+shader_parameter/pulse_strength = 0.0
+shader_parameter/emission_strength = 0.35
+shader_parameter/depth_offset = -0.001
+shader_parameter/radial_blend = 0.85
+shader_parameter/min_direction_length = 0.002
