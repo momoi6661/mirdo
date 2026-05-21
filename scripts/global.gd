@@ -22,6 +22,7 @@ var _outing_transition_busy: bool = false
 var _outing_entry_snapshot_payload: Dictionary = {}
 var _outing_pending_delta_payload: Dictionary = {}
 var _outing_pending_status_cost: Dictionary = {}
+var _pending_real_outing_return_event: Dictionary = {}
 var _pending_scene_change_path: String = ""
 var _last_scene_change_error: int = OK
 
@@ -34,6 +35,7 @@ signal xiaokong_status_requested(payload: Dictionary)
 signal character_inventory_use_requested(payload: Dictionary)
 signal loot_container_switch_requested(container: Node, player: Node)
 signal shelter_inventory_changed()
+signal player_returned_from_real_outing(payload: Dictionary)
 
 
 func _ready() -> void:
@@ -124,11 +126,12 @@ func notify_shelter_inventory_changed() -> void:
 func build_global_save_payload() -> Dictionary:
 	capture_time_state_from_current_scene()
 	return {
-		"version": 3,
+		"version": 4,
 		"outing_return_scene_path": outing_return_scene_path,
 		"shelter_inventory": _build_shelter_inventory_save_payload(),
 		"outing_map_progress": _build_outing_map_progress_save_payload(),
 		"time_state": _build_time_state_save_payload(),
+		"pending_real_outing_return_event": _pending_real_outing_return_event.duplicate(true),
 	}
 
 
@@ -142,6 +145,8 @@ func apply_global_save_payload(payload: Dictionary) -> void:
 		_apply_outing_map_progress_save_payload(payload["outing_map_progress"])
 	if payload.has("time_state") and payload["time_state"] is Dictionary:
 		_apply_time_state_save_payload(payload["time_state"])
+	if payload.has("pending_real_outing_return_event") and payload["pending_real_outing_return_event"] is Dictionary:
+		_pending_real_outing_return_event = (payload["pending_real_outing_return_event"] as Dictionary).duplicate(true)
 
 
 func apply_runtime_state_to_current_scene() -> void:
@@ -199,6 +204,7 @@ func return_from_outing_map() -> void:
 		if loaded:
 			_apply_outing_delta_after_return()
 			await save_manager.call("save_game")
+			_emit_pending_real_outing_return_deferred()
 			return
 		push_warning("退出外出地图时加载进入前存档失败，将使用场景切换兜底：" + String(save_manager.get("last_error")))
 	var target_path := outing_return_scene_path.strip_edges()
@@ -208,6 +214,7 @@ func return_from_outing_map() -> void:
 	if _last_scene_change_error == OK:
 		_apply_outing_delta_after_return()
 		_save_game_deferred()
+		_emit_pending_real_outing_return_deferred()
 
 
 func _apply_outing_delta_after_return() -> void:
@@ -219,6 +226,52 @@ func _apply_outing_delta_after_return() -> void:
 	outing_return_scene_path = ""
 	_outing_pending_delta_payload.clear()
 	_outing_entry_snapshot_payload.clear()
+
+
+func record_real_outing_completed(payload: Dictionary) -> void:
+	var location_id := String(payload.get("location_id", "")).strip_edges()
+	if location_id.is_empty() or location_id == "bunker":
+		return
+	var minutes := maxi(0, int(payload.get("total_minutes", payload.get("minutes", 0))))
+	if minutes <= 0:
+		return
+	_pending_real_outing_return_event = payload.duplicate(true)
+	_pending_real_outing_return_event["location_id"] = location_id
+	_pending_real_outing_return_event["total_minutes"] = minutes
+	_pending_real_outing_return_event["real_outing"] = true
+	_pending_real_outing_return_event["recorded_unix"] = Time.get_unix_time_from_system()
+	print("[GlobalOuting] real outing completed location=%s minutes=%d loot=%d" % [
+		location_id,
+		minutes,
+		int(_pending_real_outing_return_event.get("loot_added", 0)),
+	])
+
+
+func consume_pending_real_outing_return_event() -> Dictionary:
+	if _pending_real_outing_return_event.is_empty():
+		return {}
+	var payload := _pending_real_outing_return_event.duplicate(true)
+	_pending_real_outing_return_event.clear()
+	return payload
+
+
+func peek_pending_real_outing_return_event() -> Dictionary:
+	return _pending_real_outing_return_event.duplicate(true)
+
+
+func _emit_pending_real_outing_return_deferred() -> void:
+	call_deferred("_emit_pending_real_outing_return")
+
+
+func _emit_pending_real_outing_return() -> void:
+	var payload := consume_pending_real_outing_return_event()
+	if payload.is_empty():
+		return
+	print("[GlobalOuting] emit player_returned_from_real_outing location=%s minutes=%d" % [
+		String(payload.get("location_id", "")),
+		int(payload.get("total_minutes", 0)),
+	])
+	player_returned_from_real_outing.emit(payload)
 
 
 func record_pending_outing_status_cost(hunger_cost: float, thirst_cost: float, health_damage: float, reason: String = "outing_expedition") -> void:

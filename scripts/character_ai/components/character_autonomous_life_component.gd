@@ -14,6 +14,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var perception_component_path: NodePath
 @export var planner_path: NodePath
 @export var mind_state_path: NodePath
+@export var blackboard_path: NodePath
 @export var state_component_path: NodePath
 @export var animation_behavior_path: NodePath
 @export var navigation_motor_path: NodePath
@@ -21,6 +22,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var action_scheduler_path: NodePath
 @export var supply_user_path: NodePath
 @export var dialogue_component_path: NodePath
+@export var subtitle_target_path: NodePath
 @export var face_component_path: NodePath
 @export var actor_path: NodePath
 @export var navigation_agent_path: NodePath
@@ -39,6 +41,11 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(0.5, 90.0, 0.1) var think_interval_max: float = 9.0
 @export_range(0.0, 120.0, 0.1) var startup_delay_sec: float = 3.0
 @export_range(0.0, 120.0, 0.1) var external_grace_sec: float = 8.0
+@export var resume_after_external_grace: bool = true
+@export_range(0.0, 120.0, 0.1) var resume_token_ttl_sec: float = 18.0
+@export_range(0.0, 10.0, 0.1) var resume_grace_extra_delay_sec: float = 0.6
+@export var resumable_kinds: PackedStringArray = PackedStringArray(["ambient", "go_to_object", "go_to_nav_point"])
+@export_range(1, 8, 1) var task_stack_max_size: int = 3
 @export_range(0.0, 120.0, 0.1) var movement_cooldown_sec: float = 6.0
 @export_range(0.0, 300.0, 0.1) var same_target_cooldown_sec: float = 45.0
 @export_range(0.0, 300.0, 0.1) var sit_cooldown_sec: float = 120.0
@@ -83,6 +90,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 var _perception_component: Node
 var _planner: Node
 var _mind_state: Node
+var _blackboard: Node
 var _state_component: Node
 var _animation_behavior: Node
 var _navigation_motor: Node
@@ -90,6 +98,7 @@ var _action_executor: Node
 var _action_scheduler: Node
 var _supply_user: Node
 var _dialogue_component: Node
+var _subtitle_target: Node
 var _face_component: Node
 var _actor: CharacterBody3D
 var _navigation_agent: NavigationAgent3D
@@ -111,6 +120,11 @@ var _self_talk_cooldown_left: float = 0.0
 var _last_decision_kind: String = ""
 var _last_decision_target: String = ""
 var _recent_decision_kinds: Array[String] = []
+var _current_decision: Dictionary = {}
+var _resume_token: Dictionary = {}
+var _resume_token_ttl_left: float = 0.0
+var _resume_after_grace_left: float = 0.0
+var _task_stack: Array[Dictionary] = []
 
 func _ready() -> void:
 	_rng.randomize()
@@ -129,6 +143,8 @@ func _process(delta: float) -> void:
 		return
 	if not enabled or _navigation_active:
 		return
+	if _try_resume_saved_task():
+		return
 	_think_left -= delta
 	if _think_left > 0.0:
 		return
@@ -145,8 +161,12 @@ func _physics_process(delta: float) -> void:
 		return
 	_update_navigation(delta)
 
-func notify_external_control() -> void:
+func notify_external_control(capture_resume: bool = true) -> void:
+	if capture_resume:
+		_capture_resume_token("external_control")
 	_external_grace_left = external_grace_sec
+	_resume_after_grace_left = 0.0
+	_dwell_left = 0.0
 	if _navigation_active:
 		stop_autonomous_navigation(true)
 
@@ -154,7 +174,10 @@ func notify_dialogue_started() -> void:
 	notify_external_control()
 
 func notify_ai_response_applied(_ai_data: Dictionary = {}) -> void:
-	notify_external_control()
+	var hard_command := _is_hard_external_ai_data(_ai_data)
+	if hard_command:
+		_clear_resume_token("external_ai_command")
+	notify_external_control(not hard_command)
 
 func force_think_now() -> bool:
 	return _think(true)
@@ -231,7 +254,8 @@ func _start_nav_point_navigation(decision: Dictionary) -> bool:
 			autonomous_decision_skipped.emit("seat_requires_semantic_executor")
 			return false
 	var target := String(decision.get("target_nav_point", "")).strip_edges()
-	if not target.is_empty() and _is_target_on_cooldown(target):
+	var ignore_cooldown := bool(decision.get("ignore_resume_cooldown", false))
+	if not target.is_empty() and not ignore_cooldown and _is_target_on_cooldown(target):
 		autonomous_decision_skipped.emit("nav_point_cooldown")
 		return false
 	var marker := _resolve_nav_point_marker(decision)
@@ -274,7 +298,8 @@ func _start_object_navigation(decision: Dictionary) -> bool:
 			autonomous_decision_skipped.emit("seat_requires_semantic_executor")
 			return false
 	var target := String(decision.get("target_object", "")).strip_edges()
-	if not target.is_empty() and _is_target_on_cooldown(target):
+	var ignore_cooldown := bool(decision.get("ignore_resume_cooldown", false))
+	if not target.is_empty() and not ignore_cooldown and _is_target_on_cooldown(target):
 		autonomous_decision_skipped.emit("target_cooldown")
 		return false
 	var marker := _resolve_decision_marker(decision)
@@ -326,7 +351,8 @@ func _start_navigation_via_action_executor(decision: Dictionary, is_object: bool
 		"expression": String(decision.get("arrival_expression", "")).strip_edges(),
 	}
 	var target_ref := String(decision.get("target_object", decision.get("target_nav_point", ""))).strip_edges()
-	if not target_ref.is_empty() and _is_target_on_cooldown(target_ref):
+	var ignore_cooldown := bool(decision.get("ignore_resume_cooldown", false))
+	if not target_ref.is_empty() and not ignore_cooldown and _is_target_on_cooldown(target_ref):
 		autonomous_decision_skipped.emit("target_cooldown")
 		return false
 	var report_value: Variant = _action_executor.call("apply_ai_response", payload)
@@ -639,6 +665,7 @@ func _start_dwell(duration: float) -> void:
 	_dwell_left = maxf(_dwell_left, duration)
 
 func _remember_local_decision(decision: Dictionary) -> void:
+	_current_decision = decision.duplicate(true)
 	_last_decision_kind = String(decision.get("kind", ""))
 	_last_decision_target = _decision_target_ref(decision)
 	if not _last_decision_kind.is_empty():
@@ -652,6 +679,169 @@ func _decision_target_ref(decision: Dictionary) -> String:
 		if not text.is_empty():
 			return text
 	return ""
+
+func _capture_resume_token(reason: String = "") -> bool:
+	if not resume_after_external_grace:
+		return false
+	var source := _navigation_decision if not _navigation_decision.is_empty() else _current_decision
+	if source.is_empty():
+		return false
+	if not _is_resumable_decision(source):
+		return false
+	var token := source.duplicate(true)
+	token["resume_reason"] = reason
+	token["ignore_resume_cooldown"] = true
+	_resume_token = token
+	_resume_token_ttl_left = resume_token_ttl_sec
+	_push_task(token, reason)
+	_log("resume captured: %s" % str(_resume_token))
+	return true
+
+func _is_resumable_decision(decision: Dictionary) -> bool:
+	if bool(decision.get("resume_allowed", true)) == false:
+		return false
+	var kind := String(decision.get("kind", "")).strip_edges()
+	if kind.is_empty():
+		return false
+	for value in resumable_kinds:
+		if kind == String(value).strip_edges():
+			return true
+	return false
+
+func _clear_resume_token(reason: String = "") -> void:
+	if debug_log and not _resume_token.is_empty():
+		_log("resume cleared(%s): %s" % [reason, str(_resume_token)])
+	_resume_token = {}
+	_resume_token_ttl_left = 0.0
+	_resume_after_grace_left = 0.0
+	if reason != "consume":
+		_task_stack.clear()
+
+func _try_resume_saved_task() -> bool:
+	if not resume_after_external_grace or (_resume_token.is_empty() and _task_stack.is_empty()):
+		return false
+	if _external_grace_left > 0.0 or _resume_after_grace_left > 0.0:
+		return false
+	if _is_external_action_busy():
+		return false
+	var task := _pop_task()
+	var decision := task.duplicate(true) if not task.is_empty() else _resume_token.duplicate(true)
+	_clear_resume_token("consume")
+	var previous_movement_cooldown := _movement_cooldown_left
+	_movement_cooldown_left = 0.0
+	var ok := _dispatch_decision(decision)
+	if ok:
+		_think_left = maxf(_think_left, post_arrival_think_delay_sec)
+	else:
+		_movement_cooldown_left = previous_movement_cooldown
+	return ok
+
+func _push_task(decision: Dictionary, reason: String = "") -> void:
+	if decision.is_empty():
+		return
+	var target := _decision_target_ref(decision)
+	for i in range(_task_stack.size() - 1, -1, -1):
+		var entry := _task_stack[i]
+		if String(entry.get("kind", "")) == String(decision.get("kind", "")) and _decision_target_ref(entry) == target:
+			_task_stack.remove_at(i)
+	var task := decision.duplicate(true)
+	task["task_reason"] = reason
+	task["ttl_left"] = resume_token_ttl_sec
+	_task_stack.push_back(task)
+	while _task_stack.size() > maxi(1, task_stack_max_size):
+		_task_stack.pop_front()
+
+func _pop_task() -> Dictionary:
+	if _task_stack.is_empty():
+		return {}
+	return _task_stack.pop_back()
+
+func _tick_task_stack(delta: float) -> void:
+	if _task_stack.is_empty():
+		return
+	for i in range(_task_stack.size() - 1, -1, -1):
+		var entry := _task_stack[i]
+		var ttl := float(entry.get("ttl_left", resume_token_ttl_sec)) - delta
+		if ttl <= 0.0:
+			_task_stack.remove_at(i)
+		else:
+			entry["ttl_left"] = ttl
+			_task_stack[i] = entry
+
+func get_task_stack_debug_snapshot() -> Dictionary:
+	var top := _task_stack[_task_stack.size() - 1] if not _task_stack.is_empty() else {}
+	return {
+		"stack_size": _task_stack.size(),
+		"top_kind": String(top.get("kind", "")),
+		"top_target": _decision_target_ref(top),
+		"tasks": _task_stack.duplicate(true),
+	}
+
+func _is_hard_external_ai_data(ai_data: Dictionary) -> bool:
+	if ai_data.is_empty():
+		return false
+	var hard_keys := ["target_object", "target_nav_point", "target_marker_path", "follow", "command", "intent"]
+	for key in hard_keys:
+		var text := String(ai_data.get(key, "")).strip_edges().to_lower()
+		if text.is_empty():
+			continue
+		if key in ["command", "intent"] and text in ["talk", "dialogue", "chat", "speak", "expression", "emote"]:
+			continue
+		return true
+	return false
+
+func get_resume_debug_snapshot() -> Dictionary:
+	return {
+		"has_resume": not _resume_token.is_empty(),
+		"resume_kind": String(_resume_token.get("kind", "")),
+		"resume_target": _decision_target_ref(_resume_token),
+		"resume_ttl_left": _resume_token_ttl_left,
+		"external_grace_left": _external_grace_left,
+		"resume_after_grace_left": _resume_after_grace_left,
+		"current_decision": _current_decision.duplicate(true),
+		"task_stack": get_task_stack_debug_snapshot(),
+	}
+
+func get_current_behavior_snapshot() -> Dictionary:
+	return {
+		"navigating": is_navigating(),
+		"navigation_decision": _navigation_decision.duplicate(true),
+		"current_decision": _current_decision.duplicate(true),
+		"current_kind": String(_current_decision.get("kind", _navigation_decision.get("kind", ""))),
+		"current_target": _decision_target_ref(_current_decision) if not _current_decision.is_empty() else _decision_target_ref(_navigation_decision),
+		"last_kind": _last_decision_kind,
+		"last_target": _last_decision_target,
+		"has_resume": not _resume_token.is_empty(),
+		"resume_kind": String(_resume_token.get("kind", "")),
+		"resume_target": _decision_target_ref(_resume_token),
+		"task_stack_size": _task_stack.size(),
+		"external_grace_left": _external_grace_left,
+		"dwell_left": _dwell_left,
+	}
+
+func get_autonomous_debug_snapshot() -> Dictionary:
+	_refresh_refs()
+	return {
+		"enabled": enabled,
+		"block_reason": _get_block_reason(false),
+		"is_navigating": is_navigating(),
+		"navigation_active": _navigation_active,
+		"navigation_decision": _navigation_decision.duplicate(true),
+		"current_decision": _current_decision.duplicate(true),
+		"last_decision_kind": _last_decision_kind,
+		"last_decision_target": _last_decision_target,
+		"recent_decision_kinds": _recent_decision_kinds.duplicate(),
+		"dwell_left": _dwell_left,
+		"think_left": _think_left,
+		"movement_cooldown_left": _movement_cooldown_left,
+		"sit_cooldown_left": _sit_cooldown_left,
+		"external_grace_left": _external_grace_left,
+		"resume": get_resume_debug_snapshot(),
+		"task_stack": get_task_stack_debug_snapshot(),
+		"target_cooldowns": _target_cooldowns.duplicate(),
+		"resource_snapshot": _get_resource_snapshot(),
+		"mind_snapshot": _get_mind_snapshot(),
+	}
 
 func _resolve_decision_marker(decision: Dictionary) -> Marker3D:
 	var target_ref := String(decision.get("target_object", "")).strip_edges()
@@ -846,8 +1036,6 @@ func _apply_resource_delta(delta: Dictionary, reason: String) -> void:
 func _try_request_self_talk(decision: Dictionary, chance: float) -> bool:
 	if not self_talk_enabled:
 		return false
-	if _dialogue_component == null or not _dialogue_component.has_method("send_player_text"):
-		return false
 	if _self_talk_cooldown_left > 0.0:
 		return false
 	if _rng.randf() > chance:
@@ -855,15 +1043,20 @@ func _try_request_self_talk(decision: Dictionary, chance: float) -> bool:
 	var text := _build_self_talk_prompt(decision)
 	if text.is_empty():
 		return false
-	var result_value: Variant = _dialogue_component.call("send_player_text", text)
+	var result_value: Variant = null
+	if _dialogue_component != null and _dialogue_component.has_method("send_player_text"):
+		result_value = _dialogue_component.call("send_player_text", text)
 	var ok := false
 	if result_value is Dictionary:
 		ok = bool((result_value as Dictionary).get("ok", false))
 	elif result_value is bool:
 		ok = bool(result_value)
+	if not ok:
+		ok = _emit_local_self_talk(decision)
 	if ok:
 		_self_talk_cooldown_left = self_talk_cooldown_sec
-		notify_dialogue_started()
+		if result_value != null:
+			notify_dialogue_started()
 	return ok
 
 func _build_self_talk_prompt(decision: Dictionary) -> String:
@@ -886,6 +1079,53 @@ func _build_self_talk_prompt(decision: Dictionary) -> String:
 		maxi(8, self_talk_max_chars),
 	]
 
+func _emit_local_self_talk(decision: Dictionary) -> bool:
+	var line := _build_local_self_talk_line(decision)
+	if line.is_empty():
+		return false
+	_refresh_refs()
+	if _subtitle_target != null and _subtitle_target.has_method("show_once"):
+		_subtitle_target.call("show_once", line, "Mirdo")
+	else:
+		_log("local_self_talk: %s" % line)
+	var action := String(decision.get("arrival_action", decision.get("action", ""))).strip_edges()
+	if action.is_empty():
+		action = "tilt_head_cute"
+	_request_body_action(StringName(action))
+	var expression := _expression_for_action(action)
+	if expression.is_empty():
+		expression = "face_joy"
+	if _face_component != null and _face_component.has_method("set_face_expression"):
+		_face_component.call("set_face_expression", StringName(expression))
+	return true
+
+func _build_local_self_talk_line(decision: Dictionary) -> String:
+	var kind := String(decision.get("kind", "")).strip_edges()
+	var target := _decision_target_ref(decision)
+	var action := String(decision.get("arrival_action", decision.get("action", ""))).strip_edges()
+	var lowered := ("%s %s %s" % [kind, target, action]).to_lower()
+	var line := "老师，我在看一下周围哦。"
+	if lowered.find("food") >= 0 or target.find("食物") >= 0 or action == "work_count_supplies":
+		line = "老师，食物这边我看一下哦。"
+	elif lowered.find("medical") >= 0 or target.find("医疗") >= 0 or target.find("药") >= 0 or action == "work_check_shelf":
+		line = "老师，药品这边我会留意的。"
+	elif lowered.find("tool") >= 0 or target.find("工具") >= 0 or target.find("装备") >= 0 or action == "work_check_lower":
+		line = "老师，工具这边也检查一下。"
+	elif lowered.find("seat") >= 0 or target.find("床") >= 0 or target.find("椅") >= 0 or action.begins_with("seated"):
+		line = "老师，我先稍微休息一下。"
+	elif kind == "look_at_player" or action in ["tiny_wave", "small_wave", "small_nod"]:
+		line = "老师，我在这里哦。"
+	elif action == "look_around" or kind == "ambient":
+		line = "老师，我再观察一下避难所。"
+	return _truncate_self_talk(line)
+
+func _truncate_self_talk(text: String) -> String:
+	var limit := maxi(8, self_talk_max_chars)
+	var clean := text.strip_edges()
+	if clean.length() <= limit:
+		return clean
+	return clean.substr(0, maxi(1, limit - 1)) + "…"
+
 func _choose_planner_decision(snapshot: Dictionary) -> Dictionary:
 	_refresh_refs()
 	if _planner == null or not _planner.has_method("choose_decision"):
@@ -898,6 +1138,10 @@ func _choose_planner_decision(snapshot: Dictionary) -> Dictionary:
 		"target_cooldowns": _target_cooldowns.duplicate(),
 		"is_seated": _is_currently_seated(),
 	}
+	if _blackboard != null and _blackboard.has_method("build_blackboard_snapshot"):
+		var blackboard_value: Variant = _blackboard.call("build_blackboard_snapshot")
+		if blackboard_value is Dictionary:
+			context["blackboard"] = (blackboard_value as Dictionary).duplicate(true)
 	if snapshot.has("resource_stats"):
 		context["resource_stats"] = snapshot.get("resource_stats", {})
 	if snapshot.has("known_nav_points"):
@@ -1077,7 +1321,17 @@ func _on_motor_navigation_failed(reason: String = "") -> void:
 	autonomous_decision_skipped.emit("navigation_failed:%s" % reason)
 
 func _tick_timers(delta: float) -> void:
+	var had_external_grace := _external_grace_left > 0.0
 	_external_grace_left = maxf(0.0, _external_grace_left - delta)
+	if had_external_grace and _external_grace_left <= 0.0 and not _resume_token.is_empty():
+		_resume_after_grace_left = maxf(_resume_after_grace_left, resume_grace_extra_delay_sec)
+	if _resume_token_ttl_left > 0.0:
+		_resume_token_ttl_left = maxf(0.0, _resume_token_ttl_left - delta)
+		if _resume_token_ttl_left <= 0.0:
+			_clear_resume_token("ttl_expired")
+	if _resume_after_grace_left > 0.0:
+		_resume_after_grace_left = maxf(0.0, _resume_after_grace_left - delta)
+	_tick_task_stack(delta)
 	_movement_cooldown_left = maxf(0.0, _movement_cooldown_left - delta)
 	_sit_cooldown_left = maxf(0.0, _sit_cooldown_left - delta)
 	_self_talk_cooldown_left = maxf(0.0, _self_talk_cooldown_left - delta)
@@ -1098,6 +1352,7 @@ func _refresh_refs() -> void:
 	_perception_component = get_node_or_null(perception_component_path) if perception_component_path != NodePath() else null
 	_planner = get_node_or_null(planner_path) if planner_path != NodePath() else null
 	_mind_state = get_node_or_null(mind_state_path) if mind_state_path != NodePath() else null
+	_blackboard = get_node_or_null(blackboard_path) if blackboard_path != NodePath() else null
 	_state_component = get_node_or_null(state_component_path) if state_component_path != NodePath() else null
 	_animation_behavior = get_node_or_null(animation_behavior_path) if animation_behavior_path != NodePath() else null
 	_navigation_motor = get_node_or_null(navigation_motor_path) if navigation_motor_path != NodePath() else null
@@ -1105,6 +1360,7 @@ func _refresh_refs() -> void:
 	_action_scheduler = get_node_or_null(action_scheduler_path) if action_scheduler_path != NodePath() else null
 	_supply_user = get_node_or_null(supply_user_path) if supply_user_path != NodePath() else null
 	_dialogue_component = get_node_or_null(dialogue_component_path) if dialogue_component_path != NodePath() else null
+	_subtitle_target = get_node_or_null(subtitle_target_path) if subtitle_target_path != NodePath() else null
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
 	_actor = get_node_or_null(actor_path) as CharacterBody3D if actor_path != NodePath() else null
 	_navigation_agent = get_node_or_null(navigation_agent_path) as NavigationAgent3D if navigation_agent_path != NodePath() else null
@@ -1114,6 +1370,8 @@ func _refresh_refs() -> void:
 		_planner = _find_sibling_with_method(&"choose_decision")
 	if _mind_state == null:
 		_mind_state = _find_sibling_with_method(&"get_state_snapshot")
+	if _blackboard == null:
+		_blackboard = _find_sibling_with_method(&"build_blackboard_snapshot")
 	if _state_component == null:
 		_state_component = _find_sibling_with_method(&"get_snapshot")
 	if _animation_behavior == null:
@@ -1128,6 +1386,8 @@ func _refresh_refs() -> void:
 		_supply_user = _find_sibling_with_method(&"force_check_now")
 	if _dialogue_component == null:
 		_dialogue_component = _find_sibling_with_method(&"send_player_text")
+	if _subtitle_target == null:
+		_subtitle_target = _find_sibling_with_method(&"show_once")
 	if _face_component == null:
 		_face_component = _find_sibling_with_method(&"set_face_expression")
 	if _actor == null:

@@ -9,6 +9,12 @@ signal dialogue_failed(error_text: String)
 
 @export var ai_manager_path: NodePath
 @export var perception_component_path: NodePath
+@export var mind_state_path: NodePath
+@export var state_component_path: NodePath
+@export var player_awareness_path: NodePath
+@export var autonomous_life_path: NodePath
+@export var blackboard_path: NodePath
+@export var action_semantics_path: NodePath
 @export var action_executor_path: NodePath
 @export var subtitle_target_path: NodePath
 @export var face_component_path: NodePath
@@ -43,6 +49,12 @@ signal dialogue_failed(error_text: String)
 
 var _ai_manager: AIManager
 var _perception_component: Node
+var _mind_state: Node
+var _state_component: Node
+var _player_awareness: Node
+var _autonomous_life: Node
+var _blackboard: Node
+var _action_semantics: Node
 var _action_executor: Node
 var _subtitle_target: Node
 var _face_component: Node
@@ -100,13 +112,31 @@ func _build_chat_payload(player_text: String, given_item: String) -> Dictionary:
 		"request_source": "godot_runtime",
 		"npc": _build_npc_contract_context(),
 	}
+	var blackboard := _build_blackboard_context()
+	if not blackboard.is_empty():
+		context_data["blackboard"] = blackboard
 	var perception := _build_compact_perception_context()
 	if not perception.is_empty():
 		context_data["perception"] = perception
+	var mind_state := _build_mind_state_context()
+	if not mind_state.is_empty():
+		context_data["mind_state"] = mind_state
+	var resource_stats := _build_resource_stats_context()
+	if not resource_stats.is_empty():
+		context_data["resource_stats"] = resource_stats
+	var player_awareness := _build_player_awareness_context()
+	if not player_awareness.is_empty():
+		context_data["player_awareness"] = player_awareness
+	var current_behavior := _build_current_behavior_context()
+	if not current_behavior.is_empty():
+		context_data["current_behavior"] = current_behavior
 	var nav_points := _build_nav_point_context()
 	if not nav_points.is_empty():
 		context_data["ai_nav_points"] = nav_points
 		context_data["known_nav_points"] = nav_points
+	var action_contract := _build_action_contract_context()
+	if not action_contract.is_empty():
+		context_data["action_contract"] = action_contract
 	if _ai_manager != null and _ai_manager.has_method("build_chat_request"):
 		return _ai_manager.call(
 			"build_chat_request",
@@ -154,6 +184,26 @@ func _build_npc_contract_context() -> Dictionary:
 		"navigation_contract": "ai_nav_points/known_nav_points are Mirdo's remembered global map points with positions and action contract. perception is only current Area3D vision/nearby sensing. If movement is needed, prefer command='go_to_nav_point' or command_payload.intent='go_to_nav_point' with target_nav_point equal to one ai_nav_points.id; choose action from that point's action_options and expression from expression_options.",
 	}
 
+func _build_blackboard_context() -> Dictionary:
+	_refresh_refs()
+	if _blackboard != null and _blackboard.has_method("build_llm_context"):
+		var value: Variant = _blackboard.call("build_llm_context")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	if _blackboard != null and _blackboard.has_method("build_blackboard_snapshot"):
+		var snapshot_value: Variant = _blackboard.call("build_blackboard_snapshot")
+		if snapshot_value is Dictionary:
+			return (snapshot_value as Dictionary).duplicate(true)
+	return {}
+
+func _build_action_contract_context() -> Array:
+	_refresh_refs()
+	if _action_semantics != null and _action_semantics.has_method("build_action_contract"):
+		var value: Variant = _action_semantics.call("build_action_contract", available_body_actions)
+		if value is Array:
+			return value as Array
+	return []
+
 func _build_compact_perception_context() -> Dictionary:
 	var perception := _resolve_perception_component()
 	if perception == null or not perception.has_method("build_perception_snapshot"):
@@ -176,6 +226,46 @@ func _build_compact_perception_context() -> Dictionary:
 	if not visible.is_empty():
 		compact["visible_items"] = visible
 	return compact
+
+func _build_mind_state_context() -> Dictionary:
+	_refresh_refs()
+	if _mind_state != null and _mind_state.has_method("get_state_snapshot"):
+		var value: Variant = _mind_state.call("get_state_snapshot")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	return {}
+
+func _build_resource_stats_context() -> Dictionary:
+	_refresh_refs()
+	if _state_component != null and _state_component.has_method("get_snapshot"):
+		var value: Variant = _state_component.call("get_snapshot")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	if _state_component != null and _state_component.has_method("build_ai_stats"):
+		var stats_value: Variant = _state_component.call("build_ai_stats")
+		if stats_value is Dictionary:
+			return (stats_value as Dictionary).duplicate(true)
+	return {}
+
+func _build_player_awareness_context() -> Dictionary:
+	_refresh_refs()
+	if _player_awareness != null and _player_awareness.has_method("build_player_awareness_snapshot"):
+		var value: Variant = _player_awareness.call("build_player_awareness_snapshot")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	return {}
+
+func _build_current_behavior_context() -> Dictionary:
+	_refresh_refs()
+	if _autonomous_life != null and _autonomous_life.has_method("get_current_behavior_snapshot"):
+		var value: Variant = _autonomous_life.call("get_current_behavior_snapshot")
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	if _autonomous_life != null and _autonomous_life.has_method("get_resume_debug_snapshot"):
+		var resume_value: Variant = _autonomous_life.call("get_resume_debug_snapshot")
+		if resume_value is Dictionary:
+			return (resume_value as Dictionary).duplicate(true)
+	return {}
 
 func _build_nav_point_context() -> Array:
 	var tree := get_tree()
@@ -319,27 +409,155 @@ func _apply_face_only(ai_data: Dictionary) -> void:
 		_face_component.call("play_external_visemes", visemes)
 
 func _emit_local_fallback(reason: String) -> void:
-	var data := {
-		"dialogue": fallback_reply_text,
-		"emotion": "困惑",
-		"expression": "surprised",
-		"action": "listen",
-		"error": reason,
-	}
+	var player_text := String(_last_payload.get("player_text", "")).strip_edges()
+	var given_item := String(_last_payload.get("given_item", "")).strip_edges()
+	var data := _build_local_dialogue_response(player_text, given_item, reason)
 	if auto_apply_ai_response:
 		_apply_ai_response(data)
 	if direct_subtitle_enabled:
-		_show_subtitle(fallback_reply_text)
+		_show_subtitle(String(data.get("dialogue", fallback_reply_text)))
 	dialogue_failed.emit(reason)
 	dialogue_completed.emit({
 		"ok": false,
-		"dialogue": fallback_reply_text,
+		"dialogue": String(data.get("dialogue", fallback_reply_text)),
 		"ai_data": data,
 		"route_summary": {},
 		"request_payload": _last_payload.duplicate(true),
 		"fallback": true,
 		"fallback_reason": reason,
 	})
+
+func _build_local_dialogue_response(player_text: String, given_item: String = "", reason: String = "local_fallback") -> Dictionary:
+	var text := player_text.strip_edges()
+	var lowered := text.to_lower()
+	var dialogue := fallback_reply_text.strip_edges()
+	var expression := "joy"
+	var action := "listen"
+	var command := "talk"
+	var target_hint := ""
+	if dialogue.is_empty():
+		dialogue = "老师，我在听呢。"
+	if not given_item.strip_edges().is_empty():
+		dialogue = "老师，我收到%s啦，我会注意状态的。" % given_item.strip_edges()
+		expression = "joy"
+		action = "small_nod"
+	elif _contains_any(lowered, ["感觉", "状态", "怎么样", "累", "饿", "渴"]):
+		var resource := _build_resource_stats_context()
+		var mind := _build_mind_state_context()
+		var energy := float(resource.get("energy", 70.0))
+		var mood := float(resource.get("mood", 55.0))
+		var tiredness := float(mind.get("tiredness", 0.0))
+		if energy < 35.0 or tiredness > 0.62:
+			dialogue = "老师，我有点累，不过还能继续陪你。"
+			expression = "sorrow"
+			action = "rub_eye"
+		elif mood >= 55.0:
+			dialogue = "老师，我现在状态不错，想再看看避难所。"
+			expression = "joy"
+			action = "small_nod"
+		else:
+			dialogue = "老师，我还好，就是想确认一下补给。"
+			expression = "neutral"
+			action = "tilt_head_cute"
+	elif _contains_any(lowered, ["附近", "周围", "看到", "有什么"]):
+		dialogue = _build_nearby_summary_line()
+		expression = "fun"
+		action = "look_around"
+		command = "inspect_surroundings"
+	elif _contains_any(lowered, ["食物柜", "食品柜", "food", "吃的"]):
+		dialogue = "老师，我去看看食物柜，顺便清点一下。"
+		expression = "joy"
+		action = "work_count_supplies"
+		command = "go_to_nav_point"
+		target_hint = "food_cabinet 食物柜"
+	elif _contains_any(lowered, ["医疗", "药", "medical"]):
+		dialogue = "老师，我去检查医疗柜，药品要留意。"
+		expression = "neutral"
+		action = "work_check_shelf"
+		command = "go_to_nav_point"
+		target_hint = "medical_cabinet 医疗柜"
+	elif _contains_any(lowered, ["工具", "装备", "tool", "设备"]):
+		dialogue = "老师，我去看看工具和装备有没有缺的。"
+		expression = "fun"
+		action = "work_check_lower"
+		command = "go_to_nav_point"
+		target_hint = "tool_cabinet 工具柜"
+	elif _contains_any(lowered, ["接下来", "做什么", "下一步"]):
+		dialogue = "老师，我们先确认食物、水和药品，再决定要不要外出。"
+		expression = "fun"
+		action = "cute_explain"
+		command = "suggest_task"
+	elif _contains_any(lowered, ["跟着", "跟随", "follow"]):
+		dialogue = "好呀老师，我会跟紧一点。"
+		expression = "joy"
+		action = "tiny_wave"
+		command = "follow_player"
+	elif _contains_any(lowered, ["停下", "别动", "等等", "stop"]):
+		dialogue = "嗯，老师，我先停在这里。"
+		expression = "neutral"
+		action = "small_nod"
+		command = "stop"
+	elif _contains_any(lowered, ["你好", "嗨", "hello", "在吗"]):
+		dialogue = "老师，我在哦，有什么想让我做的吗？"
+		expression = "joy"
+		action = "tiny_wave"
+	else:
+		dialogue = "老师，我听到啦。要我检查补给，还是陪你看看周围？"
+		expression = "joy"
+		action = "tilt_head_cute"
+	var data := {
+		"dialogue": _limit_text(dialogue, 42),
+		"emotion": expression,
+		"expression": expression,
+		"action": action,
+		"command": command,
+		"intent": command,
+		"visemes": _simple_visemes_for_text(dialogue),
+		"local_fallback": true,
+		"fallback_reason": reason,
+	}
+	if not target_hint.is_empty():
+		data["target_hint"] = target_hint
+		data["target_nav_point"] = target_hint
+		data["target_object"] = target_hint
+	return data
+
+func _build_nearby_summary_line() -> String:
+	var perception := _build_compact_perception_context()
+	var entries: Array = []
+	for key in ["nearby_objects", "visible_items", "areas"]:
+		var value: Variant = perception.get(key, [])
+		if value is Array:
+			for entry_value in value:
+				if entries.size() >= 3:
+					break
+				if entry_value is Dictionary:
+					var name := String((entry_value as Dictionary).get("name", (entry_value as Dictionary).get("id", ""))).strip_edges()
+					if not name.is_empty() and not entries.has(name):
+						entries.append(name)
+	if entries.is_empty():
+		return "老师，我先环顾一下，附近暂时没有特别明显的东西。"
+	return "老师，我看到%s，可以先检查一下。" % "、".join(entries)
+
+func _contains_any(text: String, needles: Array) -> bool:
+	for needle in needles:
+		if text.find(String(needle).to_lower()) >= 0:
+			return true
+	return false
+
+func _limit_text(text: String, max_chars: int) -> String:
+	var clean := text.strip_edges()
+	if clean.length() <= max_chars:
+		return clean
+	return clean.substr(0, maxi(1, max_chars - 1)) + "…"
+
+func _simple_visemes_for_text(text: String) -> String:
+	var count = clampi(int(ceil(float(maxi(1, text.length())) / 6.0)), 1, 5)
+	var pool := ["aa", "ih", "ou", "E", "oh"]
+	var out: Array[String] = []
+	for i in range(count):
+		out.append(pool[i % pool.size()])
+	return "、".join(out)
 
 func _show_subtitle(text: String) -> void:
 	var subtitle := _resolve_subtitle_target()
@@ -370,6 +588,12 @@ func _extract_error_reason(dialogue_text: String, data: Dictionary) -> String:
 func _refresh_refs() -> void:
 	_ai_manager = get_node_or_null(ai_manager_path) as AIManager if ai_manager_path != NodePath() else null
 	_perception_component = get_node_or_null(perception_component_path) if perception_component_path != NodePath() else null
+	_mind_state = get_node_or_null(mind_state_path) if mind_state_path != NodePath() else null
+	_state_component = get_node_or_null(state_component_path) if state_component_path != NodePath() else null
+	_player_awareness = get_node_or_null(player_awareness_path) if player_awareness_path != NodePath() else null
+	_autonomous_life = get_node_or_null(autonomous_life_path) if autonomous_life_path != NodePath() else null
+	_blackboard = get_node_or_null(blackboard_path) if blackboard_path != NodePath() else null
+	_action_semantics = get_node_or_null(action_semantics_path) if action_semantics_path != NodePath() else null
 	_action_executor = get_node_or_null(action_executor_path) if action_executor_path != NodePath() else null
 	_subtitle_target = get_node_or_null(subtitle_target_path) if subtitle_target_path != NodePath() else null
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
@@ -377,6 +601,18 @@ func _refresh_refs() -> void:
 		_ai_manager = _find_sibling_with_type("AIManager") as AIManager
 	if _perception_component == null:
 		_perception_component = _find_sibling_with_method(&"build_perception_snapshot")
+	if _mind_state == null:
+		_mind_state = _find_sibling_with_method(&"get_state_snapshot")
+	if _state_component == null:
+		_state_component = _find_sibling_with_method(&"get_snapshot")
+	if _player_awareness == null:
+		_player_awareness = _find_sibling_with_method(&"build_player_awareness_snapshot")
+	if _autonomous_life == null:
+		_autonomous_life = _find_sibling_with_method(&"get_current_behavior_snapshot")
+	if _blackboard == null:
+		_blackboard = _find_sibling_with_method(&"build_blackboard_snapshot")
+	if _action_semantics == null:
+		_action_semantics = _find_sibling_with_method(&"get_action_semantics")
 	if _action_executor == null:
 		_action_executor = _find_sibling_with_method(&"apply_ai_response")
 	if _subtitle_target == null:

@@ -1083,6 +1083,7 @@ func _confirm_expedition() -> void:
 		},
 	}
 	_advance_global_time_after_expedition(int(payload["time"].get("total", 0)))
+	_record_real_outing_completed_for_return(rule, payload)
 	var result_story := _build_expedition_story_report(payload)
 	var result_body := _build_expedition_result_report(payload)
 	_loadout.call("clear_all")
@@ -1895,6 +1896,37 @@ func _advance_global_time_after_expedition(total_minutes: int) -> void:
 		return
 	if global_node.has_method("advance_outing_time_minutes"):
 		global_node.call("advance_outing_time_minutes", maxi(0, total_minutes), "outing_map")
+
+
+func _record_real_outing_completed_for_return(rule: Resource, payload: Dictionary) -> void:
+	if rule == null:
+		return
+	var location_id := String(rule.get("location_id")).strip_edges()
+	if location_id.is_empty() or location_id == "bunker":
+		return
+	var total_minutes := int((payload.get("time", {}) as Dictionary).get("total", 0)) if payload.get("time", {}) is Dictionary else 0
+	if total_minutes <= 0:
+		return
+	var deposit := payload.get("deposit", {}) as Dictionary if payload.get("deposit", {}) is Dictionary else {}
+	var commit := payload.get("commit", {}) as Dictionary if payload.get("commit", {}) is Dictionary else {}
+	var status_cost := payload.get("status_cost", {}) as Dictionary if payload.get("status_cost", {}) is Dictionary else {}
+	var global_node := get_node_or_null("/root/Global")
+	if global_node == null or not global_node.has_method("record_real_outing_completed"):
+		return
+	global_node.call("record_real_outing_completed", {
+		"location_id": location_id,
+		"location_name": String(rule.get("display_name")),
+		"total_minutes": total_minutes,
+		"route_minutes": int((payload.get("time", {}) as Dictionary).get("route", 0)) if payload.get("time", {}) is Dictionary else 0,
+		"search_minutes": int((payload.get("time", {}) as Dictionary).get("search", 0)) if payload.get("time", {}) is Dictionary else 0,
+		"loot_added": int(deposit.get("added", 0)),
+		"loot_lost": int(deposit.get("lost", 0)),
+		"carried_count": int(commit.get("committed", 0)),
+		"returned_count": int(commit.get("returned", 0)),
+		"consumed_count": int(commit.get("consumed", 0)),
+		"health_damage": int(status_cost.get("health_damage", 0)),
+		"risk": String(payload.get("risk", "")),
+	})
 
 
 func _format_loot_entries(entries: Array) -> String:

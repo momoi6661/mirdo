@@ -72,6 +72,11 @@ func apply_behavior_feedback(behavior_kind: String, data: Dictionary = {}) -> vo
 		"external_ai", "dialogue":
 			social = _clamp01(social + 0.08)
 			boredom = _clamp01(boredom - 0.10)
+		"real_outing_return_greeting":
+			social = _clamp01(social + 0.12)
+			boredom = _clamp01(boredom - 0.12)
+			curiosity = _clamp01(curiosity + 0.06)
+			caution = _clamp01(caution - 0.04)
 		"fed", "ate", "drink", "treated", "consume_item", "inventory_use":
 			social = _clamp01(social + 0.18)
 			boredom = _clamp01(boredom - 0.18)

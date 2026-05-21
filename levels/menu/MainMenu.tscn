@@ -686,21 +686,21 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 420.0
-offset_top = 96.0
+offset_top = 76.0
 offset_right = -360.0
-offset_bottom = -72.0
+offset_bottom = -56.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Rows" type="VBoxContainer" parent="Root/SettingsPage/SettingsMargin" unique_id=1770324236]
 layout_mode = 2
-theme_override_constants/separation = 9
+theme_override_constants/separation = 7
 
 [node name="SettingsTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1574871966]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.86, 0.86, 0.82, 1)
 theme_override_fonts/font = ExtResource("3_silver")
-theme_override_font_sizes/font_size = 48
+theme_override_font_sizes/font_size = 44
 text = "AI SETTINGS"
 
 [node name="SettingsHint" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1166921640]
@@ -789,6 +789,21 @@ theme_override_styles/normal = SubResource("StyleBox_field")
 theme_override_styles/focus = SubResource("StyleBox_field_focus")
 placeholder_text = "http://127.0.0.1:7890"
 text = "http://127.0.0.1:7890"
+
+
+[node name="TestModelButton" type="Button" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1893305103]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBox_button_normal")
+theme_override_styles/pressed = SubResource("StyleBox_button_pressed")
+theme_override_styles/hover = SubResource("StyleBox_button_hover")
+text = "测试连接"
+alignment = 0
 
 [node name="StatusLabelSettings" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1144319744]
 unique_name_in_owner = true

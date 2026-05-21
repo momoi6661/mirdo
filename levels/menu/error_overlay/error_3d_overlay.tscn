@@ -1,0 +1,41 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://levels/menu/error_overlay/error_3d_overlay.gd" id="1_error_overlay_script"]
+
+[node name="Error3DOverlay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_error_overlay_script")
+
+[node name="Error3DTexture" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Error3DSubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+render_target_update_mode = 4
+
+[node name="Error3DCamera" type="Camera3D" parent="Error3DSubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 8)
+current = true
+fov = 48.0
+
+[node name="Error3DLight" type="DirectionalLight3D" parent="Error3DSubViewport"]
+transform = Transform3D(0.848048, -0.264313, 0.459891, 0, 0.866025, 0.5, -0.52992, -0.424024, 0.734729, 0, 0, 0)
+light_energy = 1.2
+
+[node name="Error3DSpawnTimer" type="Timer" parent="."]
+process_callback = 0
+wait_time = 0.72

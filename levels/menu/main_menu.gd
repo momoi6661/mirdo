@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name MainMenu
 
 const DEFAULT_GAME_SCENE := "res://levels/level_bunker_render.tscn"
+const ERROR_3D_OVERLAY_SCENE := "res://levels/menu/error_overlay/error_3d_overlay.tscn"
 
 @export var new_game_scene_path: String = DEFAULT_GAME_SCENE
 @export var auto_continue_when_save_exists: bool = true
@@ -16,6 +17,7 @@ const DEFAULT_GAME_SCENE := "res://levels/level_bunker_render.tscn"
 @onready var settings_page: Control = %SettingsPage
 @onready var settings_back_button: Button = %BackButton
 @onready var title_group: Control = %TitleGroup
+@onready var title_label: Label = $Root/MainPage/TitleGroup/TitleLabel
 @onready var menu_buttons: VBoxContainer = %MenuButtons
 @onready var menu_highlight: ColorRect = %MenuHighlight
 @onready var loading_overlay: ColorRect = %LoadingOverlay
@@ -31,6 +33,7 @@ const DEFAULT_GAME_SCENE := "res://levels/level_bunker_render.tscn"
 @onready var model_line_edit: LineEdit = %ModelLineEdit
 @onready var api_key_line_edit: LineEdit = %ApiKeyLineEdit
 @onready var proxy_url_line_edit: LineEdit = %ProxyUrlLineEdit
+@onready var test_model_button: Button = %TestModelButton
 @onready var settings_status_label: Label = %StatusLabelSettings
 @onready var auto_save_timer: Timer = %AutoSaveTimer
 @onready var save_slot_menu: SaveSlotMenu = %SaveSlotMenu
@@ -40,15 +43,27 @@ var _busy := false
 var _settings_open := false
 var _page_tween: Tween
 var _title_breath_tween: Tween
+var _title_letters: Array[Label] = []
+var _title_letter_tweens: Array[Tween] = []
 var _background_intro_tween: Tween
 var _main_page_home_position := Vector2.ZERO
 var _settings_page_home_position := Vector2.ZERO
 var _settings_page_offscreen_position := Vector2.ZERO
 var _main_page_settings_position := Vector2.ZERO
 var _is_loading_ai_fields := false
+var _testing_model := false
 var _loading_tween: Tween
 var _menu_hide_tween: Tween
 var _button_tweens: Dictionary = {}
+var _service_warning_layer: Control
+var _service_warning_tween: Tween
+var _service_warning_item_tweens: Array = []
+var _service_warning_spawn_timer: Timer
+var _service_warning_rng := RandomNumberGenerator.new()
+var _error_3d_overlay: Control
+var _service_health_started := false
+var _service_health_attempts := 0
+var _service_health_monitor_timer: Timer
 var _sound_library: Dictionary = {
 	"button_hover": "uid://bcmrth5ffkdj1",
 	"button_click": "uid://b0e7nekr1tt3k",
@@ -66,6 +81,7 @@ func _ready() -> void:
 	_update_continue_state()
 	_play_intro_tween()
 	_play_background_loop()
+	call_deferred("_start_passive_service_health_check")
 	if auto_continue_when_save_exists:
 		call_deferred("_auto_start_or_new_game")
 
@@ -88,6 +104,7 @@ func _connect_buttons() -> void:
 	_connect_button(settings_button, Callable(self, "_on_settings_pressed"))
 	_connect_button(quit_button, Callable(self, "_on_quit_pressed"))
 	_connect_button(settings_back_button, Callable(self, "_on_settings_back_pressed"))
+	_connect_button(test_model_button, Callable(self, "_on_test_model_pressed"))
 	_connect_ai_settings_fields()
 	if save_slot_menu != null and save_slot_menu.has_signal("back_requested") and not save_slot_menu.back_requested.is_connected(_on_progress_panel_back):
 		save_slot_menu.back_requested.connect(_on_progress_panel_back)
@@ -332,6 +349,56 @@ func _flush_ai_settings() -> void:
 	_set_settings_status("已保存大模型配置" if ok else "设置无变化")
 
 
+func _on_test_model_pressed() -> void:
+	if _testing_model:
+		return
+	_flush_ai_settings()
+	var settings := _get_ai_settings()
+	if settings == null or not settings.has_method("test_provider_connection"):
+		_set_settings_status("未找到 AISettings，无法测试")
+		return
+	if settings.has_signal("model_test_finished") and not settings.model_test_finished.is_connected(_on_model_test_finished):
+		settings.model_test_finished.connect(_on_model_test_finished)
+	_testing_model = true
+	if test_model_button != null:
+		test_model_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_model_button.text = "测试中..."
+	_set_settings_status("正在检查服务端与模型…")
+	var override_settings := {
+		"base_url": "" if base_url_line_edit == null else base_url_line_edit.text,
+		"api_key": "" if api_key_line_edit == null else api_key_line_edit.text,
+		"model": "" if model_line_edit == null else model_line_edit.text,
+		"proxy_url": "" if proxy_url_line_edit == null else proxy_url_line_edit.text,
+	}
+	var started := bool(settings.call("test_provider_connection", override_settings))
+	if not started and not bool(settings.call("is_model_test_busy") if settings.has_method("is_model_test_busy") else false):
+		_testing_model = false
+		if test_model_button != null:
+			test_model_button.mouse_filter = Control.MOUSE_FILTER_STOP
+			test_model_button.text = "测试连接"
+
+
+func _on_model_test_finished(result: Dictionary) -> void:
+	_testing_model = false
+	if test_model_button != null:
+		test_model_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		test_model_button.text = "测试连接"
+	var latency_ms := int(result.get("latency_ms", 0))
+	if bool(result.get("ok", false)):
+		_hide_service_warning()
+		var service_latency_ms := int(result.get("service_latency_ms", 0))
+		var model_latency_ms := int(result.get("model_latency_ms", 0))
+		_set_settings_status("服务端可用 · %d ms / 模型可用 · %d ms" % [service_latency_ms, model_latency_ms])
+	else:
+		var error_text := String(result.get("error", "连接失败")).strip_edges()
+		if bool(result.get("service_ok", false)):
+			_hide_service_warning()
+			_set_settings_status("服务端可用 / 模型不可用 · %d ms · %s" % [latency_ms, error_text])
+		else:
+			_show_service_warning("ERROR")
+			_set_settings_status("服务端不可用 · %d ms · %s" % [latency_ms, error_text])
+
+
 func _set_settings_status(text: String) -> void:
 	if settings_status_label != null:
 		settings_status_label.text = text
@@ -339,6 +406,261 @@ func _set_settings_status(text: String) -> void:
 
 func _get_ai_settings() -> Node:
 	return get_tree().root.get_node_or_null("AISettings")
+
+
+func _start_passive_service_health_check() -> void:
+	if _service_health_started:
+		return
+	_service_health_started = true
+	var settings := _get_ai_settings()
+	if settings == null or not settings.has_method("check_service_health"):
+		_show_service_warning("SERVICE OFFLINE")
+		return
+	if settings.has_signal("service_health_checked") and not settings.service_health_checked.is_connected(_on_service_health_checked):
+		settings.service_health_checked.connect(_on_service_health_checked)
+	_request_passive_service_health(settings)
+	_ensure_service_health_monitor()
+
+
+func _ensure_service_health_monitor() -> void:
+	if _service_health_monitor_timer != null and is_instance_valid(_service_health_monitor_timer):
+		return
+	_service_health_monitor_timer = Timer.new()
+	_service_health_monitor_timer.name = "ServiceHealthMonitorTimer"
+	_service_health_monitor_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	_service_health_monitor_timer.wait_time = 1.5
+	_service_health_monitor_timer.one_shot = false
+	add_child(_service_health_monitor_timer)
+	_service_health_monitor_timer.timeout.connect(func() -> void:
+		var settings := _get_ai_settings()
+		if settings == null or not settings.has_method("check_service_health"):
+			_show_service_warning("SERVICE OFFLINE")
+			return
+		if bool(settings.call("is_service_health_check_busy") if settings.has_method("is_service_health_check_busy") else false):
+			return
+		settings.call("check_service_health")
+	)
+	_service_health_monitor_timer.start()
+
+
+func _request_passive_service_health(settings: Node) -> void:
+	if settings == null or not is_instance_valid(settings) or not settings.has_method("check_service_health"):
+		_show_service_warning("SERVICE OFFLINE")
+		return
+	_service_health_attempts += 1
+	var started := bool(settings.call("check_service_health"))
+	if not started and not bool(settings.call("is_service_health_check_busy") if settings.has_method("is_service_health_check_busy") else false):
+		_show_service_warning("SERVICE OFFLINE")
+
+
+func _on_service_health_checked(result: Dictionary) -> void:
+	if bool(result.get("ok", false)):
+		_hide_service_warning()
+	else:
+		if _service_health_attempts < 2:
+			var timer := get_tree().create_timer(0.25, true, false, true)
+			timer.timeout.connect(func() -> void:
+				if not is_inside_tree():
+					return
+				_request_passive_service_health(_get_ai_settings())
+			)
+			return
+		_show_service_warning("ERROR")
+
+
+func _show_service_warning(text: String = "ERROR") -> void:
+	if _service_warning_layer == null or not is_instance_valid(_service_warning_layer):
+		_service_warning_layer = Control.new()
+		_service_warning_layer.name = "ServiceWarningLayer"
+		_service_warning_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_service_warning_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+		if main_page != null and main_page.get_parent() != null:
+			main_page.get_parent().add_child(_service_warning_layer)
+			main_page.get_parent().move_child(_service_warning_layer, 2)
+		else:
+			add_child(_service_warning_layer)
+	_service_warning_layer.visible = true
+	if _service_warning_layer.get_child_count() == 0:
+		_ensure_error_3d_overlay()
+	if _error_3d_overlay != null and _error_3d_overlay.has_method("start_warning"):
+		_error_3d_overlay.call("start_warning")
+	if _service_warning_tween != null and _service_warning_tween.is_valid():
+		_service_warning_tween.kill()
+	_service_warning_layer.position = Vector2.ZERO
+	_service_warning_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_service_warning_tween.tween_property(_service_warning_layer, "modulate:a", 0.88, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _hide_service_warning() -> void:
+	if _service_warning_tween != null and _service_warning_tween.is_valid():
+		_service_warning_tween.kill()
+	if _service_warning_layer == null or not is_instance_valid(_service_warning_layer):
+		return
+	var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(_service_warning_layer, "modulate:a", 0.0, 0.90).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_service_warning_layer, "position:y", -32.0, 0.90).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(func() -> void:
+		if _service_warning_layer != null and is_instance_valid(_service_warning_layer):
+			_service_warning_layer.visible = false
+			_service_warning_layer.position = Vector2.ZERO
+			_stop_service_error_spawn()
+			if _error_3d_overlay != null and _error_3d_overlay.has_method("stop_warning"):
+				_error_3d_overlay.call("stop_warning")
+			_clear_service_warning_item_tweens()
+			for child in _service_warning_layer.get_children():
+				child.queue_free()
+	)
+
+
+func _ensure_error_3d_overlay() -> void:
+	if _service_warning_layer == null:
+		return
+	if _error_3d_overlay != null and is_instance_valid(_error_3d_overlay):
+		return
+	var scene := load(ERROR_3D_OVERLAY_SCENE) as PackedScene
+	if scene == null:
+		return
+	_error_3d_overlay = scene.instantiate() as Control
+	if _error_3d_overlay == null:
+		return
+	_error_3d_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_error_3d_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_service_warning_layer.add_child(_error_3d_overlay)
+
+
+func _build_service_warning_marks(text: String) -> void:
+	if _service_warning_layer == null:
+		return
+	_clear_service_warning_item_tweens()
+	for child in _service_warning_layer.get_children():
+		child.queue_free()
+	_service_warning_rng.randomize()
+	var font := load("res://fonts/Silver.ttf") as Font
+	var marks := _initial_service_error_marks()
+	var viewport_size := get_viewport().get_visible_rect().size
+	var index := 0
+	for mark in marks:
+		var error_item := _create_3d_error_label(font, int(mark["size"]), float(mark["alpha"]))
+		error_item.rotation = float(mark["rot"])
+		error_item.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		error_item.position = viewport_size * (mark["pos"] as Vector2)
+		_service_warning_layer.add_child(error_item)
+		_animate_service_warning_mark(error_item, mark, index)
+		index += 1
+
+
+func _initial_service_error_marks() -> Array:
+	return [
+		{"pos": Vector2(0.08, -0.05), "size": 46, "rot": -0.05, "alpha": 0.36, "drift": Vector2(64, 138), "time": 4.6},
+		{"pos": Vector2(0.34, -0.08), "size": 54, "rot": 0.04, "alpha": 0.38, "drift": Vector2(-42, 150), "time": 5.0},
+		{"pos": Vector2(0.62, -0.04), "size": 50, "rot": 0.03, "alpha": 0.40, "drift": Vector2(50, 142), "time": 4.8},
+		{"pos": Vector2(0.78, 0.12), "size": 44, "rot": -0.04, "alpha": 0.30, "drift": Vector2(-68, 156), "time": 4.7},
+		{"pos": Vector2(0.22, 0.24), "size": 42, "rot": 0.03, "alpha": 0.28, "drift": Vector2(36, 166), "time": 5.2},
+		{"pos": Vector2(0.52, 0.38), "size": 48, "rot": -0.02, "alpha": 0.26, "drift": Vector2(-44, 150), "time": 5.1},
+	]
+
+
+func _create_3d_error_label(font: Font, font_size: int, alpha: float) -> Control:
+	var item := Control.new()
+	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	item.custom_minimum_size = Vector2(180, 60)
+	var layers := [
+		{"offset": Vector2(7, 7), "color": Color(0.24, 0.0, 0.02, alpha * 0.78)},
+		{"offset": Vector2(5, 5), "color": Color(0.38, 0.0, 0.03, alpha * 0.82)},
+		{"offset": Vector2(3, 3), "color": Color(0.60, 0.02, 0.05, alpha * 0.88)},
+		{"offset": Vector2(1, 1), "color": Color(0.88, 0.05, 0.08, alpha)},
+		{"offset": Vector2(0, 0), "color": Color(1.0, 0.20, 0.18, alpha)},
+	]
+	for layer in layers:
+		var label := Label.new()
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.text = "ERROR"
+		label.position = layer["offset"] as Vector2
+		label.modulate = layer["color"] as Color
+		label.add_theme_font_size_override("font_size", font_size)
+		if font != null:
+			label.add_theme_font_override("font", font)
+		item.add_child(label)
+	return item
+
+
+func _animate_service_warning_mark(item: Control, mark: Dictionary, index: int) -> void:
+	var drift := mark["drift"] as Vector2
+	var duration := float(mark["time"])
+	var base_position := item.position
+	var base_rotation := item.rotation
+	var viewport_height := get_viewport().get_visible_rect().size.y
+	var target_position := Vector2(base_position.x + drift.x, viewport_height + 120.0)
+	item.modulate.a = 0.0
+	item.scale = Vector2(0.88, 0.88)
+	var delay := float(index) * 0.18
+	var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(item, "modulate:a", 1.0, 0.85).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(item, "scale", Vector2.ONE, 1.05).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(item, "position", target_position, duration).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(item, "rotation", base_rotation + 0.09, duration).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.chain().tween_property(item, "modulate:a", 0.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.finished.connect(func() -> void:
+		if item != null and is_instance_valid(item):
+			item.queue_free()
+	)
+	_service_warning_item_tweens.append(tween)
+
+
+func _start_service_error_spawn() -> void:
+	if _service_warning_spawn_timer == null or not is_instance_valid(_service_warning_spawn_timer):
+		_service_warning_spawn_timer = Timer.new()
+		_service_warning_spawn_timer.name = "ServiceErrorDustSpawnTimer"
+		_service_warning_spawn_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+		_service_warning_spawn_timer.wait_time = 0.72
+		_service_warning_spawn_timer.one_shot = false
+		add_child(_service_warning_spawn_timer)
+		_service_warning_spawn_timer.timeout.connect(_spawn_service_error_particle)
+	if _service_warning_spawn_timer.is_stopped():
+		_service_warning_spawn_timer.start()
+
+
+func _stop_service_error_spawn() -> void:
+	if _service_warning_spawn_timer != null and is_instance_valid(_service_warning_spawn_timer):
+		_service_warning_spawn_timer.stop()
+
+
+func _spawn_service_error_particle() -> void:
+	if _service_warning_layer == null or not is_instance_valid(_service_warning_layer) or not _service_warning_layer.visible:
+		return
+	if _service_warning_layer.get_child_count() > 12:
+		return
+	var font := load("res://fonts/Silver.ttf") as Font
+	var viewport_size := get_viewport().get_visible_rect().size
+	var size := _service_warning_rng.randi_range(40, 58)
+	var alpha := _service_warning_rng.randf_range(0.24, 0.40)
+	var pos := Vector2(
+		_service_warning_rng.randf_range(0.04, 0.88),
+		_service_warning_rng.randf_range(-0.16, 0.58)
+	)
+	var drift := Vector2(
+		_service_warning_rng.randf_range(-90.0, 90.0),
+		_service_warning_rng.randf_range(105.0, 190.0)
+	)
+	var mark := {
+		"size": size,
+		"alpha": alpha,
+		"rot": _service_warning_rng.randf_range(-0.12, 0.12),
+		"drift": drift,
+		"time": _service_warning_rng.randf_range(4.2, 5.8),
+	}
+	var item := _create_3d_error_label(font, size, alpha)
+	item.rotation = float(mark["rot"])
+	item.position = viewport_size * pos
+	_service_warning_layer.add_child(item)
+	_animate_service_warning_mark(item, mark, 0)
+
+
+func _clear_service_warning_item_tweens() -> void:
+	for tween in _service_warning_item_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_service_warning_item_tweens.clear()
 
 
 func _capture_page_positions() -> void:
@@ -453,15 +775,13 @@ func _play_intro_tween() -> void:
 		_background_intro_tween.tween_property(background, "modulate:a", 1.0, 0.85).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		_background_intro_tween.tween_property(background, "scale", Vector2.ONE, 1.10).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	if title_group != null:
+		_prepare_title_letters()
 		title_group.pivot_offset = title_group.size * 0.5
 		title_group.modulate.a = 0.0
-		title_group.position.x -= 28.0
-		title_group.scale = Vector2(0.88, 0.88)
+		title_group.scale = Vector2.ONE
 		var title_tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		title_tween.tween_property(title_group, "modulate:a", 1.0, 0.70).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		title_tween.tween_property(title_group, "position:x", title_group.position.x + 28.0, 0.78).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		title_tween.tween_property(title_group, "scale", Vector2.ONE, 0.82).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-		title_tween.finished.connect(_start_title_breath)
+		title_tween.tween_property(title_group, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_play_title_letter_intro()
 	if menu_buttons != null:
 		var index := 0
 		for child in menu_buttons.get_children():
@@ -483,12 +803,78 @@ func _start_title_breath() -> void:
 		return
 	if _title_breath_tween != null and _title_breath_tween.is_valid():
 		_title_breath_tween.kill()
-	title_group.pivot_offset = title_group.size * 0.5
 	_title_breath_tween = create_tween().set_loops().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_title_breath_tween.tween_property(title_group, "scale", Vector2(1.035, 1.035), 1.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_title_breath_tween.tween_property(title_group, "modulate:a", 0.86, 1.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_title_breath_tween.chain().tween_property(title_group, "scale", Vector2.ONE, 1.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_title_breath_tween.parallel().tween_property(title_group, "modulate:a", 1.0, 1.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var index := 0
+	for letter in _title_letters:
+		if letter == null or not is_instance_valid(letter):
+			continue
+		var base_y := float(letter.get_meta("base_y", letter.position.y))
+		_title_breath_tween.tween_property(letter, "position:y", base_y - 5.0, 2.2 + float(index) * 0.08).set_delay(float(index) * 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_title_breath_tween.tween_property(letter, "modulate:a", 0.88, 2.2 + float(index) * 0.08).set_delay(float(index) * 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		index += 1
+	_title_breath_tween.chain()
+	index = 0
+	for letter in _title_letters:
+		if letter == null or not is_instance_valid(letter):
+			continue
+		var base_y := float(letter.get_meta("base_y", letter.position.y))
+		_title_breath_tween.tween_property(letter, "position:y", base_y, 2.4 + float(index) * 0.08).set_delay(float(index) * 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_title_breath_tween.tween_property(letter, "modulate:a", 1.0, 2.4 + float(index) * 0.08).set_delay(float(index) * 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		index += 1
+
+
+func _prepare_title_letters() -> void:
+	if title_group == null or title_label == null:
+		return
+	if not _title_letters.is_empty():
+		return
+	var text := title_label.text
+	title_label.visible = false
+	var row := HBoxContainer.new()
+	row.name = "TitleLetters"
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	row.add_theme_constant_override("separation", -10)
+	title_group.add_child(row)
+	title_group.move_child(row, 0)
+	for i in range(text.length()):
+		var letter := Label.new()
+		letter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		letter.text = text.substr(i, 1)
+		letter.modulate = Color(0.88, 0.88, 0.84, 0.0)
+		letter.scale = Vector2(0.52, 0.52)
+		letter.add_theme_font_override("font", load("res://fonts/SmileySans-Oblique.ttf") as Font)
+		letter.add_theme_font_size_override("font_size", 136)
+		row.add_child(letter)
+		_title_letters.append(letter)
+
+
+func _play_title_letter_intro() -> void:
+	_clear_title_letter_tweens()
+	var max_delay := 0.0
+	for i in range(_title_letters.size()):
+		var letter := _title_letters[i]
+		if letter == null or not is_instance_valid(letter):
+			continue
+		letter.pivot_offset = Vector2(42, 72)
+		letter.position.y = 34.0
+		letter.set_meta("base_y", 0.0)
+		var delay := 0.12 + float(i) * 0.085
+		max_delay = delay
+		var tween := create_tween().set_parallel(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		tween.tween_property(letter, "modulate:a", 1.0, 0.20).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(letter, "position:y", 0.0, 0.46).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(letter, "scale", Vector2.ONE, 0.46).set_delay(delay).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_title_letter_tweens.append(tween)
+	var timer := get_tree().create_timer(max_delay + 0.58, true, false, true)
+	timer.timeout.connect(_start_title_breath)
+
+
+func _clear_title_letter_tweens() -> void:
+	for tween in _title_letter_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_title_letter_tweens.clear()
 
 
 func _play_background_loop() -> void:
@@ -705,8 +1091,3 @@ func _play_ui_sound(sound_type: String) -> void:
 
 func _get_save_manager() -> Node:
 	return get_tree().root.get_node_or_null("SaveManager")
-
-
-
-
-

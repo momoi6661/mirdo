@@ -13,12 +13,14 @@ signal back_requested
 @onready var model_line_edit: LineEdit = %ModelLineEdit
 @onready var proxy_url_line_edit: LineEdit = %ProxyUrlLineEdit
 @onready var status_label: Label = %StatusLabel
+@onready var test_model_button: Button = %TestModelButton
 @onready var back_button: Button = %BackButton
 @onready var debounce_timer: Timer = %AutoSaveTimer
 
 var _settings_service: Node = null
 var _is_loading_fields: bool = false
 var _slide_tween: Tween = null
+var _testing_model: bool = false
 
 
 func _ready() -> void:
@@ -99,6 +101,8 @@ func _connect_ui_signals() -> void:
 			line_edit.text_changed.connect(_on_any_field_text_changed)
 	if back_button != null and not back_button.pressed.is_connected(_on_back_pressed):
 		back_button.pressed.connect(_on_back_pressed)
+	if test_model_button != null and not test_model_button.pressed.is_connected(_on_test_model_pressed):
+		test_model_button.pressed.connect(_on_test_model_pressed)
 
 
 func _resolve_settings_service() -> void:
@@ -176,6 +180,53 @@ func _on_settings_saved(_settings: Dictionary) -> void:
 
 func _on_settings_save_failed(error_message: String) -> void:
 	_set_status("保存失败：%s" % error_message)
+
+
+func _on_test_model_pressed() -> void:
+	if _testing_model:
+		return
+	_flush_auto_save()
+	_resolve_settings_service()
+	if _settings_service == null or not _settings_service.has_method("test_provider_connection"):
+		_set_status("未找到 AISettings，无法测试")
+		return
+	if _settings_service.has_signal("model_test_finished") and not _settings_service.model_test_finished.is_connected(_on_model_test_finished):
+		_settings_service.model_test_finished.connect(_on_model_test_finished)
+	_testing_model = true
+	if test_model_button != null:
+		test_model_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		test_model_button.text = "测试中..."
+	_set_status("正在检查服务端与模型…")
+	var override_settings := {
+		"base_url": "" if base_url_line_edit == null else base_url_line_edit.text,
+		"api_key": "" if api_key_line_edit == null else api_key_line_edit.text,
+		"model": "" if model_line_edit == null else model_line_edit.text,
+		"proxy_url": "" if proxy_url_line_edit == null else proxy_url_line_edit.text,
+	}
+	var started := bool(_settings_service.call("test_provider_connection", override_settings))
+	if not started and not bool(_settings_service.call("is_model_test_busy") if _settings_service.has_method("is_model_test_busy") else false):
+		_testing_model = false
+		if test_model_button != null:
+			test_model_button.mouse_filter = Control.MOUSE_FILTER_STOP
+			test_model_button.text = "测试连接"
+
+
+func _on_model_test_finished(result: Dictionary) -> void:
+	_testing_model = false
+	if test_model_button != null:
+		test_model_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		test_model_button.text = "测试连接"
+	var latency_ms := int(result.get("latency_ms", 0))
+	if bool(result.get("ok", false)):
+		var service_latency_ms := int(result.get("service_latency_ms", 0))
+		var model_latency_ms := int(result.get("model_latency_ms", 0))
+		_set_status("服务端可用 · %d ms / 模型可用 · %d ms" % [service_latency_ms, model_latency_ms])
+	else:
+		var error_text := String(result.get("error", "连接失败")).strip_edges()
+		if bool(result.get("service_ok", false)):
+			_set_status("服务端可用 / 模型不可用 · %d ms · %s" % [latency_ms, error_text])
+		else:
+			_set_status("服务端不可用 · %d ms · %s" % [latency_ms, error_text])
 
 
 func _on_back_pressed() -> void:

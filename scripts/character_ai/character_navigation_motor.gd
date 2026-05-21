@@ -68,6 +68,8 @@ signal navigation_failed(reason: String)
 @export_range(0.0, 1.2, 0.01) var turn_state_min_play_time_sec: float = 0.34
 @export_range(0.0, 1.5, 0.01) var turn_state_max_wait_sec: float = 0.72
 @export_range(1.0, 90.0, 1.0) var turn_state_release_angle_degrees: float = 22.0
+@export_range(0.0, 90.0, 1.0) var standalone_turn_release_angle_degrees: float = 18.0
+@export_range(0.0, 2.0, 0.01) var standalone_turn_max_wait_sec: float = 0.95
 @export var turn_left_action: StringName = &"turn_left"
 @export var turn_right_action: StringName = &"turn_right"
 @export var turn_180_action: StringName = &"turn_180"
@@ -118,10 +120,14 @@ var _seat_precise_attach_active: bool = false
 var _turn_wait_left: float = 0.0
 var _turn_wait_elapsed: float = 0.0
 var _queued_move_action_after_turn: StringName = &""
+var _standalone_turn_target_position: Vector3 = Vector3.ZERO
+var _standalone_turn_active: bool = false
+var _standalone_turn_finish_action: StringName = &""
 var _off_navmesh_recovering: bool = false
 var _off_navmesh_recovery_target: Vector3 = Vector3.ZERO
 var _off_navmesh_resume_left: float = 0.0
 var _off_navmesh_recovery_action: StringName = &""
+var _suppress_next_navigation_turn_state: bool = false
 
 func _ready() -> void:
 	_actor = self
@@ -140,6 +146,7 @@ func get_navigation_debug_snapshot() -> Dictionary:
 		"locomotion_velocity_ready": _is_locomotion_velocity_ready(),
 		"locomotion_velocity_gate_active": _locomotion_velocity_gate_active,
 		"pending_turn_action": String(_pending_turn_action),
+		"standalone_turn_active": _standalone_turn_active,
 		"turn_wait_left": _turn_wait_left,
 		"queued_move_action_after_turn": String(_queued_move_action_after_turn),
 		"forced_run": _forced_run,
@@ -147,6 +154,7 @@ func get_navigation_debug_snapshot() -> Dictionary:
 		"off_navmesh_recovery_target": _off_navmesh_recovery_target,
 		"off_navmesh_resume_left": _off_navmesh_resume_left,
 		"off_navmesh_recovery_action": String(_off_navmesh_recovery_action),
+		"suppress_next_navigation_turn_state": _suppress_next_navigation_turn_state,
 		"seat_arrival_pending": _seat_arrival_pending,
 		"target_position": _target_position,
 		"raw_target_position": _raw_target_position,
@@ -213,6 +221,9 @@ func snap_to_marker(marker: Marker3D, preserve_current_height: bool = false) -> 
 func reset_navigation_state() -> void:
 	_reset_navigation_agent_to_actor()
 
+func suppress_next_navigation_turn_state() -> void:
+	_suppress_next_navigation_turn_state = true
+
 func move_to_marker(marker: Marker3D, arrival_action: StringName = &"", run: bool = false) -> bool:
 	if marker == null:
 		navigation_failed.emit("marker_missing")
@@ -237,7 +248,8 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 		return false
 	_raw_target_position = target_position
 	var seat_precise := _seat_precise_navigation_active
-	_target_position = target_position if seat_precise and preserve_raw_target_for_seat_precise else _project_target_to_navigation_map(target_position)
+	var seat_precise_direct_candidate := seat_precise and seat_precise_use_direct_motion and _horizontal_distance(_actor.global_position, target_position) <= seat_precise_direct_max_distance
+	_target_position = target_position if seat_precise and seat_precise_direct_candidate and preserve_raw_target_for_seat_precise else _project_target_to_navigation_map(target_position)
 	_target_path = target_path
 	_arrival_action = arrival_action
 	_follow_active = false
@@ -258,7 +270,7 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_off_navmesh_resume_left = 0.0
 	_off_navmesh_recovery_action = &""
 	_seat_arrival_pending = false
-	_seat_precise_direct_active = seat_precise and seat_precise_use_direct_motion and _horizontal_distance(_actor.global_position, _target_position) <= seat_precise_direct_max_distance
+	_seat_precise_direct_active = seat_precise_direct_candidate
 	_reset_navigation_agent_to_actor()
 	var recovering_from_off_navmesh := false
 	if _navigation_agent != null and not _seat_precise_direct_active:
@@ -276,9 +288,13 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 		_seat_precise_attach_active = true
 		_set_moving_action(first_move_action)
 		call_deferred("_run_seat_precise_direct_attach", _target_path, _arrival_action, _target_position, _seat_attach_serial)
+	elif _suppress_next_navigation_turn_state:
+		_suppress_next_navigation_turn_state = false
+		_set_moving_action(first_move_action)
 	elif _request_turn_state_toward(_target_position):
 		_queued_move_action_after_turn = first_move_action
 	else:
+		_suppress_next_navigation_turn_state = false
 		_set_moving_action(first_move_action)
 	_log("move_to raw=%s projected=%s arrival=%s" % [str(_raw_target_position), str(_target_position), String(arrival_action)])
 	navigation_started.emit(target_path, arrival_action)
@@ -347,12 +363,16 @@ func face_position(target_position: Vector3, delta: float = 1.0) -> void:
 	face_direction(direction, delta)
 
 func request_turn_toward_position(target_position: Vector3) -> bool:
-	return _request_turn_state_toward(target_position)
+	if _navigating or _follow_active:
+		return _request_turn_state_toward(target_position)
+	return _request_standalone_turn_toward(target_position)
 
 func request_turn_toward_direction(direction: Vector3) -> bool:
 	if _actor == null:
 		return false
-	return _request_turn_state_toward(_actor.global_position + direction)
+	if _navigating or _follow_active:
+		return _request_turn_state_toward(_actor.global_position + direction)
+	return _request_standalone_turn_toward(_actor.global_position + direction)
 
 func face_direction(direction: Vector3, delta: float = 1.0) -> void:
 	if not turn_enabled or _actor == null or direction.length() < min_turn_direction_length:
@@ -373,6 +393,11 @@ func _physics_process(delta: float) -> void:
 	if _follow_active:
 		_update_follow_target()
 	if not _navigating:
+		if _update_standalone_turn(delta):
+			_apply_horizontal_velocity(Vector3.ZERO, delta)
+			_apply_gravity(delta)
+			_actor.move_and_slide()
+			return
 		if _should_apply_root_motion_transition(false):
 			_apply_root_motion_transition(delta)
 		return
@@ -595,6 +620,60 @@ func _request_turn_state_toward(target_position: Vector3) -> bool:
 		_turn_wait_left = maxf(turn_state_max_wait_sec, turn_state_min_play_time_sec)
 		_turn_wait_elapsed = 0.0
 	return ok
+
+func _request_standalone_turn_toward(target_position: Vector3, finish_action: StringName = &"") -> bool:
+	if not use_turn_states_before_locomotion or not turn_enabled or _actor == null:
+		return false
+	var desired := target_position - _actor.global_position
+	desired.y = 0.0
+	if desired.length() <= min_turn_direction_length:
+		return false
+	var signed_angle := _signed_flat_angle_to_direction(desired.normalized())
+	var abs_angle := absf(rad_to_deg(signed_angle))
+	if abs_angle < turn_state_min_angle_degrees:
+		face_direction(desired.normalized(), 1.0)
+		return false
+	var action := _turn_state_for_signed_angle(signed_angle)
+	if not _request_body_action(action):
+		return false
+	_pending_turn_action = action
+	_standalone_turn_active = true
+	_standalone_turn_target_position = target_position
+	_standalone_turn_finish_action = finish_action
+	_turn_wait_left = maxf(standalone_turn_max_wait_sec, turn_state_min_play_time_sec)
+	_turn_wait_elapsed = 0.0
+	return true
+
+func _update_standalone_turn(delta: float) -> bool:
+	if not _standalone_turn_active or _actor == null:
+		return false
+	var desired := _standalone_turn_target_position - _actor.global_position
+	desired.y = 0.0
+	if desired.length() <= min_turn_direction_length:
+		_finish_standalone_turn()
+		return false
+	_turn_wait_left = maxf(0.0, _turn_wait_left - delta)
+	_turn_wait_elapsed += delta
+	var remaining_angle := absf(rad_to_deg(_signed_flat_angle_to_direction(desired.normalized())))
+	var release_angle := standalone_turn_release_angle_degrees if standalone_turn_release_angle_degrees > 0.0 else turn_state_release_angle_degrees
+	var can_release_by_angle := _turn_wait_elapsed >= turn_state_min_play_time_sec and remaining_angle <= release_angle
+	var must_release := _turn_wait_left <= 0.0
+	if not can_release_by_angle and not must_release:
+		return true
+	face_direction(desired.normalized(), delta)
+	_finish_standalone_turn()
+	return false
+
+func _finish_standalone_turn() -> void:
+	var finish_action := _standalone_turn_finish_action
+	_standalone_turn_active = false
+	_standalone_turn_target_position = Vector3.ZERO
+	_standalone_turn_finish_action = &""
+	_pending_turn_action = &""
+	_turn_wait_left = 0.0
+	_turn_wait_elapsed = 0.0
+	if finish_action != &"":
+		_request_body_action(finish_action)
 
 func _update_turn_wait(direction: Vector3, delta: float) -> bool:
 	if _pending_turn_action == &"" or _queued_move_action_after_turn == &"":

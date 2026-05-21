@@ -29,10 +29,6 @@ TransitionUI="*res://controllers/ui/transition_screen.tscn"
 AudioManager="*res://scripts/audio/AudioManager.tscn"
 DevtoolRuntime="*res://addons/godot_devtool/runtime_bridge.gd"
 
-[audio]
-
-buses/default_bus_layout="res://default_bus_layout.tres"
-
 [display]
 
 window/size/viewport_width=1920
@@ -49,6 +45,7 @@ folder_colors={
 "res://3DModel/Actions/glb/": "yellow",
 "res://characters/": "teal",
 "res://features/": "green",
+"res://levels/": "purple",
 "res://resources/": "red"
 }
 

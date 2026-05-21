@@ -33,8 +33,11 @@ signal stand_up_finished()
 @export_range(0.0, 2.0, 0.01) var stand_relocate_max_planar_distance: float = 1.25
 @export_range(0.0, 4.0, 0.01) var stand_root_motion_wait_sec: float = 1.15
 @export_range(0.0, 1.0, 0.01) var stand_root_motion_end_margin_sec: float = 0.08
+@export_range(0.0, 4.0, 0.01) var stand_resume_navigation_delay_sec: float = 0.45
+@export_range(0.0, 2.0, 0.01) var stand_ready_max_planar_distance: float = 0.22
 @export var stand_align_after_root_motion: bool = true
-@export var stand_snap_after_root_motion_if_far: bool = false
+@export var stand_preserve_yaw_after_root_motion: bool = true
+@export var stand_snap_after_root_motion_if_far: bool = true
 @export_category("Seat Pose")
 @export var seat_use_root_motion: bool = true
 @export_range(0.0, 1.0, 0.01) var seat_pre_align_duration_sec: float = 0.12
@@ -375,6 +378,9 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	if marker_path == NodePath():
 		return false
 	if auto_stand_before_navigation and _should_stand_before_navigation(arrival_action):
+		_queue_navigation_after_stand(marker_path, arrival_action)
+		return true
+	if not _ensure_seat_exit_completed_before_navigation(arrival_action):
 		_queue_navigation_after_stand(marker_path, arrival_action)
 		return true
 	_seat_alignment_serial += 1
@@ -848,29 +854,45 @@ func _finish_stand_up_after_root_motion(stand_marker_path: NodePath, seat_marker
 	_active_sit_marker_path = NodePath()
 	_active_stand_marker_path = NodePath()
 	_pending_sit_marker_path = NodePath()
-	_stand_transition_active = false
 	_request_body_action(default_idle_action)
 	if _navigation_motor != null and _navigation_motor.has_method("reset_navigation_state"):
 		_navigation_motor.call("reset_navigation_state")
+	if _navigation_motor != null and _navigation_motor.has_method("suppress_next_navigation_turn_state"):
+		_navigation_motor.call("suppress_next_navigation_turn_state")
+	if tree != null and stand_resume_navigation_delay_sec > 0.0:
+		await tree.create_timer(stand_resume_navigation_delay_sec).timeout
+	if serial != _stand_relocate_serial:
+		return
+	_stand_transition_active = false
 	stand_up_finished.emit()
 	_start_queued_navigation_after_stand()
 
 func _relocate_actor_to_stand_marker(stand_marker: Marker3D) -> bool:
 	if stand_marker == null:
 		return false
-	if _navigation_motor != null and _navigation_motor.has_method("align_position_to_marker_async"):
+	if stand_preserve_yaw_after_root_motion and _navigation_motor != null and _navigation_motor.has_method("align_position_to_marker_async"):
 		var ok := bool(await _navigation_motor.call("align_position_to_marker_async", stand_marker, true, stand_relocate_duration_sec))
 		if ok:
+			return true
+	elif not stand_preserve_yaw_after_root_motion and _navigation_motor != null and _navigation_motor.has_method("align_to_marker_async"):
+		var align_ok := bool(await _navigation_motor.call("align_to_marker_async", stand_marker, true, stand_relocate_duration_sec))
+		if align_ok:
 			return true
 	if _actor == null:
 		return false
 	var planar := stand_marker.global_position - _actor.global_position
 	planar.y = 0.0
 	if stand_relocate_max_planar_distance <= 0.0 or planar.length() <= stand_relocate_max_planar_distance:
-		_snap_actor_position_to_marker(stand_marker, true)
+		if stand_preserve_yaw_after_root_motion:
+			_snap_actor_position_to_marker(stand_marker, true)
+		else:
+			_snap_actor_to_marker(stand_marker, true)
 		return true
 	if stand_snap_after_root_motion_if_far:
-		_snap_actor_position_to_marker(stand_marker, true)
+		if stand_preserve_yaw_after_root_motion:
+			_snap_actor_position_to_marker(stand_marker, true)
+		else:
+			_snap_actor_to_marker(stand_marker, true)
 		return true
 	return false
 
@@ -900,6 +922,22 @@ func _start_queued_navigation_after_stand() -> void:
 	if marker_path == NodePath():
 		return
 	call_deferred("_start_navigation_to_marker", marker_path, arrival_action)
+
+func _ensure_seat_exit_completed_before_navigation(arrival_action: StringName) -> bool:
+	if _is_sit_action(arrival_action):
+		return true
+	if _stand_transition_active:
+		return false
+	if _active_sit_marker_path != NodePath():
+		return false
+	if _active_stand_marker_path == NodePath():
+		return true
+	var stand_marker := _get_marker_from_path(String(_active_stand_marker_path))
+	if stand_marker == null or _actor == null:
+		return true
+	var offset := stand_marker.global_position - _actor.global_position
+	offset.y = 0.0
+	return offset.length() <= maxf(0.02, stand_ready_max_planar_distance)
 
 func _resolve_stand_root_motion_wait_time() -> float:
 	var fallback := maxf(stand_root_motion_wait_sec, stand_relocate_delay_sec)

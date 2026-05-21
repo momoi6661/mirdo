@@ -45,6 +45,7 @@ var _tween: Tween
 var _inside_actors: Dictionary = {}
 var _default_collision_layer: int = 1
 var _default_collision_mask: int = 1
+var _pending_save_state: Dictionary = {}
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
@@ -66,9 +67,65 @@ func _runtime_setup() -> void:
 	_resolve_sfx_players()
 	_apply_sfx_volume()
 	_set_door_collision_enabled(true)
+	if not _pending_save_state.is_empty():
+		_apply_save_state(_pending_save_state)
+		_pending_save_state.clear()
 
 func is_open() -> bool:
 	return _is_open
+
+func _get_custom_save_data() -> Dictionary:
+	return {
+		"version": 1,
+		"is_open": _is_open,
+	}
+
+func _load_custom_save_data(data: Dictionary) -> void:
+	if data.is_empty():
+		return
+	if _left_panel == null or _right_panel == null:
+		_pending_save_state = data.duplicate(true)
+		_is_open = bool(data.get("is_open", _is_open))
+		call_deferred("_apply_pending_save_state")
+		return
+	_apply_save_state(data)
+
+func _apply_pending_save_state() -> void:
+	if _pending_save_state.is_empty():
+		return
+	if _left_panel == null or _right_panel == null:
+		return
+	_apply_save_state(_pending_save_state)
+	_pending_save_state.clear()
+
+func _apply_save_state(data: Dictionary) -> void:
+	var should_open := bool(data.get("is_open", false))
+	_apply_open_state_immediate(should_open)
+
+func _apply_open_state_immediate(opening: bool) -> void:
+	if _left_panel == null or _right_panel == null:
+		_is_open = opening
+		return
+	if _tween != null and _tween.is_valid():
+		_tween.kill()
+		_tween = null
+
+	var axis: Vector3 = slide_axis_local.normalized()
+	if axis.length_squared() <= 0.0:
+		axis = Vector3.RIGHT
+	if invert_slide_direction:
+		axis = -axis
+
+	var left_target: Vector3 = _left_closed_position
+	var right_target: Vector3 = _right_closed_position
+	if opening:
+		left_target -= axis * open_distance
+		right_target += axis * open_distance
+
+	_left_panel.position = left_target
+	_right_panel.position = right_target
+	_is_open = opening
+	_set_door_collision_enabled(not opening)
 
 func get_interaction_time() -> float:
 	return 0.0

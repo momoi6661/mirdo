@@ -4,7 +4,7 @@ signal service_starting
 signal service_start_failed(error_message: String)
 signal service_stopped
 
-@export var auto_start_enabled: bool = true
+@export var auto_start_enabled: bool = false
 @export var stop_on_exit: bool = true
 @export var server_host: String = "127.0.0.1"
 @export_range(1, 65535, 1) var server_port: int = 5678

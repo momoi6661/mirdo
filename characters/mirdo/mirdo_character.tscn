@@ -66,12 +66,17 @@
 [ext_resource type="Script" uid="uid://glwxqw3rd7xb" path="res://scripts/character_ai/components/character_autonomous_planner_component.gd" id="66_ai_autonomous_planner"]
 [ext_resource type="Script" uid="uid://coq1pdg006roj" path="res://scripts/character_ai/character_navigation_motor.gd" id="67_navigation_motor"]
 [ext_resource type="Script" uid="uid://cp5pthc836yma" path="res://scripts/character_resources/character_resource_state_component.gd" id="68_resource_state"]
-[ext_resource type="PackedScene" path="res://controllers/interaction/CharacterResourcePanel3D.tscn" id="69_resource_panel"]
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="70_save_comp"]
 [ext_resource type="Script" uid="uid://c47diqj7a287c" path="res://scripts/character_ai/components/character_action_expression_component.gd" id="71_action_expression"]
 [ext_resource type="Script" uid="uid://bgt005wgigo6p" path="res://scripts/character_resources/character_item_consumer_component.gd" id="72_item_consumer"]
 [ext_resource type="Script" path="res://scripts/character_ai/components/character_action_scheduler_component.gd" id="73_action_scheduler"]
 [ext_resource type="Script" path="res://scripts/character_ai/components/character_autonomous_supply_user_component.gd" id="74_supply_user"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_head_look_at_controller.gd" id="75_head_look_controller"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_player_awareness_component.gd" id="76_player_awareness"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_action_semantics_component.gd" id="77_action_semantics"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_ai_blackboard_component.gd" id="78_ai_blackboard"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_situation_behavior_pack_component.gd" id="79_situation_packs"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_return_greeting_component.gd" id="80_return_greeting"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
@@ -1789,13 +1794,8 @@ parameters/BlinkBlend/add_amount = 0.0
 [node name="DialogueAnchor" type="Marker3D" parent="." unique_id=1273321001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
 
-[node name="StatusAnchor" type="Marker3D" parent="." unique_id=1273321011]
-transform = Transform3D(0.9999964, 0, 0, 0, 0.9299085, 0.367943, 0, -0.36817682, 0.9293179, -0.0101983845, 0.61930645, 0.35533264)
-
-[node name="StatusPanel" parent="." unique_id=487579873 instance=ExtResource("69_resource_panel")]
-transform = Transform3D(1, 0, 0, 0, 0.9297765, 0.36812454, 0, -0.36812454, 0.9297765, -0.0101983845, 0.61930645, 0.35533264)
-anchor_mark_path = NodePath("../StatusAnchor")
-state_component_path = NodePath("../Components/StateComponent")
+[node name="HeadLookProxyTarget" type="Marker3D" parent="." unique_id=815896320]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.011, 0.58, 2)
 
 [node name="Components" type="Node" parent="." unique_id=1273321002]
 
@@ -1860,6 +1860,76 @@ check_interval_sec = 5.0
 success_cooldown_sec = 95.0
 failure_cooldown_sec = 28.0
 
+[node name="CharacterHeadLookAtController" type="Node" parent="Components" unique_id=815896321]
+script = ExtResource("75_head_look_controller")
+actor_path = NodePath("../..")
+skeleton_path = NodePath("../../VisualRoot/Model/Armature/GeneralSkeleton")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+dialogue_component_path = NodePath("../AIDialogueComponent")
+proxy_target_path = NodePath("../../HeadLookProxyTarget")
+max_yaw_degrees = 65.0
+max_pitch_up_degrees = 25.0
+max_pitch_down_degrees = 35.0
+default_forward_distance = 2.0
+default_head_height_offset = 0.02
+idle_weight = 0.35
+near_idle_weight = 0.55
+dialogue_weight = 0.85
+moving_weight = 0.15
+work_weight = 0.08
+seated_weight = 0.45
+reaction_weight = 0.65
+weight_blend_speed = 5.0
+target_lerp_speed = 8.0
+editor_preview_enabled = true
+editor_manual_proxy_target = true
+editor_preview_weight = 0.85
+
+
+[node name="CharacterPlayerAwareness" type="Node" parent="Components" unique_id=815896322]
+script = ExtResource("76_player_awareness")
+actor_path = NodePath("../..")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+face_component_path = NodePath("../FaceComponent")
+head_look_controller_path = NodePath("../CharacterHeadLookAtController")
+navigation_motor_path = NodePath("../..")
+mind_state_path = NodePath("../CharacterMindState")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+awareness_radius = 5.0
+near_distance = 3.0
+very_close_distance = 1.2
+target_eye_height = 0.58
+gaze_dot_threshold = 0.92
+gaze_start_hold_sec = 0.85
+gaze_strong_hold_sec = 2.2
+social_reaction_cooldown_sec = 8.0
+close_reaction_cooldown_sec = 10.0
+gaze_reaction_cooldown_sec = 12.0
+near_reaction_chance = 0.35
+gaze_reaction_chance = 0.75
+
+[node name="CharacterReturnGreeting" type="Node" parent="Components" unique_id=1765314904]
+script = ExtResource("80_return_greeting")
+actor_path = NodePath("../..")
+navigation_motor_path = NodePath("../..")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+face_component_path = NodePath("../FaceComponent")
+head_look_controller_path = NodePath("../CharacterHeadLookAtController")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+mind_state_path = NodePath("../CharacterMindState")
+state_component_path = NodePath("../StateComponent")
+subtitle_target_path = NodePath("../WorldSubtitleComponent")
+greet_distance = 1.35
+close_enough_distance = 2.0
+max_greeting_approach_distance = 6.0
+arrival_timeout_sec = 2.8
+wave_action = &"small_wave"
+close_action = &"tiny_wave"
+far_fallback_action = &"small_happy_bounce"
+greeting_expression = &"face_joy"
+speaker_name = "Mirdo"
+debug_log = true
+
 [node name="CharacterActionExpression" type="Node" parent="Components" unique_id=821712066]
 script = ExtResource("71_action_expression")
 animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
@@ -1877,6 +1947,25 @@ max_objects = 16
 
 [node name="CharacterAIIntentInterpreter" type="Node" parent="Components" unique_id=291289046]
 script = ExtResource("59_ai_interpreter")
+
+[node name="CharacterActionSemantics" type="Node" parent="Components" unique_id=1765314901]
+script = ExtResource("77_action_semantics")
+
+[node name="CharacterSituationBehaviorPacks" type="Node" parent="Components" unique_id=1765314903]
+script = ExtResource("79_situation_packs")
+
+[node name="CharacterAIBlackboard" type="Node" parent="Components" unique_id=1765314902]
+script = ExtResource("78_ai_blackboard")
+actor_path = NodePath("../..")
+perception_component_path = NodePath("../CharacterPerception")
+mind_state_path = NodePath("../CharacterMindState")
+state_component_path = NodePath("../StateComponent")
+player_awareness_path = NodePath("../CharacterPlayerAwareness")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+action_semantics_path = NodePath("../CharacterActionSemantics")
+situation_behavior_pack_path = NodePath("../CharacterSituationBehaviorPacks")
+debug_print_enabled = true
+debug_print_interval_sec = 2.0
 
 [node name="CharacterAIActionExecutor" type="Node" parent="Components" unique_id=1694252670]
 script = ExtResource("60_ai_executor")
@@ -1929,6 +2018,8 @@ duty_drift = 0.0015
 [node name="CharacterAutonomousPlanner" type="Node" parent="Components" unique_id=1870238246]
 script = ExtResource("66_ai_autonomous_planner")
 mind_state_path = NodePath("../CharacterMindState")
+blackboard_path = NodePath("../CharacterAIBlackboard")
+action_semantics_path = NodePath("../CharacterActionSemantics")
 state_component_path = NodePath("../StateComponent")
 perception_component_path = NodePath("../CharacterPerception")
 object_distance_penalty = 0.05
@@ -1951,6 +2042,7 @@ script = ExtResource("64_ai_autonomous_life")
 perception_component_path = NodePath("../CharacterPerception")
 planner_path = NodePath("../CharacterAutonomousPlanner")
 mind_state_path = NodePath("../CharacterMindState")
+blackboard_path = NodePath("../CharacterAIBlackboard")
 state_component_path = NodePath("../StateComponent")
 animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
 navigation_motor_path = NodePath("../..")
@@ -1958,6 +2050,7 @@ action_executor_path = NodePath("../CharacterAIActionExecutor")
 action_scheduler_path = NodePath("../CharacterActionScheduler")
 supply_user_path = NodePath("../CharacterAutonomousSupplyUser")
 dialogue_component_path = NodePath("../AIDialogueComponent")
+subtitle_target_path = NodePath("../WorldSubtitleComponent")
 face_component_path = NodePath("../FaceComponent")
 actor_path = NodePath("../..")
 navigation_agent_path = NodePath("../../NavigationAgent3D")
@@ -1994,6 +2087,12 @@ script = ExtResource("55_ai_manager")
 script = ExtResource("56_ai_dialogue")
 ai_manager_path = NodePath("../AIManager")
 perception_component_path = NodePath("../CharacterPerception")
+mind_state_path = NodePath("../CharacterMindState")
+state_component_path = NodePath("../StateComponent")
+player_awareness_path = NodePath("../CharacterPlayerAwareness")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+blackboard_path = NodePath("../CharacterAIBlackboard")
+action_semantics_path = NodePath("../CharacterActionSemantics")
 action_executor_path = NodePath("../CharacterAIActionExecutor")
 subtitle_target_path = NodePath("../WorldSubtitleComponent")
 face_component_path = NodePath("../FaceComponent")
@@ -2003,8 +2102,8 @@ response_contract_prompt = "回复 JSON：dialogue 是要说的话；expression 
 available_body_actions = PackedStringArray("idle_normal", "idle_relaxed", "idle_sleepy", "idle_alert", "idle_fidget", "listen", "happy_bounce", "walk", "run", "seated_idle", "seated_sleepy", "work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies", "work_reach", "work_take_item", "work_place_item", "work_drink", "work_explain", "react_nod", "react_wave", "tiny_wave", "rub_eye", "sleepy_yawn", "cute_startle", "curious_peek", "tilt_head_cute", "look_back", "look_around", "turn_left", "turn_right", "turn_180")
 available_expressions = PackedStringArray("neutral", "joy", "fun", "angry", "sorrow", "surprised", "disappointed")
 available_visemes = PackedStringArray("aa", "ih", "ou", "E", "oh")
+fallback_reply_text = "老师，我在听呢。"
 
 [connection signal="face_talk_requested" from="Components/WorldSubtitleComponent" to="Components/FaceComponent" method="set_face_talk_enabled"]
 
 [editable path="VisualRoot/Model"]
-
