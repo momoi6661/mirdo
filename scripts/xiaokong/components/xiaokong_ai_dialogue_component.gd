@@ -21,8 +21,9 @@ signal model_probe_failed(error_text: String)
 @export var use_local_fallback_on_error: bool = true
 @export var fallback_reply_text: String = "信号不稳定，我们先留在避难所，稳住状态再行动。"
 @export_range(-20.0, 20.0, 0.5) var fallback_mood_delta: float = 1.0
-@export var session_id: String = "default_session"
+@export var session_id: String = "current_save_slot"
 @export var save_slot_name: String = ""
+@export var use_save_scoped_session_id: bool = true
 @export_category("NPC Contract")
 @export var npc_display_name: String = "小空"
 @export_multiline var npc_role_prompt: String = "末日避难所便利站的少女 NPC，谨慎、温和、可靠，会把玩家称为老师。"
@@ -128,10 +129,14 @@ func send_subtitle_test(test_text: String = "Subtitle debug test") -> Dictionary
 		_log("send_subtitle_test rejected: ai_busy")
 		return {"ok": false, "error": "ai_busy"}
 
-	var clean_session_id := session_id.strip_edges()
-	if clean_session_id.is_empty():
-		clean_session_id = "default_session"
+	var save_slot := _resolve_save_slot_name()
+	var clean_session_id := _resolve_effective_session_id(save_slot)
 	session_id = clean_session_id
+
+	var subtitle_context := _build_ai_checkpoint_context(save_slot, clean_session_id)
+	subtitle_context["debug_subtitle_test"] = true
+	subtitle_context["debug_transparent"] = transparent_request_debug
+	subtitle_context["request_source"] = "godot_debug_subtitle_test"
 
 	var payload := {
 		"day": 1,
@@ -146,13 +151,7 @@ func send_subtitle_test(test_text: String = "Subtitle debug test") -> Dictionary
 		},
 		"player_text": text,
 		"given_item": "",
-		"context": {
-			"session_id": clean_session_id,
-			"save_slot": _resolve_save_slot_name(),
-			"debug_subtitle_test": true,
-			"debug_transparent": transparent_request_debug,
-			"request_source": "godot_debug_subtitle_test",
-		},
+		"context": subtitle_context,
 	}
 
 	_last_payload = payload.duplicate(true)
@@ -194,7 +193,7 @@ func clear_local_dialogue_tracking(reset_session_id: bool = false) -> void:
 	_tracking_session_id = ""
 	_skip_external_emit_once = bootstrap_skip_existing_external_reply
 	if reset_session_id:
-		session_id = "default_session"
+		session_id = "current_save_slot"
 		external_poll_session_id = ""
 
 func pull_external_history_once(limit: int = -1) -> bool:
@@ -239,18 +238,14 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 	if _state_component != null:
 		stats = _state_component.build_ai_stats()
 
-	var clean_session_id := session_id.strip_edges()
-	if clean_session_id.is_empty():
-		clean_session_id = "default_session"
+	var save_slot := _resolve_save_slot_name()
+	var clean_session_id := _resolve_effective_session_id(save_slot)
 	session_id = clean_session_id
 
-	var context_data := {
-		"session_id": clean_session_id,
-		"save_slot": _resolve_save_slot_name(),
-		"debug_transparent": transparent_request_debug,
-		"request_source": "godot_runtime",
-		"npc": _build_npc_contract_context(),
-	}
+	var context_data := _build_ai_checkpoint_context(save_slot, clean_session_id)
+	context_data["debug_transparent"] = transparent_request_debug
+	context_data["request_source"] = "godot_runtime"
+	context_data["npc"] = _build_npc_contract_context()
 	var perception_snapshot: Dictionary = _build_compact_perception_context()
 	if not perception_snapshot.is_empty():
 		context_data["perception"] = perception_snapshot
@@ -277,6 +272,31 @@ func _build_dialogue_payload(player_text: String, given_item: String) -> Diction
 		"given_item": given_item.strip_edges(),
 		"context": context_data,
 	}
+
+
+func _build_ai_checkpoint_context(save_slot: String, clean_session_id: String) -> Dictionary:
+	var context := {
+		"session_id": clean_session_id,
+		"save_slot": save_slot,
+	}
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("build_ai_checkpoint_context"):
+		var checkpoint = save_manager.call("build_ai_checkpoint_context")
+		if checkpoint is Dictionary:
+			for key in (checkpoint as Dictionary).keys():
+				context[key] = checkpoint[key]
+	context["session_id"] = clean_session_id
+	return context
+
+
+func _record_ai_progress_from_response(final_data: Dictionary) -> void:
+	var timeline := String(final_data.get("session_id", session_id)).strip_edges()
+	var turn_id := int(final_data.get("turn_id", 0))
+	if timeline.is_empty() or turn_id <= 0:
+		return
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("record_ai_progress"):
+		save_manager.call("record_ai_progress", timeline, turn_id)
 
 func _build_npc_contract_context() -> Dictionary:
 	var npc := {
@@ -417,6 +437,7 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 	_request_in_flight = false
 	_reset_stream_sync_state()
 	_log("ai_completed keys=%s" % str(final_data.keys()))
+	_record_ai_progress_from_response(final_data)
 	var turn_id := int(final_data.get("turn_id", 0))
 	if turn_id > _last_seen_turn_id:
 		_last_seen_turn_id = turn_id
@@ -681,6 +702,41 @@ func _resolve_save_slot_name() -> String:
 	return "manual_save"
 
 
+func _resolve_effective_session_id(save_slot: String = "") -> String:
+	var clean := session_id.strip_edges()
+	var slot := save_slot.strip_edges()
+	if slot.is_empty():
+		slot = _resolve_save_slot_name()
+	if use_save_scoped_session_id and (clean.is_empty() or clean == "default_session" or clean == "xiaokong_session" or clean == "mirdo_session" or clean == "current_save_slot"):
+		return _build_save_scoped_session_id(slot)
+	if clean.is_empty():
+		return "default_session"
+	return clean
+
+
+func _build_save_scoped_session_id(save_slot: String) -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_ai_timeline_id"):
+		var timeline := String(save_manager.call("get_current_ai_timeline_id")).strip_edges()
+		if not timeline.is_empty():
+			return timeline
+	var slot := _sanitize_session_part(save_slot)
+	if slot.is_empty():
+		slot = "manual_save"
+	return "mirdo:%s" % slot
+
+
+func _sanitize_session_part(value: String) -> String:
+	var clean := value.strip_edges()
+	if clean.is_empty():
+		return ""
+	for ch in [" ", "\t", "\n", "\r", "/", "\\", ":", "?", "#", "&", "="]:
+		clean = clean.replace(ch, "_")
+	while clean.find("__") >= 0:
+		clean = clean.replace("__", "_")
+	return clean.trim_prefix("_").trim_suffix("_")
+
+
 func _extract_dialogue(data: Dictionary) -> String:
 	for key in ["dialogue", "reply", "text", "message", "summary"]:
 		var value = String(data.get(key, "")).strip_edges()
@@ -852,7 +908,13 @@ func _resolve_external_poll_session_id() -> String:
 	if sid.is_empty():
 		sid = session_id.strip_edges()
 	if sid.is_empty():
-		sid = "default_session"
+		sid = "current_save_slot"
+	if sid == "current_save_slot" or sid == "default_session" or sid == "xiaokong_session" or sid == "mirdo_session":
+		var previous := session_id
+		session_id = sid
+		var resolved := _resolve_effective_session_id(_resolve_save_slot_name())
+		session_id = previous
+		return resolved
 	return sid
 
 func _ensure_tracking_session(clean_session_id: String) -> void:

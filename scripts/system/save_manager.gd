@@ -25,6 +25,8 @@ var last_error: String = ""
 var current_slot_name: String = DEFAULT_SLOT
 var last_loaded_slot_name: String = ""
 var autosave_enabled: bool = true
+var current_ai_timeline_id: String = ""
+var current_ai_turn_id: int = 0
 
 var _autosave_timer: Timer
 
@@ -61,7 +63,11 @@ func get_save_path(slot_name: String = "") -> String:
 
 
 func set_current_slot(slot_name: String) -> void:
+	var previous_slot := _sanitize_slot_name(current_slot_name)
 	current_slot_name = _sanitize_slot_name(slot_name)
+	if current_slot_name != previous_slot:
+		current_ai_timeline_id = ""
+		current_ai_turn_id = 0
 	_save_profile()
 
 
@@ -72,6 +78,28 @@ func get_current_slot() -> String:
 func get_last_loaded_slot() -> String:
 	return _resolve_load_slot_name(last_loaded_slot_name)
 
+
+
+func get_current_ai_timeline_id() -> String:
+	return _ensure_current_ai_timeline_id()
+
+
+func get_current_ai_turn_id() -> int:
+	return maxi(0, int(current_ai_turn_id))
+
+
+func record_ai_progress(timeline_id: String, turn_id: int) -> void:
+	var clean_timeline := String(timeline_id).strip_edges()
+	if not clean_timeline.is_empty():
+		current_ai_timeline_id = clean_timeline
+	current_ai_turn_id = maxi(get_current_ai_turn_id(), int(turn_id))
+
+
+func build_ai_checkpoint_context() -> Dictionary:
+	return {
+		"ai_timeline_id": get_current_ai_timeline_id(),
+		"ai_checkpoint_turn_id": get_current_ai_turn_id(),
+	}
 
 func save_current_game() -> bool:
 	return save_game()
@@ -105,6 +133,8 @@ func start_or_load_game(new_game_scene_path: String = "") -> bool:
 func start_new_game(new_game_scene_path: String = "") -> bool:
 	var use_external_cover := bool(get_meta(EXTERNAL_LOAD_COVER_META, false))
 	_start_new_game_runtime()
+	current_ai_timeline_id = _generate_ai_timeline_id(_resolve_slot_name(current_slot_name))
+	current_ai_turn_id = 0
 	var target_scene := new_game_scene_path.strip_edges()
 	if target_scene.is_empty():
 		target_scene = "res://levels/level_bunker_render.tscn"
@@ -219,6 +249,7 @@ func save_game(slot_name: String = "") -> bool:
 	current_slot_name = resolved_slot
 	save_started.emit(resolved_slot)
 
+	_ensure_current_ai_timeline_id()
 	var save_game := _build_save_game(resolved_slot)
 	var file_path := get_save_path(resolved_slot)
 	var result := ResourceSaver.save(save_game, file_path)
@@ -271,6 +302,7 @@ func load_game(slot_name: String = "") -> bool:
 
 	save_game.normalize()
 	session_destroyed_objects = _string_array_from(save_game.destroyed_objects)
+	_restore_ai_timeline_from_save(save_game)
 	_apply_global_payload(save_game.global_data)
 
 	var scene_loaded := await _change_to_saved_scene(save_game.current_level_path)
@@ -330,12 +362,16 @@ func _build_save_game(slot_name: String) -> SaveGame:
 	save_game.last_saved_time = Time.get_datetime_string_from_system()
 	save_game.current_level_path = _get_current_scene_path()
 	save_game.destroyed_objects = session_destroyed_objects.duplicate()
+	save_game.set("ai_timeline_id", current_ai_timeline_id)
+	save_game.set("ai_turn_id", get_current_ai_turn_id())
 	save_game.global_data = _collect_global_payload()
 	save_game.metadata = {
 		"unix_time": Time.get_unix_time_from_system(),
 		"display_time": _format_display_datetime_from_system(),
 		"scene_name": save_game.current_level_path.get_file().get_basename(),
 		"savable_count": 0,
+		"ai_timeline_id": current_ai_timeline_id,
+		"ai_turn_id": get_current_ai_turn_id(),
 	}
 
 	var world_data: Array[Dictionary] = []
@@ -747,6 +783,52 @@ func _resolve_load_slot_name(slot_name: String = "") -> String:
 		return newest_slot
 	return _resolve_slot_name(current_slot_name)
 
+
+
+func _restore_ai_timeline_from_save(save_game: SaveGame) -> void:
+	var metadata: Dictionary = save_game.metadata if save_game.metadata is Dictionary else {}
+	var timeline := String(save_game.get("ai_timeline_id")).strip_edges()
+	if timeline.is_empty():
+		timeline = String(metadata.get("ai_timeline_id", "")).strip_edges()
+	if timeline.is_empty():
+		timeline = _generate_ai_timeline_id(save_game.slot_name)
+	current_ai_timeline_id = timeline
+	var turn_id := int(save_game.get("ai_turn_id"))
+	if turn_id <= 0:
+		turn_id = int(metadata.get("ai_turn_id", 0))
+	current_ai_turn_id = maxi(0, turn_id)
+
+
+func _ensure_current_ai_timeline_id() -> String:
+	var clean := current_ai_timeline_id.strip_edges()
+	if clean.is_empty():
+		clean = _generate_ai_timeline_id(_resolve_slot_name(current_slot_name))
+		current_ai_timeline_id = clean
+	return clean
+
+
+func _generate_ai_timeline_id(slot_name: String) -> String:
+	var slot := _sanitize_session_part(_resolve_slot_name(slot_name))
+	if slot.is_empty():
+		slot = DEFAULT_SLOT
+	return "mirdo:%s:timeline_%s" % [slot, _new_short_id()]
+
+
+func _new_short_id() -> String:
+	var ticks := Time.get_ticks_usec()
+	var random_value := randi() & 0xFFFFF
+	return "%x%x" % [ticks, random_value]
+
+
+func _sanitize_session_part(value: String) -> String:
+	var clean := value.strip_edges()
+	if clean.is_empty():
+		return ""
+	for ch in [" ", "\t", "\n", "\r", "/", "\\", ":", "?", "#", "&", "="]:
+		clean = clean.replace(ch, "_")
+	while clean.find("__") >= 0:
+		clean = clean.replace("__", "_")
+	return clean.trim_prefix("_").trim_suffix("_")
 
 func _string_array_from(values: Array) -> Array[String]:
 	var result: Array[String] = []

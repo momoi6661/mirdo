@@ -13,20 +13,22 @@
 [ext_resource type="Animation" path="res://features/character_face/animations/viseme_ou.tres" id="11_ou"]
 [ext_resource type="Animation" path="res://features/character_face/animations/viseme_E.tres" id="12_E"]
 [ext_resource type="Animation" path="res://features/character_face/animations/viseme_oh.tres" id="13_oh"]
+[ext_resource type="Animation" path="res://features/character_face/animations/viseme_closed.tres" id="14_closed"]
 
 [resource]
 _data = {
-&"face_neutral": ExtResource("1_neutral"),
-&"face_joy": ExtResource("2_joy"),
-&"face_fun": ExtResource("3_fun"),
 &"face_angry": ExtResource("4_angry"),
+&"face_blink": ExtResource("7_blink"),
+&"face_fun": ExtResource("3_fun"),
+&"face_joy": ExtResource("2_joy"),
+&"face_neutral": ExtResource("1_neutral"),
 &"face_sorrow": ExtResource("5_sorrow"),
 &"face_surprised": ExtResource("6_surprised"),
-&"face_blink": ExtResource("7_blink"),
 &"face_talk_loop": ExtResource("8_talk"),
-&"viseme_aa": ExtResource("9_aa"),
-&"viseme_ih": ExtResource("10_ih"),
-&"viseme_ou": ExtResource("11_ou"),
 &"viseme_E": ExtResource("12_E"),
-&"viseme_oh": ExtResource("13_oh")
+&"viseme_aa": ExtResource("9_aa"),
+&"viseme_closed": ExtResource("14_closed"),
+&"viseme_ih": ExtResource("10_ih"),
+&"viseme_oh": ExtResource("13_oh"),
+&"viseme_ou": ExtResource("11_ou")
 }

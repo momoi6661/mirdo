@@ -39,12 +39,21 @@ const OPTION_ID_EAT := "eat"
 	"可以去看看食物柜吗？",
 	"先跟着我走。",
 ])
+@export_range(0.5, 30.0, 0.1) var focus_external_control_hold_sec: float = 2.5
+@export_range(2.0, 120.0, 0.5) var dialogue_external_control_hold_sec: float = 45.0
 
 var _global_node: Node
+var _focused_character_root: Node
 
 func _ready() -> void:
 	add_to_group(&"character_interactable")
 	_global_node = get_node_or_null(GLOBAL_PATH)
+	set_process(true)
+
+func _process(_delta: float) -> void:
+	if _focused_character_root == null or not is_instance_valid(_focused_character_root):
+		return
+	_refresh_external_control_hold(_focused_character_root, focus_external_control_hold_sec, false)
 
 func get_world_panel_title() -> String:
 	return panel_title
@@ -84,6 +93,17 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 
 func should_clear_world_panel_after_execute(option_id: String) -> bool:
 	return option_id in [OPTION_ID_DIALOGUE, OPTION_ID_VIEW_STATUS, OPTION_ID_USE_ITEM]
+
+func on_world_panel_focus_enter(_helper: Node = null, _context: Dictionary = {}) -> void:
+	var character_root := _resolve_character_root()
+	if character_root == null:
+		return
+	_focused_character_root = character_root
+	_refresh_external_control_hold(character_root, focus_external_control_hold_sec, false)
+	_request_character_head_look_at_player(character_root)
+
+func on_world_panel_focus_exit(_helper: Node = null, _context: Dictionary = {}) -> void:
+	_focused_character_root = null
 
 func _append_option(model: WorldInteractionPanelModel, option_id: String, label: String) -> void:
 	var clean_label := label.strip_edges()
@@ -128,17 +148,39 @@ func _notify_character_fed(character_root: Node) -> void:
 func _notify_character_interaction_started(character_root: Node) -> void:
 	if character_root == null:
 		return
+	_refresh_external_control_hold(character_root, dialogue_external_control_hold_sec, true)
+	var awareness := character_root.get_node_or_null("Components/CharacterPlayerAwareness")
+	if awareness != null and awareness.has_method("notify_direct_interaction"):
+		awareness.call("notify_direct_interaction", &"direct_interaction")
 	var life := character_root.get_node_or_null("Components/CharacterAutonomousLife")
-	if life != null and life.has_method("notify_external_control"):
+	if life != null and life.has_method("notify_dialogue_started"):
+		life.call("notify_dialogue_started")
+	elif life != null and life.has_method("notify_external_control"):
 		life.call("notify_external_control", true)
 	var executor := _resolve_action_executor(character_root)
 	if executor != null and executor.has_method("stop_navigation_from_external"):
 		executor.call("stop_navigation_from_external")
 
+func _refresh_external_control_hold(character_root: Node, hold_sec: float, capture_resume: bool) -> void:
+	if character_root == null:
+		return
+	var life := character_root.get_node_or_null("Components/CharacterAutonomousLife")
+	if life == null:
+		return
+	if life.has_method("notify_external_control_for"):
+		life.call("notify_external_control_for", hold_sec, capture_resume)
+	elif life.has_method("notify_external_control"):
+		life.call("notify_external_control", capture_resume)
+
 func _request_character_attention(character_root: Node, action: StringName = &"listen", expression: StringName = &"neutral") -> void:
 	_request_character_head_look_at_player(character_root)
 	var executor := _resolve_action_executor(character_root)
-	if executor == null or not executor.has_method("apply_ai_response"):
+	if executor == null:
+		return
+	if executor.has_method("interrupt_for_dialogue"):
+		executor.call("interrupt_for_dialogue", action, expression, true)
+		return
+	if not executor.has_method("apply_ai_response"):
 		return
 	executor.call("apply_ai_response", {
 		"command": "look_at_player",

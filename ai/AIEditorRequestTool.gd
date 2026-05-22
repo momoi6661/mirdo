@@ -11,7 +11,7 @@ class_name AIEditorRequestTool
 @export var clear_memory_endpoint_path: String = "/memory/clear"
 
 @export var session_id: String = "default_session"
-@export var shared_runtime_session_id: String = "default_session"
+@export var shared_runtime_session_id: String = "current_save_slot"
 @export var auto_map_editor_session: bool = true
 @export var player_text: String = "你好，小空。"
 @export var given_item: String = ""
@@ -216,6 +216,9 @@ func _build_chat_payload() -> Dictionary:
 	session_id = clean_session
 
 	var context_dict := _parse_context_json(context_json)
+	var checkpoint := _build_ai_checkpoint_context(clean_session)
+	for key in checkpoint.keys():
+		context_dict[key] = checkpoint[key]
 	context_dict["debug_transparent"] = debug_transparent
 	context_dict["request_source"] = request_source.strip_edges() if not request_source.strip_edges().is_empty() else "godot_editor_tool"
 	context_dict["source"] = context_dict["request_source"]
@@ -283,9 +286,53 @@ func _resolve_effective_session_id(raw_session_id: String) -> String:
 	if auto_map_editor_session and clean == "editor_session":
 		var mapped := shared_runtime_session_id.strip_edges()
 		if not mapped.is_empty():
-			return mapped
-		return "default_session"
+			clean = mapped
+		else:
+			clean = "default_session"
+	if clean == "current_save_slot" or clean == "mirdo_session":
+		return _build_save_scoped_session_id(_resolve_save_slot_name())
 	return clean
+
+func _resolve_save_slot_name() -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_slot"):
+		var current_slot := String(save_manager.call("get_current_slot")).strip_edges()
+		if not current_slot.is_empty():
+			return current_slot
+	return "manual_save"
+
+func _build_save_scoped_session_id(save_slot: String) -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_ai_timeline_id"):
+		var timeline := String(save_manager.call("get_current_ai_timeline_id")).strip_edges()
+		if not timeline.is_empty():
+			return timeline
+	var slot := _sanitize_session_part(save_slot)
+	if slot.is_empty():
+		slot = "manual_save"
+	return "mirdo:%s" % slot
+
+func _sanitize_session_part(value: String) -> String:
+	var clean := value.strip_edges()
+	if clean.is_empty():
+		return ""
+	for ch in [" ", "\t", "\n", "\r", "/", "\\", ":", "?", "#", "&", "="]:
+		clean = clean.replace(ch, "_")
+	while clean.find("__") >= 0:
+		clean = clean.replace("__", "_")
+	return clean.trim_prefix("_").trim_suffix("_")
+
+
+func _build_ai_checkpoint_context(clean_session_id: String) -> Dictionary:
+	var context := {"session_id": clean_session_id, "save_slot": _resolve_save_slot_name()}
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("build_ai_checkpoint_context"):
+		var checkpoint = save_manager.call("build_ai_checkpoint_context")
+		if checkpoint is Dictionary:
+			for key in (checkpoint as Dictionary).keys():
+				context[key] = checkpoint[key]
+	context["session_id"] = clean_session_id
+	return context
 
 func _parse_context_json(raw_text: String) -> Dictionary:
 	var parser := JSON.new()

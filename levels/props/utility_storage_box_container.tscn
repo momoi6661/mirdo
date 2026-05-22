@@ -111,6 +111,7 @@ transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0
 [node name="ContainerPanel3D" parent="." unique_id=1716970738 instance=ExtResource("4_panel")]
 transform = Transform3D(-1, 3.694646e-08, -7.9231945e-08, 0, 0.9063078, 0.42261824, 8.742278e-08, 0.42261824, -0.9063078, 0, 0.56, -0.42)
 anchor_mark_path = NodePath("../ContainerPanelMark3D")
+face_camera_when_using_mark = true
 use_anchor_mark_transform_directly = false
 panel_pitch_degrees = -10.0
 panel_title_text = "杂物物资箱"

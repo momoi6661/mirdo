@@ -7,6 +7,7 @@ func _init() -> void:
 
 func _run() -> void:
 	await _test_self_talk_falls_back_to_local_subtitle_when_dialogue_fails()
+	await _test_self_talk_uses_autonomous_backend_entry_and_decision_context()
 	await _test_current_behavior_snapshot_exposes_current_decision()
 	_finish()
 
@@ -37,6 +38,33 @@ func _test_self_talk_falls_back_to_local_subtitle_when_dialogue_fails() -> void:
 	_expect(subtitle.lines.size() == 1, "local self talk fallback should show one subtitle line")
 	if subtitle.lines.size() > 0:
 		_expect(String(subtitle.lines[0]).find("老师") >= 0, "local self talk line should address teacher")
+	host.queue_free()
+	await process_frame
+
+func _test_self_talk_uses_autonomous_backend_entry_and_decision_context() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var script := load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	var life := Node.new()
+	life.set_script(script)
+	host.add_child(life)
+	var dialogue := _CapturingAutonomousDialogue.new()
+	dialogue.name = "Dialogue"
+	host.add_child(dialogue)
+	life.set("dialogue_component_path", life.get_path_to(dialogue))
+	life.set("_dialogue_component", dialogue)
+	life.set("self_talk_enabled", true)
+	life.set("self_talk_use_backend", true)
+	life.set("self_talk_cooldown_sec", 30.0)
+	await process_frame
+	var decision := {"kind": "go_to_nav_point", "target_nav_point": "food_cabinet", "arrival_action": "work_count_supplies"}
+	var ok: bool = life.call("_try_request_self_talk", decision, 1.0)
+	_expect(ok, "self talk should use backend autonomous dialogue when available")
+	_expect(dialogue.requests.size() == 1, "autonomous dialogue should receive one request")
+	if dialogue.requests.size() > 0:
+		var request: Dictionary = dialogue.requests[0]
+		_expect(String((request.get("decision", {}) as Dictionary).get("target_nav_point", "")) == "food_cabinet", "autonomous dialogue should receive decision context")
+		_expect(String(request.get("text", "")).find("当前") >= 0, "autonomous prompt should describe current behavior")
 	host.queue_free()
 	await process_frame
 
@@ -71,6 +99,14 @@ class _FailingDialogue:
 	signal dialogue_requested(payload: Dictionary)
 	func send_player_text(_text: String, _given_item: String = "") -> Dictionary:
 		return {"ok": false, "error": "forced_failure"}
+
+class _CapturingAutonomousDialogue:
+	extends Node
+	signal dialogue_requested(payload: Dictionary)
+	var requests: Array[Dictionary] = []
+	func send_autonomous_text(text: String, decision: Dictionary = {}) -> Dictionary:
+		requests.append({"text": text, "decision": decision.duplicate(true)})
+		return {"ok": true}
 
 class _FakeSubtitle:
 	extends Node

@@ -113,6 +113,8 @@ const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gd
 @export_range(0.0006, 0.012, 0.0001) var caret_width_world: float = 0.0052
 @export_range(0.01, 0.08, 0.001) var caret_line_step_world: float = 0.032
 @export_range(0.0, 0.03, 0.0005) var caret_gap_world: float = 0.008
+@export var sync_ime_position_to_3d_caret: bool = true
+@export var ime_screen_offset: Vector2i = Vector2i(10, 18)
 @export_range(1.0, 1.08, 0.001) var hover_scale_multiplier: float = 1.01
 @export_range(0.90, 1.0, 0.001) var pressed_scale_multiplier: float = 0.985
 
@@ -1001,11 +1003,32 @@ func _update_caret_visual(delta: float) -> void:
 		caret_quad.size = Vector2(caret_width_world, _get_caret_height_world())
 	_input_caret.position = Vector3(local_x, local_y, text_surface_depth + 0.0003)
 	_input_caret.visible = _input_focused and _caret_visible and _panel_alpha > 0.01
+	if _input_focused:
+		_update_ime_position()
 
 func _set_ime_active(active: bool) -> void:
 	if not DisplayServer.has_feature(DisplayServer.FEATURE_IME):
 		return
 	DisplayServer.window_set_ime_active(active)
+	if active:
+		_update_ime_position()
+
+func _update_ime_position() -> void:
+	if not sync_ime_position_to_3d_caret:
+		return
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_IME):
+		return
+	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+	if camera == null:
+		return
+	var anchor_node := _input_caret as Node3D
+	if anchor_node == null:
+		anchor_node = _input_root
+	if anchor_node == null:
+		return
+	var screen_pos := camera.unproject_position(anchor_node.global_position)
+	var ime_pos := Vector2i(int(round(screen_pos.x)), int(round(screen_pos.y))) + ime_screen_offset
+	DisplayServer.window_set_ime_position(ime_pos)
 
 func _with_panel_alpha(color: Color) -> Color:
 	var tinted := color

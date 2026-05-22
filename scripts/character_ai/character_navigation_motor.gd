@@ -81,8 +81,8 @@ signal navigation_failed(reason: String)
 @export_range(-1.0, 1.0, 0.01) var door_open_alignment_dot: float = 0.2
 @export_range(0.1, 5.0, 0.05) var door_open_cooldown_sec: float = 0.65
 @export_range(0.1, 2.0, 0.05) var door_open_ray_height: float = 0.9
-@export_range(0.0, 2.0, 0.05) var door_open_wait_sec: float = 0.45
-@export_range(0.0, 1.0, 0.05) var door_open_wait_margin_sec: float = 0.15
+@export_range(0.0, 2.0, 0.05) var door_open_wait_sec: float = 0.18
+@export_range(0.0, 1.0, 0.05) var door_open_wait_margin_sec: float = 0.05
 @export_range(0.0, 2.0, 0.05) var door_blocked_idle_timeout_sec: float = 0.85
 @export_flags_3d_physics var door_ray_collision_mask: int = 0xFFFFFFFF
 

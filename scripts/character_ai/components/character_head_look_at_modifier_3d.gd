@@ -49,14 +49,26 @@ func _process_modification_with_delta(_delta: float) -> void:
 	if desired_dir.length_squared() <= 0.0001:
 		return
 
-	var current_axis := (current_world.basis * head_forward_axis).normalized()
+	var current_world_basis := current_world.basis.orthonormalized()
+	var current_axis := (current_world_basis * head_forward_axis).normalized()
 	if current_axis.length_squared() <= 0.0001:
-		current_axis = current_world.basis.z.normalized()
+		current_axis = current_world_basis.z.normalized()
 	var rotation_to_target := Quaternion(current_axis, desired_dir.normalized())
-	var target_basis := (Basis(rotation_to_target) * current_world.basis).orthonormalized()
-	var target_pose := skeleton.global_transform.affine_inverse() * Transform3D(target_basis, current_world.origin)
+	var target_world_basis := (Basis(rotation_to_target) * current_world_basis).orthonormalized()
+	var skeleton_basis_inverse := skeleton.global_basis.orthonormalized().inverse()
+	var target_pose_basis := (skeleton_basis_inverse * target_world_basis).orthonormalized()
+	var current_pose_basis := current_pose.basis.orthonormalized()
+	var current_rotation := current_pose_basis.get_rotation_quaternion().normalized()
+	var target_rotation := target_pose_basis.get_rotation_quaternion().normalized()
 	var write_weight := clampf(target_weight * pose_write_strength, 0.0, 1.0)
-	skeleton.set_bone_global_pose(_head_bone_idx, current_pose.interpolate_with(target_pose, write_weight))
+	var blended_rotation := current_rotation.slerp(target_rotation, write_weight).normalized()
+	var safe_pose := Transform3D(Basis(blended_rotation).orthonormalized(), current_pose.origin)
+	if debug_log:
+		var before_scale := current_pose.basis.get_scale()
+		var after_scale := safe_pose.basis.get_scale()
+		if _max_scale_deviation(before_scale) > 0.02 or _max_scale_deviation(after_scale) > 0.02:
+			print("[HeadLookAtModifier] sanitized head pose scale before=", before_scale, " after=", after_scale)
+	skeleton.set_bone_global_pose(_head_bone_idx, safe_pose)
 	skeleton.force_update_bone_child_transform(_head_bone_idx)
 
 func set_look_weight(value: float) -> void:
@@ -133,3 +145,6 @@ func _resolve_actor() -> Node3D:
 			return _actor_node
 		current = current.get_parent()
 	return null
+
+func _max_scale_deviation(scale: Vector3) -> float:
+	return maxf(maxf(absf(scale.x - 1.0), absf(scale.y - 1.0)), absf(scale.z - 1.0))

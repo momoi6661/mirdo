@@ -178,6 +178,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.61
 [node name="ContainerPanel3D" parent="." unique_id=625817024 instance=ExtResource("2_container_panel")]
 transform = Transform3D(-4.371139e-08, -0.2079117, 0.9781476, 0, 0.9781476, 0.2079117, -1, 9.088109e-09, -4.275619e-08, 0.613, 1.299, 0.015)
 anchor_mark_path = NodePath("../ContainerPanelMark3D")
+face_camera_when_using_mark = true
 use_anchor_mark_transform_directly = false
 panel_pitch_degrees = -12.0
 slot_columns = 4
@@ -187,29 +188,29 @@ panel_title_text = "储物柜"
 show_alt_hint_label = false
 auto_place_hint_below_second_row = false
 
-[node name="FrameQuad2" type="MeshInstance3D" parent="ContainerPanel3D" unique_id=1407746021]
+[node name="FrameQuad" type="MeshInstance3D" parent="ContainerPanel3D" unique_id=1407746021]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.003)
 visible = false
 cast_shadow = 0
 gi_mode = 0
 mesh = SubResource("QuadMesh_2llap")
 
-[node name="ScreenQuad2" type="MeshInstance3D" parent="ContainerPanel3D" unique_id=1481192306]
+[node name="ScreenQuad" type="MeshInstance3D" parent="ContainerPanel3D" unique_id=1481192306]
 visible = false
 cast_shadow = 0
 gi_mode = 0
 mesh = SubResource("QuadMesh_oag48")
 
-[node name="SlotsRoot2" type="Node3D" parent="ContainerPanel3D" unique_id=767934259]
+[node name="SlotsRoot" type="Node3D" parent="ContainerPanel3D" unique_id=767934259]
 
-[node name="TitleLabel2" type="Label3D" parent="ContainerPanel3D" unique_id=1356040944]
+[node name="TitleLabel" type="Label3D" parent="ContainerPanel3D" unique_id=1356040944]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 0.31, 0.008)
 visible = false
 no_depth_test = true
 render_priority = 1
 outline_render_priority = 1
 
-[node name="HintLabel2" type="Label3D" parent="ContainerPanel3D" unique_id=1462961709]
+[node name="HintLabel" type="Label3D" parent="ContainerPanel3D" unique_id=1462961709]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.27753606, -0.15953854, 0.022)
 pixel_size = 0.00095
 no_depth_test = true
@@ -222,7 +223,7 @@ font = ExtResource("6_gwyag")
 font_size = 40
 outline_size = 8
 
-[node name="HintLabelBack2" type="Label3D" parent="ContainerPanel3D" unique_id=354663704]
+[node name="HintLabelBack" type="Label3D" parent="ContainerPanel3D" unique_id=354663704]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.27753606, -0.15953854, 0.0216)
 pixel_size = 0.00095
 no_depth_test = true
@@ -235,10 +236,10 @@ font = ExtResource("6_gwyag")
 font_size = 40
 outline_size = 10
 
-[node name="DragGhost2" type="Node3D" parent="ContainerPanel3D" unique_id=1707064380]
+[node name="DragGhost" type="Node3D" parent="ContainerPanel3D" unique_id=1707064380]
 visible = false
 
-[node name="HitArea2" type="Area3D" parent="ContainerPanel3D" unique_id=1717074878]
+[node name="HitArea" type="Area3D" parent="ContainerPanel3D" unique_id=1717074878]
 collision_layer = 1048576
 collision_mask = 0
 input_ray_pickable = false

@@ -1141,8 +1141,7 @@ func _update_panel_transform(delta: float = 0.0) -> void:
 				if _camera != null and is_instance_valid(_camera):
 					var cam_pos := _camera.global_position
 					if target_position.distance_squared_to(cam_pos) > 0.00001:
-						look_at(cam_pos, Vector3.UP, true)
-						base_basis = global_basis
+						base_basis = _build_face_camera_basis(target_position, cam_pos, base_basis)
 			if face_camera_x_axis_once_when_opened:
 				base_basis = _get_open_face_camera_x_axis_basis(target_position, base_basis)
 			target_basis = base_basis * tilt_basis
@@ -1173,7 +1172,27 @@ func _update_panel_transform(delta: float = 0.0) -> void:
 	var pos_alpha := clampf(delta * PANEL_POS_LERP_SPEED, 0.0, 1.0)
 	var rot_alpha := clampf(delta * PANEL_ROT_LERP_SPEED, 0.0, 1.0)
 	global_position = global_position.lerp(target_position, pos_alpha)
-	global_basis = global_basis.orthonormalized().slerp(target_basis, rot_alpha).orthonormalized()
+	global_basis = global_basis.orthonormalized().slerp(target_basis.orthonormalized(), rot_alpha).orthonormalized()
+
+
+func _build_face_camera_basis(target_position: Vector3, camera_position: Vector3, fallback_basis: Basis) -> Basis:
+	var to_camera := camera_position - target_position
+	if to_camera.length_squared() < 0.00001:
+		return fallback_basis
+
+	var forward := to_camera.normalized()
+	var up := Vector3.UP
+	if absf(forward.dot(up)) > 0.96:
+		up = fallback_basis.y.normalized()
+	if up.length_squared() < 0.00001 or absf(forward.dot(up.normalized())) > 0.96:
+		up = Vector3.FORWARD
+
+	var z_axis := forward
+	var right := up.cross(z_axis).normalized()
+	if right.length_squared() < 0.00001:
+		return fallback_basis
+	var real_up := z_axis.cross(right).normalized()
+	return Basis(right, real_up, z_axis).orthonormalized()
 
 
 func _get_open_face_camera_x_axis_basis(target_position: Vector3, base_basis: Basis) -> Basis:

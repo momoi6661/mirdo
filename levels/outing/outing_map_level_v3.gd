@@ -1451,6 +1451,7 @@ func _request_ai_expedition_result(rule: Resource, commit_summary: Dictionary, u
 	if _is_backend_ai_failure(_outing_ai_response):
 		push_warning("[OutingAI] 后端已连接但 AI 结算失败 url=%s error=%s" % [url, String(_outing_ai_response.get("error", ""))])
 		return _outing_ai_response
+	_record_ai_progress_from_response(_outing_ai_response)
 	print("[OutingAI] 后端结算完成 url=%s loot=%d" % [url, (Array(_outing_ai_response.get("loot", []))).size()])
 	return _outing_ai_response
 
@@ -1520,8 +1521,11 @@ func _ensure_ai_service_running_for_outing() -> void:
 
 
 func _build_ai_expedition_payload(rule: Resource, commit_summary: Dictionary, unlocked_locations: Array[String]) -> Dictionary:
-	return {
-		"session_id": "outing_%s" % String(rule.get("location_id")),
+	var save_slot := _resolve_save_slot_name()
+	var clean_session_id := _build_save_scoped_session_id(save_slot)
+	var payload := {
+		"session_id": clean_session_id,
+		"save_slot": save_slot,
 		"location": {
 			"id": String(rule.get("location_id")),
 			"name": String(rule.get("display_name")),
@@ -1544,6 +1548,67 @@ func _build_ai_expedition_payload(rule: Resource, commit_summary: Dictionary, un
 		"unlocked_neighbors": unlocked_locations,
 		"provider": _build_provider_from_ai_settings(),
 	}
+	var checkpoint := _build_ai_checkpoint_context(save_slot, clean_session_id)
+	for key in checkpoint.keys():
+		payload[key] = checkpoint[key]
+	return payload
+
+
+func _build_ai_checkpoint_context(save_slot: String, clean_session_id: String) -> Dictionary:
+	var context := {
+		"session_id": clean_session_id,
+		"save_slot": save_slot,
+	}
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("build_ai_checkpoint_context"):
+		var checkpoint = save_manager.call("build_ai_checkpoint_context")
+		if checkpoint is Dictionary:
+			for key in (checkpoint as Dictionary).keys():
+				context[key] = checkpoint[key]
+	context["session_id"] = clean_session_id
+	return context
+
+
+func _record_ai_progress_from_response(response: Dictionary) -> void:
+	var timeline := String(response.get("session_id", "")).strip_edges()
+	var turn_id := int(response.get("turn_id", 0))
+	if timeline.is_empty() or turn_id <= 0:
+		return
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("record_ai_progress"):
+		save_manager.call("record_ai_progress", timeline, turn_id)
+
+
+func _resolve_save_slot_name() -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_slot"):
+		var current_slot := String(save_manager.call("get_current_slot")).strip_edges()
+		if not current_slot.is_empty():
+			return current_slot
+	return "manual_save"
+
+
+func _build_save_scoped_session_id(save_slot: String) -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_ai_timeline_id"):
+		var timeline := String(save_manager.call("get_current_ai_timeline_id")).strip_edges()
+		if not timeline.is_empty():
+			return timeline
+	var slot := _sanitize_session_part(save_slot)
+	if slot.is_empty():
+		slot = "manual_save"
+	return "mirdo:%s" % slot
+
+
+func _sanitize_session_part(value: String) -> String:
+	var clean := value.strip_edges()
+	if clean.is_empty():
+		return ""
+	for ch in [" ", "\t", "\n", "\r", "/", "\\", ":", "?", "#", "&", "="]:
+		clean = clean.replace(ch, "_")
+	while clean.find("__") >= 0:
+		clean = clean.replace("__", "_")
+	return clean.trim_prefix("_").trim_suffix("_")
 
 
 func _build_ai_loadout_items(commit_summary: Dictionary) -> Array[Dictionary]:

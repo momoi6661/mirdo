@@ -11,6 +11,8 @@ func _run() -> void:
 	await _test_character_perception_snapshot_filters_and_nests_marker_roles()
 	await _test_intent_interpreter_normalizes_common_commands()
 	await _test_action_executor_resolves_object_marker_role()
+	await _test_action_executor_dialogue_interrupt_replaces_work_action()
+	await _test_action_executor_dialogue_interrupt_keeps_seated_posture()
 	await _test_action_executor_safely_reads_object_without_object_id_property()
 	await _test_action_executor_stand_up_uses_stand_marker_without_navigation()
 	await _test_affective_director_maps_emotion_and_stats_to_expression()
@@ -247,6 +249,58 @@ func _test_action_executor_safely_reads_object_without_object_id_property() -> v
 
 	life.queue_free()
 	plain_target.queue_free()
+	await process_frame
+
+func _test_action_executor_dialogue_interrupt_replaces_work_action() -> void:
+	var executor_script: Script = load("res://scripts/character_ai/components/character_ai_action_executor_component.gd") as Script
+	_expect(executor_script != null, "CharacterAIActionExecutorComponent script should load")
+	if executor_script == null:
+		return
+	var host := Node.new()
+	root.add_child(host)
+	var executor := Node.new()
+	executor.set_script(executor_script)
+	host.add_child(executor)
+	var animation := _FakeAnimationBehavior.new()
+	host.add_child(animation)
+	var motor := _FakeNavigationMotor.new()
+	motor.navigating = true
+	host.add_child(motor)
+	executor.set("animation_behavior_path", executor.get_path_to(animation))
+	executor.set("navigation_motor_path", executor.get_path_to(motor))
+	await process_frame
+	executor.call("apply_ai_response", {"action": "work_count_supplies"})
+	var report: Dictionary = executor.call("interrupt_for_dialogue", &"listen", &"neutral", false)
+	_expect(bool(report.get("action_applied", false)), "dialogue interrupt should apply a body action")
+	_expect(animation.actions.size() >= 2, "dialogue interrupt should append a replacement action")
+	if animation.actions.size() >= 2:
+		_expect(animation.actions[-1] == &"listen", "dialogue interrupt should replace work action with listen")
+	_expect(motor.stop_calls >= 1, "dialogue interrupt should stop active navigation/motor state")
+	host.queue_free()
+	await process_frame
+
+func _test_action_executor_dialogue_interrupt_keeps_seated_posture() -> void:
+	var executor_script: Script = load("res://scripts/character_ai/components/character_ai_action_executor_component.gd") as Script
+	if executor_script == null:
+		return
+	var host := Node.new()
+	root.add_child(host)
+	var seat := Marker3D.new()
+	seat.name = "SeatMarker"
+	host.add_child(seat)
+	var executor := Node.new()
+	executor.set_script(executor_script)
+	host.add_child(executor)
+	var animation := _FakeAnimationBehavior.new()
+	host.add_child(animation)
+	executor.set("animation_behavior_path", executor.get_path_to(animation))
+	executor.set("_active_sit_marker_path", seat.get_path())
+	await process_frame
+	var report: Dictionary = executor.call("interrupt_for_dialogue", &"listen", &"neutral", false)
+	_expect(String(report.get("action", "")) == "seated_idle", "seated dialogue interrupt should keep seated idle")
+	if animation.actions.size() > 0:
+		_expect(animation.actions[-1] == &"seated_idle", "seated dialogue interrupt should not stand up")
+	host.queue_free()
 	await process_frame
 
 func _test_action_executor_stand_up_uses_stand_marker_without_navigation() -> void:
@@ -887,8 +941,15 @@ class _FakeNavigationMotor:
 	var move_calls := 0
 	var snap_calls := 0
 	var align_calls := 0
+	var stop_calls := 0
+	var navigating := false
 	func is_navigating() -> bool:
-		return false
+		return navigating
+	func stop_navigation(_play_stop: bool = true) -> void:
+		stop_calls += 1
+		navigating = false
+	func reset_navigation_state() -> void:
+		pass
 	func move_to_marker(_marker: Marker3D, _arrival_action: StringName = &"", _run: bool = false) -> bool:
 		move_calls += 1
 		return true

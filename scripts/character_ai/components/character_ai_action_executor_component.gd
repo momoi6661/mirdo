@@ -28,6 +28,8 @@ signal stand_up_finished()
 @export_range(0.1, 5.0, 0.05) var follow_distance: float = 1.4
 @export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 4.0
 @export_range(0.0, 3.0, 0.01) var look_at_player_face_hold_sec: float = 1.05
+@export var dialogue_listen_action: StringName = &"listen"
+@export var dialogue_seated_action: StringName = &"seated_idle"
 @export_category("Seat Exit")
 @export_range(0.0, 3.0, 0.01) var stand_relocate_delay_sec: float = 0.92
 @export_range(0.0, 1.0, 0.01) var stand_relocate_duration_sec: float = 0.16
@@ -208,6 +210,28 @@ func is_busy() -> bool:
 
 func stop_navigation_from_external() -> void:
 	_stop_navigation(true)
+
+func interrupt_for_dialogue(action: StringName = &"listen", expression: StringName = &"neutral", face_player: bool = true) -> Dictionary:
+	_refresh_refs()
+	var report := {
+		"ok": true,
+		"action_applied": false,
+		"action": "",
+		"expression_applied": false,
+		"navigation_cancelled": false,
+		"was_seated": _active_sit_marker_path != NodePath(),
+	}
+	_cancel_transient_navigation_for_dialogue()
+	report["navigation_cancelled"] = true
+	if face_player:
+		_face_player()
+	if expression != &"" and _face_component != null and _face_component.has_method("set_face_expression"):
+		report["expression_applied"] = bool(_face_component.call("set_face_expression", expression))
+	var chosen := _resolve_dialogue_interrupt_action(action)
+	report["action_applied"] = _request_body_action(chosen)
+	report["action"] = String(chosen)
+	ai_response_application_finished.emit(report.duplicate(true))
+	return report
 
 func get_active_sit_marker() -> Marker3D:
 	if _active_sit_marker_path == NodePath():
@@ -555,6 +579,38 @@ func _stop_navigation(play_stop: bool = true) -> void:
 	if play_stop:
 		_request_body_action(stop_action)
 		navigation_cancelled.emit()
+
+func _cancel_transient_navigation_for_dialogue() -> void:
+	_queued_navigation_after_stand = {}
+	_pending_sit_marker_path = NodePath()
+	_pending_seat_marker_after_approach_path = NodePath()
+	_pending_seat_action_after_approach = &""
+	_navigation_target_marker_path = NodePath()
+	_pending_arrival_action = &""
+	_moving_action = &""
+	_navigation_active = false
+	_follow_active = false
+	_seat_alignment_active = false
+	_seat_exact_navigation_active = false
+	_seat_alignment_serial += 1
+	if _actor != null:
+		_actor.velocity.x = 0.0
+		_actor.velocity.z = 0.0
+	if _navigation_motor != null:
+		if _navigation_motor.has_method("stop_navigation") and bool(_navigation_motor.call("is_navigating") if _navigation_motor.has_method("is_navigating") else true):
+			_navigation_motor.call("stop_navigation", false)
+		if _navigation_motor.has_method("reset_navigation_state"):
+			_navigation_motor.call("reset_navigation_state")
+	navigation_cancelled.emit()
+
+func _resolve_dialogue_interrupt_action(requested: StringName) -> StringName:
+	if _active_sit_marker_path != NodePath():
+		if requested != &"" and _is_sit_action(requested):
+			return requested
+		return dialogue_seated_action
+	if requested == &"":
+		return dialogue_listen_action
+	return requested
 
 func _face_player() -> void:
 	var player := _find_player()

@@ -32,6 +32,7 @@
 
 [ext_resource type="PackedScene" path="res://controllers/ui/CharacterStatusBars2D.tscn" id="29_status_bars"]
 [ext_resource type="Script" path="res://features/anime_toon/mita_warm_particles_3d.gd" id="32_warm_particles"]
+[ext_resource type="Script" path="res://controllers/scripts/character_subtitle_overlay.gd" id="33_subtitle_overlay"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -484,6 +485,21 @@ grow_horizontal = 2
 state_component_path = NodePath("../Components/StateComponent")
 constant_motion = true
 breathe_seconds = 2.4
+
+[node name="CharacterSubtitleLayer" type="CanvasLayer" parent="."]
+layer = 6
+process_mode = 3
+
+[node name="CharacterSubtitleOverlay" type="Control" parent="CharacterSubtitleLayer"]
+z_index = 80
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("33_subtitle_overlay")
+default_speaker = "Mirdo"
 
 [node name="XiaokongControlPanel" type="PanelContainer" parent="Control" unique_id=118273645]
 visible = false

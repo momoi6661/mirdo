@@ -30,6 +30,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 
 @export_category("Self Talk")
 @export var self_talk_enabled: bool = true
+@export var self_talk_use_backend: bool = true
 @export_range(0.0, 1.0, 0.01) var self_talk_chance_on_arrival: float = 0.24
 @export_range(0.0, 1.0, 0.01) var self_talk_chance_on_ambient: float = 0.06
 @export_range(5.0, 300.0, 1.0) var self_talk_cooldown_sec: float = 38.0
@@ -178,9 +179,13 @@ func _physics_process(delta: float) -> void:
 	_update_navigation(delta)
 
 func notify_external_control(capture_resume: bool = true) -> void:
+	notify_external_control_for(external_grace_sec, capture_resume)
+
+func notify_external_control_for(hold_sec: float, capture_resume: bool = true) -> void:
+	var safe_hold := maxf(0.0, hold_sec)
 	if capture_resume:
 		_capture_resume_token("external_control")
-	_external_grace_left = external_grace_sec
+	_external_grace_left = maxf(_external_grace_left, safe_hold)
 	_resume_after_grace_left = 0.0
 	_dwell_left = 0.0
 	if _navigation_active:
@@ -188,6 +193,7 @@ func notify_external_control(capture_resume: bool = true) -> void:
 
 func notify_dialogue_started() -> void:
 	notify_external_control()
+	_interrupt_body_for_dialogue()
 
 func notify_ai_response_applied(_ai_data: Dictionary = {}) -> void:
 	var hard_command := _is_hard_external_ai_data(_ai_data)
@@ -1133,7 +1139,9 @@ func _try_request_self_talk(decision: Dictionary, chance: float) -> bool:
 	if text.is_empty():
 		return false
 	var result_value: Variant = null
-	if _dialogue_component != null and _dialogue_component.has_method("send_player_text"):
+	if self_talk_use_backend and _dialogue_component != null and _dialogue_component.has_method("send_autonomous_text"):
+		result_value = _dialogue_component.call("send_autonomous_text", text, decision.duplicate(true))
+	elif self_talk_use_backend and _dialogue_component != null and _dialogue_component.has_method("send_player_text"):
 		result_value = _dialogue_component.call("send_player_text", text)
 	var ok := false
 	if result_value is Dictionary:
@@ -1187,6 +1195,20 @@ func _emit_local_self_talk(decision: Dictionary) -> bool:
 	if _face_component != null and _face_component.has_method("set_face_expression"):
 		_face_component.call("set_face_expression", StringName(expression))
 	return true
+
+func _interrupt_body_for_dialogue() -> void:
+	_refresh_refs()
+	if _action_scheduler != null:
+		if _action_scheduler.has_method("clear_queue"):
+			_action_scheduler.call("clear_queue")
+		if _action_scheduler.has_method("cancel_current"):
+			_action_scheduler.call("cancel_current", false)
+	if _action_executor != null and _action_executor.has_method("interrupt_for_dialogue"):
+		_action_executor.call("interrupt_for_dialogue", listen_action, &"neutral", true)
+		return
+	if _action_executor != null and _action_executor.has_method("stop_navigation_from_external"):
+		_action_executor.call("stop_navigation_from_external")
+	_request_body_action(listen_action)
 
 func _build_local_self_talk_line(decision: Dictionary) -> String:
 	var kind := String(decision.get("kind", "")).strip_edges()
@@ -1399,7 +1421,7 @@ func _on_external_navigation_started(_target_marker_path: NodePath = NodePath(),
 	notify_external_control()
 
 func _on_dialogue_requested(_payload: Dictionary = {}) -> void:
-	notify_external_control()
+	notify_dialogue_started()
 
 func _on_motor_navigation_finished(_finished_action: StringName = &"") -> void:
 	if not _navigation_active:

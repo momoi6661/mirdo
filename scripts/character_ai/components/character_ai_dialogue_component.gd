@@ -40,9 +40,11 @@ signal dialogue_failed(error_text: String)
 @export_category("Request")
 @export var session_id: String = "mirdo_session"
 @export var save_slot_name: String = ""
+@export var use_save_scoped_session_id: bool = true
 @export var use_streaming_request: bool = false
 @export var auto_apply_ai_response: bool = true
 @export var direct_subtitle_enabled: bool = true
+@export var compact_backend_context: bool = true
 @export var fallback_reply_text: String = "我有点没听清，可以再说一次吗？"
 @export var suppress_error_dialogue_output: bool = true
 @export var always_log: bool = true
@@ -71,6 +73,12 @@ func chat(text: String, given_item: String = "") -> bool:
 	return bool(result.get("ok", false))
 
 func send_player_text(player_text: String, given_item: String = "") -> Dictionary:
+	return _send_dialogue_text(player_text, given_item, "player", {})
+
+func send_autonomous_text(prompt_text: String, autonomous_decision: Dictionary = {}) -> Dictionary:
+	return _send_dialogue_text(prompt_text, "", "autonomous", autonomous_decision)
+
+func _send_dialogue_text(player_text: String, given_item: String = "", request_source: String = "player", source_decision: Dictionary = {}) -> Dictionary:
 	_refresh_refs()
 	_bind_ai_signals()
 	var text := player_text.strip_edges()
@@ -82,7 +90,7 @@ func send_player_text(player_text: String, given_item: String = "") -> Dictionar
 	if _request_in_flight:
 		return {"ok": false, "error": "request_in_flight"}
 
-	var payload := _build_chat_payload(text, given_item)
+	var payload := _build_chat_payload(text, given_item, request_source, source_decision)
 	_last_payload = payload.duplicate(true)
 	_stream_text = ""
 	_request_in_flight = true
@@ -101,17 +109,15 @@ func send_player_text(player_text: String, given_item: String = "") -> Dictionar
 		return {"ok": false, "error": "request_failed"}
 	return {"ok": true, "payload": payload}
 
-func _build_chat_payload(player_text: String, given_item: String) -> Dictionary:
-	var clean_session_id := session_id.strip_edges()
-	if clean_session_id.is_empty():
-		clean_session_id = "default_session"
+func _build_chat_payload(player_text: String, given_item: String, request_source: String = "player", source_decision: Dictionary = {}) -> Dictionary:
+	var save_slot := _resolve_save_slot_name()
+	var clean_session_id := _resolve_effective_session_id(save_slot)
 	session_id = clean_session_id
-	var context_data := {
-		"session_id": clean_session_id,
-		"save_slot": _resolve_save_slot_name(),
-		"request_source": "godot_runtime",
-		"npc": _build_npc_contract_context(),
-	}
+	var context_data := _build_ai_checkpoint_context(save_slot, clean_session_id)
+	context_data["request_source"] = request_source.strip_edges() if not request_source.strip_edges().is_empty() else "player"
+	context_data["npc"] = _build_npc_contract_context()
+	if not source_decision.is_empty():
+		context_data["source_decision"] = _compact_decision(source_decision)
 	var blackboard := _build_blackboard_context()
 	if not blackboard.is_empty():
 		context_data["blackboard"] = blackboard
@@ -137,6 +143,7 @@ func _build_chat_payload(player_text: String, given_item: String) -> Dictionary:
 	var action_contract := _build_action_contract_context()
 	if not action_contract.is_empty():
 		context_data["action_contract"] = action_contract
+	var ai_stats := _build_npc_stats_for_request(context_data)
 	if _ai_manager != null and _ai_manager.has_method("build_chat_request"):
 		return _ai_manager.call(
 			"build_chat_request",
@@ -144,7 +151,7 @@ func _build_chat_payload(player_text: String, given_item: String) -> Dictionary:
 			clean_session_id,
 			1,
 			0,
-			{"hunger": 50, "thirst": 50, "mood": 55, "favor": 20},
+			ai_stats,
 			given_item.strip_edges(),
 			context_data,
 			-1
@@ -154,11 +161,84 @@ func _build_chat_payload(player_text: String, given_item: String) -> Dictionary:
 		"time": 0,
 		"time_min": 0,
 		"session_id": clean_session_id,
-		"npc_stats": {"hunger": 50, "thirst": 50, "mood": 55, "favor": 20},
+		"npc_stats": ai_stats,
 		"player_text": player_text,
 		"given_item": given_item.strip_edges(),
 		"context": context_data,
 	}
+
+
+func _build_ai_checkpoint_context(save_slot: String, clean_session_id: String) -> Dictionary:
+	var context := {
+		"session_id": clean_session_id,
+		"save_slot": save_slot,
+	}
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("build_ai_checkpoint_context"):
+		var checkpoint = save_manager.call("build_ai_checkpoint_context")
+		if checkpoint is Dictionary:
+			for key in (checkpoint as Dictionary).keys():
+				context[key] = checkpoint[key]
+	context["session_id"] = clean_session_id
+	return context
+
+
+func _record_ai_progress_from_response(final_data: Dictionary) -> void:
+	var timeline := String(final_data.get("session_id", session_id)).strip_edges()
+	var turn_id := int(final_data.get("turn_id", 0))
+	if timeline.is_empty() or turn_id <= 0:
+		return
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("record_ai_progress"):
+		save_manager.call("record_ai_progress", timeline, turn_id)
+
+func _build_npc_stats_for_request(context_data: Dictionary) -> Dictionary:
+	var stats := {}
+	var raw: Variant = context_data.get("resource_stats", {})
+	if raw is Dictionary:
+		stats = (raw as Dictionary).duplicate(true)
+	return {
+		"hunger": int(round(float(stats.get("hunger", 50)))),
+		"thirst": int(round(float(stats.get("thirst", 50)))),
+		"mood": int(round(float(stats.get("mood", 55)))),
+		"favor": int(round(float(stats.get("favor", 20)))),
+	}
+
+
+func _resolve_effective_session_id(save_slot: String = "") -> String:
+	var clean := session_id.strip_edges()
+	var slot := save_slot.strip_edges()
+	if slot.is_empty():
+		slot = _resolve_save_slot_name()
+	if use_save_scoped_session_id and (clean.is_empty() or clean == "default_session" or clean == "mirdo_session" or clean == "current_save_slot"):
+		return _build_save_scoped_session_id(slot)
+	if clean.is_empty():
+		return "default_session"
+	return clean
+
+
+func _build_save_scoped_session_id(save_slot: String) -> String:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager != null and save_manager.has_method("get_current_ai_timeline_id"):
+		var timeline := String(save_manager.call("get_current_ai_timeline_id")).strip_edges()
+		if not timeline.is_empty():
+			return timeline
+	var slot := _sanitize_session_part(save_slot)
+	if slot.is_empty():
+		slot = "manual_save"
+	return "mirdo:%s" % slot
+
+
+func _sanitize_session_part(value: String) -> String:
+	var clean := value.strip_edges()
+	if clean.is_empty():
+		return ""
+	for ch in [" ", "\t", "\n", "\r", "/", "\\", ":", "?", "#", "&", "="]:
+		clean = clean.replace(ch, "_")
+	while clean.find("__") >= 0:
+		clean = clean.replace("__", "_")
+	return clean.trim_prefix("_").trim_suffix("_")
+
 
 func _resolve_save_slot_name() -> String:
 	var explicit_slot := save_slot_name.strip_edges()
@@ -173,16 +253,21 @@ func _resolve_save_slot_name() -> String:
 
 
 func _build_npc_contract_context() -> Dictionary:
-	return {
+	var context := {
 		"name": npc_display_name.strip_edges(),
 		"role_prompt": npc_role_prompt.strip_edges(),
 		"personality_knowledge": npc_personality_knowledge.strip_edges(),
 		"response_contract": response_contract_prompt.strip_edges(),
-		"available_body_actions": _packed_to_clean_array(available_body_actions),
 		"available_expressions": _packed_to_clean_array(available_expressions),
 		"available_visemes": _packed_to_clean_array(available_visemes),
 		"navigation_contract": "ai_nav_points/known_nav_points are Mirdo's remembered global map points with positions and action contract. perception is only current Area3D vision/nearby sensing. If movement is needed, prefer command='go_to_nav_point' or command_payload.intent='go_to_nav_point' with target_nav_point equal to one ai_nav_points.id; choose action from that point's action_options and expression from expression_options.",
 	}
+	if compact_backend_context:
+		context["preferred_social_actions"] = ["listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "seated_idle"]
+		context["preferred_work_actions"] = ["work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies", "work_take_item", "work_drink"]
+	else:
+		context["available_body_actions"] = _packed_to_clean_array(available_body_actions)
+	return context
 
 func _build_blackboard_context() -> Dictionary:
 	_refresh_refs()
@@ -201,7 +286,8 @@ func _build_action_contract_context() -> Array:
 	if _action_semantics != null and _action_semantics.has_method("build_action_contract"):
 		var value: Variant = _action_semantics.call("build_action_contract", available_body_actions)
 		if value is Array:
-			return value as Array
+			var actions := value as Array
+			return _compact_action_contract(actions) if compact_backend_context else actions
 	return []
 
 func _build_compact_perception_context() -> Dictionary:
@@ -260,11 +346,11 @@ func _build_current_behavior_context() -> Dictionary:
 	if _autonomous_life != null and _autonomous_life.has_method("get_current_behavior_snapshot"):
 		var value: Variant = _autonomous_life.call("get_current_behavior_snapshot")
 		if value is Dictionary:
-			return (value as Dictionary).duplicate(true)
+			return _compact_current_behavior(value as Dictionary) if compact_backend_context else (value as Dictionary).duplicate(true)
 	if _autonomous_life != null and _autonomous_life.has_method("get_resume_debug_snapshot"):
 		var resume_value: Variant = _autonomous_life.call("get_resume_debug_snapshot")
 		if resume_value is Dictionary:
-			return (resume_value as Dictionary).duplicate(true)
+			return _compact_current_behavior(resume_value as Dictionary) if compact_backend_context else (resume_value as Dictionary).duplicate(true)
 	return {}
 
 func _build_nav_point_context() -> Array:
@@ -330,6 +416,66 @@ func _compact_entries(entries_value: Variant, limit: int) -> Array:
 			out.append(compact)
 	return out
 
+func _compact_current_behavior(snapshot: Dictionary) -> Dictionary:
+	var out := {}
+	for key in ["navigating", "current_kind", "current_target", "last_kind", "last_target", "has_resume", "resume_kind", "resume_target", "external_grace_left", "dwell_left"]:
+		if snapshot.has(key):
+			out[key] = snapshot[key]
+	var current := _compact_decision(snapshot.get("current_decision", {}))
+	if not current.is_empty():
+		out["current_decision"] = current
+	var navigation := _compact_decision(snapshot.get("navigation_decision", {}))
+	if not navigation.is_empty():
+		out["navigation_decision"] = navigation
+	var stack_value: Variant = snapshot.get("task_stack", [])
+	if stack_value is Array:
+		var stack: Array = []
+		for entry in stack_value:
+			if entry is Dictionary:
+				var compact_entry := _compact_decision(entry)
+				if not compact_entry.is_empty():
+					stack.append(compact_entry)
+			if stack.size() >= 3:
+				break
+		if not stack.is_empty():
+			out["resume_task_stack"] = stack
+	return out
+
+func _compact_decision(value: Variant) -> Dictionary:
+	if value is not Dictionary:
+		return {}
+	var decision := value as Dictionary
+	var out := {}
+	for key in [
+		"kind", "target_object", "target_nav_point", "target_ref", "marker_role",
+		"action", "arrival_action", "arrival_expression", "face_target",
+		"dwell_time_sec", "resume_reason", "score", "feedback"
+	]:
+		if decision.has(key):
+			out[key] = decision[key]
+	return out
+
+func _compact_action_contract(actions: Array) -> Array:
+	var preferred := [
+		"listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "seated_idle", "seated_sleepy",
+		"work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies", "work_take_item", "work_drink",
+		"look_around", "curious_peek", "rub_eye", "sleepy_yawn", "walk", "run", "turn_left", "turn_right", "turn_180"
+	]
+	var out: Array = []
+	for entry_value in actions:
+		if entry_value is not Dictionary:
+			continue
+		var entry := entry_value as Dictionary
+		var name := String(entry.get("name", "")).strip_edges()
+		if not preferred.has(name):
+			continue
+		var compact := {}
+		for key in ["name", "category", "posture", "loop", "interruptible", "uses_root_motion", "default_expression", "tags", "description"]:
+			if entry.has(key):
+				compact[key] = entry[key]
+		out.append(compact)
+	return out
+
 func _bind_ai_signals() -> void:
 	if _ai_manager == null:
 		return
@@ -365,6 +511,7 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 	if not _request_in_flight:
 		return
 	_request_in_flight = false
+	_record_ai_progress_from_response(final_data)
 	var dialogue_text := _extract_dialogue(final_data)
 	if dialogue_text.is_empty():
 		dialogue_text = _stream_text.strip_edges()
@@ -445,18 +592,58 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 		dialogue = "老师，我收到%s啦，我会注意状态的。" % given_item.strip_edges()
 		expression = "joy"
 		action = "small_nod"
-	elif _contains_any(lowered, ["感觉", "状态", "怎么样", "累", "饿", "渴"]):
+	elif _contains_any(lowered, ["感觉", "状态", "怎么样", "累", "困", "饿", "渴"]):
 		var resource := _build_resource_stats_context()
 		var mind := _build_mind_state_context()
+		var hunger := float(resource.get("hunger", 65.0))
+		var thirst := float(resource.get("thirst", 60.0))
 		var energy := float(resource.get("energy", 70.0))
 		var mood := float(resource.get("mood", 55.0))
 		var tiredness := float(mind.get("tiredness", 0.0))
-		if energy < 35.0 or tiredness > 0.62:
-			dialogue = "老师，我有点累，不过还能继续陪你。"
+		var asks_hunger := _contains_any(lowered, ["饿不饿", "饿吗", "你饿", "肚子饿", "hungry"])
+		var asks_thirst := _contains_any(lowered, ["渴不渴", "渴吗", "你渴", "口渴", "thirsty"])
+		var asks_tired := _contains_any(lowered, ["累不累", "累吗", "你累", "困不困", "困吗", "tired", "sleepy"])
+		if asks_hunger:
+			if hunger <= 25.0:
+				dialogue = "老师，Mirdo 有点饿了……等会儿想看看食物柜。"
+				expression = "sorrow"
+			elif hunger <= 50.0:
+				dialogue = "老师，有一点点饿，不过还可以陪你哦。"
+				expression = "neutral"
+			else:
+				dialogue = "老师，我现在不太饿哦，先不用担心。"
+				expression = "joy"
+			action = "small_nod"
+		elif asks_thirst:
+			if thirst <= 25.0:
+				dialogue = "老师，Mirdo 有点渴了……等会儿想补一点水。"
+				expression = "sorrow"
+			elif thirst <= 50.0:
+				dialogue = "老师，有一点点渴，但还可以忍住哦。"
+				expression = "neutral"
+			else:
+				dialogue = "老师，我现在不太渴哦，谢谢老师关心。"
+				expression = "joy"
+			action = "small_nod"
+		elif asks_tired or energy < 35.0 or tiredness > 0.62:
+			if energy < 35.0 or tiredness > 0.62:
+				dialogue = "老师，Mirdo 有点累了……但还能继续陪你。"
+				expression = "sorrow"
+				action = "rub_eye"
+			else:
+				dialogue = "老师，我现在不累哦，精神还可以。"
+				expression = "joy"
+				action = "small_nod"
+		elif hunger <= 25.0:
+			dialogue = "老师，我有点饿，想先确认一下食物补给。"
 			expression = "sorrow"
-			action = "rub_eye"
+			action = "small_nod"
+		elif thirst <= 25.0:
+			dialogue = "老师，我有点渴，想先确认一下饮水。"
+			expression = "sorrow"
+			action = "small_nod"
 		elif mood >= 55.0:
-			dialogue = "老师，我现在状态不错，想再看看避难所。"
+			dialogue = "老师，我现在状态不错，可以继续陪你守着避难所。"
 			expression = "joy"
 			action = "small_nod"
 		else:

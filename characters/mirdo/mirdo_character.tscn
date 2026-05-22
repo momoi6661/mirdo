@@ -82,6 +82,7 @@
 [ext_resource type="Script" uid="uid://bkhy2m2a3cmpg" path="res://scripts/character_ai/components/character_footstep_audio_component.gd" id="82_footstep_audio"]
 [ext_resource type="AudioStream" uid="uid://dxfbu5judk8sq" path="res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3" id="83_footstep_sfx"]
 [ext_resource type="Script" path="res://scripts/mirdo/mirdo_ik_controller.gd" id="84_mirdo_ik_controller"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_subtitle_router_component.gd" id="85_subtitle_router"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
@@ -921,7 +922,7 @@ animation = &"face_talk_loop"
 [sub_resource type="AnimationNodeAdd2" id="AnimationNodeAdd2_viseme"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_viseme_closed"]
-animation = &"face_neutral"
+animation = &"viseme_closed"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_viseme_E"]
 animation = &"viseme_E"
@@ -987,6 +988,8 @@ off_navmesh_recovery_arrival_distance = 0.12
 off_navmesh_recovery_speed = 1.05
 door_open_check_distance = 1.35
 door_open_ray_height = 1.05
+door_open_wait_sec = 0.18
+door_open_wait_margin_sec = 0.05
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1527126213]
 script = ExtResource("70_save_comp")
@@ -1066,7 +1069,7 @@ bones/142/rotation = Quaternion(0.031872783, 0.67896056, -0.73307526, -0.0244435
 [node name="vrm-mesh" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="0" unique_id=1136892378]
 mesh = SubResource("ArrayMesh_cr1od")
 skin = SubResource("Skin_8bpvu")
-blend_shapes/Joy = 0.62
+blend_shapes/Joy = 0.0
 surface_material_override/0 = SubResource("ShaderMaterial_6m6gt")
 
 [node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="1" unique_id=2018157511]
@@ -2021,6 +2024,7 @@ energy_decay_per_hour = 3.8
 
 [node name="ItemConsumer" type="Node" parent="Components" unique_id=815896317]
 script = ExtResource("72_item_consumer")
+subtitle_component_path = NodePath("../CharacterSubtitleRouter")
 
 [node name="FaceComponent" type="Node" parent="Components" unique_id=1273321003]
 script = ExtResource("4_face_component")
@@ -2038,6 +2042,13 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
 anchor_marker_path = NodePath("../../DialogueAnchor")
 show_time = 2.6
 queue_clear_delay = 2.8
+
+[node name="CharacterSubtitleRouter" type="Node" parent="Components"]
+script = ExtResource("85_subtitle_router")
+world_subtitle_path = NodePath("../WorldSubtitleComponent")
+dialogue_anchor_path = NodePath("../../DialogueAnchor")
+screen_edge_margin_ratio = 0.09
+comfortable_center_radius_ratio = 0.32
 
 [node name="AnimationBehaviorTreeComponent" type="Node" parent="Components" unique_id=1326592975]
 script = ExtResource("54_1kdye")
@@ -2075,11 +2086,12 @@ proactive_approach_chance = 0.62
 proactive_near_max_distance = 4.4
 near_actions = PackedStringArray("small_nod", "tiny_wave", "tilt_head_cute")
 gaze_actions = PackedStringArray("tilt_head_cute", "tiny_wave", "react_nod")
-very_close_actions = PackedStringArray("cute_startle", "tilt_head_cute")
+very_close_actions = PackedStringArray("tilt_head_cute", "small_nod")
 busy_soft_actions = PackedStringArray("small_nod", "tilt_head_cute")
 
 [node name="CharacterReturnGreeting" type="Node" parent="Components" unique_id=1765314904]
 script = ExtResource("80_return_greeting")
+subtitle_target_path = NodePath("../CharacterSubtitleRouter")
 
 [node name="CharacterActionExpression" type="Node" parent="Components" unique_id=821712066]
 script = ExtResource("71_action_expression")
@@ -2199,7 +2211,7 @@ action_executor_path = NodePath("../CharacterAIActionExecutor")
 action_scheduler_path = NodePath("../CharacterActionScheduler")
 supply_user_path = NodePath("../CharacterAutonomousSupplyUser")
 dialogue_component_path = NodePath("../AIDialogueComponent")
-subtitle_target_path = NodePath("../WorldSubtitleComponent")
+subtitle_target_path = NodePath("../CharacterSubtitleRouter")
 face_component_path = NodePath("../FaceComponent")
 actor_path = NodePath("../..")
 navigation_agent_path = NodePath("../../NavigationAgent3D")
@@ -2248,7 +2260,7 @@ autonomous_life_path = NodePath("../CharacterAutonomousLife")
 blackboard_path = NodePath("../CharacterAIBlackboard")
 action_semantics_path = NodePath("../CharacterActionSemantics")
 action_executor_path = NodePath("../CharacterAIActionExecutor")
-subtitle_target_path = NodePath("../WorldSubtitleComponent")
+subtitle_target_path = NodePath("../CharacterSubtitleRouter")
 face_component_path = NodePath("../FaceComponent")
 npc_role_prompt = "可爱的避难所少女 NPC，称呼玩家为老师，性格活泼、好奇、温柔，会主动观察设施和整理补给。"
 npc_personality_knowledge = "Mirdo 是可爱的 VRChat 风格原创少女角色。她把玩家称作老师，活泼、好奇、温柔，会自己在避难所走动，观察食物柜、医疗柜、工具箱、装备柜、工作台和床铺；她会关心食物、水、药品和工具是否够用，偶尔短短地自言自语。"

@@ -130,6 +130,9 @@ dialogue_component.chat("今天先休息一下")
 ## 6. 历史接口的定位
 
 - `GET /session/{session_id}/history` 仅作补充排障，不是主链路。
+- AI 平行时间线：Godot 存档会保存 `ai_timeline_id` 与 `ai_turn_id`。AI 请求的 `session_id` 使用当前存档的 `ai_timeline_id`，并在 context/payload 带 `ai_checkpoint_turn_id`；后端如果发现从旧 turn 继续写入，会自动 fork 新 `session_id`，返回 `forked_from/forked_at_turn_id`，Godot 记录新的 timeline 和 turn。
+- 记忆调试/管理：`GET /sessions` 查看会话列表；`GET /memory/{session_id}` 查看长期记忆；`GET /memory/{session_id}/search?q=...` 检索记忆；`DELETE /memory/{session_id}/facts/{fact_id}` 删除单条记忆；`POST /memory/clear` 同时清 SQLite 会话和 `session_memory` 向量缓存。
+- 知识库管理：`GET /rag/status` 查看世界知识库状态；`POST /ingest` 建库/重建；`DELETE /rag/clear` 清世界知识库索引。
 - 调试默认关闭持续轮询：`external_history_poll_enabled=false`。
 - 如需手动拉一次：`pull_external_history_once()`。
 

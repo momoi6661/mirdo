@@ -69,7 +69,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_sync_held_object_exception()
 
-	if _is_any_blocking_ui_open(false):
+	if _is_any_blocking_ui_open():
 		_clear_target()
 		return
 
@@ -127,7 +127,7 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _external_ui_blocked:
 		return
-	if _is_any_blocking_ui_open(false):
+	if _is_any_blocking_ui_open():
 		return
 	if not _is_world_mode(current_interaction_mode) or current_interactable == null:
 		return

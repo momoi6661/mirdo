@@ -17,9 +17,10 @@ extends StaticBody3D
 @export var actor_groups: PackedStringArray = PackedStringArray(["Player", "player", "Mirdo", "AICharacter", "character"])
 @export var accept_character_bodies_without_group: bool = true
 @export var navigation_open_hold_sec: float = 1.2
-@export var navigation_open_max_hold_sec: float = 3.0
 @export var navigation_open_recheck_sec: float = 0.35
-@export_range(0.0, 4.0, 0.05) var navigation_actor_clearance: float = 0.85
+@export_range(0.0, 8.0, 0.05) var navigation_actor_clearance: float = 3.2
+@export_range(0.0, 8.0, 0.05) var navigation_actor_passed_clearance: float = 1.35
+@export_range(0.0, 0.5, 0.01) var navigation_plane_epsilon: float = 0.08
 
 @export_group("Motion")
 @export var slide_axis_local: Vector3 = Vector3.RIGHT
@@ -49,7 +50,7 @@ var _right_closed_position: Vector3 = Vector3.ZERO
 var _is_open: bool = false
 var _tween: Tween
 var _inside_actors: Dictionary = {}
-var _navigation_open_actors: Dictionary = {}
+var _navigation_passages: Dictionary = {}
 var _navigation_close_generation: int = 0
 var _default_collision_layer: int = 1
 var _default_collision_mask: int = 1
@@ -142,7 +143,9 @@ func get_prompt_text() -> String:
 	return "Close" if _is_open else "Open"
 
 func get_navigation_open_wait_time() -> float:
-	return maxf(0.05, open_duration)
+	# Collision is disabled as soon as opening starts, so AI navigation does not
+	# need to wait for the full visual slide animation.
+	return maxf(0.05, open_duration * 0.45)
 
 func interact(_player: Node) -> void:
 	toggle()
@@ -311,9 +314,16 @@ func _close_after_delay() -> void:
 		close()
 
 func _track_navigation_actor(actor: Node) -> void:
-	if actor == null:
+	if actor == null or not (actor is Node3D):
 		return
-	_navigation_open_actors[actor.get_instance_id()] = actor
+	var actor_3d := actor as Node3D
+	var side := _actor_door_side(actor_3d)
+	_navigation_passages[actor.get_instance_id()] = {
+		"actor": actor,
+		"start_side": side,
+		"last_side": side,
+		"passed": false,
+	}
 
 func _schedule_navigation_close_check() -> void:
 	_navigation_close_generation += 1
@@ -328,31 +338,63 @@ func _navigation_close_check_async(generation: int) -> void:
 	if tree == null:
 		return
 	await tree.create_timer(maxf(0.0, navigation_open_hold_sec)).timeout
-	var elapsed := maxf(0.0, navigation_open_hold_sec)
 	while generation == _navigation_close_generation and _is_open:
 		if not _has_valid_actor_inside() and not _has_near_navigation_actor():
 			close()
 			return
-		if elapsed >= maxf(navigation_open_hold_sec, navigation_open_max_hold_sec) and not _has_valid_actor_inside():
-			close()
-			return
 		await tree.create_timer(maxf(0.05, navigation_open_recheck_sec)).timeout
-		elapsed += maxf(0.05, navigation_open_recheck_sec)
 
 func _has_near_navigation_actor() -> bool:
-	var valid_actors: Dictionary = {}
-	var clearance := maxf(0.0, navigation_actor_clearance)
-	for actor_id in _navigation_open_actors.keys():
-		var actor: Node = _navigation_open_actors[actor_id]
+	var active_passages: Dictionary = {}
+	var approach_clearance := maxf(0.0, navigation_actor_clearance)
+	var passed_clearance := maxf(0.0, navigation_actor_passed_clearance)
+	var door_center := _door_trigger_global_center()
+	for actor_id in _navigation_passages.keys():
+		var passage: Dictionary = _navigation_passages[actor_id] if _navigation_passages[actor_id] is Dictionary else {}
+		var actor: Node = passage.get("actor", null)
 		if not is_instance_valid(actor) or not actor.is_inside_tree():
 			continue
 		if actor is Node3D:
 			var actor_3d := actor as Node3D
-			if actor_3d.global_position.distance_to(global_position) <= clearance:
-				valid_actors[actor_id] = actor
+			var distance := actor_3d.global_position.distance_to(door_center)
+			var current_side := _actor_door_side(actor_3d)
+			var start_side := int(passage.get("start_side", current_side))
+			var passed := bool(passage.get("passed", false))
+			if not passed and start_side != 0 and current_side != 0 and current_side != start_side:
+				passed = true
+			passage["last_side"] = current_side
+			passage["passed"] = passed
+			if (not passed and distance <= approach_clearance) or (passed and distance <= passed_clearance):
+				active_passages[actor_id] = passage
 				continue
-	_navigation_open_actors = valid_actors
-	return not _navigation_open_actors.is_empty()
+	_navigation_passages = active_passages
+	return not _navigation_passages.is_empty()
+
+func _door_trigger_global_center() -> Vector3:
+	if _trigger_area != null:
+		var shape := _trigger_area.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if shape != null:
+			return shape.global_position
+		return _trigger_area.global_position
+	return global_position
+
+func _door_plane_normal() -> Vector3:
+	var normal := global_transform.basis.z
+	normal.y = 0.0
+	if normal.length_squared() <= 0.0001:
+		normal = global_transform.basis.x
+		normal.y = 0.0
+	if normal.length_squared() <= 0.0001:
+		return Vector3.FORWARD
+	return normal.normalized()
+
+func _actor_door_side(actor: Node3D) -> int:
+	var delta := actor.global_position - _door_trigger_global_center()
+	delta.y = 0.0
+	var signed_distance := delta.dot(_door_plane_normal())
+	if absf(signed_distance) <= navigation_plane_epsilon:
+		return 0
+	return 1 if signed_distance > 0.0 else -1
 
 func _accept_actor(body: Node) -> bool:
 	if body == null:
