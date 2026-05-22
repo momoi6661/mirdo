@@ -43,7 +43,7 @@ content_margin_bottom = 8.0
 
 [node name="SaveSlotMenu" type="CanvasLayer"]
 process_mode = 3
-layer = 80
+layer = 92
 script = ExtResource("1_save_slot_menu")
 
 [node name="Root" type="Control" parent="."]

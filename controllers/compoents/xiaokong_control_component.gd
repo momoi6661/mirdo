@@ -242,6 +242,13 @@ func send_dialogue_text(text: String) -> bool:
 	_set_status("Dialogue request failed: %s" % String(result.get("error", "unknown_error")))
 	return false
 
+func notify_player_input_draft_changed(draft_text: String) -> void:
+	if _target == null and not _deferred_bind_target():
+		return
+	_bind_dialogue_component_from_target()
+	if _dialogue_component != null and _dialogue_component.has_method("notify_player_input_draft_changed"):
+		_dialogue_component.call("notify_player_input_draft_changed", draft_text)
+
 func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
 	var trimmed := text.strip_edges()
 	if trimmed.is_empty():

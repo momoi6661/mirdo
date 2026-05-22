@@ -59,6 +59,8 @@ func _ready() -> void:
 			button.mouse_entered.connect(_on_button_hover.bind(button))
 	if confirm_delete_dialog != null and not confirm_delete_dialog.confirmed.is_connected(_confirm_delete_slot):
 		confirm_delete_dialog.confirmed.connect(_confirm_delete_slot)
+	if dim_rect != null and not dim_rect.gui_input.is_connected(_on_dim_gui_input):
+		dim_rect.gui_input.connect(_on_dim_gui_input)
 
 
 func open_panel(mode: String = "") -> void:
@@ -98,6 +100,16 @@ func _on_refresh_pressed() -> void:
 	_play_ui_sound("button_click")
 	_refresh_slots()
 	_play_cards_tween()
+
+
+func _on_dim_gui_input(event: InputEvent) -> void:
+	if not visible or _is_closing:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		close_panel()
+		var viewport := get_viewport()
+		if viewport != null:
+			viewport.set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:

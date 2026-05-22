@@ -623,6 +623,23 @@ func _send_dialogue_to_xiaokong(text: String, payload: Dictionary) -> bool:
 
 	return _send_dialogue_direct_to_payload_target(clean_text, xiaokong_path)
 
+func _notify_dialogue_input_draft_to_xiaokong(draft_text: String, payload: Dictionary) -> void:
+	var xiaokong_path: String = String(payload.get("xiaokong_path", payload.get("character_path", ""))).strip_edges()
+	var controller_node := _resolve_xiaokong_control_component()
+	if controller_node != null and is_instance_valid(controller_node):
+		if controller_node.has_method("notify_player_input_draft_changed"):
+			controller_node.call("notify_player_input_draft_changed", draft_text)
+			return
+	var target_path := xiaokong_path.strip_edges()
+	if target_path.is_empty():
+		return
+	var character_root: Node = get_node_or_null(NodePath(target_path))
+	if character_root == null:
+		return
+	var dialogue_component := _find_dialogue_component_recursive(character_root)
+	if dialogue_component != null and dialogue_component.has_method("notify_player_input_draft_changed"):
+		dialogue_component.call("notify_player_input_draft_changed", draft_text)
+
 func _send_dialogue_direct_to_payload_target(clean_text: String, character_path: String) -> bool:
 	var target_path := character_path.strip_edges()
 	if target_path.is_empty():
@@ -655,6 +672,9 @@ func _on_global_xiaokong_dialogue_requested(payload: Dictionary) -> void:
 
 func _on_xiaokong_dialogue_panel_submit(text: String, payload: Dictionary) -> void:
 	_send_dialogue_to_xiaokong(text, payload)
+
+func _on_xiaokong_dialogue_panel_input_draft_changed(draft_text: String, payload: Dictionary) -> void:
+	_notify_dialogue_input_draft_to_xiaokong(draft_text, payload)
 
 func _on_xiaokong_dialogue_panel_visibility_changed(is_open: bool) -> void:
 	_set_world_interaction_blocked(is_open)
@@ -1058,6 +1078,10 @@ func _ready():
 			var visibility_callable := Callable(self, "_on_xiaokong_dialogue_panel_visibility_changed")
 			if not xiaokong_dialogue_panel.is_connected("panel_visibility_changed", visibility_callable):
 				xiaokong_dialogue_panel.connect("panel_visibility_changed", visibility_callable)
+		if xiaokong_dialogue_panel.has_signal("input_draft_changed"):
+			var draft_callable := Callable(self, "_on_xiaokong_dialogue_panel_input_draft_changed")
+			if not xiaokong_dialogue_panel.is_connected("input_draft_changed", draft_callable):
+				xiaokong_dialogue_panel.connect("input_draft_changed", draft_callable)
 	var status_panel := _resolve_xiaokong_status_panel()
 	if status_panel != null and is_instance_valid(status_panel):
 		xiaokong_status_panel = status_panel

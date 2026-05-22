@@ -205,6 +205,8 @@ func _bind_signals() -> void:
 		send_dialogue_button.pressed.connect(_on_send_dialogue_pressed)
 	if dialogue_input != null:
 		dialogue_input.text_submitted.connect(_on_dialogue_submitted)
+		if not dialogue_input.text_changed.is_connected(_on_dialogue_input_text_changed):
+			dialogue_input.text_changed.connect(_on_dialogue_input_text_changed)
 	if queue_subtitle_button != null and not queue_subtitle_button.pressed.is_connected(_on_queue_subtitle_pressed):
 		queue_subtitle_button.pressed.connect(_on_queue_subtitle_pressed)
 	if clear_subtitle_queue_button != null and not clear_subtitle_queue_button.pressed.is_connected(_on_clear_subtitle_queue_pressed):
@@ -253,6 +255,10 @@ func _on_stop_nav_pressed() -> void:
 func _on_dialogue_submitted(_new_text: String) -> void:
 	_on_send_dialogue_pressed()
 
+func _on_dialogue_input_text_changed(new_text: String) -> void:
+	if _controller != null and _controller.has_method("notify_player_input_draft_changed"):
+		_controller.call("notify_player_input_draft_changed", new_text)
+
 func _on_send_dialogue_pressed() -> void:
 	if _controller == null:
 		return
@@ -264,6 +270,8 @@ func _on_send_dialogue_pressed() -> void:
 	if _controller.has_method("send_dialogue_text"):
 		_controller.call("send_dialogue_text", text)
 		dialogue_input.text = ""
+		if _controller.has_method("notify_player_input_draft_changed"):
+			_controller.call("notify_player_input_draft_changed", "")
 
 func _on_subtitle_queue_submitted(_new_text: String) -> void:
 	_on_queue_subtitle_pressed()

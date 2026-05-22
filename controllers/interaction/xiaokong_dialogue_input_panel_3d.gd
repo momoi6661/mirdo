@@ -5,6 +5,7 @@ class_name XiaokongDialogueInputPanel3D
 signal dialogue_submit_requested(text: String, payload: Dictionary)
 signal panel_visibility_changed(is_open: bool)
 signal option_selected(index: int, option_data: Dictionary, payload: Dictionary)
+signal input_draft_changed(draft_text: String, payload: Dictionary)
 
 const PANEL_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
 const ROUNDED_RECT_SHADER: Shader = preload("res://shaders/ui_rounded_rect_3d.gdshader")
@@ -229,6 +230,7 @@ func _input(event: InputEvent) -> void:
 		if not _input_text.is_empty():
 			_input_text = _input_text.substr(0, _input_text.length() - 1)
 			_refresh_input_text_visual()
+			input_draft_changed.emit(_input_text, _current_payload.duplicate(true))
 		var vp_back := get_viewport()
 		if vp_back != null:
 			vp_back.set_input_as_handled()
@@ -296,6 +298,7 @@ func _set_panel_open(value: bool) -> void:
 	_set_input_focus(false)
 	_input_text = ""
 	_refresh_input_text_visual()
+	input_draft_changed.emit("", _current_payload.duplicate(true))
 	panel_visibility_changed.emit(false)
 	if Engine.is_editor_hint():
 		_set_panel_alpha(0.0)
@@ -685,6 +688,7 @@ func _handle_option_click(index: int, option_data: Dictionary, option_text: Stri
 		else:
 			_input_text = option_text
 			_refresh_input_text_visual()
+			input_draft_changed.emit(_input_text, _current_payload.duplicate(true))
 			_set_input_focus(true)
 		return
 
@@ -694,6 +698,7 @@ func _handle_option_click(index: int, option_data: Dictionary, option_text: Stri
 	else:
 		_input_text = ""
 		_refresh_input_text_visual()
+		input_draft_changed.emit("", _current_payload.duplicate(true))
 		_set_input_focus(true)
 
 func _set_input_focus(focused: bool) -> void:
@@ -774,6 +779,7 @@ func _submit_input_text() -> void:
 	else:
 		_input_text = ""
 		_refresh_input_text_visual()
+		input_draft_changed.emit("", _current_payload.duplicate(true))
 		_set_input_focus(true)
 
 func _append_input_text(segment: String) -> void:
@@ -786,6 +792,7 @@ func _append_input_text(segment: String) -> void:
 		return
 	_input_text = candidate
 	_refresh_input_text_visual()
+	input_draft_changed.emit(_input_text, _current_payload.duplicate(true))
 
 func _get_input_background_height() -> float:
 	var lines: int = _estimate_wrapped_line_count(_input_text if not _input_text.is_empty() else input_placeholder_text)

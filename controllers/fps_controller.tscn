@@ -26,13 +26,11 @@
 [ext_resource type="Script" uid="uid://crsyy4ppfnwnf" path="res://controllers/interaction/holo_inventory_dual_panel_3d.gd" id="25_dual_inv"]
 [ext_resource type="PackedScene" uid="uid://6fmvbd1hhedb" path="res://controllers/interaction/XiaokongDialogueInputPanel3D.tscn" id="26_xk_dialogue_panel"]
 [ext_resource type="PackedScene" uid="uid://bcttpkk0u6xyf" path="res://controllers/ui/TimeHud.tscn" id="27_time_hud"]
-
-[ext_resource type="Script" path="res://scripts/character_resources/character_resource_state_component.gd" id="28_resource_state"]
-[ext_resource type="Script" path="res://scripts/character_resources/character_resource_time_decay_component.gd" id="30_resource_decay"]
-
-[ext_resource type="PackedScene" path="res://controllers/ui/CharacterStatusBars2D.tscn" id="29_status_bars"]
-[ext_resource type="Script" path="res://features/anime_toon/mita_warm_particles_3d.gd" id="32_warm_particles"]
-[ext_resource type="Script" path="res://controllers/scripts/character_subtitle_overlay.gd" id="33_subtitle_overlay"]
+[ext_resource type="Script" uid="uid://cp5pthc836yma" path="res://scripts/character_resources/character_resource_state_component.gd" id="28_resource_state"]
+[ext_resource type="PackedScene" uid="uid://b8dfg0g5uotgp" path="res://controllers/ui/CharacterStatusBars2D.tscn" id="29_status_bars"]
+[ext_resource type="Script" uid="uid://beiixda73gl0f" path="res://scripts/character_resources/character_resource_time_decay_component.gd" id="30_resource_decay"]
+[ext_resource type="Script" uid="uid://m14ciefq6ug2" path="res://features/anime_toon/mita_warm_particles_3d.gd" id="32_warm_particles"]
+[ext_resource type="Script" uid="uid://cjf10xmapsoo" path="res://controllers/scripts/character_subtitle_overlay.gd" id="33_subtitle_overlay"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -130,6 +128,57 @@ _data = {
 &"crouch": SubResource("Animation_xc2pf")
 }
 
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_mqjtl"]
+emission_shape = 3
+emission_box_extents = Vector3(1.9, 1, 1.5)
+direction = Vector3(0.08, 0.3, 0.02)
+spread = 180.0
+initial_velocity_min = 0.01125
+initial_velocity_max = 0.0405
+angular_velocity_min = -12.0
+angular_velocity_max = 12.0
+gravity = Vector3(0, 0.003, 0)
+scale_min = 0.55
+scale_max = 1.05
+color = Color(1, 0.86, 0.72, 0.24)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qmwy2"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 0.86, 0.72, 0.24)
+disable_receive_shadows = true
+billboard_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_bjwns"]
+material = SubResource("StandardMaterial3D_qmwy2")
+size = Vector2(0.014, 0.014)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ou6tx"]
+emission_shape = 3
+emission_box_extents = Vector3(1.9, 1, 1.5)
+direction = Vector3(0.08, 0.3, 0.02)
+spread = 180.0
+initial_velocity_min = 0.02025
+initial_velocity_max = 0.05625
+angular_velocity_min = -12.0
+angular_velocity_max = 12.0
+gravity = Vector3(0, 0.005, 0)
+scale_min = 0.45
+scale_max = 1.15
+color = Color(1, 0.94, 0.78, 0.28)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stri7"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+albedo_color = Color(1, 0.94, 0.78, 0.28)
+disable_receive_shadows = true
+billboard_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_adv5w"]
+material = SubResource("StandardMaterial3D_stri7")
+size = Vector2(0.03, 0.02)
+
 [sub_resource type="SphereShape3D" id="SphereShape3D_yvtcv"]
 radius = 0.01
 
@@ -205,12 +254,6 @@ inventory_handler = NodePath("Components/InventoryDataService")
 inventory_panel_3d = NodePath("HoloInventoryPanel3D")
 dual_inventory_panel = NodePath("HoloInventoryDualPanel3D")
 xiaokong_dialogue_panel = NodePath("XiaokongDialogueInputPanel3D")
-footstep_volume_db = -21.0
-footstep_pitch_min = 0.96
-footstep_pitch_max = 1.02
-footstep_folder_path = "res://Audio/footsteps/sneakers_soft"
-footstep_loop_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3"
-footstep_landing_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_scuffs_170499.mp3"
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -218,10 +261,10 @@ unique_id = "player_001"
 
 [node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=630296697]
 stream = ExtResource("22_step_sfx")
-bus = &"SFX"
 volume_db = -21.0
 unit_size = 0.55
 max_distance = 6.0
+bus = &"SFX"
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]
 collision_layer = 0
@@ -276,26 +319,21 @@ follow_speed = 15.0
 [node name="InventoryDataService" type="Node" parent="Components" unique_id=1256058613]
 script = ExtResource("16_inv_data")
 inventory_storage = ExtResource("24_inv_storage")
-enable_item_stacking = true
 
-[node name="StateComponent" type="Node" parent="Components"]
+[node name="StateComponent" type="Node" parent="Components" unique_id=1342876411]
 script = ExtResource("28_resource_state")
 character_id = &"player"
 display_name = "老师"
 initial_hunger = 82.0
 initial_thirst = 78.0
-initial_mood = 70.0
 initial_favor = 0.0
 hunger_decay_per_hour = 1.35
 thirst_decay_per_hour = 1.75
 health_decay_when_hunger_critical = 0.45
 health_decay_when_thirst_critical = 0.65
 
-[node name="StateTimeDecay" type="Node" parent="Components"]
+[node name="StateTimeDecay" type="Node" parent="Components" unique_id=1817430242]
 script = ExtResource("30_resource_decay")
-state_component_path = NodePath("../StateComponent")
-real_seconds_per_game_hour = 900.0
-min_tick_game_hours = 0.05
 
 [node name="PlayerInteractionComponent" type="Node" parent="Components" unique_id=2034430049 node_paths=PackedStringArray("interaction_ray")]
 script = ExtResource("13_yvtcv")
@@ -333,15 +371,32 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3412707, 0)
 top_level = true
 cull_mask = 1
 
-
 [node name="MitaWarmParticles" type="Node3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=510205205]
 script = ExtResource("32_warm_particles")
-auto_setup_on_ready = true
-particle_count = 80
-forward_offset = -2.2
-dust_size = 0.014
-sparkle_size = 0.02
-drift_speed = 0.045
+
+[node name="WarmDustParticles" type="GPUParticles3D" parent="Marker3D/CameraOffset/Camera3D/MitaWarmParticles" unique_id=879546336]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2)
+cast_shadow = 0
+amount = 80
+amount_ratio = 0.72
+lifetime = 7.0
+preprocess = 7.0
+randomness = 0.74
+visibility_aabb = AABB(-2.4699998, -1.3, -4.15, 4.9399996, 2.6, 3.8999999)
+process_material = SubResource("ParticleProcessMaterial_mqjtl")
+draw_pass_1 = SubResource("QuadMesh_bjwns")
+
+[node name="WarmSparkleParticles" type="GPUParticles3D" parent="Marker3D/CameraOffset/Camera3D/MitaWarmParticles" unique_id=910024929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2)
+cast_shadow = 0
+amount = 9
+amount_ratio = 0.72
+lifetime = 5.04
+preprocess = 5.04
+randomness = 0.74
+visibility_aabb = AABB(-2.4699998, -1.3, -4.15, 4.9399996, 2.6, 3.8999999)
+process_material = SubResource("ParticleProcessMaterial_ou6tx")
+draw_pass_1 = SubResource("QuadMesh_adv5w")
 
 [node name="PickUpRayCast" type="RayCast3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=1410065399]
 target_position = Vector3(0, 0, -3)
@@ -391,10 +446,13 @@ script = ExtResource("25_dual_inv")
 close_check_interval_sec = 0.12
 
 [node name="XiaokongDialogueInputPanel3D" parent="." unique_id=467270216 instance=ExtResource("26_xk_dialogue_panel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2412707, -1)
 anchor_mark_path = NodePath("../Marker3D/CameraOffset/Camera3D/InteractionPanelMark3D")
 auto_focus_input_on_open = true
 show_quick_options = false
 preview_options = PackedStringArray()
+input_text_offset = Vector3(-0.33, -0.002, 0.0022)
+placeholder_text_offset = Vector3(-0.33, -0.002, 0.0024)
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=1148858384]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1882923, 0)
@@ -480,26 +538,6 @@ anchor_right = 0.5
 offset_top = 20.0
 offset_bottom = 176.0
 grow_horizontal = 2
-
-[node name="PlayerStatusBars2D" parent="." instance=ExtResource("29_status_bars")]
-state_component_path = NodePath("../Components/StateComponent")
-constant_motion = true
-breathe_seconds = 2.4
-
-[node name="CharacterSubtitleLayer" type="CanvasLayer" parent="."]
-layer = 6
-process_mode = 3
-
-[node name="CharacterSubtitleOverlay" type="Control" parent="CharacterSubtitleLayer"]
-z_index = 80
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("33_subtitle_overlay")
-default_speaker = "Mirdo"
 
 [node name="XiaokongControlPanel" type="PanelContainer" parent="Control" unique_id=118273645]
 visible = false
@@ -687,6 +725,26 @@ theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
 text = "Status: idle"
 autowrap_mode = 2
 
+[node name="PlayerStatusBars2D" parent="." unique_id=1628359490 instance=ExtResource("29_status_bars")]
+state_component_path = NodePath("../Components/StateComponent")
+breathe_seconds = 2.4
+
+[node name="CharacterSubtitleLayer" type="CanvasLayer" parent="." unique_id=836182496]
+process_mode = 3
+layer = 6
+
+[node name="CharacterSubtitleOverlay" type="Control" parent="CharacterSubtitleLayer" unique_id=1337671315]
+z_index = 80
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("33_subtitle_overlay")
+default_speaker = "Mirdo"
+
 [node name="KickArea" type="Area3D" parent="." unique_id=1376236608]
 collision_layer = 0
 collision_mask = 2
@@ -695,11 +753,5 @@ collision_mask = 2
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.52246094, 0)
 shape = SubResource("CylinderShape3D_kick")
 
-
-
-
 [connection signal="body_entered" from="Area3D" to="Area3D" method="OnObjectEnteredArea"]
 [connection signal="body_exited" from="Area3D" to="Area3D" method="OnObjectExitedArea"]
-
-
-

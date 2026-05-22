@@ -7,9 +7,10 @@ class_name CharacterSubtitleRouterComponent
 @export var player_camera_path: NodePath
 @export var player_overlay_group: StringName = &"player_subtitle_overlay"
 @export_range(0.0, 0.45, 0.01) var screen_edge_margin_ratio: float = 0.08
-@export_range(0.05, 0.75, 0.01) var comfortable_center_radius_ratio: float = 0.30
 @export_range(0.0, 40.0, 0.1) var max_overlay_distance: float = 14.0
 @export_range(0.0, 2.0, 0.05) var overlay_refresh_interval_sec: float = 0.18
+@export_range(0.2, 12.0, 0.1) var overlay_line_lifetime_sec: float = 3.2
+@export var scale_lifetime_with_text_length: bool = true
 @export var hide_overlay_when_world_subtitle_visible: bool = true
 @export var debug_log: bool = false
 
@@ -23,7 +24,9 @@ var _active_speaker: String = ""
 var _line_active: bool = false
 var _streaming: bool = false
 var _overlay_visible_for_current_line: bool = false
+var _world_seen_for_current_line: bool = false
 var _overlay_refresh_left: float = 0.0
+var _line_lifetime_left: float = 0.0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -36,6 +39,8 @@ func show_once(text: String, speaker: String = "") -> void:
 	_streaming = false
 	_line_active = not _active_text.is_empty()
 	_overlay_visible_for_current_line = false
+	_world_seen_for_current_line = false
+	_line_lifetime_left = _resolve_line_lifetime(_active_text)
 	if _world_subtitle != null and _world_subtitle.has_method("show_once"):
 		_world_subtitle.call("show_once", text, speaker)
 	_update_overlay_visibility(true)
@@ -47,6 +52,8 @@ func begin_stream(speaker: String = "") -> void:
 	_streaming = true
 	_line_active = true
 	_overlay_visible_for_current_line = false
+	_world_seen_for_current_line = false
+	_line_lifetime_left = overlay_line_lifetime_sec
 	if _world_subtitle != null and _world_subtitle.has_method("begin_stream"):
 		_world_subtitle.call("begin_stream", speaker)
 	_update_overlay_visibility(true)
@@ -58,6 +65,7 @@ func push_chunk(chunk: String) -> void:
 	if not _line_active:
 		begin_stream(_active_speaker)
 	_active_text += chunk
+	_line_lifetime_left = maxf(_line_lifetime_left, _resolve_line_lifetime(_active_text))
 	if _world_subtitle != null and _world_subtitle.has_method("push_chunk"):
 		_world_subtitle.call("push_chunk", chunk)
 	_update_overlay_visibility(true)
@@ -69,6 +77,7 @@ func finish_stream(final_text: String = "") -> void:
 		_active_text = clean
 	_streaming = false
 	_line_active = not _active_text.strip_edges().is_empty()
+	_line_lifetime_left = _resolve_line_lifetime(_active_text)
 	if _world_subtitle != null and _world_subtitle.has_method("finish_stream"):
 		_world_subtitle.call("finish_stream", final_text)
 	_update_overlay_visibility(true)
@@ -77,7 +86,9 @@ func cancel_now() -> void:
 	_line_active = false
 	_streaming = false
 	_active_text = ""
+	_line_lifetime_left = 0.0
 	_overlay_visible_for_current_line = false
+	_world_seen_for_current_line = false
 	if _world_subtitle != null and _world_subtitle.has_method("cancel_now"):
 		_world_subtitle.call("cancel_now")
 	if _player_overlay != null and _player_overlay.has_method("cancel_now"):
@@ -110,6 +121,11 @@ func is_overlay_needed_now() -> bool:
 func _process(delta: float) -> void:
 	if not _line_active:
 		return
+	if not _streaming:
+		_line_lifetime_left = maxf(0.0, _line_lifetime_left - delta)
+		if _line_lifetime_left <= 0.0:
+			_expire_current_line()
+			return
 	_overlay_refresh_left = maxf(0.0, _overlay_refresh_left - delta)
 	if _overlay_refresh_left <= 0.0:
 		_overlay_refresh_left = overlay_refresh_interval_sec
@@ -123,6 +139,8 @@ func _update_overlay_visibility(force_refresh: bool = false) -> void:
 		return
 	var should_show := _should_show_overlay()
 	if should_show:
+		if _world_seen_for_current_line and not _overlay_visible_for_current_line:
+			return
 		if _player_overlay == null or not _player_overlay.has_method("show_once"):
 			return
 		if not _overlay_visible_for_current_line:
@@ -130,9 +148,8 @@ func _update_overlay_visibility(force_refresh: bool = false) -> void:
 			_overlay_visible_for_current_line = true
 		elif _streaming and _player_overlay.has_method("finish_stream"):
 			_player_overlay.call("finish_stream", _active_text)
-		elif force_refresh and not _streaming:
-			_player_overlay.call("show_once", _active_text, _active_speaker)
 		return
+	_world_seen_for_current_line = true
 	if hide_overlay_when_world_subtitle_visible and _overlay_visible_for_current_line:
 		if _player_overlay != null and _player_overlay.has_method("cancel_now"):
 			_player_overlay.call("cancel_now")
@@ -159,9 +176,26 @@ func _should_show_overlay() -> bool:
 	var margin := minf(size.x, size.y) * screen_edge_margin_ratio
 	if screen_pos.x < margin or screen_pos.y < margin or screen_pos.x > size.x - margin or screen_pos.y > size.y - margin:
 		return true
-	var center := size * 0.5
-	var center_radius := minf(size.x, size.y) * comfortable_center_radius_ratio
-	return screen_pos.distance_to(center) > center_radius
+	return false
+
+func _expire_current_line() -> void:
+	_line_active = false
+	_streaming = false
+	_active_text = ""
+	_line_lifetime_left = 0.0
+	_overlay_visible_for_current_line = false
+	_world_seen_for_current_line = false
+	if _player_overlay != null and _player_overlay.has_method("cancel_now"):
+		_player_overlay.call("cancel_now")
+
+func _resolve_line_lifetime(text: String) -> float:
+	if not scale_lifetime_with_text_length:
+		return overlay_line_lifetime_sec
+	var clean := text.strip_edges()
+	if clean.is_empty():
+		return overlay_line_lifetime_sec
+	var reading_time := float(clean.length()) / 14.0
+	return maxf(overlay_line_lifetime_sec, minf(8.0, reading_time + 1.2))
 
 func _refresh_refs() -> void:
 	_world_subtitle = get_node_or_null(world_subtitle_path) if world_subtitle_path != NodePath() else null

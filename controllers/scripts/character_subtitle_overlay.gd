@@ -1,13 +1,15 @@
 extends Control
 class_name CharacterSubtitleOverlay
 
+const SUBTITLE_FONT: FontFile = preload("res://fonts/SmileySans-Oblique.ttf")
+
 @export var default_speaker: String = "MIRDO"
 @export_range(5.0, 120.0, 1.0) var chars_per_second: float = 36.0
 @export_range(0.2, 8.0, 0.1) var hold_seconds: float = 2.6
 @export_range(0.05, 1.0, 0.01) var fade_in_seconds: float = 0.12
 @export_range(0.05, 1.5, 0.01) var fade_out_seconds: float = 0.28
 @export_range(320.0, 1500.0, 10.0) var max_text_width: float = 860.0
-@export_range(0.0, 260.0, 1.0) var bottom_margin: float = 54.0
+@export_range(0.0, 260.0, 1.0) var bottom_margin: float = 64.0
 @export var show_speaker: bool = true
 @export var overlay_group: StringName = &"player_subtitle_overlay"
 
@@ -120,7 +122,7 @@ func _build_if_needed() -> void:
 	_anchor.anchor_right = 1.0
 	_anchor.anchor_bottom = 1.0
 	_anchor.offset_left = 0.0
-	_anchor.offset_top = -270.0
+	_anchor.offset_top = -230.0
 	_anchor.offset_right = 0.0
 	_anchor.offset_bottom = -bottom_margin
 	add_child(_anchor)
@@ -140,28 +142,29 @@ func _build_if_needed() -> void:
 	center.add_child(_bubble)
 
 	var bubble_style := StyleBoxFlat.new()
-	bubble_style.content_margin_left = 22.0
-	bubble_style.content_margin_top = 13.0
-	bubble_style.content_margin_right = 22.0
-	bubble_style.content_margin_bottom = 16.0
-	bubble_style.bg_color = Color(0.015, 0.022, 0.04, 0.84)
-	bubble_style.border_width_top = 1
-	bubble_style.border_width_right = 1
-	bubble_style.border_width_bottom = 1
-	bubble_style.border_width_left = 4
-	bubble_style.border_color = Color(0.60, 0.86, 1.0, 0.92)
-	bubble_style.corner_radius_top_left = 14
-	bubble_style.corner_radius_top_right = 14
-	bubble_style.corner_radius_bottom_left = 14
-	bubble_style.corner_radius_bottom_right = 14
-	bubble_style.shadow_color = Color(0.08, 0.48, 0.95, 0.30)
-	bubble_style.shadow_size = 14
+	bubble_style.content_margin_left = 18.0
+	bubble_style.content_margin_top = 9.0
+	bubble_style.content_margin_right = 18.0
+	bubble_style.content_margin_bottom = 11.0
+	bubble_style.bg_color = Color(0.018, 0.022, 0.026, 0.74)
+	bubble_style.border_width_top = 0
+	bubble_style.border_width_right = 0
+	bubble_style.border_width_bottom = 0
+	bubble_style.border_width_left = 0
+	bubble_style.border_color = Color(0, 0, 0, 0)
+	bubble_style.corner_radius_top_left = 6
+	bubble_style.corner_radius_top_right = 6
+	bubble_style.corner_radius_bottom_left = 6
+	bubble_style.corner_radius_bottom_right = 6
+	bubble_style.shadow_color = Color(0.0, 0.0, 0.0, 0.38)
+	bubble_style.shadow_size = 8
+	bubble_style.shadow_offset = Vector2(0, 1)
 	_bubble.add_theme_stylebox_override("panel", bubble_style)
 
 	var body := VBoxContainer.new()
 	body.name = "Body"
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 3)
+	body.add_theme_constant_override("separation", 1)
 	_bubble.add_child(body)
 
 	_speaker_label = Label.new()
@@ -169,9 +172,10 @@ func _build_if_needed() -> void:
 	_speaker_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_speaker_label.uppercase = true
 	_speaker_label.text = default_speaker
-	_speaker_label.modulate = Color(1.0, 0.78, 0.55, 0.96)
+	_speaker_label.modulate = Color(0.70, 0.76, 0.78, 0.92)
 	_speaker_label.visible = show_speaker
-	_speaker_label.add_theme_font_size_override("font_size", 17)
+	_speaker_label.add_theme_font_override("font", SUBTITLE_FONT)
+	_speaker_label.add_theme_font_size_override("font_size", 14)
 	body.add_child(_speaker_label)
 
 	_subtitle_label = Label.new()
@@ -186,12 +190,13 @@ func _build_if_needed() -> void:
 	body.add_child(_subtitle_label)
 
 	var subtitle_settings := LabelSettings.new()
-	subtitle_settings.font_size = 34
-	subtitle_settings.font_color = Color(0.72, 0.94, 1.0, 1.0)
-	subtitle_settings.outline_size = 8
-	subtitle_settings.outline_color = Color(0.04, 0.16, 0.36, 0.96)
-	subtitle_settings.shadow_size = 3
-	subtitle_settings.shadow_color = Color(0.01, 0.03, 0.08, 0.90)
+	subtitle_settings.font = SUBTITLE_FONT
+	subtitle_settings.font_size = 29
+	subtitle_settings.font_color = Color(0.88, 0.93, 0.94, 0.98)
+	subtitle_settings.outline_size = 0
+	subtitle_settings.outline_color = Color(0, 0, 0, 0)
+	subtitle_settings.shadow_size = 2
+	subtitle_settings.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
 	_subtitle_label.label_settings = subtitle_settings
 
 func _set_speaker(speaker: String) -> void:

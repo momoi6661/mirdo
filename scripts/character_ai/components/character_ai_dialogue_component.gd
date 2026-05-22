@@ -47,6 +47,17 @@ signal dialogue_failed(error_text: String)
 @export var compact_backend_context: bool = true
 @export var fallback_reply_text: String = "我有点没听清，可以再说一次吗？"
 @export var suppress_error_dialogue_output: bool = true
+@export var local_fallback_variety_enabled: bool = true
+@export var speak_local_fallback_when_ai_busy: bool = false
+@export var aggregate_player_dialogue_enabled: bool = true
+@export_range(0.0, 1.5, 0.05) var player_dialogue_aggregate_delay_sec: float = 0.45
+@export_range(0.0, 5.0, 0.1) var player_dialogue_aggregate_max_wait_sec: float = 2.5
+@export var queue_player_dialogue_while_busy: bool = true
+@export var queue_autonomous_dialogue_while_busy: bool = false
+@export var merge_queued_player_dialogue: bool = true
+@export_range(120, 1200, 10) var max_merged_player_dialogue_chars: int = 420
+@export_range(0, 8, 1) var max_queued_dialogue_requests: int = 4
+@export_range(0.05, 2.0, 0.05) var queued_dialogue_retry_delay_sec: float = 0.25
 @export var always_log: bool = true
 
 var _ai_manager: AIManager
@@ -63,6 +74,17 @@ var _face_component: Node
 var _request_in_flight: bool = false
 var _last_payload: Dictionary = {}
 var _stream_text: String = ""
+var _last_ai_error_text: String = ""
+var _ai_error_handled_during_send: bool = false
+var _sending_request: bool = false
+var _queued_dialogue_requests: Array[Dictionary] = []
+var _queue_retry_scheduled: bool = false
+var _pending_player_dialogue_parts: Array[String] = []
+var _pending_player_given_item: String = ""
+var _pending_player_source_decision: Dictionary = {}
+var _pending_player_flush_token: int = 0
+var _pending_player_first_input_ticks_msec: int = 0
+var _player_input_draft_text: String = ""
 
 func _ready() -> void:
 	_refresh_refs()
@@ -78,36 +100,264 @@ func send_player_text(player_text: String, given_item: String = "") -> Dictionar
 func send_autonomous_text(prompt_text: String, autonomous_decision: Dictionary = {}) -> Dictionary:
 	return _send_dialogue_text(prompt_text, "", "autonomous", autonomous_decision)
 
-func _send_dialogue_text(player_text: String, given_item: String = "", request_source: String = "player", source_decision: Dictionary = {}) -> Dictionary:
+func _send_dialogue_text(
+	player_text: String,
+	given_item: String = "",
+	request_source: String = "player",
+	source_decision: Dictionary = {},
+	bypass_player_aggregation: bool = false
+) -> Dictionary:
 	_refresh_refs()
 	_bind_ai_signals()
 	var text := player_text.strip_edges()
 	if text.is_empty():
 		return {"ok": false, "error": "empty_text"}
+	if _should_aggregate_player_dialogue(request_source, bypass_player_aggregation):
+		return _aggregate_player_dialogue_text(text, given_item, source_decision)
 	if _ai_manager == null:
 		_emit_local_fallback("ai_manager_missing")
 		return {"ok": false, "error": "ai_manager_missing"}
 	if _request_in_flight:
+		if _can_queue_dialogue_request(request_source):
+			return _enqueue_dialogue_text(text, given_item, request_source, source_decision)
 		return {"ok": false, "error": "request_in_flight"}
 
 	var payload := _build_chat_payload(text, given_item, request_source, source_decision)
 	_last_payload = payload.duplicate(true)
 	_stream_text = ""
+	_last_ai_error_text = ""
+	_ai_error_handled_during_send = false
 	_request_in_flight = true
 	dialogue_requested.emit(payload.duplicate(true))
 
 	var sent := false
+	_sending_request = true
 	if use_streaming_request and _ai_manager.has_method("request_chat_stream"):
 		sent = bool(_ai_manager.call("request_chat_stream", payload, {"type": "character_dialogue", "npc": npc_display_name}))
 	elif _ai_manager.has_method("request_chat_once"):
 		sent = bool(_ai_manager.call("request_chat_once", payload, {"type": "character_dialogue", "npc": npc_display_name}))
 	elif _ai_manager.has_method("send_chat_payload"):
 		sent = bool(_ai_manager.call("send_chat_payload", payload, {"type": "character_dialogue", "npc": npc_display_name}))
+	_sending_request = false
 	if not sent:
-		_request_in_flight = false
-		_emit_local_fallback("request_failed")
-		return {"ok": false, "error": "request_failed"}
+		var error_text := _last_ai_error_text if not _last_ai_error_text.strip_edges().is_empty() else "request_failed"
+		if error_text == "request_in_progress" and _can_queue_dialogue_request(request_source):
+			_request_in_flight = false
+			var queued := _enqueue_dialogue_text(text, given_item, request_source, source_decision, true)
+			_schedule_queued_dialogue_retry(queued_dialogue_retry_delay_sec)
+			return queued
+		if not _ai_error_handled_during_send:
+			_handle_dialogue_error(error_text)
+		return {"ok": false, "error": error_text}
 	return {"ok": true, "payload": payload}
+
+func get_queued_dialogue_count() -> int:
+	return _queued_dialogue_requests.size()
+
+func clear_queued_dialogue() -> void:
+	_queued_dialogue_requests.clear()
+
+func notify_player_input_draft_changed(draft_text: String) -> void:
+	_player_input_draft_text = draft_text.strip_edges()
+
+func _should_aggregate_player_dialogue(request_source: String, bypass_player_aggregation: bool) -> bool:
+	if bypass_player_aggregation:
+		return false
+	if not aggregate_player_dialogue_enabled:
+		return false
+	if player_dialogue_aggregate_delay_sec <= 0.0:
+		return false
+	var source := request_source.strip_edges()
+	return source.is_empty() or source == "player"
+
+func _aggregate_player_dialogue_text(player_text: String, given_item: String = "", source_decision: Dictionary = {}) -> Dictionary:
+	if _pending_player_dialogue_parts.is_empty():
+		_pending_player_first_input_ticks_msec = Time.get_ticks_msec()
+	_pending_player_dialogue_parts.append(player_text.strip_edges())
+	if _pending_player_given_item.is_empty() and not given_item.strip_edges().is_empty():
+		_pending_player_given_item = given_item.strip_edges()
+	if _pending_player_source_decision.is_empty() and not source_decision.is_empty():
+		_pending_player_source_decision = source_decision.duplicate(true)
+	_pending_player_flush_token += 1
+	var token := _pending_player_flush_token
+	_log("dialogue_aggregate_pending parts=%d text=%s" % [
+		_pending_player_dialogue_parts.size(),
+		_preview_text(player_text),
+	])
+	var timer := get_tree().create_timer(player_dialogue_aggregate_delay_sec)
+	timer.timeout.connect(func() -> void:
+		_flush_pending_player_dialogue_if_current(token)
+	)
+	return {"ok": true, "queued": true, "aggregating": true, "parts": _pending_player_dialogue_parts.size()}
+
+func _flush_pending_player_dialogue_if_current(token: int) -> void:
+	if token != _pending_player_flush_token:
+		return
+	if _should_delay_pending_player_dialogue_flush():
+		_pending_player_flush_token += 1
+		var next_token := _pending_player_flush_token
+		var timer := get_tree().create_timer(player_dialogue_aggregate_delay_sec)
+		timer.timeout.connect(func() -> void:
+			_flush_pending_player_dialogue_if_current(next_token)
+		)
+		return
+	_flush_pending_player_dialogue()
+
+func _flush_pending_player_dialogue() -> void:
+	if _pending_player_dialogue_parts.is_empty():
+		return
+	var merged_text := _format_related_player_dialogue(_pending_player_dialogue_parts)
+	var item := _pending_player_given_item
+	var decision := _pending_player_source_decision.duplicate(true)
+	_pending_player_dialogue_parts.clear()
+	_pending_player_given_item = ""
+	_pending_player_source_decision = {}
+	_pending_player_first_input_ticks_msec = 0
+	_send_dialogue_text(merged_text, item, "player", decision, true)
+
+func _should_delay_pending_player_dialogue_flush() -> bool:
+	if _pending_player_dialogue_parts.is_empty():
+		return false
+	if _player_input_draft_text.is_empty():
+		return false
+	if player_dialogue_aggregate_max_wait_sec <= 0.0:
+		return false
+	var first_ticks := _pending_player_first_input_ticks_msec
+	if first_ticks <= 0:
+		return true
+	var elapsed_sec := float(Time.get_ticks_msec() - first_ticks) / 1000.0
+	return elapsed_sec < player_dialogue_aggregate_max_wait_sec
+
+func _format_related_player_dialogue(parts: Array[String]) -> String:
+	var clean_parts: Array[String] = []
+	for part in parts:
+		var clean := String(part).strip_edges()
+		if not clean.is_empty():
+			clean_parts.append(clean)
+	if clean_parts.is_empty():
+		return ""
+	if clean_parts.size() == 1:
+		return clean_parts[0]
+	var lines: Array[String] = [
+		"玩家连续输入了几句话，请像 AI Agent 处理连续用户消息一样按时间顺序理解：",
+		"后续内容可能是补充、修正、打断、强调或新目标；不要机械逐句回答，综合判断玩家当前最终意图后自然回应。",
+	]
+	for i in range(clean_parts.size()):
+		var prefix := "第%d句：" % int(i + 1)
+		if i == 1:
+			prefix = "随后："
+		elif i > 1:
+			prefix = "继续："
+		lines.append("%s%s" % [prefix, clean_parts[i]])
+	var merged := "\n".join(lines)
+	if merged.length() <= max_merged_player_dialogue_chars:
+		return merged
+	return "…" + merged.substr(merged.length() - max_merged_player_dialogue_chars + 1)
+
+func _can_queue_dialogue_request(request_source: String) -> bool:
+	if max_queued_dialogue_requests <= 0:
+		return false
+	var source := request_source.strip_edges()
+	if source.is_empty() or source == "player":
+		return queue_player_dialogue_while_busy
+	return queue_autonomous_dialogue_while_busy
+
+func _enqueue_dialogue_text(
+	player_text: String,
+	given_item: String = "",
+	request_source: String = "player",
+	source_decision: Dictionary = {},
+	front: bool = false
+) -> Dictionary:
+	var entry := {
+		"player_text": player_text.strip_edges(),
+		"given_item": given_item.strip_edges(),
+		"request_source": request_source.strip_edges() if not request_source.strip_edges().is_empty() else "player",
+		"source_decision": source_decision.duplicate(true),
+	}
+	if entry["player_text"].is_empty():
+		return {"ok": false, "error": "empty_text"}
+	if _try_merge_queued_dialogue(entry):
+		_log("dialogue_merged count=%d text=%s" % [
+			_queued_dialogue_requests.size(),
+			_preview_text(String((_queued_dialogue_requests.back() as Dictionary).get("player_text", ""))),
+		])
+		return {"ok": true, "queued": true, "merged": true, "queue_size": _queued_dialogue_requests.size()}
+	while _queued_dialogue_requests.size() >= max_queued_dialogue_requests:
+		if front:
+			_queued_dialogue_requests.pop_back()
+		else:
+			_queued_dialogue_requests.pop_front()
+	if front:
+		_queued_dialogue_requests.push_front(entry)
+	else:
+		_queued_dialogue_requests.append(entry)
+	_log("dialogue_queued source=%s count=%d text=%s" % [
+		String(entry.get("request_source", "")),
+		_queued_dialogue_requests.size(),
+		_preview_text(String(entry.get("player_text", ""))),
+	])
+	return {"ok": true, "queued": true, "queue_size": _queued_dialogue_requests.size()}
+
+func _try_merge_queued_dialogue(entry: Dictionary) -> bool:
+	if not merge_queued_player_dialogue:
+		return false
+	if _queued_dialogue_requests.is_empty():
+		return false
+	if String(entry.get("request_source", "player")) != "player":
+		return false
+	var tail := _queued_dialogue_requests.back() as Dictionary
+	if String(tail.get("request_source", "player")) != "player":
+		return false
+	var old_text := String(tail.get("player_text", "")).strip_edges()
+	var new_text := String(entry.get("player_text", "")).strip_edges()
+	if old_text.is_empty() or new_text.is_empty():
+		return false
+	var merged := _merge_player_dialogue_text(old_text, new_text)
+	tail["player_text"] = merged
+	var old_item := String(tail.get("given_item", "")).strip_edges()
+	var new_item := String(entry.get("given_item", "")).strip_edges()
+	if old_item.is_empty() and not new_item.is_empty():
+		tail["given_item"] = new_item
+	_queued_dialogue_requests[_queued_dialogue_requests.size() - 1] = tail
+	return true
+
+func _merge_player_dialogue_text(old_text: String, new_text: String) -> String:
+	var parts := _extract_related_player_dialogue_parts(old_text)
+	var clean_new := new_text.strip_edges()
+	if not clean_new.is_empty():
+		parts.append(clean_new)
+	return _format_related_player_dialogue(parts)
+
+func _extract_related_player_dialogue_parts(text: String) -> Array[String]:
+	var clean_text := text.strip_edges()
+	var parts: Array[String] = []
+	if clean_text.is_empty():
+		return parts
+	var lines := clean_text.split("\n", false)
+	for raw_line in lines:
+		var line := String(raw_line).strip_edges()
+		if line.is_empty():
+			continue
+		var content := _extract_related_player_dialogue_content(line)
+		if not content.is_empty():
+			parts.append(content)
+	if parts.is_empty():
+		parts.append(clean_text)
+	return parts
+
+func _extract_related_player_dialogue_content(line: String) -> String:
+	if line.begins_with("随后："):
+		return line.substr("随后：".length()).strip_edges()
+	if line.begins_with("继续："):
+		return line.substr("继续：".length()).strip_edges()
+	if line.begins_with("补充："):
+		return line.substr("补充：".length()).strip_edges()
+	if line.begins_with("第"):
+		var marker_index := line.find("句：")
+		if marker_index > 0:
+			return line.substr(marker_index + "句：".length()).strip_edges()
+	return ""
 
 func _build_chat_payload(player_text: String, given_item: String, request_source: String = "player", source_decision: Dictionary = {}) -> Dictionary:
 	var save_slot := _resolve_save_slot_name()
@@ -533,12 +783,63 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		"request_payload": _last_payload.duplicate(true),
 	}
 	dialogue_completed.emit(report)
+	_drain_queued_dialogue_deferred()
 
 func _on_ai_error(error_text: String) -> void:
 	if not _request_in_flight:
 		return
+	_last_ai_error_text = error_text
+	_ai_error_handled_during_send = true
+	_handle_dialogue_error(error_text)
+
+func _handle_dialogue_error(error_text: String) -> void:
 	_request_in_flight = false
-	_emit_local_fallback(error_text)
+	if _should_speak_local_fallback_for_error(error_text):
+		_emit_local_fallback(error_text)
+		return
+	_log("local_fallback_suppressed reason=%s" % error_text)
+	dialogue_failed.emit(error_text)
+	if not _sending_request:
+		_drain_queued_dialogue_deferred()
+
+func _should_speak_local_fallback_for_error(error_text: String) -> bool:
+	var reason := error_text.strip_edges()
+	if reason == "request_in_progress":
+		return speak_local_fallback_when_ai_busy
+	return true
+
+func _drain_queued_dialogue_deferred() -> void:
+	if _queued_dialogue_requests.is_empty() or _request_in_flight:
+		return
+	call_deferred("_drain_queued_dialogue")
+
+func _drain_queued_dialogue() -> void:
+	if _request_in_flight or _queued_dialogue_requests.is_empty():
+		return
+	var entry: Dictionary = _queued_dialogue_requests.pop_front()
+	var result := _send_dialogue_text(
+		String(entry.get("player_text", "")),
+		String(entry.get("given_item", "")),
+		String(entry.get("request_source", "player")),
+		(entry.get("source_decision", {}) as Dictionary).duplicate(true) if entry.get("source_decision", {}) is Dictionary else {},
+		true
+	)
+	if bool(result.get("queued", false)):
+		_schedule_queued_dialogue_retry(queued_dialogue_retry_delay_sec)
+
+func _schedule_queued_dialogue_retry(delay_sec: float) -> void:
+	if _queue_retry_scheduled:
+		return
+	_queue_retry_scheduled = true
+	var timer := get_tree().create_timer(maxf(0.01, delay_sec))
+	timer.timeout.connect(_on_queue_retry_timer_timeout)
+
+func _on_queue_retry_timer_timeout() -> void:
+	_queue_retry_scheduled = false
+	if not _request_in_flight:
+		_drain_queued_dialogue_deferred()
+	elif not _queued_dialogue_requests.is_empty():
+		_schedule_queued_dialogue_retry(queued_dialogue_retry_delay_sec)
 
 func _apply_ai_response(ai_data: Dictionary) -> Dictionary:
 	_refresh_refs()
@@ -563,6 +864,7 @@ func _emit_local_fallback(reason: String) -> void:
 	var player_text := String(_last_payload.get("player_text", "")).strip_edges()
 	var given_item := String(_last_payload.get("given_item", "")).strip_edges()
 	var data := _build_local_dialogue_response(player_text, given_item, reason)
+	_log("local_fallback reason=%s dialogue=%s" % [reason, String(data.get("dialogue", ""))])
 	if auto_apply_ai_response:
 		_apply_ai_response(data)
 	if direct_subtitle_enabled:
@@ -577,6 +879,7 @@ func _emit_local_fallback(reason: String) -> void:
 		"fallback": true,
 		"fallback_reason": reason,
 	})
+	_drain_queued_dialogue_deferred()
 
 func _build_local_dialogue_response(player_text: String, given_item: String = "", reason: String = "local_fallback") -> Dictionary:
 	var text := player_text.strip_edges()
@@ -693,7 +996,7 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 		expression = "joy"
 		action = "tiny_wave"
 	else:
-		dialogue = "老师，我听到啦。要我检查补给，还是陪你看看周围？"
+		dialogue = _pick_general_fallback_line(text, reason)
 		expression = "joy"
 		action = "tilt_head_cute"
 	var data := {
@@ -712,6 +1015,20 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 		data["target_nav_point"] = target_hint
 		data["target_object"] = target_hint
 	return data
+
+func _pick_general_fallback_line(player_text: String, reason: String = "") -> String:
+	if not local_fallback_variety_enabled:
+		return fallback_reply_text.strip_edges() if not fallback_reply_text.strip_edges().is_empty() else "老师，我在听呢。"
+	var options := [
+		"老师，我在听。刚才那句我可能没完全理解。",
+		"嗯，老师，我听见了。你可以再说具体一点吗？",
+		"老师，我有点没跟上，不过我会继续听你说。",
+		"我在哦，老师。你想让我靠近一点，还是先等一下？",
+		"老师，我收到啦。你再补一句，我就更明白了。",
+	]
+	var seed_text := "%s|%s|%s" % [player_text, reason, Time.get_ticks_msec()]
+	var index := absi(seed_text.hash()) % options.size()
+	return options[index]
 
 func _build_nearby_summary_line() -> String:
 	var perception := _build_compact_perception_context()
@@ -741,6 +1058,12 @@ func _limit_text(text: String, max_chars: int) -> String:
 	if clean.length() <= max_chars:
 		return clean
 	return clean.substr(0, maxi(1, max_chars - 1)) + "…"
+
+func _preview_text(text: String, max_chars: int = 36) -> String:
+	var clean := text.strip_edges()
+	if clean.length() <= max_chars:
+		return clean
+	return clean.substr(0, maxi(1, max_chars - 3)) + "..."
 
 func _simple_visemes_for_text(text: String) -> String:
 	var count = clampi(int(ceil(float(maxi(1, text.length())) / 6.0)), 1, 5)
