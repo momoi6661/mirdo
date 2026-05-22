@@ -384,9 +384,20 @@ func _run_inspector_play_viseme_sequence() -> void:
 	play_viseme_text(inspector_viseme_sequence, external_viseme_separator)
 
 func _normalize_expression_name(expression_name: StringName) -> StringName:
-	var lowered := StringName(String(expression_name).to_lower())
-	if EXPRESSION_ALIASES.has(lowered):
-		return lowered
+	var lowered := String(String(expression_name).strip_edges().to_lower())
+	match lowered:
+		"neutral", "face_neutral":
+			return &"neutral"
+		"joy", "face_joy", "smile", "face_smile", "happy", "face_happy":
+			return &"joy"
+		"fun", "face_fun":
+			return &"fun"
+		"angry", "face_angry":
+			return &"angry"
+		"sorrow", "face_sorrow", "sad", "face_sad", "sleepy", "face_sleepy", "worried", "face_worried":
+			return &"sorrow"
+		"surprised", "face_surprised", "surprise", "face_surprise":
+			return &"surprised"
 	return expression_name
 
 func _resolve_expression_state(expression_name: StringName) -> StringName:

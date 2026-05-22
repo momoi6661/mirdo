@@ -32,6 +32,7 @@ var _active_left_panel: HoloInventoryPanel3D
 var _active_operate_area: Area3D
 var _is_dual_open: bool = false
 var _close_check_elapsed: float = 0.0
+var _active_left_world_drop_allowed: bool = false
 
 
 func _ready() -> void:
@@ -123,6 +124,7 @@ func open_for_container(container_node: Node) -> void:
 			left_panel_title = normalized_title
 
 	_active_container = container
+	_active_left_world_drop_allowed = allow_world_drop_from_left_panel or _container_allows_left_world_drop(container, left_panel)
 	if _left_adapter == null:
 		return
 	_left_adapter.call("bind_container", container)
@@ -151,6 +153,7 @@ func close_dual_panel() -> void:
 		return
 	_is_dual_open = false
 	_active_container = null
+	_active_left_world_drop_allowed = false
 	_unbind_operate_area()
 
 	if _active_left_panel != null and is_instance_valid(_active_left_panel):
@@ -329,7 +332,7 @@ func _on_right_panel_drop_requested(item: ItemData, amount: int) -> void:
 func _on_left_panel_drop_requested(item: ItemData, amount: int) -> void:
 	if item == null or amount <= 0:
 		return
-	if not allow_world_drop_from_left_panel:
+	if not _active_left_world_drop_allowed:
 		return
 	world_drop_requested.emit(item, amount)
 
@@ -372,7 +375,7 @@ func _on_left_panel_transfer_requested(
 		amount,
 		source_storage,
 		pointer_screen_pos,
-		allow_world_drop_from_left_panel
+		_active_left_world_drop_allowed
 	)
 
 
@@ -562,3 +565,20 @@ func _drop_from_source_to_world(source_storage: Object, from_slot: int, requeste
 	if removed_item == null or removed_amount <= 0:
 		return
 	world_drop_requested.emit(removed_item, removed_amount)
+
+
+func _container_allows_left_world_drop(container: LootContainerComponent, left_panel: HoloInventoryPanel3D) -> bool:
+	if left_panel != null and is_instance_valid(left_panel):
+		var panel_value: Variant = left_panel.get("allow_release_outside_panel")
+		if typeof(panel_value) == TYPE_BOOL and bool(panel_value):
+			return true
+	if container == null or not is_instance_valid(container):
+		return false
+	var current: Node = container
+	while current != null:
+		var panel := current.get_node_or_null("ContainerPanel3D") as HoloInventoryPanel3D
+		if panel != null:
+			var value: Variant = panel.get("allow_release_outside_panel")
+			return typeof(value) == TYPE_BOOL and bool(value)
+		current = current.get_parent()
+	return false

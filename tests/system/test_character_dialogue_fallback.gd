@@ -11,6 +11,7 @@ func _run() -> void:
 	await _test_related_player_lines_are_formatted_for_backend()
 	await _test_queued_player_lines_are_merged_as_agent_ordered_messages()
 	await _test_pending_flush_waits_while_player_is_typing()
+	await _test_pending_flush_resumes_after_draft_goes_idle()
 	await _test_request_in_progress_does_not_speak_local_fallback()
 	await _test_chat_payload_includes_runtime_context()
 	await _test_autonomous_chat_payload_compacts_behavior_context()
@@ -114,6 +115,26 @@ func _test_pending_flush_waits_while_player_is_typing() -> void:
 	dialogue.call("notify_player_input_draft_changed", "")
 	var should_flush: bool = bool(dialogue.call("_should_delay_pending_player_dialogue_flush"))
 	_expect(not should_flush, "pending player dialogue flush should resume after input draft is cleared")
+	dialogue.queue_free()
+	await process_frame
+
+func _test_pending_flush_resumes_after_draft_goes_idle() -> void:
+	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	if script == null:
+		return
+	var dialogue := Node.new()
+	dialogue.set_script(script)
+	root.add_child(dialogue)
+	await process_frame
+	dialogue.set("player_dialogue_aggregate_max_wait_sec", 2.0)
+	dialogue.set("player_dialogue_draft_idle_flush_sec", 0.35)
+	dialogue.call("_aggregate_player_dialogue_text", "第一句", "", {})
+	dialogue.call("notify_player_input_draft_changed", "正在补充")
+	var should_wait_now: bool = bool(dialogue.call("_should_delay_pending_player_dialogue_flush"))
+	_expect(should_wait_now, "pending player dialogue flush should wait immediately after draft changes")
+	dialogue.set("_player_input_draft_updated_msec", Time.get_ticks_msec() - 900)
+	var should_wait_after_idle: bool = bool(dialogue.call("_should_delay_pending_player_dialogue_flush"))
+	_expect(not should_wait_after_idle, "pending player dialogue flush should resume once draft text is idle instead of blocking until max wait")
 	dialogue.queue_free()
 	await process_frame
 

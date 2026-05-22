@@ -84,6 +84,7 @@ func close_panel() -> void:
 	if not visible or _is_closing:
 		return
 	_is_closing = true
+	_dismiss_confirm_delete_dialog()
 	_play_ui_sound("menu_close")
 	await _play_close_tween()
 	hide()
@@ -403,7 +404,25 @@ func _on_delete_requested(slot_name: String) -> void:
 	_pending_delete_slot = slot_name
 	if confirm_delete_dialog != null:
 		confirm_delete_dialog.dialog_text = "确定清理 %s 吗？这个操作不可撤销。" % _slot_display_name(slot_name)
-		confirm_delete_dialog.popup_centered()
+		_popup_confirm_delete_dialog()
+
+
+func _popup_confirm_delete_dialog() -> void:
+	if confirm_delete_dialog == null or not is_instance_valid(confirm_delete_dialog):
+		return
+	if confirm_delete_dialog.visible:
+		confirm_delete_dialog.grab_focus()
+		return
+	if confirm_delete_dialog.get_parent() == null:
+		add_child(confirm_delete_dialog)
+	confirm_delete_dialog.popup_centered()
+
+
+func _dismiss_confirm_delete_dialog() -> void:
+	if confirm_delete_dialog == null or not is_instance_valid(confirm_delete_dialog):
+		return
+	if confirm_delete_dialog.visible:
+		confirm_delete_dialog.hide()
 
 
 func _confirm_delete_slot() -> void:

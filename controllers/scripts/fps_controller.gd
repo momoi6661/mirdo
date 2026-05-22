@@ -26,7 +26,7 @@ extends CharacterBody3D
 
 @export_category("Footstep Audio")
 @export var footstep_player_path: NodePath = NodePath("FootstepAudio3D")
-@export var footstep_volume_db: float = -21.0
+@export var footstep_volume_db: float = -15.0
 @export var footstep_min_speed: float = 0.65
 @export var footstep_interval_walk: float = 0.58
 @export var footstep_interval_sprint: float = 0.40
@@ -41,8 +41,9 @@ extends CharacterBody3D
 @export_file("*.mp3", "*.ogg", "*.wav") var footstep_landing_stream_path: String = "res://Audio/footsteps/sneakers_soft/tennis_tile_scuffs_170499.mp3"
 @export var footstep_bus_name: StringName = &"SFX"
 @export var footstep_use_continuous_loop: bool = true
+@export var footstep_use_2d_audible_fallback: bool = true
 @export_range(0.0, 12.0, 0.1) var footstep_stop_fade_db_per_sec: float = 7.0
-@export_range(-40.0, 6.0, 0.5) var footstep_landing_volume_db: float = -20.0
+@export_range(-40.0, 6.0, 0.5) var footstep_landing_volume_db: float = -16.0
 
 @export_category("Inventory UI Audio")
 @export var inventory_ui_sfx_player_path: NodePath = NodePath("InventoryUISFXPlayer")
@@ -75,6 +76,8 @@ var is_on_crouching:bool=false
 var is_on_stand:bool=false
 var _footstep_player: AudioStreamPlayer3D
 var _footstep_landing_player: AudioStreamPlayer3D
+var _footstep_audible_player: AudioStreamPlayer
+var _footstep_landing_audible_player: AudioStreamPlayer
 var _footstep_elapsed: float = 0.0
 var _last_footstep_clip_index: int = -1
 var _was_grounded_for_footsteps: bool = false
@@ -82,6 +85,8 @@ var _last_footstep_vertical_velocity: float = 0.0
 var _footstep_loop_active: bool = false
 var _footstep_loop_target_volume_db: float = -21.0
 var _inventory_ui_sfx_player: AudioStreamPlayer
+var _footstep_debug_elapsed: float = 0.0
+var _footstep_was_moving: bool = false
 
 var _mouse_rotation : Vector3
 var _player_rotation : Vector3
@@ -680,6 +685,7 @@ func _on_xiaokong_dialogue_panel_visibility_changed(is_open: bool) -> void:
 	_set_world_interaction_blocked(is_open)
 	if not is_open:
 		_dialogue_mouse_free_mode = false
+		_release_ui_captured_movement_input()
 		if not _is_inventory_panel_open():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -742,7 +748,6 @@ func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target:
 	
 	if !is_climbing:
 		move_and_slide()
-		
 		handle_rigid_body_collisions()
 		
 		if step_handler:
@@ -750,17 +755,73 @@ func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target:
 
 	_update_footstep_audio(delta, vertical_velocity_before_slide)
 
+func _release_ui_captured_movement_input() -> void:
+	for action_name in [&"move_forward", &"move_backward", &"move_left", &"move_right", &"sprint", &"jump"]:
+		if Input.is_action_pressed(action_name):
+			Input.action_release(action_name)
+	velocity.x = 0.0
+	velocity.z = 0.0
+	_rotation_input = 0.0
+	_tilt_input = 0.0
+
 func _resolve_footstep_player() -> void:
 	_footstep_player = get_node_or_null(footstep_player_path) as AudioStreamPlayer3D
 	if _footstep_player == null:
 		_footstep_player = get_node_or_null("FootstepAudio3D") as AudioStreamPlayer3D
+	_ensure_footstep_audible_player()
 	if _footstep_landing_player == null or not is_instance_valid(_footstep_landing_player):
 		_footstep_landing_player = get_node_or_null("FootstepLandingAudio3D") as AudioStreamPlayer3D
 	if _footstep_landing_player == null:
 		_footstep_landing_player = AudioStreamPlayer3D.new()
 		_footstep_landing_player.name = "FootstepLandingAudio3D"
 		add_child(_footstep_landing_player)
+	_ensure_footstep_landing_audible_player()
 	_configure_landing_player()
+
+func _ensure_footstep_audible_player() -> void:
+	if not footstep_use_2d_audible_fallback:
+		return
+	if _footstep_audible_player != null and is_instance_valid(_footstep_audible_player):
+		return
+	_footstep_audible_player = get_node_or_null("PlayerFootstepAudiblePlayer") as AudioStreamPlayer
+	if _footstep_audible_player == null:
+		_footstep_audible_player = AudioStreamPlayer.new()
+		_footstep_audible_player.name = "PlayerFootstepAudiblePlayer"
+		add_child(_footstep_audible_player)
+	_configure_footstep_audible_player(_footstep_audible_player)
+
+func _ensure_footstep_landing_audible_player() -> void:
+	if not footstep_use_2d_audible_fallback:
+		return
+	if _footstep_landing_audible_player != null and is_instance_valid(_footstep_landing_audible_player):
+		return
+	_footstep_landing_audible_player = get_node_or_null("PlayerFootstepLandingAudiblePlayer") as AudioStreamPlayer
+	if _footstep_landing_audible_player == null:
+		_footstep_landing_audible_player = AudioStreamPlayer.new()
+		_footstep_landing_audible_player.name = "PlayerFootstepLandingAudiblePlayer"
+		add_child(_footstep_landing_audible_player)
+	_configure_footstep_audible_player(_footstep_landing_audible_player)
+
+func _get_primary_footstep_player():
+	if footstep_use_2d_audible_fallback:
+		_ensure_footstep_audible_player()
+		if _footstep_audible_player != null:
+			return _footstep_audible_player
+	return _footstep_player
+
+func _get_primary_landing_player():
+	if footstep_use_2d_audible_fallback:
+		_ensure_footstep_landing_audible_player()
+		if _footstep_landing_audible_player != null:
+			return _footstep_landing_audible_player
+	return _footstep_landing_player
+
+func _configure_footstep_audible_player(player: AudioStreamPlayer) -> void:
+	if player == null:
+		return
+	if not String(footstep_bus_name).is_empty() and AudioServer.get_bus_index(String(footstep_bus_name)) != -1:
+		player.bus = String(footstep_bus_name)
+	player.volume_db = footstep_volume_db
 
 func _autoload_footstep_clips() -> void:
 	if not footstep_clips.is_empty():
@@ -792,20 +853,34 @@ func _autoload_footstep_clips() -> void:
 	_configure_footstep_clips()
 
 func _apply_footstep_volume() -> void:
-	if _footstep_player == null:
+	var primary_player = _get_primary_footstep_player()
+	if primary_player == null:
 		return
 	if not String(footstep_bus_name).is_empty() and AudioServer.get_bus_index(String(footstep_bus_name)) != -1:
-		_footstep_player.bus = String(footstep_bus_name)
-	_footstep_player.volume_db = footstep_volume_db
-	_configure_footstep_stream(_footstep_player.stream)
+		if _footstep_player != null:
+			_footstep_player.bus = String(footstep_bus_name)
+		primary_player.bus = String(footstep_bus_name)
+	if _footstep_player != null:
+		_footstep_player.volume_db = footstep_volume_db
+	_configure_footstep_audible_player(_footstep_audible_player)
+	primary_player.volume_db = footstep_volume_db
+	_configure_footstep_stream(primary_player.stream)
+	if _footstep_player != null:
+		_configure_footstep_stream(_footstep_player.stream)
 	_configure_landing_player()
 
 func _update_footstep_audio(delta: float, vertical_velocity_before_slide: float = INF) -> void:
-	if _footstep_player == null:
+	var primary_player = _get_primary_footstep_player()
+	if primary_player == null:
 		return
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
 	var grounded := is_on_floor()
 	var should_play_step := grounded and horizontal_speed >= footstep_min_speed
+	_footstep_debug_elapsed += delta
+	if _footstep_debug_elapsed >= 1.0:
+		_footstep_debug_elapsed = 0.0
+		if should_play_step or primary_player.playing:
+			print("[Footstep] player ground=%s speed=%.2f should=%s playing=%s audible=%s clips=%d stream=%s vol=%.1f bus=%s" % [str(grounded), horizontal_speed, str(should_play_step), str(primary_player.playing), str(primary_player == _footstep_audible_player), footstep_clips.size(), primary_player.stream.resource_path if primary_player.stream != null else "", primary_player.volume_db, primary_player.bus])
 	var vertical_sample := vertical_velocity_before_slide if is_finite(vertical_velocity_before_slide) else _last_footstep_vertical_velocity
 	var landing_fall_speed: float = maxf(0.0, -vertical_sample)
 
@@ -821,8 +896,15 @@ func _update_footstep_audio(delta: float, vertical_velocity_before_slide: float 
 		return
 
 	if not should_play_step:
+		_footstep_was_moving = false
 		if not grounded:
 			_footstep_elapsed = 0.0
+		return
+
+	if not _footstep_was_moving:
+		_footstep_was_moving = true
+		_footstep_elapsed = 0.0
+		_play_footstep_audio(false)
 		return
 
 	var base_interval: float = footstep_interval_sprint if _is_sprinting else footstep_interval_walk
@@ -837,7 +919,8 @@ func _update_footstep_audio(delta: float, vertical_velocity_before_slide: float 
 	_play_footstep_audio(false)
 
 func _play_footstep_audio(is_landing_step: bool = false) -> void:
-	if _footstep_player == null:
+	var primary_player = _get_primary_footstep_player()
+	if primary_player == null:
 		return
 	if not footstep_clips.is_empty():
 		var clip_index: int = randi() % footstep_clips.size()
@@ -849,67 +932,80 @@ func _play_footstep_audio(is_landing_step: bool = false) -> void:
 		_last_footstep_clip_index = clip_index
 		var clip: AudioStream = footstep_clips[clip_index]
 		if clip != null:
-			_footstep_player.stream = clip
-			_configure_footstep_stream(_footstep_player.stream)
-	if _footstep_player.stream == null:
+			primary_player.stream = clip
+			if _footstep_player != null:
+				_footstep_player.stream = clip
+			_configure_footstep_stream(primary_player.stream)
+	if primary_player.stream == null:
 		return
 	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
 	var speed_ratio: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.0, 1.6)
 	var speed_gain_db: float = lerpf(-2.2, 0.8, clampf(speed_ratio / 1.6, 0.0, 1.0))
 	var crouch_gain_db: float = -4.0 if is_crouching or is_on_crouching else 0.0
 	var landing_gain_db: float = footstep_landing_volume_boost_db if is_landing_step else 0.0
-	_footstep_player.stop()
-	_footstep_player.volume_db = footstep_volume_db + speed_gain_db + crouch_gain_db + landing_gain_db + randf_range(-footstep_volume_jitter_db, footstep_volume_jitter_db)
-	_footstep_player.pitch_scale = randf_range(footstep_pitch_min, footstep_pitch_max)
-	_footstep_player.max_distance = 6.0
-	_footstep_player.unit_size = 0.55
-	_footstep_player.play()
+	primary_player.stop()
+	primary_player.volume_db = footstep_volume_db + speed_gain_db + crouch_gain_db + landing_gain_db + randf_range(-footstep_volume_jitter_db, footstep_volume_jitter_db)
+	primary_player.pitch_scale = randf_range(footstep_pitch_min, footstep_pitch_max)
+	if primary_player is AudioStreamPlayer3D:
+		(primary_player as AudioStreamPlayer3D).max_distance = 10.0
+		(primary_player as AudioStreamPlayer3D).unit_size = 1.0
+	primary_player.play()
+	print("[Footstep] play player audible=%s stream=%s vol=%.1f pitch=%.2f bus=%s" % [str(primary_player == _footstep_audible_player), primary_player.stream.resource_path if primary_player.stream != null else "", primary_player.volume_db, primary_player.pitch_scale, primary_player.bus])
 
 func _play_landing_footstep_audio(fall_speed: float) -> void:
-	if _footstep_landing_player == null:
+	var landing_player = _get_primary_landing_player()
+	if landing_player == null:
 		return
-	if _footstep_landing_player.stream == null:
+	if landing_player.stream == null:
 		var landing_stream := load(footstep_landing_stream_path) as AudioStream if not footstep_landing_stream_path.is_empty() else null
 		if landing_stream == null and not footstep_clips.is_empty():
 			landing_stream = footstep_clips[0]
-		_footstep_landing_player.stream = landing_stream
+		landing_player.stream = landing_stream
+		if _footstep_landing_player != null:
+			_footstep_landing_player.stream = landing_stream
 	_configure_landing_player()
-	if _footstep_landing_player.stream == null:
+	if landing_player.stream == null:
 		return
 	var strength := clampf((fall_speed - footstep_landing_min_fall_speed) / 5.0, 0.0, 1.0)
-	_footstep_landing_player.stop()
-	_footstep_landing_player.volume_db = footstep_landing_volume_db + footstep_landing_volume_boost_db * strength + randf_range(-0.6, 0.6)
-	_footstep_landing_player.pitch_scale = randf_range(0.96, 1.03)
-	_footstep_landing_player.play(0.0)
+	landing_player.stop()
+	landing_player.volume_db = footstep_landing_volume_db + footstep_landing_volume_boost_db * strength + randf_range(-0.6, 0.6)
+	landing_player.pitch_scale = randf_range(0.96, 1.03)
+	landing_player.play(0.0)
+	print("[Footstep] landing player audible=%s fall=%.2f stream=%s vol=%.1f bus=%s" % [str(landing_player == _footstep_landing_audible_player), fall_speed, landing_player.stream.resource_path if landing_player.stream != null else "", landing_player.volume_db, landing_player.bus])
 
 func _update_footstep_loop(delta: float, should_play_step: bool, horizontal_speed: float) -> void:
-	if _footstep_player == null:
+	var primary_player = _get_primary_footstep_player()
+	if primary_player == null:
 		return
 	if should_play_step:
-		if _footstep_player.stream == null and not footstep_clips.is_empty():
-			_footstep_player.stream = footstep_clips[0]
-			_configure_footstep_stream(_footstep_player.stream)
-		if _footstep_player.stream == null:
+		if primary_player.stream == null and not footstep_clips.is_empty():
+			primary_player.stream = footstep_clips[0]
+			if _footstep_player != null:
+				_footstep_player.stream = footstep_clips[0]
+			_configure_footstep_stream(primary_player.stream)
+		if primary_player.stream == null:
 			return
 		var speed_ratio: float = clampf(horizontal_speed / maxf(0.01, SPEED_DEFAULT), 0.0, 1.6)
 		var speed_gain_db: float = lerpf(-2.2, 0.8, clampf(speed_ratio / 1.6, 0.0, 1.0))
 		var crouch_gain_db: float = -4.0 if is_crouching or is_on_crouching else 0.0
 		_footstep_loop_target_volume_db = footstep_volume_db + speed_gain_db + crouch_gain_db
-		_footstep_player.max_distance = 6.0
-		_footstep_player.unit_size = 0.55
-		_footstep_player.pitch_scale = clampf(remap(horizontal_speed, footstep_min_speed, SPEED_DEFAULT * 1.6, footstep_pitch_min, footstep_pitch_max), footstep_pitch_min, footstep_pitch_max)
-		if not _footstep_player.playing:
-			_footstep_player.volume_db = _footstep_loop_target_volume_db
-			_footstep_player.play()
+		primary_player.pitch_scale = clampf(remap(horizontal_speed, footstep_min_speed, SPEED_DEFAULT * 1.6, footstep_pitch_min, footstep_pitch_max), footstep_pitch_min, footstep_pitch_max)
+		if primary_player is AudioStreamPlayer3D:
+			(primary_player as AudioStreamPlayer3D).max_distance = 10.0
+			(primary_player as AudioStreamPlayer3D).unit_size = 1.0
+		if not primary_player.playing:
+			primary_player.volume_db = _footstep_loop_target_volume_db
+			primary_player.play()
+			print("[Footstep] START player audible=%s stream=%s vol=%.1f bus=%s loop=%s pos=%.3f" % [str(primary_player == _footstep_audible_player), primary_player.stream.resource_path if primary_player.stream != null else "", primary_player.volume_db, primary_player.bus, _stream_loop_debug(primary_player.stream), primary_player.get_playback_position()])
 		else:
-			_footstep_player.volume_db = lerpf(_footstep_player.volume_db, _footstep_loop_target_volume_db, clampf(delta * 8.0, 0.0, 1.0))
+			primary_player.volume_db = lerpf(primary_player.volume_db, _footstep_loop_target_volume_db, clampf(delta * 8.0, 0.0, 1.0))
 		_footstep_loop_active = true
 		return
-	if _footstep_player.playing and _footstep_loop_active:
-		_footstep_player.volume_db = move_toward(_footstep_player.volume_db, -60.0, footstep_stop_fade_db_per_sec * delta)
-		if _footstep_player.volume_db <= -55.0:
-			_footstep_player.stop()
-			_footstep_player.volume_db = footstep_volume_db
+	if primary_player.playing and _footstep_loop_active:
+		primary_player.volume_db = move_toward(primary_player.volume_db, -60.0, footstep_stop_fade_db_per_sec * delta)
+		if primary_player.volume_db <= -55.0:
+			primary_player.stop()
+			primary_player.volume_db = footstep_volume_db
 			_footstep_loop_active = false
 	else:
 		_footstep_loop_active = false
@@ -928,20 +1024,59 @@ func _configure_footstep_stream(stream: AudioStream) -> void:
 	elif stream is AudioStreamWAV:
 		var wav := stream as AudioStreamWAV
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if footstep_use_continuous_loop else AudioStreamWAV.LOOP_DISABLED
+		if footstep_use_continuous_loop:
+			wav.loop_begin = 0
+			var sample_count := _footstep_wav_sample_count(wav)
+			if sample_count > 0:
+				wav.loop_end = sample_count
+
+func _footstep_wav_sample_count(wav: AudioStreamWAV) -> int:
+	if wav == null:
+		return 0
+	var channel_count := 2 if wav.stereo else 1
+	var bytes_per_sample := 2
+	match wav.format:
+		AudioStreamWAV.FORMAT_8_BITS:
+			bytes_per_sample = 1
+		AudioStreamWAV.FORMAT_16_BITS:
+			bytes_per_sample = 2
+		_:
+			return max(int(round(wav.get_length() * float(wav.mix_rate))), 0)
+	var frame_size := bytes_per_sample * channel_count
+	if frame_size <= 0:
+		return 0
+	return int(wav.data.size() / float(frame_size))
 
 func _configure_landing_player() -> void:
-	if _footstep_landing_player == null:
-		return
+	var landing_player = _get_primary_landing_player()
 	if not String(footstep_bus_name).is_empty() and AudioServer.get_bus_index(String(footstep_bus_name)) != -1:
-		_footstep_landing_player.bus = String(footstep_bus_name)
-	_footstep_landing_player.max_distance = 5.5
-	_footstep_landing_player.unit_size = 0.55
-	if _footstep_landing_player.stream is AudioStreamMP3:
-		(_footstep_landing_player.stream as AudioStreamMP3).loop = false
-	elif _footstep_landing_player.stream is AudioStreamOggVorbis:
-		(_footstep_landing_player.stream as AudioStreamOggVorbis).loop = false
-	elif _footstep_landing_player.stream is AudioStreamWAV:
-		(_footstep_landing_player.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_DISABLED
+		if _footstep_landing_player != null:
+			_footstep_landing_player.bus = String(footstep_bus_name)
+		if landing_player != null:
+			landing_player.bus = String(footstep_bus_name)
+	if _footstep_landing_player != null:
+		_footstep_landing_player.max_distance = 9.0
+		_footstep_landing_player.unit_size = 1.0
+	if landing_player == null:
+		return
+	if landing_player.stream is AudioStreamMP3:
+		(landing_player.stream as AudioStreamMP3).loop = false
+	elif landing_player.stream is AudioStreamOggVorbis:
+		(landing_player.stream as AudioStreamOggVorbis).loop = false
+	elif landing_player.stream is AudioStreamWAV:
+		(landing_player.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_DISABLED
+
+func _stream_loop_debug(stream: AudioStream) -> String:
+	if stream == null:
+		return "none"
+	if stream is AudioStreamMP3:
+		return "mp3 loop=%s offset=%.3f len=%.3f" % [str((stream as AudioStreamMP3).loop), (stream as AudioStreamMP3).loop_offset, stream.get_length()]
+	if stream is AudioStreamOggVorbis:
+		return "ogg loop=%s offset=%.3f len=%.3f" % [str((stream as AudioStreamOggVorbis).loop), (stream as AudioStreamOggVorbis).loop_offset, stream.get_length()]
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		return "wav mode=%d begin=%d end=%d len=%.3f" % [wav.loop_mode, wav.loop_begin, wav.loop_end, wav.get_length()]
+	return stream.get_class()
 
 func _resolve_inventory_ui_sfx_player() -> void:
 	_inventory_ui_sfx_player = get_node_or_null(inventory_ui_sfx_player_path) as AudioStreamPlayer
@@ -1004,6 +1139,10 @@ func _ready():
 	_resolve_footstep_player()
 	_autoload_footstep_clips()
 	_apply_footstep_volume()
+	var footstep_ready_bus := ""
+	if _footstep_player != null:
+		footstep_ready_bus = _footstep_player.bus
+	print("[Footstep] ready player=%s clips=%d folder=%s one_shot=%s volume=%.1f bus=%s" % [str(_footstep_player != null), footstep_clips.size(), footstep_folder_path, str(not footstep_use_continuous_loop), footstep_volume_db, footstep_ready_bus])
 	_resolve_inventory_ui_sfx_player()
 	shape_cast_3d.add_exception($'.')
 	add_to_group("player")

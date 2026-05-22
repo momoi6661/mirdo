@@ -149,7 +149,11 @@ func start_new_game(new_game_scene_path: String = "") -> bool:
 	await _release_external_load_cover_if_needed(use_external_cover)
 	current_slot_name = _resolve_slot_name(current_slot_name)
 	last_loaded_slot_name = current_slot_name
-	_save_profile(current_slot_name)
+	var initial_saved := save_game(current_slot_name)
+	if not initial_saved:
+		push_warning("[SaveManager] 新游戏初始进度保存失败: %s" % last_error)
+		_save_profile(current_slot_name)
+	_play_game_bgm()
 	return true
 
 
@@ -324,6 +328,7 @@ func load_game(slot_name: String = "") -> bool:
 	is_loading = false
 	last_loaded_slot_name = resolved_slot
 	_save_profile(resolved_slot)
+	_play_game_bgm()
 	load_finished.emit(resolved_slot, true)
 	print("[SaveManager] Game loaded: ", file_path)
 	return true
@@ -342,6 +347,12 @@ func _release_external_load_cover_if_needed(use_external_cover: bool) -> void:
 		await transition_ui.call("release_cover")
 		if transition_ui.has_method("force_release_cover"):
 			transition_ui.call("force_release_cover")
+
+
+func _play_game_bgm() -> void:
+	var audio_manager := get_node_or_null("/root/AudioManager")
+	if audio_manager != null and audio_manager.has_method("play_game_music"):
+		audio_manager.call("play_game_music")
 
 
 func delete_save(slot_name: String = "") -> bool:
@@ -641,13 +652,18 @@ func _load_profile() -> void:
 	last_loaded_slot_name = _sanitize_slot_name(String(profile.get("last_loaded_slot_name")))
 	if last_loaded_slot_name.is_empty() or not has_save(last_loaded_slot_name):
 		last_loaded_slot_name = _find_newest_existing_slot()
-	if not last_loaded_slot_name.is_empty() and has_save(last_loaded_slot_name):
-		current_slot_name = last_loaded_slot_name
-	elif not has_save(current_slot_name):
-		var newest_slot := _find_newest_existing_slot()
-		if not newest_slot.is_empty():
-			current_slot_name = newest_slot
-			last_loaded_slot_name = newest_slot
+	if current_slot_name.is_empty():
+		current_slot_name = DEFAULT_SLOT
+	if last_loaded_slot_name.is_empty() and has_save(current_slot_name):
+		last_loaded_slot_name = current_slot_name
+	if not has_save(current_slot_name):
+		if not last_loaded_slot_name.is_empty() and has_save(last_loaded_slot_name):
+			current_slot_name = last_loaded_slot_name
+		else:
+			var newest_slot := _find_newest_existing_slot()
+			if not newest_slot.is_empty():
+				current_slot_name = newest_slot
+				last_loaded_slot_name = newest_slot
 	print("[SaveManager] Profile loaded current=", current_slot_name, " last=", last_loaded_slot_name)
 
 
@@ -774,14 +790,11 @@ func _resolve_load_slot_name(slot_name: String = "") -> String:
 	var raw := slot_name.strip_edges()
 	if not raw.is_empty():
 		return _sanitize_slot_name(raw)
-	if not last_loaded_slot_name.strip_edges().is_empty() and FileAccess.file_exists(SAVE_DIR + _sanitize_slot_name(last_loaded_slot_name) + SAVE_EXTENSION):
-		return _sanitize_slot_name(last_loaded_slot_name)
-	if not current_slot_name.strip_edges().is_empty() and FileAccess.file_exists(SAVE_DIR + _sanitize_slot_name(current_slot_name) + SAVE_EXTENSION):
+	if not current_slot_name.strip_edges().is_empty():
 		return _sanitize_slot_name(current_slot_name)
-	var newest_slot := _find_newest_existing_slot()
-	if not newest_slot.is_empty():
-		return newest_slot
-	return _resolve_slot_name(current_slot_name)
+	if not last_loaded_slot_name.strip_edges().is_empty():
+		return _sanitize_slot_name(last_loaded_slot_name)
+	return DEFAULT_SLOT
 
 
 

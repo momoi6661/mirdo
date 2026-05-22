@@ -321,7 +321,10 @@ func start_follow(target: Node3D, distance: float = 1.4) -> bool:
 	_door_blocked_idle_left = 0.0
 	_navigation_opened_doors.clear()
 	_update_follow_target()
-	_set_moving_action(walk_action)
+	if _navigating:
+		_set_moving_action(walk_action)
+	else:
+		_pause_follow_movement()
 	navigation_started.emit(NodePath(), &"")
 	return true
 
@@ -503,6 +506,7 @@ func _update_follow_target() -> void:
 	if _follow_target == null or not is_instance_valid(_follow_target) or _actor == null:
 		stop_navigation(false)
 		return
+	var was_navigating := _navigating
 	var offset := _actor.global_position - _follow_target.global_position
 	offset.y = 0.0
 	if offset.length() < 0.01:
@@ -512,6 +516,20 @@ func _update_follow_target() -> void:
 	_navigating = _horizontal_distance(_actor.global_position, _target_position) > _scaled_distance(arrival_distance)
 	if _navigation_agent != null:
 		_navigation_agent.target_position = _target_position
+	if not _navigating and (was_navigating or _moving_action != &""):
+		_pause_follow_movement()
+
+func _pause_follow_movement() -> void:
+	if _actor != null:
+		_actor.velocity.x = 0.0
+		_actor.velocity.z = 0.0
+	_request_body_action(stop_action)
+	_moving_action = &""
+	_locomotion_velocity_gate_active = false
+	_pending_turn_action = &""
+	_queued_move_action_after_turn = &""
+	_turn_wait_left = 0.0
+	_turn_wait_elapsed = 0.0
 
 func _horizontal_distance(a: Vector3, b: Vector3) -> float:
 	var offset := b - a

@@ -19,6 +19,9 @@ signal decision_scored(best_decision: Dictionary, candidates: Array)
 @export_range(0.0, 1.0, 0.01) var base_ambient_score: float = 0.30
 @export_range(0.0, 1.0, 0.01) var max_rest_score_without_need: float = 0.42
 @export_range(0.0, 1.0, 0.01) var social_prompt_bonus: float = 0.34
+@export_range(0.0, 2.0, 0.01) var give_item_base_score: float = 0.42
+@export_range(0.0, 300.0, 1.0) var give_item_cooldown_sec: float = 85.0
+@export_range(0.5, 6.0, 0.05) var give_item_max_player_distance: float = 3.2
 @export_range(0.0, 1.0, 0.01) var natural_variety_band: float = 0.22
 @export_range(0.0, 1.0, 0.01) var natural_variety_chance: float = 0.34
 @export_range(0.0, 3.0, 0.01) var action_tag_weight: float = 0.22
@@ -101,6 +104,7 @@ func choose_decision(context: Dictionary = {}) -> Dictionary:
 	var candidates: Array = []
 	var is_seated := bool(context.get("is_seated", false))
 	_add_social_candidates(candidates, mind, snapshot)
+	_add_give_item_candidates(candidates, mind, snapshot, context)
 	if not is_seated:
 		_add_object_candidates(candidates, mind, snapshot, context)
 		_add_nav_point_candidates(candidates, mind, context)
@@ -145,6 +149,37 @@ func _add_social_candidates(out: Array, mind: Dictionary, _snapshot: Dictionary)
 	out.append({"kind": "ambient", "action": ambient_social_action, "score": social * 0.46 + boredom * 0.07 + fed_bonus * 0.55, "feedback": "small_wave", "cooldown_sec": 18.0, "arrival_expression": _expression_for_action_or_default(ambient_social_action, "face_joy", _snapshot)})
 	if fed_bonus > 0.0:
 		out.append({"kind": "ambient", "action": "seated_idle" if is_seated else "small_happy_bounce", "score": fed_bonus * 0.70 + social * 0.22, "feedback": "fed", "cooldown_sec": 28.0, "arrival_expression": "face_joy", "dwell_time_sec": 1.8})
+
+func _add_give_item_candidates(out: Array, mind: Dictionary, snapshot: Dictionary, context: Dictionary) -> void:
+	if bool(context.get("is_seated", false)):
+		return
+	if _is_ref_on_cooldown("give_item_to_player", context):
+		return
+	var player_distance := _player_distance(snapshot)
+	if player_distance > give_item_max_player_distance:
+		return
+	var resource_stats: Dictionary = context.get("resource_stats", snapshot.get("resource_stats", {})) as Dictionary if (context.get("resource_stats", snapshot.get("resource_stats", {})) is Dictionary) else {}
+	var mood := float(resource_stats.get("mood", mind.get("mood", 55.0)))
+	var favor := float(resource_stats.get("favor", mind.get("favor", 20.0)))
+	var social := float(mind.get("social", 0.0))
+	var player_interest := _player_interest_score(snapshot)
+	var score := give_item_base_score + social * 0.24 + player_interest * 0.22 + maxf(0.0, mood - 55.0) / 100.0 * 0.22 + maxf(0.0, favor - 25.0) / 100.0 * 0.18
+	if player_distance <= 1.7:
+		score += 0.20
+	var item_id := _choose_gift_item_id(resource_stats, mind)
+	out.append({
+		"kind": "give_item_to_player",
+		"item_id": item_id,
+		"action": "work_reach",
+		"arrival_action": "work_reach",
+		"arrival_expression": "face_fun",
+		"dialogue": _gift_dialogue_for_item(item_id),
+		"feedback": "give_item_to_player",
+		"semantic_group": "social_gift",
+		"cooldown_sec": give_item_cooldown_sec,
+		"dwell_time_sec": 2.4,
+		"score": score,
+	})
 
 func _add_object_candidates(out: Array, mind: Dictionary, snapshot: Dictionary, context: Dictionary) -> void:
 	var objects: Variant = snapshot.get("nearby_objects", [])
@@ -429,6 +464,36 @@ func _player_interest_score(snapshot: Dictionary) -> float:
 			if value is Dictionary and _has_any_tag(value as Dictionary, PackedStringArray(["player", "teacher", "social"])):
 				return 0.35
 	return 0.0
+
+func _player_distance(snapshot: Dictionary) -> float:
+	var awareness: Variant = snapshot.get("player_awareness", snapshot.get("awareness", {}))
+	if awareness is Dictionary:
+		var distance := float((awareness as Dictionary).get("distance", INF))
+		if is_finite(distance):
+			return distance
+	var objects: Variant = snapshot.get("nearby_objects", [])
+	if objects is Array:
+		for value in objects:
+			if value is Dictionary and _has_any_tag(value as Dictionary, PackedStringArray(["player", "teacher", "social"])):
+				return float((value as Dictionary).get("distance", INF))
+	return INF
+
+func _choose_gift_item_id(resource_stats: Dictionary, mind: Dictionary) -> String:
+	var health := float(resource_stats.get("health", 100.0))
+	var favor := float(resource_stats.get("favor", mind.get("favor", 20.0)))
+	if health <= 55.0 or favor >= 45.0:
+		return "bandage"
+	return "water"
+
+func _gift_dialogue_for_item(item_id: String) -> String:
+	match item_id:
+		"bandage":
+			return "老师，这个给你，受伤的时候会用得上。"
+		"medkit":
+			return "老师，急救包带上吧。"
+		"water":
+			return "老师，给你一瓶水。"
+	return "老师，这个给你。"
 
 func _make_go_decision(entry: Dictionary, target_ref: String, marker_role: String, arrival_action: String, score: float, feedback: String) -> Dictionary:
 	return {
@@ -911,6 +976,8 @@ func _push_recent(list: Array[String], value: String, limit: int) -> void:
 		list.pop_back()
 
 func _decision_target_ref(decision: Dictionary) -> String:
+	if String(decision.get("kind", "")) == "give_item_to_player":
+		return "give_item_to_player"
 	for key in ["target_nav_point", "target_object", "action"]:
 		var text := String(decision.get(key, "")).strip_edges()
 		if not text.is_empty():

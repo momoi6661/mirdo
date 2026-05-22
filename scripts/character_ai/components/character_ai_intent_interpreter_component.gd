@@ -12,6 +12,7 @@ const INTENT_STAND_UP := "stand_up"
 const INTENT_PLAY_ACTION := "play_action"
 const INTENT_SPEAK_HINT := "speak_hint"
 const INTENT_SET_EXPRESSION := "set_expression"
+const INTENT_GIVE_ITEM_TO_PLAYER := "give_item_to_player"
 
 const COMMAND_ALIASES := {
 	"follow": INTENT_FOLLOW_PLAYER,
@@ -48,6 +49,13 @@ const COMMAND_ALIASES := {
 	"play_action": INTENT_PLAY_ACTION,
 	"speak_hint": INTENT_SPEAK_HINT,
 	"set_expression": INTENT_SET_EXPRESSION,
+	"give_item": INTENT_GIVE_ITEM_TO_PLAYER,
+	"give_item_to_player": INTENT_GIVE_ITEM_TO_PLAYER,
+	"offer_item": INTENT_GIVE_ITEM_TO_PLAYER,
+	"offer_item_to_player": INTENT_GIVE_ITEM_TO_PLAYER,
+	"递给玩家": INTENT_GIVE_ITEM_TO_PLAYER,
+	"给玩家物品": INTENT_GIVE_ITEM_TO_PLAYER,
+	"给我物品": INTENT_GIVE_ITEM_TO_PLAYER,
 }
 
 func interpret_payload(payload: Dictionary) -> Dictionary:
@@ -67,6 +75,9 @@ func interpret_payload(payload: Dictionary) -> Dictionary:
 		"target_nav_point": _extract_target_nav_point(payload),
 		"marker_role": String(payload.get("marker_role", payload.get("role", ""))).strip_edges(),
 		"action": String(payload.get("action", "")).strip_edges(),
+		"item_id": _extract_item_id(payload),
+		"item_path": _extract_item_path(payload),
+		"amount": int(payload.get("amount", payload.get("count", 1))),
 		"source": String(payload.get("source", "payload")).strip_edges(),
 		"raw": payload.duplicate(true),
 	}
@@ -123,6 +134,12 @@ func _guess_intent(raw: String, canonical: String) -> String:
 		return INTENT_GO_TO_NAV_POINT
 	if canonical.contains("go_to") or canonical.contains("marker"):
 		return INTENT_GO_TO_MARKER
+	if canonical.contains("give") and (canonical.contains("item") or canonical.contains("player")):
+		return INTENT_GIVE_ITEM_TO_PLAYER
+	if canonical.contains("offer") and canonical.contains("item"):
+		return INTENT_GIVE_ITEM_TO_PLAYER
+	if lower.find("给") >= 0 and (lower.find("物品") >= 0 or lower.find("道具") >= 0):
+		return INTENT_GIVE_ITEM_TO_PLAYER
 	if lower.find("停止") >= 0 and lower.find("跟") >= 0:
 		return INTENT_STOP_FOLLOW
 	if (lower.find("跟着") >= 0 or lower.find("跟随") >= 0) and lower.find("别") < 0:
@@ -131,6 +148,36 @@ func _guess_intent(raw: String, canonical: String) -> String:
 		return INTENT_LOOK_AT_PLAYER
 	if lower.find("坐下") >= 0 or lower.find("坐着") >= 0:
 		return INTENT_SIT_DOWN
+	return ""
+
+func _extract_item_id(payload: Dictionary) -> String:
+	for key in ["item_id", "item", "given_item", "gift_item", "target_item"]:
+		if payload.has(key):
+			return String(payload[key]).strip_edges()
+	var command_value: Variant = payload.get("command", null)
+	if command_value is Dictionary:
+		return _extract_item_id(command_value as Dictionary)
+	for nested_key in ["action_hint", "intent_payload", "command_payload", "payload", "parameters", "args"]:
+		var nested_value: Variant = payload.get(nested_key, null)
+		if nested_value is Dictionary:
+			var nested_item := _extract_item_id(nested_value as Dictionary)
+			if not nested_item.is_empty():
+				return nested_item
+	return ""
+
+func _extract_item_path(payload: Dictionary) -> String:
+	for key in ["item_path", "item_resource", "item_res", "resource_path"]:
+		if payload.has(key):
+			return String(payload[key]).strip_edges()
+	var command_value: Variant = payload.get("command", null)
+	if command_value is Dictionary:
+		return _extract_item_path(command_value as Dictionary)
+	for nested_key in ["action_hint", "intent_payload", "command_payload", "payload", "parameters", "args"]:
+		var nested_value: Variant = payload.get(nested_key, null)
+		if nested_value is Dictionary:
+			var nested_path := _extract_item_path(nested_value as Dictionary)
+			if not nested_path.is_empty():
+				return nested_path
 	return ""
 
 func _extract_target_nav_point(payload: Dictionary) -> String:

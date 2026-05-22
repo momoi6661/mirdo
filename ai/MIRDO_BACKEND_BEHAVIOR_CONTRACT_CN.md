@@ -256,6 +256,67 @@ Godot 现在会给后端发送 compact 行为状态，例如：
 
 自主请求不要频繁发移动命令，除非 `source_decision` 就是移动/检查任务，且确实需要补充口播。
 
+
+
+### 到达目标后的行动结果回调（external_goal_follow_up）
+
+当玩家让 Mirdo 去某处检查/观察/使用后，Godot 执行完导航会再发起一次 `request_source="autonomous"` 请求。这不是普通自言自语，而是 **行动结果回调**，用于让后端继续做下一轮 agent 决策。
+
+典型 `context.source_decision`：
+
+```json
+{
+  "kind": "external_goal_follow_up",
+  "event": "navigation_goal_finished",
+  "target_nav_point": "bathroom_mirror_look",
+  "target_object": "bathroom_mirror",
+  "target_name": "卫生间镜子",
+  "target_description": "卫生间里的镜子，可以观察有没有异常反光。",
+  "action_hint": "靠近后看一眼镜面和周围。",
+  "arrival_action": "curious_peek",
+  "marker_role": "look",
+  "chain_id": "bathroom_mirror_look:123456",
+  "chain_depth": 1
+}
+```
+
+后端处理规则：
+
+- 把它当作“工具/行动已完成”的 observation/result，而不是玩家新命令。
+- 优先输出观察反馈，例如“老师，镜子这边我看过啦，暂时没发现异常。”
+- 不要重复返回前往同一个 `target_nav_point` / `target_object` 的命令，否则 Mirdo 会到点后又去同一个点。
+- 可以返回 `command=""` 或 `command="talk"` 表示只反馈。
+- 如果确实需要继续衍生任务，可以返回一个 **不同目标** 的新 `command`，例如镜子没异常但洗手台旁有东西，再去 `wash_sink_point`。
+- 如果要继续衍生任务，建议 dialogue 先自然说明下一步，例如“老师，镜子没问题，我再看一下洗手台旁边。”
+- `chain_id/chain_depth` 由 Godot 行为层追踪。后端可以只返回新目标，规划器会把链信息写回 `command_payload`；深度较高时应停止衍生，只反馈结果。
+- Godot 的 `CharacterAutonomousLife` 会在 follow-up 链期间暂停本地自动巡游/自言自语，避免自动行为覆盖后端新任务。
+
+示例：只反馈结果
+
+```json
+{
+  "dialogue": "老师，镜子这边我看过啦，暂时没发现奇怪的东西。",
+  "expression": "neutral",
+  "action": "curious_peek",
+  "command": "talk",
+  "command_payload": {},
+  "visemes": "aa、ih、ou"
+}
+```
+
+示例：衍生下一步
+
+```json
+{
+  "dialogue": "老师，镜子没问题，我再看一下洗手台下面。",
+  "expression": "fun",
+  "action": "work_check_lower",
+  "command": "go_to_nav_point",
+  "command_payload": {"target_nav_point": "wash_sink_point"},
+  "visemes": "aa、ih、ou"
+}
+```
+
 ## 9. 性能取舍
 
 Godot 默认开启 `compact_backend_context=true`：
@@ -325,3 +386,31 @@ Godot 默认开启 `compact_backend_context=true`：
   "visemes": "aa、ih、ou"
 }
 ```
+
+
+## Autonomous Task 自主任务请求
+
+Godot 的 `CharacterAutonomousLifeComponent` 现在会在本地自主思考周期中发起 `source_decision.kind = "autonomous_task"` 的后端请求。它不是普通自言自语，而是一次小型 Agent 决策：后端可以只返回对白，也可以同时返回对白、表情、身体动作和 `command/command_payload`。
+
+期望：
+
+```json
+{
+  "dialogue": "老师，我去清点一下食物和水。",
+  "expression": "neutral",
+  "action": "work_count_supplies",
+  "command": "go_to_nav_point",
+  "command_payload": {
+    "target_nav_point": "food_cabinet_1_approach"
+  },
+  "visemes": "aa、ih、ou"
+}
+```
+
+规则：
+
+- `autonomous_task` 可围绕食物/饮水、医疗药品、武器装备、工具材料、门口与外出风险做自然小任务。
+- 如果返回移动命令，目标必须来自 `known_nav_points/ai_nav_points` 或当前 `perception`。
+- Godot 会把 `chain_id/chain_depth` 透传给执行器；到达目标后会触发 `external_goal_follow_up`，由后端继续判断反馈或下一步。
+- Godot 会在请求和任务链期间保持 `external_grace`，避免本地巡游覆盖 AI 任务。
+- 不要固定复读“老师我听到了”；没有明确任务时可以只说一句具体观察。

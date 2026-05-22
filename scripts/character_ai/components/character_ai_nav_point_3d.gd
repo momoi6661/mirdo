@@ -34,7 +34,7 @@ class_name CharacterAINavPoint3D
 @export_group("Debug")
 @export_range(0.0, 5.0, 0.1) var debug_radius: float = 0.35
 @export var show_debug_mesh: bool = true
-@export var show_debug_mesh_in_game: bool = true
+@export var show_debug_mesh_in_game: bool = false
 
 func _ready() -> void:
 	add_to_group(&"ai_nav_point")

@@ -15,6 +15,7 @@ func _run() -> void:
 	await _test_action_executor_dialogue_interrupt_keeps_seated_posture()
 	await _test_action_executor_safely_reads_object_without_object_id_property()
 	await _test_action_executor_stand_up_uses_stand_marker_without_navigation()
+	await _test_action_executor_emits_navigation_goal_finished_report_from_motor()
 	await _test_affective_director_maps_emotion_and_stats_to_expression()
 	await _test_affective_director_applies_ai_response_to_face_component()
 	await _test_affective_director_binds_dialogue_completion_to_face_expression()
@@ -355,6 +356,63 @@ func _test_action_executor_stand_up_uses_stand_marker_without_navigation() -> vo
 	actor.queue_free()
 	seat.queue_free()
 	stand.queue_free()
+	await process_frame
+
+func _test_action_executor_emits_navigation_goal_finished_report_from_motor() -> void:
+	var executor_script: Script = load("res://scripts/character_ai/components/character_ai_action_executor_component.gd") as Script
+	var nav_point_script: Script = load("res://scripts/character_ai/components/character_ai_nav_point_3d.gd") as Script
+	_expect(executor_script != null, "CharacterAIActionExecutorComponent script should load")
+	_expect(nav_point_script != null, "CharacterAINavPoint3D script should load")
+	if executor_script == null or nav_point_script == null:
+		return
+
+	var host := Node3D.new()
+	root.add_child(host)
+	var motor := _FakeNavigationMotorWithSignal.new()
+	motor.name = "NavigationMotor"
+	host.add_child(motor)
+	var executor := Node.new()
+	executor.name = "CharacterAIActionExecutor"
+	executor.set_script(executor_script)
+	host.add_child(executor)
+	executor.set("navigation_motor_path", executor.get_path_to(motor))
+
+	var point := Marker3D.new()
+	point.name = "BathroomMirrorLookPoint"
+	point.set_script(nav_point_script)
+	point.set("point_id", "bathroom_mirror_look")
+	point.set("id_suffix_from_owner", false)
+	point.set("display_name", "卫生间镜子检查点")
+	point.set("description", "卫生间镜子前方，适合观察镜面有没有异常。")
+	point.set("action_hint", "到达后看镜面和洗手台周围。")
+	point.set("marker_role", "look")
+	point.set("arrival_action", &"curious_peek")
+	host.add_child(point)
+	point.add_to_group("ai_nav_point")
+
+	var reports: Array[Dictionary] = []
+	executor.navigation_goal_finished.connect(func(report: Dictionary) -> void:
+		reports.append(report.duplicate(true))
+	)
+	await process_frame
+	var started: bool = executor.call("_start_navigation_to_marker", point.get_path(), &"curious_peek", {"target_nav_point": "bathroom_mirror_look"}, {"intent": "go_to_nav_point", "target_nav_point": "bathroom_mirror_look"}, {"target_marker_path": String(point.get_path())})
+	_expect(started, "executor should start navigation to semantic nav point")
+	motor.navigation_finished.emit(&"curious_peek")
+	await process_frame
+	_expect(reports.size() == 1, "executor should emit navigation_goal_finished when motor finishes")
+	if reports.size() > 0:
+		var report: Dictionary = reports[0]
+		_expect(String(report.get("event", "")) == "navigation_goal_finished", "goal report should include event name")
+		_expect(String(report.get("arrival_action", "")) == "curious_peek", "goal report should include arrival action")
+		_expect(String(report.get("finished_marker_path", "")) == String(point.get_path()), "goal report should include finished marker path")
+		_expect(String(report.get("target_marker_path", "")) == String(point.get_path()), "goal report should keep target marker path")
+		_expect(String(report.get("target_nav_point", "")) == "bathroom_mirror_look", "goal report should include nav point id")
+		_expect(String(report.get("target_name", "")) == "卫生间镜子检查点", "goal report should include nav point display name")
+		_expect(String(report.get("target_description", "")).find("镜子") >= 0, "goal report should include nav point description")
+		_expect(String(report.get("action_hint", "")).find("洗手台") >= 0, "goal report should include nav point action hint")
+		_expect(String(report.get("marker_role", "")) == "look", "goal report should include marker role")
+
+	host.queue_free()
 	await process_frame
 
 func _test_affective_director_maps_emotion_and_stats_to_expression() -> void:
@@ -961,6 +1019,12 @@ class _FakeNavigationMotor:
 		return true
 	func face_direction(_direction: Vector3, _delta: float = 1.0) -> void:
 		pass
+
+
+class _FakeNavigationMotorWithSignal:
+	extends _FakeNavigationMotor
+	signal navigation_finished(arrival_action: StringName)
+	signal navigation_cancelled()
 
 class _FakeInterpreter:
 	extends Node

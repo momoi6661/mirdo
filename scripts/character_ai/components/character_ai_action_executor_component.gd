@@ -5,6 +5,7 @@ signal ai_response_application_started(ai_data: Dictionary)
 signal ai_response_application_finished(report: Dictionary)
 signal navigation_started(target_marker_path: NodePath, arrival_action: StringName)
 signal navigation_finished(arrival_action: StringName)
+signal navigation_goal_finished(report: Dictionary)
 signal navigation_cancelled()
 signal stand_up_finished()
 
@@ -13,6 +14,7 @@ signal stand_up_finished()
 @export var animation_behavior_path: NodePath
 @export var face_component_path: NodePath
 @export var navigation_motor_path: NodePath
+@export var give_item_component_path: NodePath
 @export var actor_path: NodePath
 @export var navigation_agent_path: NodePath
 @export var world_object_group: StringName = &"ai_world_object"
@@ -58,12 +60,14 @@ var _intent_interpreter: Node
 var _animation_behavior: Node
 var _face_component: Node
 var _navigation_motor: Node
+var _give_item_component: Node
 var _actor: CharacterBody3D
 var _navigation_agent: NavigationAgent3D
 var _navigation_active: bool = false
 var _follow_active: bool = false
 var _navigation_target_position: Vector3 = Vector3.ZERO
 var _navigation_target_marker_path: NodePath
+var _navigation_goal_context: Dictionary = {}
 var _pending_arrival_action: StringName = &""
 var _moving_action: StringName = &""
 var _pending_sit_marker_path: NodePath
@@ -126,6 +130,12 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 		"pick_up_item", "use_item", "eat_item":
 			if _resolve_pickable_item_marker(intent, report):
 				report["chosen_action"] = &"work_take_item"
+		"give_item_to_player":
+			report["ok"] = _resolve_gift_item(intent) != null
+			if report["ok"]:
+				report["chosen_action"] = &"work_reach"
+			else:
+				report["errors"].append("gift_item_missing")
 		_:
 			report["ok"] = true
 	return report
@@ -177,10 +187,17 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 					report["action"] = "stand_up"
 					ai_response_application_finished.emit(report.duplicate(true))
 					return report
+				"give_item_to_player":
+					var give_report := _start_give_item_to_player(intent, payload)
+					report["action_applied"] = bool(give_report.get("ok", false))
+					report["action"] = String(intent_report.get("chosen_action", "work_reach"))
+					report["intent_report"] = give_report
+					ai_response_application_finished.emit(report.duplicate(true))
+					return report
 			var chosen := StringName(String(intent_report.get("chosen_action", "")))
 			var marker_path := String(intent_report.get("target_marker_path", "")).strip_edges()
 			if not marker_path.is_empty():
-				report["navigation_started"] = _start_navigation_to_marker(NodePath(marker_path), chosen)
+				report["navigation_started"] = _start_navigation_to_marker(NodePath(marker_path), chosen, payload, intent, intent_report)
 				if report["navigation_started"]:
 					report["action_applied"] = true
 					report["action"] = String(walk_action)
@@ -407,15 +424,15 @@ func _resolve_pickable_item_marker(intent: Dictionary, report: Dictionary) -> bo
 	report["target_marker_path"] = String(marker.get_path())
 	return true
 
-func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringName) -> bool:
+func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringName, payload: Dictionary = {}, intent: Dictionary = {}, intent_report: Dictionary = {}) -> bool:
 	_refresh_refs()
 	if marker_path == NodePath():
 		return false
 	if auto_stand_before_navigation and _should_stand_before_navigation(arrival_action):
-		_queue_navigation_after_stand(marker_path, arrival_action)
+		_queue_navigation_after_stand(marker_path, arrival_action, payload, intent, intent_report)
 		return true
 	if not _ensure_seat_exit_completed_before_navigation(arrival_action):
-		_queue_navigation_after_stand(marker_path, arrival_action)
+		_queue_navigation_after_stand(marker_path, arrival_action, payload, intent, intent_report)
 		return true
 	_seat_alignment_serial += 1
 	_seat_alignment_active = false
@@ -452,6 +469,7 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	_pending_arrival_action = actual_arrival_action
 	_navigation_target_marker_path = actual_marker.get_path()
 	_navigation_target_position = actual_marker.global_position
+	_navigation_goal_context = _build_navigation_goal_context(actual_marker, actual_arrival_action, payload, intent, intent_report)
 	_navigation_active = true
 	_follow_active = false
 	_moving_action = &""
@@ -459,6 +477,7 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 		if not bool(_navigation_motor.call("move_to_marker", actual_marker, actual_arrival_action, false)):
 			_navigation_active = false
 			_navigation_target_marker_path = NodePath()
+			_navigation_goal_context = {}
 			_seat_exact_navigation_active = false
 			return false
 	elif _navigation_agent != null:
@@ -504,8 +523,10 @@ func _update_follow_target() -> void:
 func _finish_navigation() -> void:
 	var finished_action := _pending_arrival_action
 	var finished_marker_path := _navigation_target_marker_path
+	var goal_context := _navigation_goal_context.duplicate(true)
 	_stop_navigation(false)
 	if _pending_seat_marker_after_approach_path != NodePath():
+		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
 	if finished_action != &"":
@@ -515,6 +536,7 @@ func _finish_navigation() -> void:
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_pending_arrival_action = &""
 	navigation_finished.emit(finished_action)
+	_emit_navigation_goal_finished(finished_action, finished_marker_path, goal_context)
 
 func _bind_navigation_motor_signals() -> void:
 	if _navigation_motor == null:
@@ -528,26 +550,32 @@ func _bind_navigation_motor_signals() -> void:
 
 func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 	var finished_marker_path := _navigation_target_marker_path
+	var goal_context := _navigation_goal_context.duplicate(true)
 	_navigation_active = false
 	_follow_active = false
 	_navigation_target_marker_path = NodePath()
+	_navigation_goal_context = {}
 	_moving_action = &""
 	_pending_arrival_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation"):
 		_navigation_motor.call("stop_navigation", false)
 	if _seat_exact_navigation_active:
+		_navigation_goal_context = goal_context
 		_seat_exact_navigation_active = false
 		_start_seat_after_approach()
 		return
 	if _pending_seat_marker_after_approach_path != NodePath():
+		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	navigation_finished.emit(finished_action)
+	_emit_navigation_goal_finished(finished_action, finished_marker_path, goal_context)
 
 func _on_motor_navigation_cancelled() -> void:
 	_navigation_active = false
 	_follow_active = false
+	_navigation_goal_context = {}
 	_seat_alignment_active = false
 	_seat_exact_navigation_active = false
 	_stand_transition_active = false
@@ -556,6 +584,52 @@ func _on_motor_navigation_cancelled() -> void:
 	_moving_action = &""
 	navigation_cancelled.emit()
 
+func _build_navigation_goal_context(marker: Marker3D, arrival_action: StringName, payload: Dictionary, intent: Dictionary, intent_report: Dictionary) -> Dictionary:
+	var context := {
+		"arrival_action": String(arrival_action),
+		"target_marker_path": String(marker.get_path()) if marker != null else "",
+		"target_marker_name": String(marker.name) if marker != null else "",
+		"payload": payload.duplicate(true),
+		"intent": intent.duplicate(true),
+		"intent_report": intent_report.duplicate(true),
+		"target_object": String(intent.get("target_ref", intent_report.get("target_object_id", payload.get("target_object", "")))).strip_edges(),
+		"target_nav_point": String(intent.get("target_nav_point", payload.get("target_nav_point", ""))).strip_edges(),
+		"marker_role": String(intent.get("marker_role", payload.get("marker_role", ""))).strip_edges(),
+		"chain_id": String(payload.get("chain_id", "")).strip_edges(),
+		"chain_depth": int(payload.get("chain_depth", 0)),
+		"action_hint": "",
+		"target_description": "",
+		"target_name": "",
+	}
+	if marker != null and marker.has_method("build_ai_nav_point_summary"):
+		var summary_value: Variant = marker.call("build_ai_nav_point_summary", _actor)
+		if summary_value is Dictionary:
+			var summary := summary_value as Dictionary
+			context["nav_point_summary"] = summary.duplicate(true)
+			context["target_nav_point"] = String(summary.get("id", context.get("target_nav_point", ""))).strip_edges()
+			context["target_name"] = String(summary.get("name", "")).strip_edges()
+			context["target_description"] = String(summary.get("description", "")).strip_edges()
+			context["action_hint"] = String(summary.get("action_hint", "")).strip_edges()
+			if context["marker_role"].is_empty():
+				context["marker_role"] = String(summary.get("marker_role", "")).strip_edges()
+			if context["arrival_action"].is_empty():
+				context["arrival_action"] = String(summary.get("arrival_action", "")).strip_edges()
+			if String(context.get("target_object", "")).is_empty():
+				context["target_object"] = String(summary.get("target_object_id", "")).strip_edges()
+	if String(context.get("target_name", "")).is_empty():
+		context["target_name"] = String(payload.get("target_name", payload.get("target", ""))).strip_edges()
+	if String(context.get("target_description", "")).is_empty():
+		context["target_description"] = String(payload.get("target_description", "")).strip_edges()
+	return context
+
+func _emit_navigation_goal_finished(finished_action: StringName, finished_marker_path: NodePath, goal_context: Dictionary = {}) -> void:
+	var report := goal_context.duplicate(true)
+	report["ok"] = true
+	report["arrival_action"] = String(finished_action)
+	report["finished_marker_path"] = String(finished_marker_path)
+	report["event"] = "navigation_goal_finished"
+	navigation_goal_finished.emit(report)
+
 func _stop_navigation(play_stop: bool = true) -> void:
 	if play_stop:
 		_queued_navigation_after_stand = {}
@@ -563,6 +637,8 @@ func _stop_navigation(play_stop: bool = true) -> void:
 		_navigation_motor.call("stop_navigation", play_stop)
 	_navigation_active = false
 	_follow_active = false
+	if play_stop:
+		_navigation_goal_context = {}
 	_seat_alignment_active = false
 	_seat_exact_navigation_active = false
 	_stand_transition_active = false
@@ -586,6 +662,7 @@ func _cancel_transient_navigation_for_dialogue() -> void:
 	_pending_seat_marker_after_approach_path = NodePath()
 	_pending_seat_action_after_approach = &""
 	_navigation_target_marker_path = NodePath()
+	_navigation_goal_context = {}
 	_pending_arrival_action = &""
 	_moving_action = &""
 	_navigation_active = false
@@ -650,6 +727,17 @@ func _normalize_ai_payload(ai_data: Dictionary) -> Dictionary:
 		for key in command_payload.keys():
 			if not out.has(key) or String(out.get(key, "")).strip_edges().is_empty():
 				out[key] = command_payload[key]
+		var source_decision_value: Variant = out.get("source_decision", {})
+		if source_decision_value is Dictionary:
+			var source_decision := source_decision_value as Dictionary
+			if source_decision.has("chain_id") and not command_payload.has("chain_id"):
+				command_payload["chain_id"] = source_decision.get("chain_id", "")
+			if source_decision.has("chain_depth") and not command_payload.has("chain_depth"):
+				command_payload["chain_depth"] = int(source_decision.get("chain_depth", 0))
+			if source_decision.has("chain_id") and not out.has("chain_id"):
+				out["chain_id"] = source_decision.get("chain_id", "")
+			if source_decision.has("chain_depth") and not out.has("chain_depth"):
+				out["chain_depth"] = int(source_decision.get("chain_depth", 0))
 		if String(out.get("command", "")).strip_edges().is_empty():
 			var nested_command := String(command_payload.get("command", command_payload.get("intent", ""))).strip_edges()
 			if not nested_command.is_empty():
@@ -670,6 +758,12 @@ func _normalize_ai_payload(ai_data: Dictionary) -> Dictionary:
 			var nested_marker_path := String(command_payload.get("target_marker_path", command_payload.get("marker_path", ""))).strip_edges()
 			if not nested_marker_path.is_empty():
 				out["target_marker_path"] = nested_marker_path
+		if String(out.get("chain_id", "")).strip_edges().is_empty():
+			var nested_chain_id := String(command_payload.get("chain_id", "")).strip_edges()
+			if not nested_chain_id.is_empty():
+				out["chain_id"] = nested_chain_id
+		if int(out.get("chain_depth", 0)) <= 0 and int(command_payload.get("chain_depth", 0)) > 0:
+			out["chain_depth"] = int(command_payload.get("chain_depth", 0))
 	for nested_key in ["face", "facial", "mouth", "lip_sync", "lipsync"]:
 		var nested_face: Variant = out.get(nested_key, {})
 		if nested_face is Dictionary:
@@ -704,8 +798,56 @@ func _interpret_payload(payload: Dictionary) -> Dictionary:
 		"target_nav_point": String(payload.get("target_nav_point", payload.get("nav_point", payload.get("point_id", "")))).strip_edges(),
 		"marker_role": String(payload.get("marker_role", "approach")).strip_edges(),
 		"action": String(payload.get("action", "")).strip_edges(),
+		"item_id": String(payload.get("item_id", payload.get("item", payload.get("given_item", "")))).strip_edges(),
+		"item_path": String(payload.get("item_path", payload.get("item_resource", payload.get("resource_path", "")))).strip_edges(),
+		"amount": int(payload.get("amount", payload.get("count", 1))),
 		"raw": payload.duplicate(true),
 	}
+
+func _start_give_item_to_player(intent: Dictionary, payload: Dictionary) -> Dictionary:
+	_refresh_refs()
+	if _give_item_component == null or not _give_item_component.has_method("offer_item_to_player"):
+		return {"ok": false, "error": "give_item_component_missing"}
+	var item := _resolve_gift_item(intent)
+	if item == null:
+		return {"ok": false, "error": "gift_item_missing"}
+	var options := {
+		"amount": maxi(1, int(intent.get("amount", payload.get("amount", 1)))),
+		"action": String(payload.get("action", "work_reach")),
+		"expression": String(payload.get("expression", "face_fun")),
+	}
+	var line := String(payload.get("dialogue", payload.get("line", ""))).strip_edges()
+	if not line.is_empty():
+		options["line"] = line
+	if payload.has("timeout_sec"):
+		options["timeout_sec"] = float(payload.get("timeout_sec", 10.0))
+	var player := _find_player()
+	var result: Dictionary = _give_item_component.call("offer_item_to_player", item, player, options)
+	return result
+
+func _resolve_gift_item(intent: Dictionary) -> ItemData:
+	var item_path := String(intent.get("item_path", "")).strip_edges()
+	if item_path.is_empty():
+		var raw: Variant = intent.get("raw", {})
+		if raw is Dictionary:
+			item_path = String((raw as Dictionary).get("item_path", (raw as Dictionary).get("item_resource", ""))).strip_edges()
+	if not item_path.is_empty():
+		var by_path := load(item_path) as ItemData
+		if by_path != null:
+			return by_path
+	var item_id := String(intent.get("item_id", "")).strip_edges().to_lower()
+	if item_id.is_empty():
+		var raw_value: Variant = intent.get("raw", {})
+		if raw_value is Dictionary:
+			item_id = String((raw_value as Dictionary).get("item_id", (raw_value as Dictionary).get("item", (raw_value as Dictionary).get("given_item", "")))).strip_edges().to_lower()
+	match item_id:
+		"bandage", "绷带", "bandage_item":
+			return load("res://resources/items/bandage.tres") as ItemData
+		"medkit", "medical_kit", "first_aid", "first_aid_kit", "急救箱", "医疗包", "急救包":
+			return load("res://resources/items/medkit.tres") as ItemData
+		"water", "water_bottle", "水", "水瓶":
+			return load("res://resources/items/water_bottle.tres") as ItemData
+	return null
 
 func _extract_body_action(payload: Dictionary) -> StringName:
 	var action_text := String(payload.get("body_action", payload.get("action", ""))).strip_edges()
@@ -976,10 +1118,13 @@ func _should_stand_before_navigation(arrival_action: StringName) -> bool:
 		return true
 	return _stand_transition_active
 
-func _queue_navigation_after_stand(marker_path: NodePath, arrival_action: StringName) -> void:
+func _queue_navigation_after_stand(marker_path: NodePath, arrival_action: StringName, payload: Dictionary = {}, intent: Dictionary = {}, intent_report: Dictionary = {}) -> void:
 	_queued_navigation_after_stand = {
 		"marker_path": marker_path,
 		"arrival_action": arrival_action,
+		"payload": payload.duplicate(true),
+		"intent": intent.duplicate(true),
+		"intent_report": intent_report.duplicate(true),
 	}
 	if not _stand_transition_active:
 		_start_stand_up_from_active_seat()
@@ -992,9 +1137,12 @@ func _start_queued_navigation_after_stand() -> void:
 	_queued_navigation_after_stand = {}
 	var marker_path: NodePath = queued.get("marker_path", NodePath()) as NodePath
 	var arrival_action := StringName(String(queued.get("arrival_action", "")))
+	var payload: Dictionary = (queued.get("payload", {}) as Dictionary).duplicate(true) if queued.get("payload", {}) is Dictionary else {}
+	var intent: Dictionary = (queued.get("intent", {}) as Dictionary).duplicate(true) if queued.get("intent", {}) is Dictionary else {}
+	var intent_report: Dictionary = (queued.get("intent_report", {}) as Dictionary).duplicate(true) if queued.get("intent_report", {}) is Dictionary else {}
 	if marker_path == NodePath():
 		return
-	call_deferred("_start_navigation_to_marker", marker_path, arrival_action)
+	call_deferred("_start_navigation_to_marker", marker_path, arrival_action, payload, intent, intent_report)
 
 func _ensure_seat_exit_completed_before_navigation(arrival_action: StringName) -> bool:
 	if _is_sit_action(arrival_action):
@@ -1293,6 +1441,7 @@ func _refresh_refs() -> void:
 	_animation_behavior = get_node_or_null(animation_behavior_path) if animation_behavior_path != NodePath() else null
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
 	_navigation_motor = get_node_or_null(navigation_motor_path) if navigation_motor_path != NodePath() else null
+	_give_item_component = get_node_or_null(give_item_component_path) if give_item_component_path != NodePath() else null
 	_actor = get_node_or_null(actor_path) as CharacterBody3D if actor_path != NodePath() else null
 	_navigation_agent = get_node_or_null(navigation_agent_path) as NavigationAgent3D if navigation_agent_path != NodePath() else null
 	if _intent_interpreter == null:
@@ -1303,6 +1452,8 @@ func _refresh_refs() -> void:
 		_face_component = _find_sibling_with_method(&"set_face_expression")
 	if _navigation_motor == null:
 		_navigation_motor = _find_sibling_with_method(&"move_to_marker")
+	if _give_item_component == null:
+		_give_item_component = _find_sibling_with_method(&"offer_item_to_player")
 	if _actor == null:
 		_actor = _find_actor_from_parent()
 	if _navigation_agent == null and _actor != null:

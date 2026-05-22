@@ -87,7 +87,7 @@ show_alt_hint_label = true
 hint_text_override = "拖出物品：拖到背包面板可拿取；也可放入医疗品。"
 auto_place_hint_below_second_row = true
 allow_item_dragging = true
-allow_release_outside_panel = false
+allow_release_outside_panel = true
 
 [node name="LootOperateArea3D" type="Area3D" parent="." unique_id=218919176]
 collision_layer = 0

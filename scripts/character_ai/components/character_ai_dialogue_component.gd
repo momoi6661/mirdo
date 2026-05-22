@@ -52,6 +52,7 @@ signal dialogue_failed(error_text: String)
 @export var aggregate_player_dialogue_enabled: bool = true
 @export_range(0.0, 1.5, 0.05) var player_dialogue_aggregate_delay_sec: float = 0.45
 @export_range(0.0, 5.0, 0.1) var player_dialogue_aggregate_max_wait_sec: float = 2.5
+@export_range(0.0, 1.5, 0.05) var player_dialogue_draft_idle_flush_sec: float = 0.35
 @export var queue_player_dialogue_while_busy: bool = true
 @export var queue_autonomous_dialogue_while_busy: bool = false
 @export var merge_queued_player_dialogue: bool = true
@@ -85,6 +86,7 @@ var _pending_player_source_decision: Dictionary = {}
 var _pending_player_flush_token: int = 0
 var _pending_player_first_input_ticks_msec: int = 0
 var _player_input_draft_text: String = ""
+var _player_input_draft_updated_msec: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -123,6 +125,8 @@ func _send_dialogue_text(
 		return {"ok": false, "error": "request_in_flight"}
 
 	var payload := _build_chat_payload(text, given_item, request_source, source_decision)
+	if not source_decision.is_empty():
+		payload["source_decision"] = _compact_decision(source_decision)
 	_last_payload = payload.duplicate(true)
 	_stream_text = ""
 	_last_ai_error_text = ""
@@ -159,6 +163,7 @@ func clear_queued_dialogue() -> void:
 
 func notify_player_input_draft_changed(draft_text: String) -> void:
 	_player_input_draft_text = draft_text.strip_edges()
+	_player_input_draft_updated_msec = Time.get_ticks_msec()
 
 func _should_aggregate_player_dialogue(request_source: String, bypass_player_aggregation: bool) -> bool:
 	if bypass_player_aggregation:
@@ -213,6 +218,8 @@ func _flush_pending_player_dialogue() -> void:
 	_pending_player_given_item = ""
 	_pending_player_source_decision = {}
 	_pending_player_first_input_ticks_msec = 0
+	_player_input_draft_text = ""
+	_player_input_draft_updated_msec = 0
 	_send_dialogue_text(merged_text, item, "player", decision, true)
 
 func _should_delay_pending_player_dialogue_flush() -> bool:
@@ -224,9 +231,19 @@ func _should_delay_pending_player_dialogue_flush() -> bool:
 		return false
 	var first_ticks := _pending_player_first_input_ticks_msec
 	if first_ticks <= 0:
-		return true
+		return _is_player_draft_recently_active()
 	var elapsed_sec := float(Time.get_ticks_msec() - first_ticks) / 1000.0
-	return elapsed_sec < player_dialogue_aggregate_max_wait_sec
+	return elapsed_sec < player_dialogue_aggregate_max_wait_sec and _is_player_draft_recently_active()
+
+func _is_player_draft_recently_active() -> bool:
+	if _player_input_draft_text.is_empty():
+		return false
+	if player_dialogue_draft_idle_flush_sec <= 0.0:
+		return false
+	if _player_input_draft_updated_msec <= 0:
+		return false
+	var idle_sec := float(Time.get_ticks_msec() - _player_input_draft_updated_msec) / 1000.0
+	return idle_sec < player_dialogue_draft_idle_flush_sec
 
 func _format_related_player_dialogue(parts: Array[String]) -> String:
 	var clean_parts: Array[String] = []
@@ -367,7 +384,9 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 	context_data["request_source"] = request_source.strip_edges() if not request_source.strip_edges().is_empty() else "player"
 	context_data["npc"] = _build_npc_contract_context()
 	if not source_decision.is_empty():
-		context_data["source_decision"] = _compact_decision(source_decision)
+		var compact_source_decision := _compact_decision(source_decision)
+		context_data["source_decision"] = compact_source_decision
+		context_data["event"] = String(compact_source_decision.get("event", context_data.get("event", ""))).strip_edges()
 	var blackboard := _build_blackboard_context()
 	if not blackboard.is_empty():
 		context_data["blackboard"] = blackboard
@@ -697,9 +716,9 @@ func _compact_decision(value: Variant) -> Dictionary:
 	var decision := value as Dictionary
 	var out := {}
 	for key in [
-		"kind", "target_object", "target_nav_point", "target_ref", "marker_role",
-		"action", "arrival_action", "arrival_expression", "face_target",
-		"dwell_time_sec", "resume_reason", "score", "feedback"
+		"kind", "event", "target_object", "target_nav_point", "target_ref", "target_name", "target_description", "marker_role",
+		"action", "action_hint", "arrival_action", "arrival_expression", "face_target",
+		"dwell_time_sec", "resume_reason", "reason", "score", "feedback", "chain_depth", "chain_id"
 	]:
 		if decision.has(key):
 			out[key] = decision[key]
@@ -1177,3 +1196,4 @@ func _packed_to_clean_array(values: PackedStringArray) -> Array:
 func _log(message: String) -> void:
 	if always_log:
 		print("[CharacterAIDialogue] %s" % message)
+

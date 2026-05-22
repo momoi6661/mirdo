@@ -81,8 +81,9 @@
 [ext_resource type="PackedScene" path="res://controllers/interaction/CharacterResourcePanel3D.tscn" id="81_status_panel_scene"]
 [ext_resource type="Script" uid="uid://bkhy2m2a3cmpg" path="res://scripts/character_ai/components/character_footstep_audio_component.gd" id="82_footstep_audio"]
 [ext_resource type="AudioStream" uid="uid://dxfbu5judk8sq" path="res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3" id="83_footstep_sfx"]
-[ext_resource type="Script" path="res://scripts/mirdo/mirdo_ik_controller.gd" id="84_mirdo_ik_controller"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_subtitle_router_component.gd" id="85_subtitle_router"]
+[ext_resource type="Script" uid="uid://b3lqlctl8c6av" path="res://scripts/mirdo/mirdo_ik_controller.gd" id="84_mirdo_ik_controller"]
+[ext_resource type="Script" uid="uid://d6om73cgk8py" path="res://scripts/character_ai/components/character_subtitle_router_component.gd" id="85_subtitle_router"]
+[ext_resource type="Script" path="res://scripts/character_ai/components/character_give_item_component.gd" id="86_give_item"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
@@ -121,7 +122,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_re6qp")
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_i84cf"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_j81o5"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -133,9 +134,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_tj53j"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hxkyi"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_i84cf")
+next_pass = SubResource("ShaderMaterial_j81o5")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -145,9 +146,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_j81o5"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_p1kpa"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_tj53j")
+next_pass = SubResource("ShaderMaterial_hxkyi")
 shader = ExtResource("3_bryac")
 shader_parameter/use_texture = false
 shader_parameter/base_color = Color(0, 0.88082504, 1, 0.28)
@@ -669,7 +670,7 @@ bind/150/name = &"VSB_4"
 bind/150/bone = -1
 bind/150/pose = Transform3D(1, 4.177345e-09, 4.4052992e-08, -7.911808e-09, 0.9963709, 0.08511619, -4.3537565e-08, -0.085116185, 0.996371, 1.1727916e-07, -5.9604638e-08, -2.6077043e-08)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_hxkyi"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6m6gt"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -681,9 +682,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_p1kpa"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yee0x"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_hxkyi")
+next_pass = SubResource("ShaderMaterial_6m6gt")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -693,9 +694,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_6m6gt"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gvd01"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_p1kpa")
+next_pass = SubResource("ShaderMaterial_yee0x")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -749,7 +750,7 @@ _surfaces = [{
 }]
 blend_shape_mode = 0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_yee0x"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wx6s2"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -761,9 +762,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_gvd01"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_r8ldh"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_yee0x")
+next_pass = SubResource("ShaderMaterial_wx6s2")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -773,9 +774,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_wx6s2"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_42q2u"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_gvd01")
+next_pass = SubResource("ShaderMaterial_r8ldh")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -857,7 +858,7 @@ _data = {
 [sub_resource type="SphereShape3D" id="SphereShape3D_ai_vision"]
 radius = 12.0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_r8ldh"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j81o5"]
 resource_name = "AI Vision Debug Cyan"
 transparency = 1
 cull_mode = 2
@@ -988,8 +989,6 @@ off_navmesh_recovery_arrival_distance = 0.12
 off_navmesh_recovery_speed = 1.05
 door_open_check_distance = 1.35
 door_open_ray_height = 1.05
-door_open_wait_sec = 0.18
-door_open_wait_margin_sec = 0.05
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1527126213]
 script = ExtResource("70_save_comp")
@@ -1007,75 +1006,74 @@ shape = SubResource("CapsuleShape3D_body")
 [node name="SkirtProxyClothMesh" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 462739812) index="1" unique_id=1210087579]
 visible = false
 mesh = SubResource("ArrayMesh_1yjat")
-surface_material_override/0 = SubResource("ShaderMaterial_j81o5")
+surface_material_override/0 = SubResource("ShaderMaterial_p1kpa")
 
 [node name="GeneralSkeleton" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 462739812) index="4" unique_id=327200352]
 modifier_callback_mode_process = 0
-bones/2/position = Vector3(-8.140155e-11, 0.45891407, -4.4703484e-08)
-bones/2/rotation = Quaternion(-0.038490936, -7.9679536e-05, -0.0023324946, 0.99925625)
-bones/34/rotation = Quaternion(-0.02682601, 0.0011038722, -0.000107493295, 0.9996395)
-bones/35/rotation = Quaternion(0.11898374, -0.014911168, 0.0018496809, 0.9927826)
-bones/36/rotation = Quaternion(0.1372863, 0.022511844, 0.00016782733, 0.99027556)
-bones/37/rotation = Quaternion(-0.10425315, 0.00033303804, 0.011412788, 0.99448526)
-bones/38/rotation = Quaternion(0.63896585, -0.021142308, 0.02482363, 0.7685438)
-bones/39/rotation = Quaternion(0.63908035, 0.02195102, -0.025626829, 0.7683995)
-bones/60/rotation = Quaternion(0.51203805, 0.33341017, 0.6815992, -0.40258828)
-bones/61/rotation = Quaternion(0.11325179, 0.91196394, -0.3750211, -0.121881455)
-bones/62/rotation = Quaternion(0.16086549, -0.688393, 0.16032651, 0.6888635)
-bones/63/rotation = Quaternion(0.04000282, 0.68343234, -0.016373483, 0.7287332)
-bones/64/rotation = Quaternion(0.09012791, 0.043796916, -0.037134413, 0.99427354)
-bones/65/rotation = Quaternion(0.18208708, -3.3542517e-05, -2.6017431e-05, 0.9832825)
-bones/66/rotation = Quaternion(0.18327032, -0.026857719, -0.026762396, 0.9823311)
-bones/70/rotation = Quaternion(0.1377188, 0.02216506, 0.030832112, 0.98974323)
-bones/71/rotation = Quaternion(0.05525008, -7.9885125e-05, -3.7014484e-05, 0.9984726)
-bones/72/rotation = Quaternion(0.15577509, -0.03708124, -0.038130462, 0.98635954)
-bones/76/rotation = Quaternion(0.1851408, 0.026740756, -0.00036510822, 0.9823481)
-bones/77/rotation = Quaternion(0.12046319, 4.9650676e-05, -4.3630604e-05, 0.99271786)
-bones/78/rotation = Quaternion(0.20691504, -0.007646631, 0.00057451904, 0.9783289)
-bones/82/rotation = Quaternion(0.12370889, 0.011337578, 0.00046563148, 0.99225366)
-bones/83/rotation = Quaternion(0.29379117, 0.0074982205, 0.004839972, 0.9558281)
-bones/84/rotation = Quaternion(0.17402013, 0.011847794, -0.0066354275, 0.98464847)
-bones/88/rotation = Quaternion(-0.11843205, 0.68459636, 0.19232185, 0.69304687)
-bones/89/rotation = Quaternion(-0.009086677, -0.0039331936, 0.11347313, 0.9934917)
-bones/89/scale = Vector3(1.0001662, 0.9998367, 0.99999696)
-bones/90/rotation = Quaternion(0.076495744, 5.1468618e-05, 5.1170595e-05, 0.99706995)
-bones/95/rotation = Quaternion(0.4813686, -0.35514954, -0.70586306, -0.37935525)
-bones/96/rotation = Quaternion(-0.117900625, 0.90430003, -0.385851, 0.13949881)
-bones/97/rotation = Quaternion(0.1556737, 0.69032615, -0.15325703, 0.68973035)
-bones/98/rotation = Quaternion(0.032076627, -0.68168765, -0.023189498, 0.7305718)
-bones/99/rotation = Quaternion(0.042842895, -0.0451037, 0.034575433, 0.9974642)
-bones/100/rotation = Quaternion(0.09619419, 2.6032332e-05, -4.0531162e-05, 0.99536264)
-bones/101/rotation = Quaternion(0.1048398, 0.021415146, 0.03513244, 0.9936377)
-bones/105/rotation = Quaternion(0.1835172, -0.00017578898, -0.10506153, 0.97738606)
-bones/106/rotation = Quaternion(0.07124274, 0.00015847386, -8.7618835e-05, 0.99745905)
-bones/107/rotation = Quaternion(0.1583219, 0.0370533, 0.03962892, 0.98589593)
-bones/111/rotation = Quaternion(0.12868595, -0.032842573, -0.009280323, 0.991098)
-bones/112/rotation = Quaternion(0.12322532, 0.056338653, 0.018777221, 0.99060035)
-bones/113/rotation = Quaternion(0.17081834, 0.005814913, -0.00040891915, 0.9852853)
-bones/117/rotation = Quaternion(0.17490014, -0.014151737, -0.03526795, 0.9838526)
-bones/118/rotation = Quaternion(0.16327083, -3.960729e-05, -5.6952245e-05, 0.9865814)
-bones/119/rotation = Quaternion(0.09371852, -0.012425499, 0.0029775803, 0.99551684)
-bones/123/rotation = Quaternion(-0.17604335, -0.66078985, -0.18916851, 0.704685)
-bones/124/rotation = Quaternion(-0.00032623098, 0.021644892, -0.136956, 0.9903406)
-bones/124/scale = Vector3(1.0001659, 0.99983674, 0.9999965)
-bones/125/rotation = Quaternion(0.110580415, -3.0472871e-05, 3.6060806e-06, 0.99386716)
-bones/130/rotation = Quaternion(0.026417615, -0.031986877, 0.99887675, -0.022897722)
-bones/131/rotation = Quaternion(0.00048773736, 0.99880415, -0.048861805, -0.0016340784)
-bones/132/rotation = Quaternion(-0.010949714, 0.67462724, -0.7377828, 0.02085307)
-bones/140/rotation = Quaternion(-0.012229414, -0.038713835, 0.9990278, 0.01718239)
-bones/141/rotation = Quaternion(0.00012633868, 0.9994073, -0.03442375, 0.00032757077)
-bones/142/rotation = Quaternion(0.031872783, 0.67896056, -0.73307526, -0.024443517)
+bones/2/position = Vector3(-0.0068781395, 0.4558978, 0.014130974)
+bones/2/rotation = Quaternion(-0.025070677, -0.012100722, -0.0054895305, 0.99959743)
+bones/34/rotation = Quaternion(-0.016438838, 0.0024111846, 0.004168658, 0.9998534)
+bones/35/rotation = Quaternion(0.08742289, -0.012276457, 0.008079373, 0.9960629)
+bones/36/rotation = Quaternion(0.012531354, 0.025191199, -0.017133309, 0.99945736)
+bones/37/rotation = Quaternion(-0.12993416, -0.08072701, -0.059385408, 0.986445)
+bones/38/rotation = Quaternion(0.6379673, -0.022046084, 0.025348937, 0.76933044)
+bones/39/rotation = Quaternion(0.6380453, 0.022087751, -0.025579363, 0.7692568)
+bones/60/rotation = Quaternion(0.43203065, 0.39356086, 0.6217694, -0.521404)
+bones/61/rotation = Quaternion(0.11797799, 0.8742808, -0.20529796, -0.42375344)
+bones/62/rotation = Quaternion(0.54911363, -0.43245327, 0.55793977, 0.44739422)
+bones/63/rotation = Quaternion(0.18333097, 0.74531895, 0.42013085, 0.4841277)
+bones/64/rotation = Quaternion(0.09007139, 0.043736797, -0.037058648, 0.99428415)
+bones/65/rotation = Quaternion(0.18203007, -2.9802326e-08, -2.9802326e-08, 0.98329306)
+bones/66/rotation = Quaternion(0.18338495, -0.026876856, -0.026791517, 0.98230845)
+bones/70/rotation = Quaternion(0.13773587, 0.022084191, 0.030985653, 0.98973787)
+bones/71/rotation = Quaternion(0.055288576, -8.940698e-08, -2.9802326e-08, 0.9984705)
+bones/72/rotation = Quaternion(0.15592928, -0.037232805, -0.038142208, 0.9863291)
+bones/76/rotation = Quaternion(0.18517424, 0.026739981, -0.0001554787, 0.9823418)
+bones/77/rotation = Quaternion(0.12032075, 0, -5.960465e-08, 0.99273515)
+bones/78/rotation = Quaternion(0.20695838, -0.0076171616, 0.0006103516, 0.97832)
+bones/82/rotation = Quaternion(0.12376045, 0.011362822, 0.0005974472, 0.9922469)
+bones/83/rotation = Quaternion(0.29410967, 0.007328556, 0.0048807566, 0.9557312)
+bones/84/rotation = Quaternion(0.17400561, 0.011886137, -0.006447614, 0.9846519)
+bones/88/rotation = Quaternion(-0.11841793, 0.6848174, 0.1925247, 0.6927746)
+bones/89/rotation = Quaternion(-0.009073549, -0.004319208, 0.11319347, 0.99352217)
+bones/89/scale = Vector3(1.000166, 0.99983674, 0.99999696)
+bones/90/rotation = Quaternion(0.07650017, 1.4901163e-08, -5.960465e-08, 0.99706966)
+bones/95/rotation = Quaternion(0.40618378, -0.50348693, -0.5865255, -0.48734337)
+bones/96/rotation = Quaternion(-0.38559118, 0.7055013, -0.44672918, -0.39245448)
+bones/97/rotation = Quaternion(0.6611671, 0.2324358, -0.6731538, 0.23599935)
+bones/98/rotation = Quaternion(0.07497977, -0.8266233, -0.082349434, 0.55162543)
+bones/99/rotation = Quaternion(0.042763602, -0.045000087, 0.03452606, 0.9974739)
+bones/100/rotation = Quaternion(0.096024126, -2.9802326e-08, 2.9802326e-08, 0.9953791)
+bones/101/rotation = Quaternion(0.10457511, 0.021425322, 0.035039663, 0.99366856)
+bones/105/rotation = Quaternion(0.18338016, -0.00011703372, -0.10489687, 0.9774295)
+bones/106/rotation = Quaternion(0.07117482, 2.9802326e-08, -2.9802326e-08, 0.99746394)
+bones/107/rotation = Quaternion(0.15822676, 0.03722927, 0.03957668, 0.9859067)
+bones/111/rotation = Quaternion(0.12855633, -0.032808732, -0.009252041, 0.99111617)
+bones/112/rotation = Quaternion(0.12307738, 0.056191407, 0.018799962, 0.9906267)
+bones/113/rotation = Quaternion(0.17048872, 0.0057881926, -0.00027316812, 0.9853427)
+bones/117/rotation = Quaternion(0.17479631, -0.014248207, -0.03518763, 0.98387253)
+bones/118/rotation = Quaternion(0.16321646, 0, 0, 0.98659027)
+bones/119/rotation = Quaternion(0.09373117, -0.012537343, 0.0030260677, 0.995514)
+bones/123/rotation = Quaternion(-0.17602967, -0.6607505, -0.18917568, 0.70472324)
+bones/124/rotation = Quaternion(-0.00039367357, 0.022038676, -0.13692318, 0.9903365)
+bones/124/scale = Vector3(1.000166, 0.9998369, 0.99999654)
+bones/125/rotation = Quaternion(0.11052047, -1.0430813e-07, 5.9604645e-08, 0.99387383)
+bones/130/rotation = Quaternion(0.018689688, -0.053311434, 0.9976382, -0.03907202)
+bones/131/rotation = Quaternion(-9.576978e-05, 0.99915886, -0.040993948, -0.0010530411)
+bones/132/rotation = Quaternion(0.052638408, 0.65196556, -0.7482645, 0.11077232)
+bones/140/rotation = Quaternion(0.027448263, -0.017303683, 0.99916774, 0.024722775)
+bones/141/rotation = Quaternion(0.0007347444, 0.99705625, -0.07664997, 0.001786683)
+bones/142/rotation = Quaternion(0.025335781, 0.65537244, -0.75423384, -0.031250242)
 
 [node name="vrm-mesh" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="0" unique_id=1136892378]
 mesh = SubResource("ArrayMesh_cr1od")
 skin = SubResource("Skin_8bpvu")
-blend_shapes/Joy = 0.0
-surface_material_override/0 = SubResource("ShaderMaterial_6m6gt")
+surface_material_override/0 = SubResource("ShaderMaterial_gvd01")
 
 [node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="1" unique_id=2018157511]
 mesh = SubResource("ArrayMesh_pg8os")
 skin = SubResource("Skin_8bpvu")
-surface_material_override/0 = SubResource("ShaderMaterial_wx6s2")
+surface_material_override/0 = SubResource("ShaderMaterial_42q2u")
 
 [node name="AnimeSpringBones" type="SpringBoneSimulator3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="2" unique_id=858434378]
 influence = 0.78
@@ -1585,7 +1583,7 @@ settings/17/enable_all_child_collisions = true
 settings/17/exclude_collision_count = 0
 
 [node name="HeadSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=629885098]
-transform = Transform3D(0.9994271, -0.030106261, 0.015467279, 0.03233455, 0.98432434, -0.17337918, -0.010005014, 0.17378001, 0.98473364, 0.00088390167, 0.8164526, 0.0066530444)
+transform = Transform3D(0.97961235, 0.15165831, -0.13175584, -0.13078327, 0.9792523, 0.15479285, 0.15249783, -0.1344055, 0.9791217, -0.0018033413, 0.8212601, 0.006796745)
 bone_name = "Head"
 bone = 37
 position_offset = Vector3(0, 0.035, 0.01)
@@ -1593,7 +1591,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.08
 
 [node name="FaceSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1964730921]
-transform = Transform3D(0.9994271, -0.030106261, 0.015467279, 0.03233455, 0.98432434, -0.17337918, -0.010005014, 0.17378001, 0.98473364, 0.000969521, 0.8219614, 0.033009186)
+transform = Transform3D(0.97961235, 0.15165831, -0.13175584, -0.13078327, 0.9792523, 0.15479285, 0.15249783, -0.1344055, 0.9791217, -0.0035806538, 0.83492243, 0.029930737)
 bone_name = "Head"
 bone = 37
 position_offset = Vector3(0, 0.045, 0.035)
@@ -1601,7 +1599,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.053
 
 [node name="NeckSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1990733035]
-transform = Transform3D(0.9998254, -0.0036193356, 0.018333256, 0.010211637, 0.92745036, -0.3738072, -0.015650246, 0.37392914, 0.9273252, 0.0016995716, 0.75802195, -0.031380877)
+transform = Transform3D(0.9998357, 0.01620792, 0.008123584, -0.015147392, 0.9930238, -0.116937034, -0.009962201, 0.11679472, 0.99310595, -0.0064027505, 0.75482273, -0.0128534585)
 bone_name = "Neck"
 bone = 36
 position_offset = Vector3(0, 0, 0)
@@ -1609,7 +1607,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.037
 
 [node name="ChestCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1889126534]
-transform = Transform3D(0.99960905, -0.0019552344, -0.027892534, -0.0010580318, 0.9941928, -0.10760933, 0.027940953, 0.10759677, 0.9938019, 0.0008066797, 0.62985927, -0.0042885942)
+transform = Transform3D(0.9989506, -0.017628321, -0.042273387, 0.013678623, 0.9956683, -0.09196548, 0.04371147, 0.09129069, 0.99486434, -0.005930205, 0.6271137, 0.016312242)
 bone_name = "UpperChest"
 bone = 35
 position_offset = Vector3(0, 0, 0)
@@ -1618,7 +1616,7 @@ radius = 0.091
 height = 0.242
 
 [node name="WaistCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1163811732]
-transform = Transform3D(0.99998534, 0.0048155277, 0.0024833193, -0.0050980197, 0.9914646, 0.13027672, -0.001834772, -0.13028747, 0.99147457, 0.00031320564, 0.53317654, -0.0046034856)
+transform = Transform3D(0.99981475, 0.003948051, -0.01883934, -0.0023706672, 0.9965445, 0.083027326, 0.019102039, -0.08296728, 0.9963691, -0.0060653053, 0.5305541, 0.0114)
 bone_name = "Spine"
 bone = 34
 position_offset = Vector3(0, -0.005, -0.015)
@@ -1627,7 +1625,7 @@ radius = 0.093
 height = 0.233
 
 [node name="HipsCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1144617926]
-transform = Transform3D(0.9999891, 0.0046676532, 2.0319261e-05, -0.004655386, 0.997026, 0.07692499, 0.00033880037, -0.07692424, 0.9970369, -1.17360564e-07, 0.45891407, -4.4703484e-08)
+transform = Transform3D(0.9996469, 0.011581386, -0.023916444, -0.010367894, 0.9986827, 0.050254017, 0.024466949, -0.049988307, 0.99845004, -0.006878257, 0.4558978, 0.014130974)
 bone_name = "Hips"
 bone = 2
 position_offset = Vector3(0, 0, 0)
@@ -1636,7 +1634,7 @@ radius = 0.091
 height = 0.264
 
 [node name="LeftUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=131598494]
-transform = Transform3D(0.49098024, 0.29673728, -0.8190759, 0.27141702, -0.9455096, -0.17984587, -0.82781094, -0.13401034, -0.544766, 0.06727392, 0.6504007, -0.046401046)
+transform = Transform3D(0.51488435, 0.8293276, -0.21704857, 0.8197476, -0.5503888, -0.15838584, -0.25081488, -0.09637452, -0.9632256, 0.09923037, 0.68237215, -0.023626981)
 bone_name = "LeftUpperArm"
 bone = 61
 position_offset = Vector3(0, 0.06, 0)
@@ -1645,7 +1643,7 @@ radius = 0.04
 height = 0.13
 
 [node name="RightUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1197866268]
-transform = Transform3D(0.55777687, -0.26341975, 0.7870799, -0.2582047, -0.95631576, -0.13707846, 0.78880596, -0.12676857, -0.601427, -0.060272805, 0.6493757, -0.04527697)
+transform = Transform3D(0.24388869, -0.1561602, 0.9571481, 0.780591, -0.55406255, -0.2892968, 0.57549644, 0.81769717, -0.013232395, -0.07016666, 0.68617195, 0.03486701)
 bone_name = "RightUpperArm"
 bone = 96
 position_offset = Vector3(0, 0.06, 0)
@@ -1654,7 +1652,7 @@ radius = 0.04
 height = 0.13
 
 [node name="LeftLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=684477654]
-transform = Transform3D(-0.8188478, 0.04820099, -0.57198334, -0.17906396, -0.9681922, 0.17475754, -0.5453662, 0.24552138, 0.80143297, 0.100216195, 0.53129506, -0.046384025)
+transform = Transform3D(-0.19508792, -0.6906231, -0.6964054, -0.16894948, -0.6757708, 0.71748865, -0.9661245, 0.2576307, 0.015154088, 0.12726143, 0.61257344, -0.013132654)
 bone_name = "LeftLowerArm"
 bone = 62
 position_offset = Vector3(0, 0.055, 0)
@@ -1663,7 +1661,7 @@ radius = 0.034
 height = 0.12
 
 [node name="RightLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=853940739]
-transform = Transform3D(-0.78804433, 0.0020066593, 0.61561507, 0.13373171, -0.9755569, 0.17436904, 0.6009175, 0.2197377, 0.7685137, -0.08838491, 0.5287272, -0.04551229)
+transform = Transform3D(-0.95887274, 0.27351987, -0.07583021, 0.28381526, 0.9206617, -0.26801348, -0.003493064, -0.27851254, -0.9604263, -0.07390247, 0.6915812, 0.0746686)
 bone_name = "RightLowerArm"
 bone = 97
 position_offset = Vector3(0, 0.055, 0)
@@ -1672,7 +1670,7 @@ radius = 0.034
 height = 0.12
 
 [node name="LeftUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1113225745]
-transform = Transform3D(-0.9977651, 0.039398953, 0.05396776, -0.038701855, -0.9991541, 0.013902046, 0.05446984, 0.011782333, 0.99844587, 0.0068874843, 0.36508644, -0.008178502)
+transform = Transform3D(-0.9976145, 0.067038655, 0.016463624, -0.06785324, -0.9961632, -0.05526892, 0.012695303, -0.056254186, 0.9983357, 0.0042611435, 0.36087358, -0.002992977)
 bone_name = "LeftUpperLeg"
 bone = 130
 position_offset = Vector3(0.055, 0.135, 0)
@@ -1681,7 +1679,7 @@ radius = 0.087
 height = 0.28
 
 [node name="RightUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1457868531]
-transform = Transform3D(-0.9989352, -0.038036592, -0.026103996, 0.038047265, -0.99927586, 8.800626e-05, -0.026088443, -0.0009052679, 0.99965924, -0.016215503, 0.3660102, -0.01175135)
+transform = Transform3D(-0.99768966, -0.061102275, 0.029693898, 0.06152971, -0.99801123, 0.013699971, 0.028797746, 0.0154953785, 0.9994651, -0.025712904, 0.36275333, 0.0019469897)
 bone_name = "RightUpperLeg"
 bone = 140
 position_offset = Vector3(-0.045, 0.135, 0)
@@ -1690,7 +1688,7 @@ radius = 0.073
 height = 0.278
 
 [node name="LeftLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1642352318]
-transform = Transform3D(0.99797755, 0.033130307, -0.05425081, 0.03761331, -0.9957712, 0.08381516, -0.05124457, -0.08568619, -0.99500346, 0.06409841, 0.1518225, -0.008718358)
+transform = Transform3D(0.9976401, 0.0657417, -0.019808546, 0.06784099, -0.9882686, 0.13683012, -0.010580719, -0.13785103, -0.9903965, 0.06760517, 0.14944243, -0.014273724)
 bone_name = "LeftLowerLeg"
 bone = 131
 position_offset = Vector3(0, 0.12, 0)
@@ -1699,7 +1697,7 @@ radius = 0.046
 height = 0.332
 
 [node name="RightLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1806893429]
-transform = Transform3D(0.9989437, -0.036425106, 0.028013933, -0.03827713, -0.9969032, 0.068693735, 0.025425006, -0.06969346, -0.99724454, -0.06344399, 0.15202996, -0.009924897)
+transform = Transform3D(0.99750024, -0.06665786, -0.023447469, -0.0627685, -0.98827004, 0.13922068, -0.032452587, -0.1374009, -0.9899837, -0.078102574, 0.15099898, -0.0006425921)
 bone_name = "RightLowerLeg"
 bone = 141
 position_offset = Vector3(0, 0.12, 0)
@@ -1708,7 +1706,7 @@ radius = 0.055
 height = 0.332
 
 [node name="leg3" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1014995242]
-transform = Transform3D(-0.9635772, 0.26615286, -0.026103996, -0.2662458, -0.9639051, 8.800626e-05, -0.025138352, 0.0070348857, 0.99965924, -0.028965807, 0.41154653, -0.032095123)
+transform = Transform3D(-0.9693727, 0.24379241, 0.029693898, -0.24348238, -0.9698086, 0.013699971, 0.03213735, 0.0060504386, 0.9994651, -0.038522534, 0.40831274, -0.01830764)
 bone_name = "RightUpperLeg"
 bone = 140
 position_offset = Vector3(-0.03, 0.09, -0.02)
@@ -1717,7 +1715,7 @@ radius = 0.082
 height = 0.328
 
 [node name="leg2" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=382647094]
-transform = Transform3D(-0.97022426, -0.23611954, 0.05396776, 0.23717128, -0.97136843, 0.013902046, 0.049140032, 0.026287716, 0.99844587, 0.04217283, 0.45628038, -0.03138662)
+transform = Transform3D(-0.9776698, -0.20950115, 0.016463624, 0.2083193, -0.97649795, -0.05526892, 0.027655598, -0.05060506, 0.9983357, 0.037802976, 0.4543478, -0.018404625)
 bone_name = "LeftUpperLeg"
 bone = 130
 position_offset = Vector3(0.015, 0.045, -0.02)
@@ -1726,19 +1724,79 @@ radius = 0.082
 height = 0.328
 
 [node name="SkirtProxyAttachment" type="BoneAttachment3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="3" unique_id=1232999926]
-transform = Transform3D(0.9999891, 0.0046676532, 2.0319261e-05, -0.004655386, 0.997026, 0.07692499, 0.00033880037, -0.07692424, 0.9970369, -1.17360564e-07, 0.45891407, -4.4703484e-08)
+transform = Transform3D(0.9996469, 0.011581386, -0.023916444, -0.010367894, 0.9986827, 0.050254017, 0.024466949, -0.049988307, 0.99845004, -0.006878257, 0.4558978, 0.014130974)
 bone_name = "Hips"
 bone_idx = 2
 
 [node name="RightHandItemAttachment" type="BoneAttachment3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="4" unique_id=358971827]
-transform = Transform3D(0.5573165, 0.058078326, 0.82826626, 0.2584364, -0.96013206, -0.10656951, 0.7890555, 0.273447, -0.55010706, -0.094166294, 0.47168896, -0.039140597)
+transform = Transform3D(0.23756525, 0.28188425, 0.929572, -0.54678, 0.82976776, -0.11188197, -0.8028664, -0.48169193, 0.35125262, -0.05837608, 0.74661076, 0.06704909)
 bone_name = "RightHand"
 bone_idx = 98
 
 [node name="HeldItemRoot" type="Node3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/RightHandItemAttachment" unique_id=1646909669]
 transform = Transform3D(1, 0, 0, 0, 0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, 0.02, 0.035, 0)
 
-[node name="HeadLookAtModifier" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="5"]
+[node name="LeftArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="5" unique_id=976104811]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftHand")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftElbowPole")
+settings/0/root_bone_name = "LeftUpperArm"
+settings/0/root_bone = 61
+settings/0/middle_bone_name = "LeftLowerArm"
+settings/0/middle_bone = 62
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "LeftHand"
+settings/0/end_bone = 63
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="RightArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="6" unique_id=1727845875]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightHand")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightElbowPole")
+settings/0/root_bone_name = "RightUpperArm"
+settings/0/root_bone = 96
+settings/0/middle_bone_name = "RightLowerArm"
+settings/0/middle_bone = 97
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "RightHand"
+settings/0/end_bone = 98
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="LeftLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="7" unique_id=891536759]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftFoot")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftKneePole")
+settings/0/root_bone_name = "LeftUpperLeg"
+settings/0/root_bone = 130
+settings/0/middle_bone_name = "LeftLowerLeg"
+settings/0/middle_bone = 131
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "LeftFoot"
+settings/0/end_bone = 132
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="RightLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="8" unique_id=1086573542]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightFoot")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightKneePole")
+settings/0/root_bone_name = "RightUpperLeg"
+settings/0/root_bone = 140
+settings/0/middle_bone_name = "RightLowerLeg"
+settings/0/middle_bone = 141
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "RightFoot"
+settings/0/end_bone = 142
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="HeadLookAtModifier" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="9"]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1758,158 +1816,101 @@ influence = 1.0
 script = ExtResource("8_46ch8")
 target_path = NodePath("../../../../../HeadLookProxyTarget")
 target_weight = 0.85
-yaw_degrees = -0.36450883615283924
-pitch_degrees = -5.789729015842041
+yaw_degrees = -0.14927320026244884
+pitch_degrees = -5.869769469087155
 actor_path = NodePath("../../../../..")
 
+[node name="MirdoIK" type="Node3D" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 462739812) index="5" unique_id=1310959316]
 
-[node name="LeftArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
-influence = 0.0
-setting_count = 1
-settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftHand")
-settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftElbowPole")
-settings/0/root_bone_name = "LeftUpperArm"
-settings/0/root_bone = 61
-settings/0/middle_bone_name = "LeftLowerArm"
-settings/0/middle_bone = 62
-settings/0/pole_direction = 6
-settings/0/end_bone_name = "LeftHand"
-settings/0/end_bone = 63
-settings/0/use_virtual_end = false
-settings/0/extend_end_bone = false
+[node name="AuthorTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK" unique_id=598096678]
 
-[node name="RightArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
-influence = 0.0
-setting_count = 1
-settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightHand")
-settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightElbowPole")
-settings/0/root_bone_name = "RightUpperArm"
-settings/0/root_bone = 96
-settings/0/middle_bone_name = "RightLowerArm"
-settings/0/middle_bone = 97
-settings/0/pole_direction = 6
-settings/0/end_bone_name = "RightHand"
-settings/0/end_bone = 98
-settings/0/use_virtual_end = false
-settings/0/extend_end_bone = false
+[node name="LeftHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=1549342873]
+transform = Transform3D(0.016138822, -0.93410116, -0.3566437, -0.78843415, 0.20747119, -0.57907474, 0.61490774, 0.29053536, -0.7331286, 0.09401547, 0.56798434, 0.002161514)
 
-[node name="LeftLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
-influence = 0.0
-setting_count = 1
-settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftFoot")
-settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftKneePole")
-settings/0/root_bone_name = "LeftUpperLeg"
-settings/0/root_bone = 130
-settings/0/middle_bone_name = "LeftLowerLeg"
-settings/0/middle_bone = 131
-settings/0/pole_direction = 6
-settings/0/end_bone_name = "LeftFoot"
-settings/0/end_bone = 132
-settings/0/use_virtual_end = false
-settings/0/extend_end_bone = false
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftHandBase" unique_id=1121667137]
 
-[node name="RightLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
-influence = 0.0
-setting_count = 1
-settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightFoot")
-settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightKneePole")
-settings/0/root_bone_name = "RightUpperLeg"
-settings/0/root_bone = 140
-settings/0/middle_bone_name = "RightLowerLeg"
-settings/0/middle_bone = 141
-settings/0/pole_direction = 6
-settings/0/end_bone_name = "RightFoot"
-settings/0/end_bone = 142
-settings/0/use_virtual_end = false
-settings/0/extend_end_bone = false
+[node name="RightHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=520694032]
+transform = Transform3D(0.23756531, 0.28188443, 0.929572, -0.54678, 0.8297676, -0.11188216, -0.8028664, -0.48169196, 0.35125276, -0.05837609, 0.74661076, 0.06704909)
 
-[node name="MirdoIK" type="Node3D" parent="VisualRoot/Model/Armature"]
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightHandBase" unique_id=954776538]
 
-[node name="AuthorTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+[node name="LeftFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=917289684]
+transform = Transform3D(-0.96959305, 0.2447134, -0.0022594514, -0.00034504384, 0.007865712, 0.99996895, 0.2447236, 0.9695637, -0.0075420886, 0.060707923, 0.06618695, -0.0643525)
 
-[node name="LeftHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftFootBase" unique_id=621662884]
 
-[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftHandBase"]
+[node name="RightFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=968912374]
+transform = Transform3D(-0.9996914, 0.018587902, -0.0164638, -0.016459046, 0.0004094094, 0.9998644, 0.018592138, 0.99982697, -0.00010354817, -0.072945304, 0.06789589, -0.05118186)
 
-[node name="RightHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightFootBase" unique_id=1175181300]
 
-[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightHandBase"]
+[node name="LeftElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=1962431803]
+transform = Transform3D(-0.19508792, -0.6906231, -0.6964054, -0.16894948, -0.6757708, 0.71748865, -0.9661245, 0.2576307, 0.015154088, 0.1652457, 0.6497408, -0.027302343)
 
-[node name="LeftFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
-
-[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftFootBase"]
-
-[node name="RightFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
-
-[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightFootBase"]
-
-[node name="LeftElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
-
-[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftElbowPoleBase"]
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftElbowPoleBase" unique_id=1849226765]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0, -0.2)
 
-[node name="RightElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+[node name="RightElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=877302917]
+transform = Transform3D(-0.95887274, 0.27351987, -0.07583021, 0.28381526, 0.9206617, -0.26801348, -0.003493064, -0.27851254, -0.9604263, -0.08894606, 0.6409448, 0.089986786)
 
-[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightElbowPoleBase"]
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightElbowPoleBase" unique_id=1058224189]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0, -0.2)
 
-[node name="LeftKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+[node name="LeftKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=1726524891]
+transform = Transform3D(0.9976401, 0.0657417, -0.019808546, 0.06784099, -0.9882686, 0.13683012, -0.010580719, -0.13785103, -0.9903965, 0.059716158, 0.2680347, 0.0022684056)
 
-[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftKneePoleBase"]
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftKneePoleBase" unique_id=1621101032]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0, -0.35)
 
-[node name="RightKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+[node name="RightKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets" unique_id=2018987762]
+transform = Transform3D(0.99750024, -0.06665786, -0.023447469, -0.0627685, -0.98827004, 0.13922068, -0.032452587, -0.1374009, -0.9899837, -0.07010363, 0.2695914, 0.015845517)
 
-[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightKneePoleBase"]
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightKneePoleBase" unique_id=308074513]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0, -0.35)
 
-[node name="RuntimeTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+[node name="RuntimeTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK" unique_id=1293263874]
 visible = false
 
-[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=2044455822]
 
-[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=1985143872]
 
-[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=877341639]
 
-[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=2074388169]
 
-[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=1306741703]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.8, -0.2)
 
-[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=1622438865]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.8, -0.2)
 
-[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=438834109]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.35, -0.35)
 
-[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets" unique_id=1943654284]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.35, -0.35)
 
-[node name="FinalTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+[node name="FinalTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK" unique_id=1809072117]
 visible = false
 
-[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=1075211265]
 
-[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=1016577241]
 
-[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=1954447639]
 
-[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=1866441583]
 
-[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.8, -0.2)
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=1304177351]
 
-[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.8, -0.2)
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=293221107]
 
-[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.35, -0.35)
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=23256469]
 
-[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.35, -0.35)
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets" unique_id=10456152]
 
-[node name="MirdoIKController" type="Node" parent="VisualRoot/Model/Armature/MirdoIK"]
+[node name="MirdoIKController" type="Node" parent="VisualRoot/Model/Armature/MirdoIK" unique_id=141039361]
 script = ExtResource("84_mirdo_ik_controller")
 author_targets_root_path = NodePath("../AuthorTargets")
 runtime_targets_root_path = NodePath("../RuntimeTargets")
@@ -1920,7 +1921,6 @@ right_hand_modifier_path = NodePath("../../GeneralSkeleton/RightArmIK")
 left_foot_modifier_path = NodePath("../../GeneralSkeleton/LeftLegIK")
 right_foot_modifier_path = NodePath("../../GeneralSkeleton/RightLegIK")
 animation_player_path = NodePath("../../../../../AnimationPlayer")
-require_author_animation_tracks = true
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1595483476]
 root_node = NodePath("../VisualRoot/Model")
@@ -1943,17 +1943,16 @@ animation_path = NodePath("../AnimationTree")
 
 [node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=1473554603]
 stream = ExtResource("83_footstep_sfx")
+volume_db = -8.0
+unit_size = 2.0
+max_distance = 14.0
 bus = &"SFX"
-volume_db = -27.0
-unit_size = 0.55
-max_distance = 5.2
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1670062239]
 path_desired_distance = 0.2
 target_desired_distance = 0.35
 height = 1.45
 radius = 0.36
-debug_enabled = true
 
 [node name="AIVisionProxy3D" type="Area3D" parent="." unique_id=1670062240]
 collision_layer = 0
@@ -1965,7 +1964,7 @@ script = ExtResource("63_ai_vision_proxy")
 shape = SubResource("SphereShape3D_ai_vision")
 
 [node name="DebugVisionSphere" type="MeshInstance3D" parent="AIVisionProxy3D" unique_id=1230717820]
-material_override = SubResource("StandardMaterial3D_r8ldh")
+material_override = SubResource("StandardMaterial3D_j81o5")
 cast_shadow = 0
 mesh = SubResource("SphereMesh_ai_vision_debug")
 
@@ -2001,7 +2000,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.011, 0.58, 2)
 
 [node name="StatusPanel" parent="." unique_id=1586910254 instance=ExtResource("81_status_panel_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.023814559, 0.5379132, 0.39084017)
-visible = false
 anchor_mark_path = NodePath("../StatusAnchor")
 state_component_path = NodePath("../Components/StateComponent")
 auto_close_when_far = true
@@ -2025,6 +2023,7 @@ energy_decay_per_hour = 3.8
 [node name="ItemConsumer" type="Node" parent="Components" unique_id=815896317]
 script = ExtResource("72_item_consumer")
 subtitle_component_path = NodePath("../CharacterSubtitleRouter")
+state_component_path = NodePath("../StateComponent")
 
 [node name="FaceComponent" type="Node" parent="Components" unique_id=1273321003]
 script = ExtResource("4_face_component")
@@ -2035,7 +2034,6 @@ face_talk_blend_duration = 0.1
 blink_duration = 0.1
 blink_interval_min = 3.8
 blink_interval_max = 5.9
-inspector_expression = "joy"
 
 [node name="WorldSubtitleComponent" parent="Components" unique_id=1273321004 instance=ExtResource("5_subtitle_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
@@ -2043,10 +2041,8 @@ anchor_marker_path = NodePath("../../DialogueAnchor")
 show_time = 2.6
 queue_clear_delay = 2.8
 
-[node name="CharacterSubtitleRouter" type="Node" parent="Components"]
+[node name="CharacterSubtitleRouter" type="Node" parent="Components" unique_id=1179800915]
 script = ExtResource("85_subtitle_router")
-world_subtitle_path = NodePath("../WorldSubtitleComponent")
-dialogue_anchor_path = NodePath("../../DialogueAnchor")
 screen_edge_margin_ratio = 0.09
 
 [node name="AnimationBehaviorTreeComponent" type="Node" parent="Components" unique_id=1326592975]
@@ -2054,14 +2050,6 @@ script = ExtResource("54_1kdye")
 
 [node name="CharacterFootstepAudio" type="Node" parent="Components" unique_id=1492261522]
 script = ExtResource("82_footstep_audio")
-actor_path = NodePath("../..")
-audio_player_path = NodePath("../../FootstepAudio3D")
-animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
-footstep_folder_path = "res://Audio/footsteps/sneakers_soft"
-footstep_loop_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3"
-base_volume_db = -27.0
-max_distance = 5.2
-unit_size = 0.55
 
 [node name="CharacterActionScheduler" type="Node" parent="Components" unique_id=815896318]
 script = ExtResource("73_action_scheduler")
@@ -2135,8 +2123,19 @@ perception_component_path = NodePath("../CharacterPerception")
 animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
 face_component_path = NodePath("../FaceComponent")
 navigation_motor_path = NodePath("../..")
+give_item_component_path = NodePath("../CharacterGiveItem")
 actor_path = NodePath("../..")
 navigation_agent_path = NodePath("../../NavigationAgent3D")
+
+[node name="CharacterGiveItem" type="Node" parent="Components" unique_id=1846621401]
+script = ExtResource("86_give_item")
+character_root_path = NodePath("../..")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+face_component_path = NodePath("../FaceComponent")
+navigation_motor_path = NodePath("../..")
+autonomous_life_path = NodePath("../CharacterAutonomousLife")
+subtitle_component_path = NodePath("../CharacterSubtitleRouter")
+state_component_path = NodePath("../StateComponent")
 
 [node name="CharacterAffectiveDirector" type="Node" parent="Components" unique_id=1591922004]
 script = ExtResource("61_ai_affective")
@@ -2272,4 +2271,3 @@ fallback_reply_text = "老师，我在听呢。"
 [connection signal="face_talk_requested" from="Components/WorldSubtitleComponent" to="Components/FaceComponent" method="set_face_talk_enabled"]
 
 [editable path="VisualRoot/Model"]
-

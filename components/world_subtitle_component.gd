@@ -5,6 +5,8 @@ signal line_finished
 signal sequence_finished
 signal queue_count_changed(count: int)
 signal face_talk_requested(enabled: bool)
+signal subtitle_text_changed(text: String, speaker: String, streaming: bool)
+signal subtitle_cleared
 
 @export var letter_scene: PackedScene
 @export var anchor_marker_path: NodePath
@@ -140,6 +142,7 @@ func begin_stream(speaker: String = "") -> void:
 	_streaming = true
 	_playing = true
 	_hold_left = show_time
+	_emit_subtitle_text_changed()
 	_update_face_talk_state()
 
 func push_chunk(chunk: String) -> void:
@@ -151,6 +154,7 @@ func push_chunk(chunk: String) -> void:
 	_hold_left = show_time
 	if instant_reveal_on_stream_chunk:
 		_render_all_available_text_now()
+	_emit_subtitle_text_changed()
 	_update_face_talk_state()
 
 func finish_stream(final_text: String = "") -> void:
@@ -165,6 +169,7 @@ func finish_stream(final_text: String = "") -> void:
 	if _effective_text().is_empty():
 		cancel_now()
 		return
+	_emit_subtitle_text_changed()
 	_update_face_talk_state()
 
 func show_once(text: String, speaker: String = "") -> void:
@@ -175,6 +180,7 @@ func show_once(text: String, speaker: String = "") -> void:
 	if _effective_text().is_empty():
 		cancel_now()
 		return
+	_emit_subtitle_text_changed()
 	_update_face_talk_state()
 
 func cancel_now() -> void:
@@ -187,8 +193,21 @@ func cancel_now() -> void:
 	_hold_left = 0.0
 	_cleanup_left = 0.0
 	_clear_letters()
+	subtitle_cleared.emit()
 	_update_face_talk_state()
 	_emit_line_finished_once()
+
+func get_active_subtitle_text() -> String:
+	return _effective_text()
+
+func get_active_subtitle_speaker() -> String:
+	return _speaker_text
+
+func is_subtitle_active() -> bool:
+	return _playing and not _effective_text().strip_edges().is_empty()
+
+func _emit_subtitle_text_changed() -> void:
+	subtitle_text_changed.emit(_effective_text(), _speaker_text, _streaming)
 
 func play_sequence(sequence: WorldSubtitleSequence) -> void:
 	if sequence == null:

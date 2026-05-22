@@ -17,6 +17,7 @@ signal subtitle_stream_done_requested(final_text: String)
 @export_range(0.01, 0.3, 0.01) var local_stream_chunk_delay_sec: float = 0.04
 @export var default_target_path: NodePath = NodePath("../../../xiaokong")
 @export var target_group_name: StringName = &"Xiaokong"
+@export var fallback_target_group_names: PackedStringArray = PackedStringArray(["Mirdo", "AICharacter", "character"])
 @export_range(0.2, 10.0, 0.1) var auto_rebind_interval_sec: float = 1.5
 @export var ground_collision_mask: int = 1
 @export var ray_length: float = 200.0
@@ -35,7 +36,7 @@ var _preview_position: Vector3 = Vector3.ZERO
 @onready var _player: CharacterBody3D = get_parent().get_parent() as CharacterBody3D
 
 var _preview_marker: MeshInstance3D
-var _dialogue_component: XiaokongAIDialogueComponent
+var _dialogue_component: Node
 var _world_subtitle_component: Node
 var _subtitle_overlay: XiaokongSubtitleOverlay
 var _dialogue_stream_text: String = ""
@@ -230,7 +231,7 @@ func send_dialogue_text(text: String) -> bool:
 			_panel.call("set_request_payload", _last_request_payload)
 		_dialogue_stream_text = ""
 		_subtitle_stream_finished_early = false
-		if _dialogue_component != null and bool(_dialogue_component.get("use_local_fallback_on_error")):
+		if _dialogue_uses_local_fallback_on_error():
 			_show_subtitle_once("思考中……", subtitle_speaker_name)
 		else:
 			_begin_subtitle_stream(subtitle_speaker_name)
@@ -374,6 +375,7 @@ func _set_panel_open(opened: bool) -> void:
 		_set_status("Xiaokong panel opened.")
 	else:
 		_clear_ui_text_focus()
+		_release_ui_captured_movement_input()
 		if not _pick_navigation_enabled:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		_set_status("Xiaokong panel closed.")
@@ -393,7 +395,7 @@ func _deferred_bind_target() -> bool:
 		_target = by_group
 		_bind_dialogue_component_from_target()
 		_bind_world_subtitle_component_from_target()
-		_set_status("Auto-bound Xiaokong by group: %s" % String(target_group_name))
+		_set_status("Auto-bound AI target: %s" % String(_target.get_path()))
 		_sync_target_path_to_panel()
 		return true
 	return bind_target_by_path(String(default_target_path))
@@ -476,12 +478,26 @@ func _find_xiaokong_candidate() -> Node:
 	return null
 
 func _find_by_group() -> Node:
-	for candidate in get_tree().get_nodes_in_group(target_group_name):
-		if candidate is Node:
-			var resolved := _resolve_supported_target(candidate)
-			if resolved != null:
-				return resolved
+	for group_name in _target_group_candidates():
+		for candidate in get_tree().get_nodes_in_group(group_name):
+			if candidate is Node:
+				var resolved := _resolve_supported_target(candidate)
+				if resolved != null:
+					return resolved
 	return null
+
+func _target_group_candidates() -> Array[StringName]:
+	var groups: Array[StringName] = []
+	if not String(target_group_name).strip_edges().is_empty():
+		groups.append(target_group_name)
+	for group_value in fallback_target_group_names:
+		var group_name := String(group_value).strip_edges()
+		if group_name.is_empty():
+			continue
+		var string_name := StringName(group_name)
+		if not groups.has(string_name):
+			groups.append(string_name)
+	return groups
 
 func _resolve_supported_target(root_node: Node) -> Node:
 	if root_node == null:
@@ -501,7 +517,11 @@ func _resolve_supported_target(root_node: Node) -> Node:
 	return null
 
 func _is_supported_target(node: Node) -> bool:
-	return node != null and node.has_method("trigger_action") and node.has_method("navigate_to")
+	if node == null:
+		return false
+	if node.has_method("trigger_action") and node.has_method("navigate_to"):
+		return true
+	return _find_dialogue_component_recursive(node) != null
 
 func _ensure_preview_marker() -> void:
 	if _preview_marker != null:
@@ -683,9 +703,13 @@ func _bind_dialogue_component_from_target() -> void:
 		_dialogue_component = null
 		return
 
-	var found: XiaokongAIDialogueComponent = null
-	if _target is Node and (_target as Node).has_node("AIDialogueComponent"):
-		found = (_target as Node).get_node("AIDialogueComponent") as XiaokongAIDialogueComponent
+	var found: Node = null
+	if _target is Node:
+		for dialogue_path in [NodePath("AIDialogueComponent"), NodePath("Components/AIDialogueComponent")]:
+			var candidate := (_target as Node).get_node_or_null(dialogue_path)
+			if _is_supported_dialogue_component(candidate):
+				found = candidate
+				break
 	if found == null:
 		found = _find_dialogue_component_recursive(_target)
 
@@ -693,47 +717,13 @@ func _bind_dialogue_component_from_target() -> void:
 		return
 
 	if _dialogue_component != null:
-		var chunk_cb := Callable(self, "_on_dialogue_chunk")
-		if _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
-			_dialogue_component.dialogue_chunk_received.disconnect(chunk_cb)
-		var stream_done_cb := Callable(self, "_on_dialogue_stream_finished")
-		if _dialogue_component.dialogue_stream_finished.is_connected(stream_done_cb):
-			_dialogue_component.dialogue_stream_finished.disconnect(stream_done_cb)
-		var done_cb := Callable(self, "_on_dialogue_completed")
-		if _dialogue_component.dialogue_completed.is_connected(done_cb):
-			_dialogue_component.dialogue_completed.disconnect(done_cb)
-		var err_cb := Callable(self, "_on_dialogue_failed")
-		if _dialogue_component.dialogue_failed.is_connected(err_cb):
-			_dialogue_component.dialogue_failed.disconnect(err_cb)
-		var probe_done_cb := Callable(self, "_on_model_probe_completed")
-		if _dialogue_component.model_probe_completed.is_connected(probe_done_cb):
-			_dialogue_component.model_probe_completed.disconnect(probe_done_cb)
-		var probe_err_cb := Callable(self, "_on_model_probe_failed")
-		if _dialogue_component.model_probe_failed.is_connected(probe_err_cb):
-			_dialogue_component.model_probe_failed.disconnect(probe_err_cb)
+		_disconnect_dialogue_component_signals(_dialogue_component)
 
 	_dialogue_component = found
 	if _dialogue_component == null:
 		return
 
-	var chunk_cb := Callable(self, "_on_dialogue_chunk")
-	if not _dialogue_component.dialogue_chunk_received.is_connected(chunk_cb):
-		_dialogue_component.dialogue_chunk_received.connect(chunk_cb)
-	var stream_done_cb := Callable(self, "_on_dialogue_stream_finished")
-	if not _dialogue_component.dialogue_stream_finished.is_connected(stream_done_cb):
-		_dialogue_component.dialogue_stream_finished.connect(stream_done_cb)
-	var done_cb := Callable(self, "_on_dialogue_completed")
-	if not _dialogue_component.dialogue_completed.is_connected(done_cb):
-		_dialogue_component.dialogue_completed.connect(done_cb)
-	var err_cb := Callable(self, "_on_dialogue_failed")
-	if not _dialogue_component.dialogue_failed.is_connected(err_cb):
-		_dialogue_component.dialogue_failed.connect(err_cb)
-	var probe_done_cb := Callable(self, "_on_model_probe_completed")
-	if not _dialogue_component.model_probe_completed.is_connected(probe_done_cb):
-		_dialogue_component.model_probe_completed.connect(probe_done_cb)
-	var probe_err_cb := Callable(self, "_on_model_probe_failed")
-	if not _dialogue_component.model_probe_failed.is_connected(probe_err_cb):
-		_dialogue_component.model_probe_failed.connect(probe_err_cb)
+	_connect_dialogue_component_signals(_dialogue_component)
 
 func _bind_world_subtitle_component_from_target() -> void:
 	if _target == null:
@@ -755,11 +745,11 @@ func _find_world_subtitle_component_recursive(root_node: Node) -> Node:
 			return nested
 	return null
 
-func _find_dialogue_component_recursive(root_node: Node) -> XiaokongAIDialogueComponent:
+func _find_dialogue_component_recursive(root_node: Node) -> Node:
 	if root_node == null:
 		return null
-	if root_node is XiaokongAIDialogueComponent:
-		return root_node as XiaokongAIDialogueComponent
+	if _is_supported_dialogue_component(root_node):
+		return root_node
 	for child in root_node.get_children():
 		var child_node := child as Node
 		if child_node == null:
@@ -768,6 +758,50 @@ func _find_dialogue_component_recursive(root_node: Node) -> XiaokongAIDialogueCo
 		if nested != null:
 			return nested
 	return null
+
+func _is_supported_dialogue_component(node: Node) -> bool:
+	return node != null and node.has_method("send_player_text") and node.has_signal(&"dialogue_completed")
+
+func _dialogue_uses_local_fallback_on_error() -> bool:
+	if _dialogue_component == null:
+		return false
+	var value: Variant = _dialogue_component.get("use_local_fallback_on_error")
+	if value is bool:
+		return value
+	if value is int or value is float:
+		return value != 0
+	if value is String:
+		var text := String(value).strip_edges().to_lower()
+		return text == "true" or text == "1" or text == "yes"
+	return false
+
+func _connect_dialogue_component_signals(component: Node) -> void:
+	_connect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
+	_connect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
+	_connect_dialogue_signal(component, &"dialogue_completed", Callable(self, "_on_dialogue_completed"))
+	_connect_dialogue_signal(component, &"dialogue_failed", Callable(self, "_on_dialogue_failed"))
+	_connect_dialogue_signal(component, &"model_probe_completed", Callable(self, "_on_model_probe_completed"))
+	_connect_dialogue_signal(component, &"model_probe_failed", Callable(self, "_on_model_probe_failed"))
+
+func _disconnect_dialogue_component_signals(component: Node) -> void:
+	_disconnect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
+	_disconnect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
+	_disconnect_dialogue_signal(component, &"dialogue_completed", Callable(self, "_on_dialogue_completed"))
+	_disconnect_dialogue_signal(component, &"dialogue_failed", Callable(self, "_on_dialogue_failed"))
+	_disconnect_dialogue_signal(component, &"model_probe_completed", Callable(self, "_on_model_probe_completed"))
+	_disconnect_dialogue_signal(component, &"model_probe_failed", Callable(self, "_on_model_probe_failed"))
+
+func _connect_dialogue_signal(component: Node, signal_name: StringName, callback: Callable) -> void:
+	if component == null or not component.has_signal(signal_name):
+		return
+	if not component.is_connected(signal_name, callback):
+		component.connect(signal_name, callback)
+
+func _disconnect_dialogue_signal(component: Node, signal_name: StringName, callback: Callable) -> void:
+	if component == null or not component.has_signal(signal_name):
+		return
+	if component.is_connected(signal_name, callback):
+		component.disconnect(signal_name, callback)
 
 func _on_dialogue_chunk(chunk: String) -> void:
 	_cancel_local_stream()
@@ -938,4 +972,9 @@ func _try_release_ui_text_focus_by_click(screen_pos: Vector2) -> bool:
 		return false
 	control.release_focus()
 	return true
+
+func _release_ui_captured_movement_input() -> void:
+	for action_name in [&"move_forward", &"move_backward", &"move_left", &"move_right", &"sprint", &"jump"]:
+		if Input.is_action_pressed(action_name):
+			Input.action_release(action_name)
 
