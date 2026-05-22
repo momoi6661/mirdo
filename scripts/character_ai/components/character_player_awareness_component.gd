@@ -39,6 +39,12 @@ signal awareness_reaction_requested(event_name: StringName, context: Dictionary)
 @export_range(0.0, 120.0, 0.1) var gaze_reaction_cooldown_sec: float = 12.0
 @export_range(0.0, 1.0, 0.01) var near_reaction_chance: float = 0.35
 @export_range(0.0, 1.0, 0.01) var gaze_reaction_chance: float = 0.75
+@export_range(0.0, 1.0, 0.01) var proactive_approach_chance: float = 0.38
+@export_range(0.0, 120.0, 0.1) var proactive_approach_cooldown_sec: float = 28.0
+@export_range(0.2, 5.0, 0.05) var proactive_stop_distance: float = 1.55
+@export_range(0.5, 8.0, 0.05) var proactive_min_distance: float = 2.4
+@export_range(0.5, 12.0, 0.05) var proactive_max_distance: float = 7.0
+@export_range(0.0, 12.0, 0.05) var proactive_near_max_distance: float = 4.2
 @export_range(0.0, 5.0, 0.05) var head_look_hold_sec: float = 1.8
 @export_range(0.0, 1.0, 0.01) var head_look_weight: float = 0.85
 @export var near_actions: PackedStringArray = PackedStringArray(["small_nod", "tiny_wave", "tilt_head_cute"])
@@ -69,6 +75,7 @@ var _gaze_held_sec: float = 0.0
 var _social_cooldown_left: float = 0.0
 var _close_cooldown_left: float = 0.0
 var _gaze_cooldown_left: float = 0.0
+var _proactive_approach_cooldown_left: float = 0.0
 var _last_reaction_action: String = ""
 
 func _ready() -> void:
@@ -95,6 +102,7 @@ func _process(delta: float) -> void:
 	_update_gaze(delta, distance)
 	if react_with_head_look and (is_near or _gaze_active):
 		_request_head_look(_player, head_look_weight if _gaze_active else 0.65, head_look_hold_sec)
+	_try_proactive_approach(distance)
 
 func notify_direct_interaction(event_name: StringName = &"direct_interaction") -> void:
 	_refresh_refs_light()
@@ -181,6 +189,25 @@ func _try_social_reaction(event_name: StringName, force: bool = false, extra: Di
 	var action := _pick_action(busy_soft_actions if busy else near_actions)
 	var expression := busy_expression if busy else near_expression
 	return _apply_reaction(event_name, action, expression, social_reaction_cooldown_sec, extra)
+
+func _try_proactive_approach(distance: float) -> bool:
+	if _proactive_approach_cooldown_left > 0.0:
+		return false
+	if distance < proactive_min_distance or distance > proactive_max_distance:
+		return false
+	if _is_busy():
+		return false
+	var has_social_cue := _gaze_active or distance <= proactive_near_max_distance
+	if not has_social_cue:
+		return false
+	if _rng.randf() > proactive_approach_chance:
+		return false
+	if _autonomous_life != null and _autonomous_life.has_method("request_player_social_approach"):
+		var ok := bool(_autonomous_life.call("request_player_social_approach", "awareness", proactive_stop_distance))
+		if ok:
+			_proactive_approach_cooldown_left = proactive_approach_cooldown_sec
+			return true
+	return false
 
 func _try_gaze_reaction(extra: Dictionary = {}) -> bool:
 	if _gaze_cooldown_left > 0.0:
@@ -277,6 +304,7 @@ func _tick_cooldowns(delta: float) -> void:
 	_social_cooldown_left = maxf(0.0, _social_cooldown_left - delta)
 	_close_cooldown_left = maxf(0.0, _close_cooldown_left - delta)
 	_gaze_cooldown_left = maxf(0.0, _gaze_cooldown_left - delta)
+	_proactive_approach_cooldown_left = maxf(0.0, _proactive_approach_cooldown_left - delta)
 
 func _reset_player_state() -> void:
 	if _gaze_active:

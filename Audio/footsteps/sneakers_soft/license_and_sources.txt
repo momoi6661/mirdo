@@ -1,0 +1,15 @@
+Online sneaker / tennis-shoe footsteps used for the project.
+
+Sources:
+- free-sound-effects.net walk category:
+  - footsteps tennis shoes walk cement 01: https://free-sound-effects.net/mp3/03/free-sound-1674782824.mp3
+  - footsteps tennis shoes walk hurried 01: https://free-sound-effects.net/mp3/03/free-sound-1674782854.mp3
+  - footsteps tennis shoes walk hurried cement 01: https://free-sound-effects.net/mp3/03/free-sound-1674782862.mp3
+- UnstuntedSFX:
+  - Footsteps Tile Male Tennis Shoes Slow Pace 170498: https://cdn.unstuntedsfx.net/Footsteps_Tile_Male_Tennis_Shoes_Slow_Pace_170498.mp3
+  - Footsteps Tile Male Tennis Shoes Medium Pace 170500: https://cdn.unstuntedsfx.net/Footsteps_Tile_Male_Tennis_Shoes_Medium_Pace_170500.mp3
+  - Footsteps Tile Male Tennis Shoes Scuffs 170499: https://cdn.unstuntedsfx.net/Footsteps_Tile_Male_Tennis_Shoes_Scuffs_170499.mp3
+
+Notes:
+- Chosen to replace the harsher local concrete set with softer sneaker / rubber-sole indoor footsteps.
+- Keep this folder separate from Audio/footsteps/concrete so the old set remains available but is not used by player/Mirdo.

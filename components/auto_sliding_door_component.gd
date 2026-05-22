@@ -13,9 +13,13 @@ extends StaticBody3D
 @export_group("Trigger")
 @export var trigger_size: Vector3 = Vector3.ZERO
 @export var trigger_center_offset: Vector3 = Vector3.INF
-@export_flags_3d_physics var trigger_collision_mask: int = 4
-@export var actor_groups: PackedStringArray = PackedStringArray(["Player", "player"])
+@export_flags_3d_physics var trigger_collision_mask: int = 5
+@export var actor_groups: PackedStringArray = PackedStringArray(["Player", "player", "Mirdo", "AICharacter", "character"])
 @export var accept_character_bodies_without_group: bool = true
+@export var navigation_open_hold_sec: float = 1.2
+@export var navigation_open_max_hold_sec: float = 3.0
+@export var navigation_open_recheck_sec: float = 0.35
+@export_range(0.0, 4.0, 0.05) var navigation_actor_clearance: float = 0.85
 
 @export_group("Motion")
 @export var slide_axis_local: Vector3 = Vector3.RIGHT
@@ -29,7 +33,9 @@ extends StaticBody3D
 @export_group("Audio")
 @export var open_sfx_player_path: NodePath = NodePath("../SfxAnchor/OpenSfx3D")
 @export var close_sfx_player_path: NodePath = NodePath("../SfxAnchor/CloseSfx3D")
-@export var sound_volume_db: float = -8.0
+@export var sound_volume_db: float = -14.0
+@export_range(0.1, 10.0, 0.1) var sfx_unit_size: float = 1.2
+@export_range(0.5, 30.0, 0.1) var sfx_max_distance: float = 5.0
 
 var _door_mesh: MeshInstance3D
 var _source_mesh: Mesh
@@ -43,6 +49,8 @@ var _right_closed_position: Vector3 = Vector3.ZERO
 var _is_open: bool = false
 var _tween: Tween
 var _inside_actors: Dictionary = {}
+var _navigation_open_actors: Dictionary = {}
+var _navigation_close_generation: int = 0
 var _default_collision_layer: int = 1
 var _default_collision_mask: int = 1
 var _pending_save_state: Dictionary = {}
@@ -142,7 +150,9 @@ func interact(_player: Node) -> void:
 func short_interact(_player: Node) -> void:
 	toggle()
 
-func request_navigation_open(_actor: Node) -> bool:
+func request_navigation_open(actor: Node) -> bool:
+	_track_navigation_actor(actor)
+	_schedule_navigation_close_check()
 	if _is_open:
 		return false
 	open()
@@ -297,8 +307,52 @@ func _close_after_delay() -> void:
 	if tree == null:
 		return
 	await tree.create_timer(maxf(0.0, close_delay)).timeout
-	if not _has_valid_actor_inside():
+	if not _has_valid_actor_inside() and not _has_near_navigation_actor():
 		close()
+
+func _track_navigation_actor(actor: Node) -> void:
+	if actor == null:
+		return
+	_navigation_open_actors[actor.get_instance_id()] = actor
+
+func _schedule_navigation_close_check() -> void:
+	_navigation_close_generation += 1
+	var generation := _navigation_close_generation
+	var tree := get_tree()
+	if tree == null:
+		return
+	call_deferred("_navigation_close_check_async", generation)
+
+func _navigation_close_check_async(generation: int) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	await tree.create_timer(maxf(0.0, navigation_open_hold_sec)).timeout
+	var elapsed := maxf(0.0, navigation_open_hold_sec)
+	while generation == _navigation_close_generation and _is_open:
+		if not _has_valid_actor_inside() and not _has_near_navigation_actor():
+			close()
+			return
+		if elapsed >= maxf(navigation_open_hold_sec, navigation_open_max_hold_sec) and not _has_valid_actor_inside():
+			close()
+			return
+		await tree.create_timer(maxf(0.05, navigation_open_recheck_sec)).timeout
+		elapsed += maxf(0.05, navigation_open_recheck_sec)
+
+func _has_near_navigation_actor() -> bool:
+	var valid_actors: Dictionary = {}
+	var clearance := maxf(0.0, navigation_actor_clearance)
+	for actor_id in _navigation_open_actors.keys():
+		var actor: Node = _navigation_open_actors[actor_id]
+		if not is_instance_valid(actor) or not actor.is_inside_tree():
+			continue
+		if actor is Node3D:
+			var actor_3d := actor as Node3D
+			if actor_3d.global_position.distance_to(global_position) <= clearance:
+				valid_actors[actor_id] = actor
+				continue
+	_navigation_open_actors = valid_actors
+	return not _navigation_open_actors.is_empty()
 
 func _accept_actor(body: Node) -> bool:
 	if body == null:
@@ -367,8 +421,12 @@ func _resolve_sfx_players() -> void:
 func _apply_sfx_volume() -> void:
 	if _open_sfx_player != null:
 		_open_sfx_player.volume_db = sound_volume_db
+		_open_sfx_player.unit_size = sfx_unit_size
+		_open_sfx_player.max_distance = sfx_max_distance
 	if _close_sfx_player != null:
 		_close_sfx_player.volume_db = sound_volume_db
+		_close_sfx_player.unit_size = sfx_unit_size
+		_close_sfx_player.max_distance = sfx_max_distance
 
 func _play_door_sound(is_closing: bool) -> void:
 	var player: AudioStreamPlayer3D = _close_sfx_player if is_closing else _open_sfx_player

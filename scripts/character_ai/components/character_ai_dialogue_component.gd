@@ -19,7 +19,7 @@ signal dialogue_failed(error_text: String)
 @export var subtitle_target_path: NodePath
 @export var face_component_path: NodePath
 @export var ai_nav_point_group: StringName = &"ai_nav_point"
-@export_range(0, 64, 1) var max_nav_points_in_prompt: int = 24
+@export_range(0, 256, 1) var max_nav_points_in_prompt: int = 128
 
 @export_category("NPC Contract")
 @export var npc_display_name: String = "Mirdo"
@@ -274,8 +274,6 @@ func _build_nav_point_context() -> Array:
 	var observer := _find_observer_node()
 	var out: Array = []
 	for candidate in tree.get_nodes_in_group(ai_nav_point_group):
-		if out.size() >= max_nav_points_in_prompt:
-			break
 		var node := candidate as Node
 		if node == null or not is_instance_valid(node):
 			continue
@@ -298,7 +296,8 @@ func _build_nav_point_context() -> Array:
 				compact[key] = entry[key]
 		if not compact.is_empty():
 			out.append(compact)
-	return out
+	_sort_compact_entries_by_distance(out)
+	return out.slice(0, mini(max_nav_points_in_prompt, out.size()))
 
 func _find_observer_node() -> Node3D:
 	var current: Node = self
@@ -307,6 +306,11 @@ func _find_observer_node() -> Node3D:
 			return current as Node3D
 		current = current.get_parent()
 	return null
+
+func _sort_compact_entries_by_distance(entries: Array) -> void:
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("distance", 0.0)) < float(b.get("distance", 0.0))
+	)
 
 func _compact_entries(entries_value: Variant, limit: int) -> Array:
 	var out: Array = []

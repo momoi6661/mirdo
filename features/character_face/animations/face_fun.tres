@@ -1,4 +1,4 @@
-[gd_resource type="Animation" format=3]
+[gd_resource type="Animation" format=3 uid="uid://8v4ckge684dn"]
 
 [resource]
 resource_name = "face_fun"
@@ -9,4 +9,4 @@ tracks/0/enabled = true
 tracks/0/path = NodePath("Armature/GeneralSkeleton/vrm-mesh:Fun")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
-tracks/0/keys = PackedFloat32Array(0, 1, 1, 1, 1, 1)
+tracks/0/keys = PackedFloat32Array(0, 1, 0.68, 1, 1, 0.68)

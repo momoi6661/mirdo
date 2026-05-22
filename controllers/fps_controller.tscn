@@ -20,7 +20,7 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="17_save_comp"]
 [ext_resource type="Script" uid="uid://bsc1vf2k71u0y" path="res://controllers/compoents/xiaokong_control_component.gd" id="19_xk_ctrl"]
 [ext_resource type="Script" uid="uid://cdo3ikm0lfm5d" path="res://controllers/scripts/xiaokong_control_panel.gd" id="20_xk_panel"]
-[ext_resource type="AudioStream" uid="uid://dc3ojh2l6f4oi" path="res://Audio/footsteps/concrete/concrete_0.ogg" id="22_step_sfx"]
+[ext_resource type="AudioStream" uid="uid://dxfbu5judk8sq" path="res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3" id="22_step_sfx"]
 [ext_resource type="PackedScene" uid="uid://cih1ba2m6uqc5" path="res://controllers/interaction/world_interaction_panel.tscn" id="23_world_panel"]
 [ext_resource type="Resource" uid="uid://ca22678m80wis" path="res://resources/inventory/player_inventory_storage.tres" id="24_inv_storage"]
 [ext_resource type="Script" uid="uid://crsyy4ppfnwnf" path="res://controllers/interaction/holo_inventory_dual_panel_3d.gd" id="25_dual_inv"]
@@ -204,6 +204,12 @@ inventory_handler = NodePath("Components/InventoryDataService")
 inventory_panel_3d = NodePath("HoloInventoryPanel3D")
 dual_inventory_panel = NodePath("HoloInventoryDualPanel3D")
 xiaokong_dialogue_panel = NodePath("XiaokongDialogueInputPanel3D")
+footstep_volume_db = -21.0
+footstep_pitch_min = 0.96
+footstep_pitch_max = 1.02
+footstep_folder_path = "res://Audio/footsteps/sneakers_soft"
+footstep_loop_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3"
+footstep_landing_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_scuffs_170499.mp3"
 
 [node name="SaveComponent" type="Node" parent="." unique_id=1410065405]
 script = ExtResource("17_save_comp")
@@ -211,9 +217,10 @@ unique_id = "player_001"
 
 [node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=630296697]
 stream = ExtResource("22_step_sfx")
-volume_db = -17.0
-unit_size = 0.75
-max_distance = 9.0
+bus = &"SFX"
+volume_db = -21.0
+unit_size = 0.55
+max_distance = 6.0
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]
 collision_layer = 0

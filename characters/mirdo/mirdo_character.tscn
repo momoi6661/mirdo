@@ -4,8 +4,8 @@
 [ext_resource type="Shader" uid="uid://vm6bw28e1lgc" path="res://features/anime_toon/anime_outline.gdshader" id="2_87wd2"]
 [ext_resource type="Script" uid="uid://cd4u156gxir4" path="res://features/anime_toon/anime_toon_applier.gd" id="2_toon_applier"]
 [ext_resource type="Shader" uid="uid://cw7vfuhp4teqi" path="res://features/anime_toon/anime_toon.gdshader" id="3_bryac"]
-[ext_resource type="Shader" path="res://features/anime_toon/anime_occluded_visible.gdshader" id="4_occluded_shader"]
 [ext_resource type="Script" uid="uid://lwhwjw8o756g" path="res://features/character_face/blend_shape_face_component.gd" id="4_face_component"]
+[ext_resource type="Shader" uid="uid://dojf4hk0rjg7m" path="res://features/anime_toon/anime_occluded_visible.gdshader" id="4_occluded_shader"]
 [ext_resource type="Texture2D" uid="uid://dnwblq0cf4xco" path="res://characters/mirdo/mirdo_mirdo_BaseColor.png" id="4_ujsm0"]
 [ext_resource type="Animation" uid="uid://bkpfvl61k0fnw" path="res://resources/animate/Kimodo/check_shelf.res" id="5_kr56o"]
 [ext_resource type="Animation" uid="uid://bp6ek6n7hckih" path="res://resources/animate/Kimodo/check_lower.res" id="5_mpoqa"]
@@ -16,6 +16,7 @@
 [ext_resource type="Animation" uid="uid://c0drnfljc2jy6" path="res://resources/animate/Kimodo/kimodo_idle_alert_loop.res" id="7_fxplt"]
 [ext_resource type="Animation" uid="uid://dg3em6dheo36x" path="res://resources/animate/Kimodo/count_supplies_loop.res" id="7_wgm7h"]
 [ext_resource type="Animation" uid="uid://w2iwqlfanhjn" path="res://resources/animate/Kimodo/kimodo_idle_fidget.res" id="8_8yy6c"]
+[ext_resource type="Script" uid="uid://dslprsfwjlgs5" path="res://scripts/character_ai/components/character_head_look_at_modifier_3d.gd" id="8_46ch8"]
 [ext_resource type="Animation" uid="uid://ceq6hfgj00rwo" path="res://resources/animate/Kimodo/drink.res" id="8_8335l"]
 [ext_resource type="Animation" uid="uid://cjn6ych3iy7rx" path="res://resources/animate/Kimodo/kimodo_idle_sleepy.res" id="8_whlhr"]
 [ext_resource type="Animation" uid="uid://lpy6fq845m2p" path="res://resources/animate/Kimodo/cute_explain.res" id="9_38tn6"]
@@ -54,7 +55,7 @@
 [ext_resource type="Script" uid="uid://gcmwum3ub3ts" path="res://scripts/character_ai/components/character_animation_behavior_tree_component.gd" id="54_1kdye"]
 [ext_resource type="Script" uid="uid://cqw63up0w706h" path="res://ai/AIManager.gd" id="55_ai_manager"]
 [ext_resource type="Script" uid="uid://bynxe56cn6nd0" path="res://scripts/character_ai/components/character_ai_dialogue_component.gd" id="56_ai_dialogue"]
-[ext_resource type="Script" path="res://components/character_interactable_component.gd" id="57_character_interactable"]
+[ext_resource type="Script" uid="uid://duw1yi0bdruke" path="res://components/character_interactable_component.gd" id="57_character_interactable"]
 [ext_resource type="Script" uid="uid://cmksnwhknvws" path="res://scripts/character_ai/components/character_perception_component.gd" id="58_ai_perception"]
 [ext_resource type="Script" uid="uid://djeirn2xrxvkc" path="res://scripts/character_ai/components/character_ai_intent_interpreter_component.gd" id="59_ai_interpreter"]
 [ext_resource type="Script" uid="uid://b0460j66num5u" path="res://scripts/character_ai/components/character_ai_action_executor_component.gd" id="60_ai_executor"]
@@ -69,14 +70,18 @@
 [ext_resource type="Script" uid="uid://nqd2tq1l4j5f" path="res://scripts/system/save_component.gd" id="70_save_comp"]
 [ext_resource type="Script" uid="uid://c47diqj7a287c" path="res://scripts/character_ai/components/character_action_expression_component.gd" id="71_action_expression"]
 [ext_resource type="Script" uid="uid://bgt005wgigo6p" path="res://scripts/character_resources/character_item_consumer_component.gd" id="72_item_consumer"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_action_scheduler_component.gd" id="73_action_scheduler"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_autonomous_supply_user_component.gd" id="74_supply_user"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_head_look_at_controller.gd" id="75_head_look_controller"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_player_awareness_component.gd" id="76_player_awareness"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_action_semantics_component.gd" id="77_action_semantics"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_ai_blackboard_component.gd" id="78_ai_blackboard"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_situation_behavior_pack_component.gd" id="79_situation_packs"]
-[ext_resource type="Script" path="res://scripts/character_ai/components/character_return_greeting_component.gd" id="80_return_greeting"]
+[ext_resource type="Script" uid="uid://wx635o0c7ls2" path="res://scripts/character_ai/components/character_action_scheduler_component.gd" id="73_action_scheduler"]
+[ext_resource type="Script" uid="uid://7ptehceyoysn" path="res://scripts/character_ai/components/character_autonomous_supply_user_component.gd" id="74_supply_user"]
+[ext_resource type="Script" uid="uid://pqrfhtkwsi1i" path="res://scripts/character_ai/components/character_head_look_at_controller.gd" id="75_head_look_controller"]
+[ext_resource type="Script" uid="uid://bmk4r6r24b43x" path="res://scripts/character_ai/components/character_player_awareness_component.gd" id="76_player_awareness"]
+[ext_resource type="Script" uid="uid://c8la2ipnbp7jp" path="res://scripts/character_ai/components/character_action_semantics_component.gd" id="77_action_semantics"]
+[ext_resource type="Script" uid="uid://ctf4iqi0ikaic" path="res://scripts/character_ai/components/character_ai_blackboard_component.gd" id="78_ai_blackboard"]
+[ext_resource type="Script" uid="uid://dvl0muq417d3p" path="res://scripts/character_ai/components/character_situation_behavior_pack_component.gd" id="79_situation_packs"]
+[ext_resource type="Script" uid="uid://bxifeqwfia76y" path="res://scripts/character_ai/components/character_return_greeting_component.gd" id="80_return_greeting"]
+[ext_resource type="PackedScene" path="res://controllers/interaction/CharacterResourcePanel3D.tscn" id="81_status_panel_scene"]
+[ext_resource type="Script" uid="uid://bkhy2m2a3cmpg" path="res://scripts/character_ai/components/character_footstep_audio_component.gd" id="82_footstep_audio"]
+[ext_resource type="AudioStream" uid="uid://dxfbu5judk8sq" path="res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3" id="83_footstep_sfx"]
+[ext_resource type="Script" path="res://scripts/mirdo/mirdo_ik_controller.gd" id="84_mirdo_ik_controller"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.21240234
@@ -115,7 +120,7 @@ _surfaces = [{
 blend_shape_mode = 0
 shadow_mesh = SubResource("ArrayMesh_re6qp")
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_debug"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_i84cf"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -127,9 +132,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_u0baf"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tj53j"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_occ_debug")
+next_pass = SubResource("ShaderMaterial_i84cf")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -139,9 +144,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_vwf0e"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_j81o5"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_u0baf")
+next_pass = SubResource("ShaderMaterial_tj53j")
 shader = ExtResource("3_bryac")
 shader_parameter/use_texture = false
 shader_parameter/base_color = Color(0, 0.88082504, 1, 0.28)
@@ -663,7 +668,7 @@ bind/150/name = &"VSB_4"
 bind/150/bone = -1
 bind/150/pose = Transform3D(1, 4.177345e-09, 4.4052992e-08, -7.911808e-09, 0.9963709, 0.08511619, -4.3537565e-08, -0.085116185, 0.996371, 1.1727916e-07, -5.9604638e-08, -2.6077043e-08)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_main"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hxkyi"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -675,9 +680,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_x0obc"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_p1kpa"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_occ_main")
+next_pass = SubResource("ShaderMaterial_hxkyi")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -687,9 +692,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_8bcja"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6m6gt"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_x0obc")
+next_pass = SubResource("ShaderMaterial_p1kpa")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -743,7 +748,7 @@ _surfaces = [{
 }]
 blend_shape_mode = 0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_occ_noblend"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_yee0x"]
 render_priority = -2
 shader = ExtResource("4_occluded_shader")
 shader_parameter/outline_color = Color(0.78, 0.55, 1, 0.78)
@@ -755,9 +760,9 @@ shader_parameter/depth_offset = -0.001
 shader_parameter/radial_blend = 0.85
 shader_parameter/min_direction_length = 0.002
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ass2d"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gvd01"]
 render_priority = -1
-next_pass = SubResource("ShaderMaterial_occ_noblend")
+next_pass = SubResource("ShaderMaterial_yee0x")
 shader = ExtResource("2_87wd2")
 shader_parameter/outline_color = Color(0.055, 0.043, 0.055, 1)
 shader_parameter/outline_width = 0.003
@@ -767,9 +772,9 @@ shader_parameter/distance_fade_start = 4.0
 shader_parameter/distance_fade_end = 18.0
 shader_parameter/alpha = 1.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_thmsh"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wx6s2"]
 render_priority = 0
-next_pass = SubResource("ShaderMaterial_ass2d")
+next_pass = SubResource("ShaderMaterial_gvd01")
 shader = ExtResource("3_bryac")
 shader_parameter/albedo_texture = ExtResource("4_ujsm0")
 shader_parameter/use_texture = true
@@ -851,7 +856,7 @@ _data = {
 [sub_resource type="SphereShape3D" id="SphereShape3D_ai_vision"]
 radius = 12.0
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1mocw"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_r8ldh"]
 resource_name = "AI Vision Debug Cyan"
 transparency = 1
 cull_mode = 2
@@ -973,7 +978,7 @@ nodes/BlinkBlend/node = SubResource("AnimationNodeAdd2_blink")
 nodes/BlinkBlend/position = Vector2(960, 240)
 node_connections = [&"output", 0, &"BlinkBlend", &"VisemeBlend", 0, &"ExpressionSM", &"VisemeBlend", 1, &"VisemeSM", &"TalkBlend", 0, &"VisemeBlend", &"TalkBlend", 1, &"Talk", &"BlinkBlend", 0, &"TalkBlend", &"BlinkBlend", 1, &"Blink"]
 
-[node name="MirdoCharacter" type="CharacterBody3D" unique_id=2096496898 groups=["Mirdo", "AICharacter", "character"]]
+[node name="MirdoCharacter" type="CharacterBody3D" unique_id=2096496898 groups=["AICharacter", "Mirdo", "character"]]
 script = ExtResource("67_navigation_motor")
 arrival_distance = 0.42
 run_distance = 7.5
@@ -999,73 +1004,75 @@ shape = SubResource("CapsuleShape3D_body")
 [node name="SkirtProxyClothMesh" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 462739812) index="1" unique_id=1210087579]
 visible = false
 mesh = SubResource("ArrayMesh_1yjat")
-surface_material_override/0 = SubResource("ShaderMaterial_vwf0e")
+surface_material_override/0 = SubResource("ShaderMaterial_j81o5")
 
 [node name="GeneralSkeleton" parent="VisualRoot/Model/Armature" parent_id_path=PackedInt32Array(50782955, 462739812) index="4" unique_id=327200352]
-bones/2/position = Vector3(-5.127705e-10, 0.25946447, 8.940697e-08)
-bones/2/rotation = Quaternion(-0.35754865, 0.009257405, 0.019393343, 0.9336473)
-bones/34/rotation = Quaternion(0.13257593, -0.0039005317, 0.004913375, 0.991153)
-bones/35/rotation = Quaternion(0.19510148, -0.010377266, -0.009254666, 0.9806845)
-bones/36/rotation = Quaternion(0.03708115, 0.02951095, -0.016442265, 0.99874115)
-bones/37/rotation = Quaternion(-0.08358963, 0.0025228343, 0.012369381, 0.9964203)
-bones/38/rotation = Quaternion(0.6393251, -0.020956514, 0.025367873, 0.7682323)
-bones/39/rotation = Quaternion(0.6397628, 0.021506188, -0.025368104, 0.7678526)
-bones/60/rotation = Quaternion(0.479475, 0.40366596, 0.62982255, -0.45878237)
-bones/61/rotation = Quaternion(0.18990482, 0.86984986, -0.44976085, -0.07080071)
-bones/62/rotation = Quaternion(0.45979935, -0.5368972, 0.46349078, 0.5343243)
-bones/63/rotation = Quaternion(-0.12185861, 0.93093383, 0.050267495, 0.34056708)
-bones/64/rotation = Quaternion(0.09012055, 0.04358201, -0.037043963, 0.9942871)
-bones/65/rotation = Quaternion(0.18219161, 5.1975258e-05, -2.217293e-05, 0.98326313)
-bones/66/rotation = Quaternion(0.18348466, -0.026941538, -0.02678089, 0.98228836)
-bones/70/rotation = Quaternion(0.13770622, 0.022141814, 0.031215966, 0.98973346)
-bones/71/rotation = Quaternion(0.05525735, -9.794533e-05, -1.7017126e-05, 0.9984722)
-bones/72/rotation = Quaternion(0.15566726, -0.03719602, -0.038054887, 0.9863752)
-bones/76/rotation = Quaternion(0.1852442, 0.026604157, -0.000110357985, 0.9823323)
-bones/77/rotation = Quaternion(0.120388895, 5.3972006e-05, -1.9222498e-05, 0.9927268)
-bones/78/rotation = Quaternion(0.20679212, -0.007575721, 0.00052397564, 0.97835547)
-bones/82/rotation = Quaternion(0.123746574, 0.011212707, 0.0007362962, 0.9922502)
-bones/83/rotation = Quaternion(0.29403532, 0.007281012, 0.004802297, 0.95575476)
-bones/84/rotation = Quaternion(0.17414878, 0.011967378, -0.0063587734, 0.9846262)
-bones/88/rotation = Quaternion(-0.11840268, 0.68489957, 0.19241661, 0.692726)
-bones/89/rotation = Quaternion(-0.009399823, -0.0047811326, 0.113137975, 0.99352336)
-bones/89/scale = Vector3(1.0001662, 0.9998368, 0.9999971)
-bones/90/rotation = Quaternion(0.07652058, 7.137656e-06, 7.933378e-05, 0.99706805)
-bones/95/rotation = Quaternion(0.41883644, -0.42335817, -0.6550893, -0.46497536)
-bones/96/rotation = Quaternion(-0.15889974, 0.86499125, -0.4744258, 0.038225435)
-bones/97/rotation = Quaternion(0.48068583, 0.5167847, -0.48184925, 0.5193227)
-bones/98/rotation = Quaternion(-0.037378024, -0.9522966, 0.009430446, 0.30272964)
-bones/99/rotation = Quaternion(0.04279059, -0.044883072, 0.034433603, 0.9974812)
-bones/100/rotation = Quaternion(0.09603448, 5.882979e-05, 1.627207e-05, 0.9953781)
-bones/101/rotation = Quaternion(0.10468717, 0.021455152, 0.035146233, 0.99365234)
-bones/105/rotation = Quaternion(0.18333232, -7.188195e-05, -0.1048806, 0.97744024)
-bones/106/rotation = Quaternion(0.07116082, 3.1918287e-05, 0.0001424253, 0.9974649)
-bones/107/rotation = Quaternion(0.15805693, 0.03721031, 0.039519537, 0.98593694)
-bones/111/rotation = Quaternion(0.12849991, -0.032713234, -0.0091459155, 0.99112767)
-bones/112/rotation = Quaternion(0.12309599, 0.05621712, 0.018851846, 0.99062186)
-bones/113/rotation = Quaternion(0.17044304, 0.0058073574, -0.0002641185, 0.98535043)
-bones/117/rotation = Quaternion(0.17476313, -0.014322681, -0.03505623, 0.98388195)
-bones/118/rotation = Quaternion(0.16328034, 8.502603e-05, 3.4660105e-05, 0.9865798)
-bones/119/rotation = Quaternion(0.093656, -0.012568131, 0.0030693114, 0.99552053)
-bones/123/rotation = Quaternion(-0.17608114, -0.66102874, -0.18934551, 0.7044039)
-bones/124/rotation = Quaternion(-0.00015655774, 0.021795219, -0.13710672, 0.9903165)
-bones/124/scale = Vector3(1.0001659, 0.9998369, 0.99999654)
-bones/125/rotation = Quaternion(0.11047083, 2.3692846e-05, -1.963973e-05, 0.9938794)
-bones/130/rotation = Quaternion(0.085137285, 0.38470882, 0.9132902, -0.103207946)
-bones/131/rotation = Quaternion(0.0006100992, 0.7110073, -0.7031823, -0.0017424189)
-bones/132/rotation = Quaternion(-0.05860149, 0.71299577, -0.69732475, -0.04405882)
-bones/140/rotation = Quaternion(-0.10596226, 0.38498926, 0.91131717, 0.10028133)
-bones/141/rotation = Quaternion(0.0013506288, 0.69998723, -0.71412605, -0.0063309497)
-bones/142/rotation = Quaternion(0.022750612, 0.6816955, -0.7296789, 0.048397858)
+modifier_callback_mode_process = 0
+bones/2/position = Vector3(-8.140155e-11, 0.45891407, -4.4703484e-08)
+bones/2/rotation = Quaternion(-0.038490936, -7.9679536e-05, -0.0023324946, 0.99925625)
+bones/34/rotation = Quaternion(-0.02682601, 0.0011038722, -0.000107493295, 0.9996395)
+bones/35/rotation = Quaternion(0.11898374, -0.014911168, 0.0018496809, 0.9927826)
+bones/36/rotation = Quaternion(0.1372863, 0.022511844, 0.00016782733, 0.99027556)
+bones/37/rotation = Quaternion(-0.10425315, 0.00033303804, 0.011412788, 0.99448526)
+bones/38/rotation = Quaternion(0.63896585, -0.021142308, 0.02482363, 0.7685438)
+bones/39/rotation = Quaternion(0.63908035, 0.02195102, -0.025626829, 0.7683995)
+bones/60/rotation = Quaternion(0.51203805, 0.33341017, 0.6815992, -0.40258828)
+bones/61/rotation = Quaternion(0.11325179, 0.91196394, -0.3750211, -0.121881455)
+bones/62/rotation = Quaternion(0.16086549, -0.688393, 0.16032651, 0.6888635)
+bones/63/rotation = Quaternion(0.04000282, 0.68343234, -0.016373483, 0.7287332)
+bones/64/rotation = Quaternion(0.09012791, 0.043796916, -0.037134413, 0.99427354)
+bones/65/rotation = Quaternion(0.18208708, -3.3542517e-05, -2.6017431e-05, 0.9832825)
+bones/66/rotation = Quaternion(0.18327032, -0.026857719, -0.026762396, 0.9823311)
+bones/70/rotation = Quaternion(0.1377188, 0.02216506, 0.030832112, 0.98974323)
+bones/71/rotation = Quaternion(0.05525008, -7.9885125e-05, -3.7014484e-05, 0.9984726)
+bones/72/rotation = Quaternion(0.15577509, -0.03708124, -0.038130462, 0.98635954)
+bones/76/rotation = Quaternion(0.1851408, 0.026740756, -0.00036510822, 0.9823481)
+bones/77/rotation = Quaternion(0.12046319, 4.9650676e-05, -4.3630604e-05, 0.99271786)
+bones/78/rotation = Quaternion(0.20691504, -0.007646631, 0.00057451904, 0.9783289)
+bones/82/rotation = Quaternion(0.12370889, 0.011337578, 0.00046563148, 0.99225366)
+bones/83/rotation = Quaternion(0.29379117, 0.0074982205, 0.004839972, 0.9558281)
+bones/84/rotation = Quaternion(0.17402013, 0.011847794, -0.0066354275, 0.98464847)
+bones/88/rotation = Quaternion(-0.11843205, 0.68459636, 0.19232185, 0.69304687)
+bones/89/rotation = Quaternion(-0.009086677, -0.0039331936, 0.11347313, 0.9934917)
+bones/89/scale = Vector3(1.0001662, 0.9998367, 0.99999696)
+bones/90/rotation = Quaternion(0.076495744, 5.1468618e-05, 5.1170595e-05, 0.99706995)
+bones/95/rotation = Quaternion(0.4813686, -0.35514954, -0.70586306, -0.37935525)
+bones/96/rotation = Quaternion(-0.117900625, 0.90430003, -0.385851, 0.13949881)
+bones/97/rotation = Quaternion(0.1556737, 0.69032615, -0.15325703, 0.68973035)
+bones/98/rotation = Quaternion(0.032076627, -0.68168765, -0.023189498, 0.7305718)
+bones/99/rotation = Quaternion(0.042842895, -0.0451037, 0.034575433, 0.9974642)
+bones/100/rotation = Quaternion(0.09619419, 2.6032332e-05, -4.0531162e-05, 0.99536264)
+bones/101/rotation = Quaternion(0.1048398, 0.021415146, 0.03513244, 0.9936377)
+bones/105/rotation = Quaternion(0.1835172, -0.00017578898, -0.10506153, 0.97738606)
+bones/106/rotation = Quaternion(0.07124274, 0.00015847386, -8.7618835e-05, 0.99745905)
+bones/107/rotation = Quaternion(0.1583219, 0.0370533, 0.03962892, 0.98589593)
+bones/111/rotation = Quaternion(0.12868595, -0.032842573, -0.009280323, 0.991098)
+bones/112/rotation = Quaternion(0.12322532, 0.056338653, 0.018777221, 0.99060035)
+bones/113/rotation = Quaternion(0.17081834, 0.005814913, -0.00040891915, 0.9852853)
+bones/117/rotation = Quaternion(0.17490014, -0.014151737, -0.03526795, 0.9838526)
+bones/118/rotation = Quaternion(0.16327083, -3.960729e-05, -5.6952245e-05, 0.9865814)
+bones/119/rotation = Quaternion(0.09371852, -0.012425499, 0.0029775803, 0.99551684)
+bones/123/rotation = Quaternion(-0.17604335, -0.66078985, -0.18916851, 0.704685)
+bones/124/rotation = Quaternion(-0.00032623098, 0.021644892, -0.136956, 0.9903406)
+bones/124/scale = Vector3(1.0001659, 0.99983674, 0.9999965)
+bones/125/rotation = Quaternion(0.110580415, -3.0472871e-05, 3.6060806e-06, 0.99386716)
+bones/130/rotation = Quaternion(0.026417615, -0.031986877, 0.99887675, -0.022897722)
+bones/131/rotation = Quaternion(0.00048773736, 0.99880415, -0.048861805, -0.0016340784)
+bones/132/rotation = Quaternion(-0.010949714, 0.67462724, -0.7377828, 0.02085307)
+bones/140/rotation = Quaternion(-0.012229414, -0.038713835, 0.9990278, 0.01718239)
+bones/141/rotation = Quaternion(0.00012633868, 0.9994073, -0.03442375, 0.00032757077)
+bones/142/rotation = Quaternion(0.031872783, 0.67896056, -0.73307526, -0.024443517)
 
 [node name="vrm-mesh" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="0" unique_id=1136892378]
 mesh = SubResource("ArrayMesh_cr1od")
 skin = SubResource("Skin_8bpvu")
-surface_material_override/0 = SubResource("ShaderMaterial_8bcja")
+blend_shapes/Joy = 0.62
+surface_material_override/0 = SubResource("ShaderMaterial_6m6gt")
 
 [node name="vrm-mesh_WithoutBlendShape" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="1" unique_id=2018157511]
 mesh = SubResource("ArrayMesh_pg8os")
 skin = SubResource("Skin_8bpvu")
-surface_material_override/0 = SubResource("ShaderMaterial_thmsh")
+surface_material_override/0 = SubResource("ShaderMaterial_wx6s2")
 
 [node name="AnimeSpringBones" type="SpringBoneSimulator3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="2" unique_id=858434378]
 influence = 0.78
@@ -1575,7 +1582,7 @@ settings/17/enable_all_child_collisions = true
 settings/17/exclude_collision_count = 0
 
 [node name="HeadSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=629885098]
-transform = Transform3D(0.9973546, -0.030346978, 0.0660514, 0.019047154, 0.9860386, 0.16542451, -0.070149355, -0.16372882, 0.98400813, -0.011467546, 0.59924215, -0.11888247)
+transform = Transform3D(0.9994271, -0.030106261, 0.015467279, 0.03233455, 0.98432434, -0.17337918, -0.010005014, 0.17378001, 0.98473364, 0.00088390167, 0.8164526, 0.0066530444)
 bone_name = "Head"
 bone = 37
 position_offset = Vector3(0, 0.035, 0.01)
@@ -1583,7 +1590,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.08
 
 [node name="FaceSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1964730921]
-transform = Transform3D(0.9973546, -0.030346978, 0.0660514, 0.019047154, 0.9860386, 0.16542451, -0.070149355, -0.16372882, 0.98400813, -0.010119732, 0.61323816, -0.09591956)
+transform = Transform3D(0.9994271, -0.030106261, 0.015467279, 0.03233455, 0.98432434, -0.17337918, -0.010005014, 0.17378001, 0.98473364, 0.000969521, 0.8219614, 0.033009186)
 bone_name = "Head"
 bone = 37
 position_offset = Vector3(0, 0.045, 0.035)
@@ -1591,7 +1598,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.053
 
 [node name="NeckSphere" type="SpringBoneCollisionSphere3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1990733035]
-transform = Transform3D(0.99799305, 0.005257753, 0.063104115, -0.0051912386, 0.9999859, -0.0012180209, -0.06310962, 0.00088798255, 0.9980062, -0.011921809, 0.5309775, -0.13388649)
+transform = Transform3D(0.9998254, -0.0036193356, 0.018333256, 0.010211637, 0.92745036, -0.3738072, -0.015650246, 0.37392914, 0.9273252, 0.0016995716, 0.75802195, -0.031380877)
 bone_name = "Neck"
 bone = 36
 position_offset = Vector3(0, 0, 0)
@@ -1599,7 +1606,7 @@ rotation_offset = Quaternion(0, 0, 0, 1)
 radius = 0.037
 
 [node name="ChestCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1889126534]
-transform = Transform3D(0.99954224, -0.030087853, 0.0031587598, 0.02978153, 0.9969457, 0.07219723, -0.0053213667, -0.07207012, 0.9973854, -0.008047091, 0.40979752, -0.0842794)
+transform = Transform3D(0.99960905, -0.0019552344, -0.027892534, -0.0010580318, 0.9941928, -0.10760933, 0.027940953, 0.10759677, 0.9938019, 0.0008066797, 0.62985927, -0.0042885942)
 bone_name = "UpperChest"
 bone = 35
 position_offset = Vector3(0, 0, 0)
@@ -1608,7 +1615,7 @@ radius = 0.091
 height = 0.242
 
 [node name="WaistCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1163811732]
-transform = Transform3D(0.99865574, -0.05119117, 0.008133014, 0.04209932, 0.8926035, 0.4488727, -0.030237872, -0.4479269, 0.89355874, -0.003246999, 0.3184748, -0.052894462)
+transform = Transform3D(0.99998534, 0.0048155277, 0.0024833193, -0.0050980197, 0.9914646, 0.13027672, -0.001834772, -0.13028747, 0.99147457, 0.00031320564, 0.53317654, -0.0046034856)
 bone_name = "Spine"
 bone = 34
 position_offset = Vector3(0, -0.005, -0.015)
@@ -1617,7 +1624,7 @@ radius = 0.093
 height = 0.233
 
 [node name="HipsCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1144617926]
-transform = Transform3D(0.9990764, -0.042833026, 0.0034181746, 0.029593136, 0.74356574, 0.6680077, -0.031154428, -0.66728956, 0.7441466, -1.17791934e-07, 0.25946447, 8.940697e-08)
+transform = Transform3D(0.9999891, 0.0046676532, 2.0319261e-05, -0.004655386, 0.997026, 0.07692499, 0.00033880037, -0.07692424, 0.9970369, -1.17360564e-07, 0.45891407, -4.4703484e-08)
 bone_name = "Hips"
 bone = 2
 position_offset = Vector3(0, 0, 0)
@@ -1626,7 +1633,7 @@ radius = 0.091
 height = 0.264
 
 [node name="LeftUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=131598494]
-transform = Transform3D(0.47469038, 0.31300864, -0.82261443, -0.019010842, -0.93076247, -0.36512992, -0.8799476, 0.18896215, -0.4358735, 0.060911287, 0.4328527, -0.120952055)
+transform = Transform3D(0.49098024, 0.29673728, -0.8190759, 0.27141702, -0.9455096, -0.17984587, -0.82781094, -0.13401034, -0.544766, 0.06727392, 0.6504007, -0.046401046)
 bone_name = "LeftUpperArm"
 bone = 61
 position_offset = Vector3(0, 0.06, 0)
@@ -1635,7 +1642,7 @@ radius = 0.04
 height = 0.13
 
 [node name="RightUpperArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1197866268]
-transform = Transform3D(0.4973524, -0.27144933, 0.8239876, -0.01855664, -0.95289993, -0.30271655, 0.86735, 0.13526636, -0.47896427, -0.07932271, 0.42976537, -0.12081214)
+transform = Transform3D(0.55777687, -0.26341975, 0.7870799, -0.2582047, -0.95631576, -0.13707846, 0.78880596, -0.12676857, -0.601427, -0.060272805, 0.6493757, -0.04527697)
 bone_name = "RightUpperArm"
 bone = 96
 position_offset = Vector3(0, 0.06, 0)
@@ -1644,7 +1651,7 @@ radius = 0.04
 height = 0.13
 
 [node name="LeftLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=684477654]
-transform = Transform3D(-0.82502973, -0.41810435, -0.38015056, -0.36647484, -0.11619423, 0.92314404, -0.43014207, 0.90093714, -0.057360996, 0.0692825, 0.36035505, -0.06232756)
+transform = Transform3D(-0.8188478, 0.04820099, -0.57198334, -0.17906396, -0.9681922, 0.17475754, -0.5453662, 0.24552138, 0.80143297, 0.100216195, 0.53129506, -0.046384025)
 bone_name = "LeftLowerArm"
 bone = 62
 position_offset = Vector3(0, 0.055, 0)
@@ -1653,7 +1660,7 @@ radius = 0.034
 height = 0.12
 
 [node name="RightLowerArmCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=853940739]
-transform = Transform3D(-0.8222401, 0.47706732, 0.31036755, 0.30616271, -0.08894281, 0.94781524, 0.47977647, 0.87435454, -0.072927706, -0.08160734, 0.35710493, -0.06722796)
+transform = Transform3D(-0.78804433, 0.0020066593, 0.61561507, 0.13373171, -0.9755569, 0.17436904, 0.6009175, 0.2197377, 0.7685137, -0.08838491, 0.5287272, -0.04551229)
 bone_name = "RightLowerArm"
 bone = 97
 position_offset = Vector3(0, 0.055, 0)
@@ -1662,7 +1669,7 @@ radius = 0.034
 height = 0.12
 
 [node name="LeftUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1113225745]
-transform = Transform3D(-0.957237, 0.28537285, 0.047535073, 0.036927626, -0.042440236, 0.9984164, 0.28693834, 0.9574764, 0.030087262, 0.04013527, 0.28409132, 0.106727675)
+transform = Transform3D(-0.9977651, 0.039398953, 0.05396776, -0.038701855, -0.9991541, 0.013902046, 0.05446984, 0.011782333, 0.99844587, 0.0068874843, 0.36508644, -0.008178502)
 bone_name = "LeftUpperLeg"
 bone = 130
 position_offset = Vector3(0.055, 0.135, 0)
@@ -1671,7 +1678,7 @@ radius = 0.087
 height = 0.28
 
 [node name="RightUpperLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1457868531]
-transform = Transform3D(-0.9618052, -0.2325204, -0.14444676, -0.13368629, -0.061475456, 0.9891152, -0.23886937, 0.9706466, 0.028042674, -0.04622675, 0.28217778, 0.10697735)
+transform = Transform3D(-0.9989352, -0.038036592, -0.026103996, 0.038047265, -0.99927586, 8.800626e-05, -0.026088443, -0.0009052679, 0.99965924, -0.016215503, 0.3660102, -0.01175135)
 bone_name = "RightUpperLeg"
 bone = 140
 position_offset = Vector3(-0.045, 0.135, 0)
@@ -1680,7 +1687,7 @@ radius = 0.073
 height = 0.278
 
 [node name="LeftLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1642352318]
-transform = Transform3D(0.9582545, -0.042858202, -0.2826866, -0.03545104, -0.99888235, 0.031268287, -0.28371075, -0.019941617, -0.95870256, 0.10976075, 0.16962624, 0.18245319)
+transform = Transform3D(0.99797755, 0.033130307, -0.05425081, 0.03761331, -0.9957712, 0.08381516, -0.05124457, -0.08568619, -0.99500346, 0.06409841, 0.1518225, -0.008718358)
 bone_name = "LeftLowerLeg"
 bone = 131
 position_offset = Vector3(0, 0.12, 0)
@@ -1689,7 +1696,7 @@ radius = 0.046
 height = 0.332
 
 [node name="RightLowerLegCapsule" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1806893429]
-transform = Transform3D(0.958181, 0.15593264, 0.23994665, 0.13986163, -0.98671013, 0.08271637, 0.24965595, -0.04569812, -0.96725565, -0.08891459, 0.16384259, 0.18559417)
+transform = Transform3D(0.9989437, -0.036425106, 0.028013933, -0.03827713, -0.9969032, 0.068693735, 0.025425006, -0.06969346, -0.99724454, -0.06344399, 0.15202996, -0.009924897)
 bone_name = "RightLowerLeg"
 bone = 141
 position_offset = Vector3(0, 0.12, 0)
@@ -1698,7 +1705,7 @@ radius = 0.055
 height = 0.332
 
 [node name="leg3" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=1014995242]
-transform = Transform3D(-0.98706496, 0.06955451, -0.14444676, -0.14602366, -0.018120412, 0.9891152, 0.06617996, 0.9974135, 0.028042674, -0.047301486, 0.26315656, 0.05915437)
+transform = Transform3D(-0.9635772, 0.26615286, -0.026103996, -0.2662458, -0.9639051, 8.800626e-05, -0.025138352, 0.0070348857, 0.99965924, -0.028965807, 0.41154653, -0.032095123)
 bone_name = "RightUpperLeg"
 bone = 140
 position_offset = Vector3(-0.03, 0.09, -0.02)
@@ -1707,7 +1714,7 @@ radius = 0.082
 height = 0.328
 
 [node name="leg2" type="SpringBoneCollisionCapsule3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/AnimeSpringBones" unique_id=382647094]
-transform = Transform3D(-0.998803, 0.01152724, 0.047535073, 0.047162723, -0.030667586, 0.9984164, 0.012966841, 0.99946314, 0.030087262, 0.05179049, 0.26646549, 0.008475497)
+transform = Transform3D(-0.97022426, -0.23611954, 0.05396776, 0.23717128, -0.97136843, 0.013902046, 0.049140032, 0.026287716, 0.99844587, 0.04217283, 0.45628038, -0.03138662)
 bone_name = "LeftUpperLeg"
 bone = 130
 position_offset = Vector3(0.015, 0.045, -0.02)
@@ -1716,16 +1723,201 @@ radius = 0.082
 height = 0.328
 
 [node name="SkirtProxyAttachment" type="BoneAttachment3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="3" unique_id=1232999926]
-transform = Transform3D(0.9990764, -0.042833026, 0.0034181746, 0.029593136, 0.74356574, 0.6680077, -0.031154428, -0.66728956, 0.7441466, -1.17791934e-07, 0.25946447, 8.940697e-08)
+transform = Transform3D(0.9999891, 0.0046676532, 2.0319261e-05, -0.004655386, 0.997026, 0.07692499, 0.00033880037, -0.07692424, 0.9970369, -1.17360564e-07, 0.45891407, -4.4703484e-08)
 bone_name = "Hips"
 bone_idx = 2
 
-[node name="RightHandItemAttachment" type="BoneAttachment3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="4"]
+[node name="RightHandItemAttachment" type="BoneAttachment3D" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="4" unique_id=358971827]
+transform = Transform3D(0.5573165, 0.058078326, 0.82826626, 0.2584364, -0.96013206, -0.10656951, 0.7890555, 0.273447, -0.55010706, -0.094166294, 0.47168896, -0.039140597)
 bone_name = "RightHand"
 bone_idx = 98
 
-[node name="HeldItemRoot" type="Node3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/RightHandItemAttachment"]
-transform = Transform3D(1, 0, 0, 0, 0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, 0.02, 0.035, 0.0)
+[node name="HeldItemRoot" type="Node3D" parent="VisualRoot/Model/Armature/GeneralSkeleton/RightHandItemAttachment" unique_id=1646909669]
+transform = Transform3D(1, 0, 0, 0, 0.9961947, -0.08715574, 0, 0.08715574, 0.9961947, 0.02, 0.035, 0)
+
+[node name="HeadLookAtModifier" parent="VisualRoot/Model/Armature/GeneralSkeleton" index="5"]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("8_46ch8")
+target_path = NodePath("../../../../../HeadLookProxyTarget")
+target_weight = 0.85
+yaw_degrees = -0.36450883615283924
+pitch_degrees = -5.789729015842041
+actor_path = NodePath("../../../../..")
+
+
+[node name="LeftArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftHand")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftElbowPole")
+settings/0/root_bone_name = "LeftUpperArm"
+settings/0/root_bone = 61
+settings/0/middle_bone_name = "LeftLowerArm"
+settings/0/middle_bone = 62
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "LeftHand"
+settings/0/end_bone = 63
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="RightArmIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightHand")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightElbowPole")
+settings/0/root_bone_name = "RightUpperArm"
+settings/0/root_bone = 96
+settings/0/middle_bone_name = "RightLowerArm"
+settings/0/middle_bone = 97
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "RightHand"
+settings/0/end_bone = 98
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="LeftLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/LeftFoot")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/LeftKneePole")
+settings/0/root_bone_name = "LeftUpperLeg"
+settings/0/root_bone = 130
+settings/0/middle_bone_name = "LeftLowerLeg"
+settings/0/middle_bone = 131
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "LeftFoot"
+settings/0/end_bone = 132
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="RightLegIK" type="TwoBoneIK3D" parent="VisualRoot/Model/Armature/GeneralSkeleton"]
+influence = 0.0
+setting_count = 1
+settings/0/target_node = NodePath("../../MirdoIK/FinalTargets/RightFoot")
+settings/0/pole_node = NodePath("../../MirdoIK/FinalTargets/RightKneePole")
+settings/0/root_bone_name = "RightUpperLeg"
+settings/0/root_bone = 140
+settings/0/middle_bone_name = "RightLowerLeg"
+settings/0/middle_bone = 141
+settings/0/pole_direction = 6
+settings/0/end_bone_name = "RightFoot"
+settings/0/end_bone = 142
+settings/0/use_virtual_end = false
+settings/0/extend_end_bone = false
+
+[node name="MirdoIK" type="Node3D" parent="VisualRoot/Model/Armature"]
+
+[node name="AuthorTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+
+[node name="LeftHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftHandBase"]
+
+[node name="RightHandBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightHandBase"]
+
+[node name="LeftFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftFootBase"]
+
+[node name="RightFootBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightFootBase"]
+
+[node name="LeftElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftElbowPoleBase"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0, -0.2)
+
+[node name="RightElbowPoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightElbowPoleBase"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0, -0.2)
+
+[node name="LeftKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/LeftKneePoleBase"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0, -0.35)
+
+[node name="RightKneePoleBase" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets"]
+
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/AuthorTargets/RightKneePoleBase"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0, -0.35)
+
+[node name="RuntimeTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+visible = false
+
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.8, -0.2)
+
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.8, -0.2)
+
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.35, -0.35)
+
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/RuntimeTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.35, -0.35)
+
+[node name="FinalTargets" type="Node3D" parent="VisualRoot/Model/Armature/MirdoIK"]
+visible = false
+
+[node name="LeftHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+
+[node name="RightHand" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+
+[node name="LeftFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+
+[node name="RightFoot" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+
+[node name="LeftElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.8, -0.2)
+
+[node name="RightElbowPole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.25, 0.8, -0.2)
+
+[node name="LeftKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.35, -0.35)
+
+[node name="RightKneePole" type="Marker3D" parent="VisualRoot/Model/Armature/MirdoIK/FinalTargets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.35, -0.35)
+
+[node name="MirdoIKController" type="Node" parent="VisualRoot/Model/Armature/MirdoIK"]
+script = ExtResource("84_mirdo_ik_controller")
+author_targets_root_path = NodePath("../AuthorTargets")
+runtime_targets_root_path = NodePath("../RuntimeTargets")
+final_targets_root_path = NodePath("../FinalTargets")
+skeleton_path = NodePath("../../GeneralSkeleton")
+left_hand_modifier_path = NodePath("../../GeneralSkeleton/LeftArmIK")
+right_hand_modifier_path = NodePath("../../GeneralSkeleton/RightArmIK")
+left_foot_modifier_path = NodePath("../../GeneralSkeleton/LeftLegIK")
+right_foot_modifier_path = NodePath("../../GeneralSkeleton/RightLegIK")
+animation_player_path = NodePath("../../../../../AnimationPlayer")
+require_author_animation_tracks = true
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1595483476]
 root_node = NodePath("../VisualRoot/Model")
@@ -1746,6 +1938,13 @@ parameters/Mode/current_index = 0
 visible = false
 animation_path = NodePath("../AnimationTree")
 
+[node name="FootstepAudio3D" type="AudioStreamPlayer3D" parent="." unique_id=1473554603]
+stream = ExtResource("83_footstep_sfx")
+bus = &"SFX"
+volume_db = -27.0
+unit_size = 0.55
+max_distance = 5.2
+
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1670062239]
 path_desired_distance = 0.2
 target_desired_distance = 0.35
@@ -1763,7 +1962,7 @@ script = ExtResource("63_ai_vision_proxy")
 shape = SubResource("SphereShape3D_ai_vision")
 
 [node name="DebugVisionSphere" type="MeshInstance3D" parent="AIVisionProxy3D" unique_id=1230717820]
-material_override = SubResource("StandardMaterial3D_1mocw")
+material_override = SubResource("StandardMaterial3D_r8ldh")
 cast_shadow = 0
 mesh = SubResource("SphereMesh_ai_vision_debug")
 
@@ -1772,9 +1971,6 @@ script = ExtResource("2_toon_applier")
 include_mesh_name_filters = PackedStringArray()
 exclude_mesh_name_filters = PackedStringArray("collider", "collision")
 outline_width = 0.003
-occluded_outline_width = 0.006
-occluded_outline_alpha = 0.82
-occluded_outline_radial_blend = 0.85
 shadow_hardness = 0.85
 received_shadow_strength = 0.55
 shadow_tint_strength = 0.78
@@ -1791,11 +1987,22 @@ parameters/VisemeBlend/add_amount = 1.0
 parameters/TalkBlend/add_amount = 0.0
 parameters/BlinkBlend/add_amount = 0.0
 
+[node name="StatusAnchor" type="Marker3D" parent="." unique_id=1098715080]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.023814559, 0.5379132, 0.39084017)
+
 [node name="DialogueAnchor" type="Marker3D" parent="." unique_id=1273321001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
 
 [node name="HeadLookProxyTarget" type="Marker3D" parent="." unique_id=815896320]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.011, 0.58, 2)
+
+[node name="StatusPanel" parent="." unique_id=1586910254 instance=ExtResource("81_status_panel_scene")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.023814559, 0.5379132, 0.39084017)
+visible = false
+anchor_mark_path = NodePath("../StatusAnchor")
+state_component_path = NodePath("../Components/StateComponent")
+auto_close_when_far = true
+open_auto_close_grace_sec = 0.25
 
 [node name="Components" type="Node" parent="." unique_id=1273321002]
 
@@ -1824,7 +2031,7 @@ face_talk_blend_duration = 0.1
 blink_duration = 0.1
 blink_interval_min = 3.8
 blink_interval_max = 5.9
-disable_blink_on_joy = true
+inspector_expression = "joy"
 
 [node name="WorldSubtitleComponent" parent="Components" unique_id=1273321004 instance=ExtResource("5_subtitle_scene")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1539465, 0)
@@ -1834,101 +2041,45 @@ queue_clear_delay = 2.8
 
 [node name="AnimationBehaviorTreeComponent" type="Node" parent="Components" unique_id=1326592975]
 script = ExtResource("54_1kdye")
-selected_state_name = "seated_idle"
 
+[node name="CharacterFootstepAudio" type="Node" parent="Components" unique_id=1492261522]
+script = ExtResource("82_footstep_audio")
+actor_path = NodePath("../..")
+audio_player_path = NodePath("../../FootstepAudio3D")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
+footstep_folder_path = "res://Audio/footsteps/sneakers_soft"
+footstep_loop_stream_path = "res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3"
+base_volume_db = -27.0
+max_distance = 5.2
+unit_size = 0.55
 
 [node name="CharacterActionScheduler" type="Node" parent="Components" unique_id=815896318]
 script = ExtResource("73_action_scheduler")
-animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
-action_executor_path = NodePath("../CharacterAIActionExecutor")
-navigation_motor_path = NodePath("../..")
-default_return_action = &"idle_normal"
-seated_return_action = &"seated_idle"
 
 [node name="CharacterAutonomousSupplyUser" type="Node" parent="Components" unique_id=815896319]
 script = ExtResource("74_supply_user")
-state_component_path = NodePath("../StateComponent")
-action_executor_path = NodePath("../CharacterAIActionExecutor")
-action_scheduler_path = NodePath("../CharacterActionScheduler")
-item_consumer_path = NodePath("../ItemConsumer")
-autonomous_life_path = NodePath("../CharacterAutonomousLife")
-face_component_path = NodePath("../FaceComponent")
-actor_path = NodePath("../..")
-thirst_trigger_threshold = 48.0
-hunger_trigger_threshold = 48.0
-check_interval_sec = 5.0
+thirst_trigger_threshold = 32.0
+hunger_trigger_threshold = 32.0
+check_interval_sec = 14.0
 success_cooldown_sec = 95.0
-failure_cooldown_sec = 28.0
+failure_cooldown_sec = 45.0
+debug_log = true
 
 [node name="CharacterHeadLookAtController" type="Node" parent="Components" unique_id=815896321]
 script = ExtResource("75_head_look_controller")
-actor_path = NodePath("../..")
-skeleton_path = NodePath("../../VisualRoot/Model/Armature/GeneralSkeleton")
-animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
-dialogue_component_path = NodePath("../AIDialogueComponent")
-proxy_target_path = NodePath("../../HeadLookProxyTarget")
-max_yaw_degrees = 65.0
-max_pitch_up_degrees = 25.0
-max_pitch_down_degrees = 35.0
-default_forward_distance = 2.0
-default_head_height_offset = 0.02
-idle_weight = 0.35
-near_idle_weight = 0.55
-dialogue_weight = 0.85
-moving_weight = 0.15
-work_weight = 0.08
-seated_weight = 0.45
-reaction_weight = 0.65
-weight_blend_speed = 5.0
-target_lerp_speed = 8.0
-editor_preview_enabled = true
-editor_manual_proxy_target = true
-editor_preview_weight = 0.85
-
 
 [node name="CharacterPlayerAwareness" type="Node" parent="Components" unique_id=815896322]
 script = ExtResource("76_player_awareness")
-actor_path = NodePath("../..")
-animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
-face_component_path = NodePath("../FaceComponent")
-head_look_controller_path = NodePath("../CharacterHeadLookAtController")
-navigation_motor_path = NodePath("../..")
-mind_state_path = NodePath("../CharacterMindState")
-autonomous_life_path = NodePath("../CharacterAutonomousLife")
-awareness_radius = 5.0
-near_distance = 3.0
-very_close_distance = 1.2
-target_eye_height = 0.58
-gaze_dot_threshold = 0.92
-gaze_start_hold_sec = 0.85
-gaze_strong_hold_sec = 2.2
-social_reaction_cooldown_sec = 8.0
-close_reaction_cooldown_sec = 10.0
-gaze_reaction_cooldown_sec = 12.0
-near_reaction_chance = 0.35
-gaze_reaction_chance = 0.75
+awareness_radius = 6.5
+proactive_approach_chance = 0.62
+proactive_near_max_distance = 4.4
+near_actions = PackedStringArray("small_nod", "tiny_wave", "tilt_head_cute")
+gaze_actions = PackedStringArray("tilt_head_cute", "tiny_wave", "react_nod")
+very_close_actions = PackedStringArray("cute_startle", "tilt_head_cute")
+busy_soft_actions = PackedStringArray("small_nod", "tilt_head_cute")
 
 [node name="CharacterReturnGreeting" type="Node" parent="Components" unique_id=1765314904]
 script = ExtResource("80_return_greeting")
-actor_path = NodePath("../..")
-navigation_motor_path = NodePath("../..")
-animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
-face_component_path = NodePath("../FaceComponent")
-head_look_controller_path = NodePath("../CharacterHeadLookAtController")
-autonomous_life_path = NodePath("../CharacterAutonomousLife")
-mind_state_path = NodePath("../CharacterMindState")
-state_component_path = NodePath("../StateComponent")
-subtitle_target_path = NodePath("../WorldSubtitleComponent")
-greet_distance = 1.35
-close_enough_distance = 2.0
-max_greeting_approach_distance = 6.0
-arrival_timeout_sec = 2.8
-wave_action = &"small_wave"
-close_action = &"tiny_wave"
-far_fallback_action = &"small_happy_bounce"
-greeting_expression = &"face_joy"
-speaker_name = "Mirdo"
-debug_log = true
 
 [node name="CharacterActionExpression" type="Node" parent="Components" unique_id=821712066]
 script = ExtResource("71_action_expression")
@@ -1965,7 +2116,6 @@ autonomous_life_path = NodePath("../CharacterAutonomousLife")
 action_semantics_path = NodePath("../CharacterActionSemantics")
 situation_behavior_pack_path = NodePath("../CharacterSituationBehaviorPacks")
 debug_print_enabled = true
-debug_print_interval_sec = 2.0
 
 [node name="CharacterAIActionExecutor" type="Node" parent="Components" unique_id=1694252670]
 script = ExtResource("60_ai_executor")
@@ -2018,10 +2168,9 @@ duty_drift = 0.0015
 [node name="CharacterAutonomousPlanner" type="Node" parent="Components" unique_id=1870238246]
 script = ExtResource("66_ai_autonomous_planner")
 mind_state_path = NodePath("../CharacterMindState")
+perception_component_path = NodePath("../CharacterPerception")
 blackboard_path = NodePath("../CharacterAIBlackboard")
 action_semantics_path = NodePath("../CharacterActionSemantics")
-state_component_path = NodePath("../StateComponent")
-perception_component_path = NodePath("../CharacterPerception")
 object_distance_penalty = 0.05
 repeat_target_penalty = 3.2
 movement_bias = 0.55
@@ -2035,7 +2184,7 @@ lower_check_tags = PackedStringArray("tool", "material", "utility")
 sit_tags = PackedStringArray("seat", "rest", "bed")
 avoid_tags = PackedStringArray("danger", "blocked")
 ambient_actions = PackedStringArray("idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce", "tiny_wave", "small_wave", "small_nod", "rub_eye", "sleepy_yawn", "look_back")
-max_nav_point_candidates = 32
+debug_log = true
 
 [node name="CharacterAutonomousLife" type="Node" parent="Components" unique_id=1870238244]
 script = ExtResource("64_ai_autonomous_life")
@@ -2062,21 +2211,26 @@ think_interval_max = 7.0
 external_grace_sec = 7.0
 movement_cooldown_sec = 5.5
 same_target_cooldown_sec = 55.0
+same_semantic_group_cooldown_sec = 55.0
+storage_chain_cooldown_sec = 120.0
+supply_chain_cooldown_sec = 110.0
 sit_cooldown_sec = 180.0
 post_arrival_dwell_default_sec = 2.0
 post_arrival_think_delay_sec = 3.0
+player_social_approach_cooldown_sec = 22.0
+player_social_arrival_dwell_sec = 2.8
+look_at_player_chance = 0.18
 inspect_tags = PackedStringArray("storage", "supplies", "food", "medical", "equipment", "tool", "material", "cabinet", "utility")
 sit_tags = PackedStringArray("seat", "rest", "bed")
 avoid_autonomous_tags = PackedStringArray("player", "door", "danger", "blocked")
+ambient_actions = PackedStringArray("idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce", "tiny_wave", "small_wave", "small_nod", "rub_eye", "sleepy_yawn", "look_back")
 seated_ambient_actions = PackedStringArray("seated_idle", "seated_sleepy")
 player_social_seated_actions = PackedStringArray("seated_idle")
-ambient_actions = PackedStringArray("idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce", "tiny_wave", "small_wave", "small_nod", "rub_eye", "sleepy_yawn", "look_back")
+debug_log = true
 
 [node name="CharacterInteractable" type="Node" parent="Components" unique_id=946740976]
 script = ExtResource("57_character_interactable")
 show_eat_option = false
-action_executor_path = NodePath("../CharacterAIActionExecutor")
-eat_label = "吃桌上的食物"
 consume_reason = "mirdo_table_meal"
 dialogue_options = PackedStringArray("你现在感觉怎么样？", "你能看看附近有什么吗？", "我们接下来做什么？", "可以去看看食物柜吗？", "先跟着我走。")
 
@@ -2107,3 +2261,4 @@ fallback_reply_text = "老师，我在听呢。"
 [connection signal="face_talk_requested" from="Components/WorldSubtitleComponent" to="Components/FaceComponent" method="set_face_talk_enabled"]
 
 [editable path="VisualRoot/Model"]
+

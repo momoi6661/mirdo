@@ -67,7 +67,7 @@ func _process(_delta: float) -> void:
 		process_stream_path,
 		bgm_player.volume_db,
 		bgm_player.bus,
-		str(bgm_player.get_stream_playback() != null),
+		str(bgm_player.playing and bgm_player.get_stream_playback() != null),
 	])
 
 func play_menu_music() -> void:

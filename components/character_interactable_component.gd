@@ -69,12 +69,15 @@ func execute_world_panel_option(option_id: String, _helper: Node, _context: Dict
 	var character_root := _resolve_character_root()
 	if character_root == null:
 		return
+	_notify_character_interaction_started(character_root)
 	match option_id:
 		OPTION_ID_DIALOGUE:
+			_request_character_attention(character_root, &"listen", &"neutral")
 			_emit_global_interaction_request(SIGNAL_LEGACY_DIALOGUE_REQUESTED, OPTION_ID_DIALOGUE, character_root)
 		OPTION_ID_VIEW_STATUS:
 			_open_status_panel_direct(character_root)
 		OPTION_ID_USE_ITEM:
+			_request_character_attention(character_root, &"listen", &"neutral")
 			_emit_global_interaction_request(SIGNAL_CHARACTER_INVENTORY_USE_REQUESTED, OPTION_ID_USE_ITEM, character_root)
 		OPTION_ID_EAT:
 			_execute_eat_option(character_root)
@@ -89,6 +92,7 @@ func _append_option(model: WorldInteractionPanelModel, option_id: String, label:
 	model.options.append(WorldInteractionOption.create(option_id, clean_label, "", WorldInteractionOption.TRIGGER_TAP, 0.0, true))
 
 func _open_status_panel_direct(character_root: Node) -> void:
+	_request_character_attention(character_root, &"listen", &"neutral")
 	var status_panel := character_root.get_node_or_null("StatusPanel")
 	if status_panel == null or not is_instance_valid(status_panel):
 		_emit_global_interaction_request(SIGNAL_LEGACY_STATUS_REQUESTED, OPTION_ID_VIEW_STATUS, character_root)
@@ -118,9 +122,54 @@ func _execute_eat_option(character_root: Node) -> void:
 		_notify_character_fed(character_root)
 
 func _notify_character_fed(character_root: Node) -> void:
+	_notify_character_interaction_started(character_root)
+	_request_character_attention(character_root, &"small_happy_bounce", &"joy")
+
+func _notify_character_interaction_started(character_root: Node) -> void:
+	if character_root == null:
+		return
 	var life := character_root.get_node_or_null("Components/CharacterAutonomousLife")
 	if life != null and life.has_method("notify_external_control"):
-		life.call("notify_external_control")
+		life.call("notify_external_control", true)
+	var executor := _resolve_action_executor(character_root)
+	if executor != null and executor.has_method("stop_navigation_from_external"):
+		executor.call("stop_navigation_from_external")
+
+func _request_character_attention(character_root: Node, action: StringName = &"listen", expression: StringName = &"neutral") -> void:
+	_request_character_head_look_at_player(character_root)
+	var executor := _resolve_action_executor(character_root)
+	if executor == null or not executor.has_method("apply_ai_response"):
+		return
+	executor.call("apply_ai_response", {
+		"command": "look_at_player",
+		"action": String(action),
+		"expression": String(expression),
+	})
+
+func _request_character_head_look_at_player(character_root: Node) -> void:
+	if character_root == null:
+		return
+	var player := _resolve_player_node()
+	if player == null:
+		return
+	var head_look := character_root.get_node_or_null("Components/CharacterHeadLookAtController")
+	if head_look != null and head_look.has_method("request_look_at_node"):
+		head_look.call("request_look_at_node", player, 0.92, 3.2)
+
+func _resolve_player_node() -> Node3D:
+	var global_node := get_node_or_null(GLOBAL_PATH)
+	if global_node != null:
+		var value: Variant = global_node.get("player")
+		if value is Node3D and is_instance_valid(value):
+			return value as Node3D
+	var tree := get_tree()
+	if tree == null:
+		return null
+	for group_name in [&"Player", &"player"]:
+		for entry in tree.get_nodes_in_group(group_name):
+			if entry is Node3D and is_instance_valid(entry):
+				return entry as Node3D
+	return null
 
 func _can_show_eat_option(character_root: Node) -> bool:
 	if character_root == null or not _is_character_seated(character_root):
@@ -225,3 +274,4 @@ func _pick_consume_item_path(food_entries: Array[Dictionary]) -> String:
 		if picked_path.is_empty() or path < picked_path:
 			picked_path = path
 	return picked_path
+

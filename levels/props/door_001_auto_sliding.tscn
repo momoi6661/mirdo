@@ -127,7 +127,13 @@ left_panel_path = NodePath("../AutoLeftPanel")
 right_panel_path = NodePath("../AutoRightPanel")
 mirror_right_panel = false
 trigger_size = Vector3(1.76, 2.16, 0.86)
-actor_groups = PackedStringArray("Player", "player")
+trigger_collision_mask = 5
+actor_groups = PackedStringArray("Player", "player", "Mirdo", "AICharacter", "character")
+navigation_open_max_hold_sec = 3.0
+navigation_actor_clearance = 0.85
+sound_volume_db = -16.0
+sfx_unit_size = 1.0
+sfx_max_distance = 4.5
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="door_001_col" unique_id=1437057212]
 shape = SubResource("ConcavePolygonShape3D_jujbo")
@@ -137,14 +143,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.78, 0, 0)
 
 [node name="OpenSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor" unique_id=579029365]
 stream = ExtResource("2_torb5")
-volume_db = -8.0
-unit_size = 4.5
+volume_db = -16.0
+unit_size = 1.0
 pitch_scale = 0.96
-max_distance = 9.0
+max_distance = 4.5
 
 [node name="CloseSfx3D" type="AudioStreamPlayer3D" parent="SfxAnchor" unique_id=917489138]
 stream = ExtResource("3_4s6t4")
-volume_db = -8.0
-unit_size = 4.5
+volume_db = -16.0
+unit_size = 1.0
 pitch_scale = 0.92
-max_distance = 9.0
+max_distance = 4.5

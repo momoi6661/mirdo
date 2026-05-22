@@ -13,7 +13,7 @@ class_name CharacterPerceptionComponent
 @export var prefer_vision_area_overlap: bool = true
 @export var fallback_radius_scan: bool = true
 @export var include_known_nav_points: bool = true
-@export_range(1, 128, 1) var max_known_nav_points: int = 64
+@export_range(1, 256, 1) var max_known_nav_points: int = 128
 
 func build_perception_snapshot() -> Dictionary:
 	var observer := _resolve_observer()
@@ -162,8 +162,6 @@ func _collect_known_nav_points(observer: Node3D) -> Array:
 	if tree == null:
 		return entries
 	for candidate in tree.get_nodes_in_group(nav_point_group):
-		if entries.size() >= max_known_nav_points:
-			break
 		var node := candidate as Node
 		if node == null or not is_instance_valid(node):
 			continue
@@ -179,7 +177,7 @@ func _collect_known_nav_points(observer: Node3D) -> Array:
 		summary["map_role"] = String(summary.get("map_role", "known_nav_point"))
 		entries.append(summary)
 	_sort_by_distance(entries)
-	return entries
+	return entries.slice(0, mini(max_known_nav_points, entries.size()))
 
 func _collect_vision_overlap_nodes(required_group: StringName) -> Array[Node3D]:
 	var result: Array[Node3D] = []

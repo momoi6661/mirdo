@@ -15,7 +15,7 @@ class_name CharacterAIVisionProxy3D
 		debug_visible_in_editor = value
 		_sync_debug_visibility()
 
-@export var debug_visible_in_game: bool = false:
+@export var debug_visible_in_game: bool = true:
 	set(value):
 		debug_visible_in_game = value
 		_sync_debug_visibility()

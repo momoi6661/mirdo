@@ -48,6 +48,11 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(1, 8, 1) var task_stack_max_size: int = 3
 @export_range(0.0, 120.0, 0.1) var movement_cooldown_sec: float = 6.0
 @export_range(0.0, 300.0, 0.1) var same_target_cooldown_sec: float = 45.0
+@export_range(0.0, 300.0, 0.1) var same_semantic_group_cooldown_sec: float = 38.0
+@export_range(0.0, 300.0, 0.1) var storage_chain_cooldown_sec: float = 70.0
+@export_range(0.0, 300.0, 0.1) var supply_chain_cooldown_sec: float = 55.0
+@export_range(0.0, 5.0, 0.05) var local_nav_cluster_radius: float = 2.6
+@export_range(0.0, 300.0, 0.1) var local_nav_cluster_cooldown_sec: float = 65.0
 @export_range(0.0, 300.0, 0.1) var sit_cooldown_sec: float = 120.0
 @export_range(0.0, 60.0, 0.1) var post_arrival_dwell_default_sec: float = 1.8
 @export_range(0.0, 60.0, 0.1) var post_arrival_think_delay_sec: float = 2.5
@@ -56,11 +61,17 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(0.05, 2.0, 0.01) var arrival_distance: float = 0.45
 @export_range(0.1, 8.0, 0.05) var walk_speed: float = 1.8
 @export_range(0.1, 8.0, 0.05) var run_speed: float = 3.6
-@export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 10.0
+@export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 4.0
 @export_range(0.1, 30.0, 0.1) var far_distance: float = 7.0
 @export_range(0.0, 100.0, 1.0) var low_energy_threshold: float = 35.0
 @export_range(0.0, 100.0, 1.0) var critical_energy_threshold: float = 18.0
 @export_range(0.0, 1.0, 0.01) var run_when_far_chance: float = 0.08
+
+@export_category("Player Social Approach")
+@export_range(0.5, 6.0, 0.05) var player_social_approach_distance: float = 1.55
+@export_range(0.0, 120.0, 0.1) var player_social_approach_cooldown_sec: float = 28.0
+@export_range(0.0, 10.0, 0.05) var player_social_arrival_dwell_sec: float = 2.2
+@export_range(0.0, 10.0, 0.05) var player_social_near_dwell_sec: float = 1.6
 
 @export_category("Decision Weights")
 @export_range(0.0, 1.0, 0.01) var inspect_chance: float = 0.18
@@ -106,8 +117,11 @@ var _rng := RandomNumberGenerator.new()
 var _think_left := 0.0
 var _external_grace_left := 0.0
 var _movement_cooldown_left := 0.0
+var _player_social_approach_cooldown_left := 0.0
 var _sit_cooldown_left := 0.0
 var _target_cooldowns: Dictionary = {}
+var _semantic_group_cooldowns: Dictionary = {}
+var _nav_cluster_cooldowns: Array[Dictionary] = []
 var _last_ambient_action := ""
 var _navigation_active := false
 var _navigation_target_position := Vector3.ZERO
@@ -120,11 +134,13 @@ var _self_talk_cooldown_left: float = 0.0
 var _last_decision_kind: String = ""
 var _last_decision_target: String = ""
 var _recent_decision_kinds: Array[String] = []
+var _recent_semantic_groups: Array[String] = []
 var _current_decision: Dictionary = {}
 var _resume_token: Dictionary = {}
 var _resume_token_ttl_left: float = 0.0
 var _resume_after_grace_left: float = 0.0
 var _task_stack: Array[Dictionary] = []
+var _self_executor_signal_suppress_depth: int = 0
 
 func _ready() -> void:
 	_rng.randomize()
@@ -181,6 +197,66 @@ func notify_ai_response_applied(_ai_data: Dictionary = {}) -> void:
 
 func force_think_now() -> bool:
 	return _think(true)
+
+func request_player_social_approach(reason: String = "awareness", stop_distance: float = -1.0) -> bool:
+	_refresh_refs()
+	if not enabled or _actor == null or _navigation_motor == null:
+		return false
+	if _player_social_approach_cooldown_left > 0.0:
+		return false
+	if is_navigating() or _is_currently_seated() or _is_external_action_busy():
+		return false
+	var player := _find_player()
+	if player == null:
+		return false
+	var desired_distance := player_social_approach_distance if stop_distance <= 0.0 else stop_distance
+	var distance := _horizontal_distance(_actor.global_position, player.global_position)
+	if distance <= desired_distance + 0.25:
+		var near_decision := _make_player_social_decision(reason, _pick_player_social_action(false), player_social_near_dwell_sec)
+		_face_player(0.65)
+		_request_body_action(StringName(String(near_decision.get("arrival_action", "tiny_wave"))))
+		_apply_decision_expression(near_decision)
+		_start_dwell(float(near_decision.get("dwell_time_sec", player_social_near_dwell_sec)))
+		_player_social_approach_cooldown_left = player_social_approach_cooldown_sec
+		_movement_cooldown_left = movement_cooldown_sec
+		_remember_local_decision(near_decision)
+		_notify_decision_executed(near_decision)
+		autonomous_decision_made.emit(near_decision.duplicate(true))
+		_log("near player social: %s" % str(near_decision))
+		return true
+	var target := _compute_player_side_position(player, desired_distance)
+	var action := _pick_player_social_action(false)
+	var decision := _make_player_social_decision(reason, action, player_social_arrival_dwell_sec)
+	var ok := bool(_navigation_motor.call("move_to_position", target, StringName(action), NodePath(), false))
+	if not ok:
+		return false
+	_player_social_approach_cooldown_left = player_social_approach_cooldown_sec
+	_movement_cooldown_left = movement_cooldown_sec
+	_current_decision = decision.duplicate(true)
+	_navigation_decision = decision.duplicate(true)
+	_arrival_action = StringName(action)
+	_navigation_target_position = target
+	_navigation_active = true
+	_face_player(0.4)
+	_apply_decision_expression(decision)
+	_remember_local_decision(decision)
+	_notify_decision_executed(decision)
+	autonomous_decision_made.emit(decision.duplicate(true))
+	_log("approach player: %s" % str(decision))
+	return true
+
+func _make_player_social_decision(reason: String, action: String, dwell_time: float) -> Dictionary:
+	return {
+		"kind": "approach_player",
+		"reason": reason,
+		"target": "player",
+		"arrival_action": action,
+		"arrival_expression": "face_joy",
+		"face_mode": "player",
+		"dwell_time_sec": dwell_time,
+		"feedback": "approach_player",
+		"run": false,
+	}
 
 func is_navigating() -> bool:
 	if _navigation_motor != null and _navigation_motor.has_method("is_navigating"):
@@ -281,6 +357,7 @@ func _start_nav_point_navigation(decision: Dictionary) -> bool:
 		_navigation_agent.target_position = _navigation_target_position
 	if not target.is_empty():
 		_target_cooldowns[target] = float(decision.get("cooldown_sec", same_target_cooldown_sec))
+	_apply_semantic_group_cooldown(decision)
 	_movement_cooldown_left = movement_cooldown_sec
 	_apply_resource_delta_for_movement(decision)
 	_remember_local_decision(decision)
@@ -325,6 +402,7 @@ func _start_object_navigation(decision: Dictionary) -> bool:
 		_navigation_agent.target_position = _navigation_target_position
 	if not target.is_empty():
 		_target_cooldowns[target] = same_target_cooldown_sec
+	_apply_semantic_group_cooldown(decision)
 	if String(decision.get("marker_role", "")).to_lower() == sit_marker_role.to_lower():
 		_sit_cooldown_left = sit_cooldown_sec
 	_movement_cooldown_left = movement_cooldown_sec
@@ -355,7 +433,9 @@ func _start_navigation_via_action_executor(decision: Dictionary, is_object: bool
 	if not target_ref.is_empty() and not ignore_cooldown and _is_target_on_cooldown(target_ref):
 		autonomous_decision_skipped.emit("target_cooldown")
 		return false
+	_self_executor_signal_suppress_depth += 1
 	var report_value: Variant = _action_executor.call("apply_ai_response", payload)
+	_self_executor_signal_suppress_depth = maxi(0, _self_executor_signal_suppress_depth - 1)
 	var report: Dictionary = report_value if report_value is Dictionary else {}
 	if not bool(report.get("navigation_started", false)):
 		return false
@@ -366,6 +446,7 @@ func _start_navigation_via_action_executor(decision: Dictionary, is_object: bool
 	_apply_resource_delta_for_movement(decision)
 	if not target_ref.is_empty():
 		_target_cooldowns[target_ref] = float(decision.get("cooldown_sec", same_target_cooldown_sec))
+	_apply_semantic_group_cooldown(decision)
 	if String(decision.get("marker_role", "")).to_lower() == sit_marker_role.to_lower():
 		_sit_cooldown_left = sit_cooldown_sec
 	_remember_local_decision(decision)
@@ -672,6 +753,11 @@ func _remember_local_decision(decision: Dictionary) -> void:
 		_recent_decision_kinds.push_front(_last_decision_kind)
 	while _recent_decision_kinds.size() > 6:
 		_recent_decision_kinds.pop_back()
+	var group := _decision_semantic_group(decision)
+	if not group.is_empty():
+		_recent_semantic_groups.push_front(group)
+	while _recent_semantic_groups.size() > 8:
+		_recent_semantic_groups.pop_back()
 
 func _decision_target_ref(decision: Dictionary) -> String:
 	for key in ["target_nav_point", "target_object", "action"]:
@@ -831,14 +917,17 @@ func get_autonomous_debug_snapshot() -> Dictionary:
 		"last_decision_kind": _last_decision_kind,
 		"last_decision_target": _last_decision_target,
 		"recent_decision_kinds": _recent_decision_kinds.duplicate(),
+		"recent_semantic_groups": _recent_semantic_groups.duplicate(),
 		"dwell_left": _dwell_left,
 		"think_left": _think_left,
 		"movement_cooldown_left": _movement_cooldown_left,
+		"player_social_approach_cooldown_left": _player_social_approach_cooldown_left,
 		"sit_cooldown_left": _sit_cooldown_left,
 		"external_grace_left": _external_grace_left,
 		"resume": get_resume_debug_snapshot(),
 		"task_stack": get_task_stack_debug_snapshot(),
 		"target_cooldowns": _target_cooldowns.duplicate(),
+		"semantic_group_cooldowns": _semantic_group_cooldowns.duplicate(),
 		"resource_snapshot": _get_resource_snapshot(),
 		"mind_snapshot": _get_mind_snapshot(),
 	}
@@ -1136,6 +1225,10 @@ func _choose_planner_decision(snapshot: Dictionary) -> Dictionary:
 		"last_target": _last_object_target(),
 		"last_nav_point": _last_nav_point_target(),
 		"target_cooldowns": _target_cooldowns.duplicate(),
+		"semantic_group_cooldowns": _semantic_group_cooldowns.duplicate(),
+		"recent_semantic_groups": _recent_semantic_groups.duplicate(),
+		"nav_cluster_cooldowns": _nav_cluster_cooldowns.duplicate(true),
+		"local_nav_cluster_radius": local_nav_cluster_radius,
 		"is_seated": _is_currently_seated(),
 	}
 	if _blackboard != null and _blackboard.has_method("build_blackboard_snapshot"):
@@ -1217,6 +1310,11 @@ func _face_direction(direction: Vector3, delta: float) -> void:
 	_actor.global_basis = _actor.global_basis.orthonormalized().slerp(target_basis, amount).orthonormalized()
 
 func _find_player() -> Node3D:
+	var global_node := get_node_or_null("/root/Global")
+	if global_node != null:
+		var value: Variant = global_node.get("player")
+		if value is Node3D and is_instance_valid(value):
+			return value as Node3D
 	var tree := get_tree()
 	if tree == null:
 		return null
@@ -1226,6 +1324,25 @@ func _find_player() -> Node3D:
 			if node != null and is_instance_valid(node):
 				return node
 	return null
+
+func _compute_player_side_position(player: Node3D, desired_distance: float) -> Vector3:
+	if _actor == null or player == null:
+		return Vector3.ZERO
+	var side := player.global_basis.x
+	side.y = 0.0
+	if side.length_squared() <= 0.0001:
+		side = Vector3.RIGHT
+	side = side.normalized()
+	var to_actor := _actor.global_position - player.global_position
+	to_actor.y = 0.0
+	if to_actor.length_squared() > 0.01 and to_actor.normalized().dot(side) < 0.0:
+		side = -side
+	var back := player.global_basis.z
+	back.y = 0.0
+	if back.length_squared() <= 0.0001:
+		back = Vector3.BACK
+	back = back.normalized()
+	return player.global_position + side * desired_distance + back * 0.25
 
 func _is_external_action_busy() -> bool:
 	_refresh_refs()
@@ -1270,9 +1387,15 @@ func _connect_signal_if_exists(source: Node, signal_name: String, method_name: S
 		source.connect(signal_name, callback)
 
 func _on_external_ai_started(_ai_data: Dictionary = {}) -> void:
+	if _self_executor_signal_suppress_depth > 0:
+		_log("ignore self executor ai_response_application_started")
+		return
 	notify_external_control()
 
 func _on_external_navigation_started(_target_marker_path: NodePath = NodePath(), _external_arrival_action: StringName = &"") -> void:
+	if _self_executor_signal_suppress_depth > 0:
+		_log("ignore self executor navigation_started target=%s action=%s" % [String(_target_marker_path), String(_external_arrival_action)])
+		return
 	notify_external_control()
 
 func _on_dialogue_requested(_payload: Dictionary = {}) -> void:
@@ -1333,6 +1456,7 @@ func _tick_timers(delta: float) -> void:
 		_resume_after_grace_left = maxf(0.0, _resume_after_grace_left - delta)
 	_tick_task_stack(delta)
 	_movement_cooldown_left = maxf(0.0, _movement_cooldown_left - delta)
+	_player_social_approach_cooldown_left = maxf(0.0, _player_social_approach_cooldown_left - delta)
 	_sit_cooldown_left = maxf(0.0, _sit_cooldown_left - delta)
 	_self_talk_cooldown_left = maxf(0.0, _self_talk_cooldown_left - delta)
 	var expired: Array = []
@@ -1344,6 +1468,23 @@ func _tick_timers(delta: float) -> void:
 			_target_cooldowns[key] = next_value
 	for key in expired:
 		_target_cooldowns.erase(key)
+	var expired_groups: Array = []
+	for key in _semantic_group_cooldowns.keys():
+		var next_group := maxf(0.0, float(_semantic_group_cooldowns[key]) - delta)
+		if next_group <= 0.0:
+			expired_groups.append(key)
+		else:
+			_semantic_group_cooldowns[key] = next_group
+	for key in expired_groups:
+		_semantic_group_cooldowns.erase(key)
+	for i in range(_nav_cluster_cooldowns.size() - 1, -1, -1):
+		var entry := _nav_cluster_cooldowns[i]
+		var ttl := maxf(0.0, float(entry.get("ttl", 0.0)) - delta)
+		if ttl <= 0.0:
+			_nav_cluster_cooldowns.remove_at(i)
+		else:
+			entry["ttl"] = ttl
+			_nav_cluster_cooldowns[i] = entry
 
 func _schedule_next_think() -> void:
 	_think_left = _rng.randf_range(think_interval_min, maxf(think_interval_max, think_interval_min))
@@ -1422,6 +1563,91 @@ func _entry_ref(entry: Dictionary) -> String:
 
 func _is_target_on_cooldown(ref: String) -> bool:
 	return _target_cooldowns.has(ref) and float(_target_cooldowns[ref]) > 0.0
+
+func _apply_semantic_group_cooldown(decision: Dictionary) -> void:
+	var group := _decision_semantic_group(decision)
+	if group.is_empty():
+		return
+	var duration := same_semantic_group_cooldown_sec
+	if group == "storage":
+		duration = maxf(duration, storage_chain_cooldown_sec)
+	elif group == "supply":
+		duration = maxf(duration, supply_chain_cooldown_sec)
+	elif group in ["rest", "social", "wander"]:
+		duration *= 0.55
+	if duration > 0.0:
+		_semantic_group_cooldowns[group] = maxf(float(_semantic_group_cooldowns.get(group, 0.0)), duration)
+	_apply_nav_cluster_cooldown(decision, group)
+
+func _apply_nav_cluster_cooldown(decision: Dictionary, group: String = "") -> void:
+	if local_nav_cluster_cooldown_sec <= 0.0 or local_nav_cluster_radius <= 0.0:
+		return
+	var pos := _decision_position(decision)
+	if pos.is_empty():
+		return
+	var target := _decision_target_ref(decision)
+	for i in range(_nav_cluster_cooldowns.size() - 1, -1, -1):
+		var entry := _nav_cluster_cooldowns[i]
+		if _dict_distance(pos, entry.get("position", {})) <= local_nav_cluster_radius * 0.5:
+			_nav_cluster_cooldowns.remove_at(i)
+	var cooldown := {
+		"position": pos,
+		"radius": local_nav_cluster_radius,
+		"ttl": local_nav_cluster_cooldown_sec,
+		"target": target,
+		"group": group,
+	}
+	_nav_cluster_cooldowns.push_front(cooldown)
+	while _nav_cluster_cooldowns.size() > 8:
+		_nav_cluster_cooldowns.pop_back()
+
+func _decision_position(decision: Dictionary) -> Dictionary:
+	for key in ["global_position", "position"]:
+		var value: Variant = decision.get(key, {})
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	var path_text := String(decision.get("target_path", decision.get("target_marker_path", ""))).strip_edges()
+	if not path_text.is_empty():
+		var node := get_node_or_null(NodePath(path_text)) as Node3D
+		if node == null and get_tree() != null and get_tree().root != null:
+			node = get_tree().root.get_node_or_null(NodePath(path_text)) as Node3D
+		if node != null:
+			return {"x": node.global_position.x, "y": node.global_position.y, "z": node.global_position.z}
+	return {}
+
+func _dict_distance(a: Variant, b: Variant) -> float:
+	if a is not Dictionary or b is not Dictionary:
+		return INF
+	var ad := a as Dictionary
+	var bd := b as Dictionary
+	var av := Vector3(float(ad.get("x", 0.0)), float(ad.get("y", 0.0)), float(ad.get("z", 0.0)))
+	var bv := Vector3(float(bd.get("x", 0.0)), float(bd.get("y", 0.0)), float(bd.get("z", 0.0)))
+	return av.distance_to(bv)
+
+func _horizontal_distance(a: Vector3, b: Vector3) -> float:
+	var offset := b - a
+	offset.y = 0.0
+	return offset.length()
+
+func _decision_semantic_group(decision: Dictionary) -> String:
+	var explicit := String(decision.get("semantic_group", "")).strip_edges().to_lower()
+	if not explicit.is_empty():
+		return explicit
+	if _has_any_tag(decision, PackedStringArray(["food", "supplies"])):
+		return "supply"
+	if _has_any_tag(decision, PackedStringArray(["seat", "rest", "bed"])):
+		return "rest"
+	if _has_any_tag(decision, PackedStringArray(["teacher", "social", "player"])):
+		return "social"
+	if _has_any_tag(decision, PackedStringArray(["door", "lookout", "caution"])):
+		return "door"
+	if _has_any_tag(decision, PackedStringArray(["storage", "cabinet", "equipment", "tool", "material", "utility", "medical"])):
+		return "storage"
+	if _has_any_tag(decision, PackedStringArray(["wander", "route", "corner", "idle"])):
+		return "wander"
+	if _has_any_tag(decision, PackedStringArray(["wash", "sink", "shower", "mirror"])):
+		return "wash"
+	return ""
 
 func _has_any_tag(entry: Dictionary, tag_list: PackedStringArray) -> bool:
 	var tags: Variant = entry.get("tags", [])

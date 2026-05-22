@@ -125,6 +125,9 @@ func _process(delta: float) -> void:
 		_open_auto_close_grace_left = maxf(0.0, _open_auto_close_grace_left - delta)
 		_refresh_player_in_close_area()
 		return
+	if auto_close_when_far and not _is_player_within_auto_close_distance():
+		hide_panel()
+		return
 	if auto_close_with_area and _is_using_close_area() and not _player_inside_close_area:
 		hide_panel()
 		return
@@ -271,7 +274,7 @@ func _on_close_range_body_exited(body: Node) -> void:
 	if not _is_player_body(body):
 		return
 	_player_inside_close_area = false
-	if _is_open and auto_close_with_area:
+	if _is_open and auto_close_with_area and _open_auto_close_grace_left <= 0.0:
 		hide_panel()
 
 func _is_player_body(body: Node) -> bool:
@@ -618,6 +621,21 @@ func _is_runtime_target_valid() -> bool:
 	if global_node == null:
 		return true
 	var player_node := global_node.get("player") as Node3D
+	if player_node == null or not is_instance_valid(player_node):
+		return true
+	return player_node.global_position.distance_to(target_root.global_position) <= auto_close_distance
+
+func _is_player_within_auto_close_distance() -> bool:
+	if auto_close_distance <= 0.0:
+		return true
+	var target_root := _target_root
+	if target_root == null:
+		target_root = _resolve_target_root(_current_payload)
+	if target_root == null:
+		target_root = _resolve_owner_root()
+	if target_root == null or not is_instance_valid(target_root) or not target_root.is_inside_tree():
+		return true
+	var player_node := _resolve_player_node()
 	if player_node == null or not is_instance_valid(player_node):
 		return true
 	return player_node.global_position.distance_to(target_root.global_position) <= auto_close_distance

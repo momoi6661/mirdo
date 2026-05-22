@@ -26,7 +26,8 @@ signal stand_up_finished()
 @export_range(0.1, 8.0, 0.05) var run_speed: float = 3.6
 @export_range(0.05, 2.0, 0.01) var arrival_distance: float = 0.35
 @export_range(0.1, 5.0, 0.05) var follow_distance: float = 1.4
-@export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 10.0
+@export_range(0.0, 30.0, 0.1) var turn_lerp_speed: float = 4.0
+@export_range(0.0, 3.0, 0.01) var look_at_player_face_hold_sec: float = 1.05
 @export_category("Seat Exit")
 @export_range(0.0, 3.0, 0.01) var stand_relocate_delay_sec: float = 0.92
 @export_range(0.0, 1.0, 0.01) var stand_relocate_duration_sec: float = 0.16
@@ -74,6 +75,7 @@ var _stand_transition_active: bool = false
 var _seat_alignment_serial: int = 0
 var _stand_relocate_serial: int = 0
 var _queued_navigation_after_stand: Dictionary = {}
+var _face_player_hold_left: float = 0.0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -220,10 +222,12 @@ func clear_active_sit_marker() -> void:
 
 func _physics_process(delta: float) -> void:
 	if _navigation_motor != null and _navigation_motor.has_method("is_navigating"):
+		_update_face_player_hold(delta)
 		return
 	if _follow_active:
 		_update_follow_target()
 	if not _navigation_active:
+		_update_face_player_hold(delta)
 		return
 	_refresh_refs()
 	if _actor == null:
@@ -258,6 +262,12 @@ func _physics_process(delta: float) -> void:
 		_actor.velocity.y = 0.0
 	_actor.move_and_slide()
 	_face_direction(direction, delta)
+
+func _update_face_player_hold(delta: float) -> void:
+	if _face_player_hold_left <= 0.0:
+		return
+	_face_player_hold_left = maxf(0.0, _face_player_hold_left - delta)
+	_smooth_face_player(delta)
 
 func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 	var target_ref := String(intent.get("target_ref", intent.get("target_object_id", ""))).strip_edges()
@@ -550,14 +560,21 @@ func _face_player() -> void:
 	var player := _find_player()
 	if player == null or _actor == null:
 		return
+	_face_player_hold_left = maxf(_face_player_hold_left, look_at_player_face_hold_sec)
 	if _navigation_motor != null and _navigation_motor.has_method("request_turn_toward_position"):
-		_navigation_motor.call("request_turn_toward_position", player.global_position)
-	if _navigation_motor != null and _navigation_motor.has_method("face_position"):
-		_navigation_motor.call("face_position", player.global_position, 1.0)
+		if bool(_navigation_motor.call("request_turn_toward_position", player.global_position)):
+			return
+	_smooth_face_player(0.12)
+
+func _smooth_face_player(delta: float) -> void:
+	var player := _find_player()
+	if player == null or _actor == null:
 		return
 	var direction := player.global_position - _actor.global_position
 	direction.y = 0.0
-	_face_direction(direction.normalized(), 1.0)
+	if direction.length() < 0.01:
+		return
+	_face_direction(direction.normalized(), delta)
 
 func _face_direction(direction: Vector3, delta: float) -> void:
 	if _actor == null or direction.length() < 0.01:

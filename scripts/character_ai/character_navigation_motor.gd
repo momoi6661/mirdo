@@ -57,7 +57,7 @@ signal navigation_failed(reason: String)
 @export_category("Turning")
 @export var turn_enabled: bool = true
 @export var use_negative_z_forward: bool = false
-@export_range(0.0, 40.0, 0.1) var turn_lerp_speed: float = 9.0
+@export_range(0.0, 40.0, 0.1) var turn_lerp_speed: float = 4.0
 @export_range(-180.0, 180.0, 0.1) var visual_yaw_offset_degrees: float = 0.0
 @export_range(0.0, 0.2, 0.001) var min_turn_direction_length: float = 0.01
 
@@ -65,11 +65,11 @@ signal navigation_failed(reason: String)
 @export var use_turn_states_before_locomotion: bool = true
 @export_range(5.0, 180.0, 1.0) var turn_state_min_angle_degrees: float = 55.0
 @export_range(90.0, 180.0, 1.0) var turn_180_min_angle_degrees: float = 135.0
-@export_range(0.0, 1.2, 0.01) var turn_state_min_play_time_sec: float = 0.34
-@export_range(0.0, 1.5, 0.01) var turn_state_max_wait_sec: float = 0.72
+@export_range(0.0, 1.2, 0.01) var turn_state_min_play_time_sec: float = 0.58
+@export_range(0.0, 1.5, 0.01) var turn_state_max_wait_sec: float = 0.95
 @export_range(1.0, 90.0, 1.0) var turn_state_release_angle_degrees: float = 22.0
 @export_range(0.0, 90.0, 1.0) var standalone_turn_release_angle_degrees: float = 18.0
-@export_range(0.0, 2.0, 0.01) var standalone_turn_max_wait_sec: float = 0.95
+@export_range(0.0, 2.0, 0.01) var standalone_turn_max_wait_sec: float = 1.15
 @export var turn_left_action: StringName = &"turn_left"
 @export var turn_right_action: StringName = &"turn_right"
 @export var turn_180_action: StringName = &"turn_180"
@@ -83,6 +83,7 @@ signal navigation_failed(reason: String)
 @export_range(0.1, 2.0, 0.05) var door_open_ray_height: float = 0.9
 @export_range(0.0, 2.0, 0.05) var door_open_wait_sec: float = 0.45
 @export_range(0.0, 1.0, 0.05) var door_open_wait_margin_sec: float = 0.15
+@export_range(0.0, 2.0, 0.05) var door_blocked_idle_timeout_sec: float = 0.85
 @export_flags_3d_physics var door_ray_collision_mask: int = 0xFFFFFFFF
 
 @export_category("Animation Actions")
@@ -108,6 +109,7 @@ var _door_open_cooldowns: Dictionary = {}
 var _navigation_opened_doors: Dictionary = {}
 var _door_open_wait_left: float = 0.0
 var _force_repath_after_wait: bool = false
+var _door_blocked_idle_left: float = 0.0
 var _forced_run: bool = false
 var _locomotion_velocity_gate_active: bool = false
 var _pending_turn_action: StringName = &""
@@ -259,6 +261,7 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_repath_left = 0.0
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
+	_door_blocked_idle_left = 0.0
 	_navigation_opened_doors.clear()
 	_forced_run = run
 	_seat_precise_navigation_active = seat_precise
@@ -315,6 +318,7 @@ func start_follow(target: Node3D, distance: float = 1.4) -> bool:
 	_arrival_action = &""
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
+	_door_blocked_idle_left = 0.0
 	_navigation_opened_doors.clear()
 	_update_follow_target()
 	_set_moving_action(walk_action)
@@ -342,6 +346,7 @@ func stop_navigation(play_stop: bool = true) -> void:
 	_pending_turn_action = &""
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
+	_door_blocked_idle_left = 0.0
 	_off_navmesh_recovering = false
 	_off_navmesh_resume_left = 0.0
 	_off_navmesh_recovery_action = &""
@@ -441,6 +446,17 @@ func _physics_process(delta: float) -> void:
 		_apply_gravity(delta)
 		_actor.move_and_slide()
 		face_direction(direction, delta)
+		if _moving_action != &"":
+			_request_body_action(stop_action)
+			_moving_action = &""
+			_locomotion_velocity_gate_active = false
+		return
+	if _door_blocked_idle_left > 0.0:
+		_door_blocked_idle_left = maxf(_door_blocked_idle_left - delta, 0.0)
+		_apply_horizontal_velocity(Vector3.ZERO, delta)
+		_apply_gravity(delta)
+		_actor.move_and_slide()
+		face_direction(direction, delta)
 		return
 	if _navigation_start_grace_left > 0.0:
 		_navigation_start_grace_left = maxf(_navigation_start_grace_left - delta, 0.0)
@@ -516,6 +532,7 @@ func _finish_navigation() -> void:
 	_seat_precise_attach_active = false
 	_door_open_wait_left = 0.0
 	_force_repath_after_wait = false
+	_door_blocked_idle_left = 0.0
 	_navigation_opened_doors.clear()
 	if _actor != null:
 		_actor.velocity.x = 0.0
@@ -631,7 +648,6 @@ func _request_standalone_turn_toward(target_position: Vector3, finish_action: St
 	var signed_angle := _signed_flat_angle_to_direction(desired.normalized())
 	var abs_angle := absf(rad_to_deg(signed_angle))
 	if abs_angle < turn_state_min_angle_degrees:
-		face_direction(desired.normalized(), 1.0)
 		return false
 	var action := _turn_state_for_signed_angle(signed_angle)
 	if not _request_body_action(action):
@@ -966,6 +982,7 @@ func _try_open_navigation_door(desired_direction: Vector3) -> void:
 
 	var door_id := door_component.get_instance_id()
 	if _door_open_cooldowns.has(door_id):
+		_begin_door_blocked_idle()
 		return
 	if _navigation_opened_doors.has(door_id) and _is_door_open(door_component):
 		return
@@ -986,6 +1003,15 @@ func _try_open_navigation_door(desired_direction: Vector3) -> void:
 			_navigation_agent.target_position = _target_position
 			_repath_left = repath_interval_sec
 		_log("opened navigation door %s" % String(door_component.get_path()))
+	elif not _is_door_open(door_component):
+		_begin_door_blocked_idle()
+
+func _begin_door_blocked_idle() -> void:
+	_door_blocked_idle_left = maxf(_door_blocked_idle_left, door_blocked_idle_timeout_sec)
+	if _moving_action != &"":
+		_request_body_action(stop_action)
+		_moving_action = &""
+		_locomotion_velocity_gate_active = false
 
 func _resolve_door_component(hit_body: PhysicsBody3D) -> Node3D:
 	if _is_navigation_door_component(hit_body):

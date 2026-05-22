@@ -194,10 +194,10 @@ blink_open_time = 0.075
 blink_resume_delay = 0.35
 ```
 
-默认 `joy` 表情时关闭眨眼：
+默认 `fun` 表情时关闭眨眼：
 
 ```text
-disable_blink_on_joy = true
+disable_blink_on_fun = true
 ```
 
 如果需要调慢眨眼，优先调大：
@@ -236,9 +236,9 @@ is_talk_active() -> bool
 2. 不要把 `BlinkBlend` 常开。
    - 常开会导致 blink 动画循环，看起来眨眼过于频繁。
 
-3. `joy` 表情不要自动眨眼。
-   - 当前逻辑由 `disable_blink_on_joy` 控制。
-   - 切到 `neutral / fun / angry / sorrow / surprised` 后会在 `blink_resume_delay` 秒左右快速恢复一次眨眼，然后进入随机眨眼间隔。
+3. `fun` 表情不要自动眨眼。
+   - 当前逻辑由 `disable_blink_on_fun` 控制。
+   - 切到 `neutral / joy / angry / sorrow / surprised` 后会在 `blink_resume_delay` 秒左右快速恢复一次眨眼，然后进入随机眨眼间隔。
 
 4. 角色实际 BlendShape 名称大小写要注意：
 

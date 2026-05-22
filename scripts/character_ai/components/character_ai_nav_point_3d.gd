@@ -34,6 +34,7 @@ class_name CharacterAINavPoint3D
 @export_group("Debug")
 @export_range(0.0, 5.0, 0.1) var debug_radius: float = 0.35
 @export var show_debug_mesh: bool = true
+@export var show_debug_mesh_in_game: bool = true
 
 func _ready() -> void:
 	add_to_group(&"ai_nav_point")
@@ -207,17 +208,18 @@ func _vector3_to_dict(value: Vector3) -> Dictionary:
 	}
 
 func _sync_debug_child() -> void:
-	if not Engine.is_editor_hint() and not show_debug_mesh:
+	var should_show := show_debug_mesh if Engine.is_editor_hint() else (show_debug_mesh and show_debug_mesh_in_game)
+	if not should_show and get_node_or_null("DebugSphere") == null:
 		return
 	var mesh_node := get_node_or_null("DebugSphere") as MeshInstance3D
-	if mesh_node == null and show_debug_mesh:
+	if mesh_node == null and should_show:
 		mesh_node = MeshInstance3D.new()
 		mesh_node.name = "DebugSphere"
 		add_child(mesh_node)
 		mesh_node.owner = owner if owner != null else self
 	if mesh_node == null:
 		return
-	mesh_node.visible = show_debug_mesh
+	mesh_node.visible = should_show
 	var sphere := mesh_node.mesh as SphereMesh
 	if sphere == null:
 		sphere = SphereMesh.new()
