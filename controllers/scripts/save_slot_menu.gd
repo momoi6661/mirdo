@@ -130,7 +130,7 @@ func _normalize_mode(mode: String) -> String:
 
 func _update_header() -> void:
 	if title_label != null:
-		title_label.text = "游戏进度"
+		title_label.text = "记录"
 	if subtitle_label != null:
 		match current_mode:
 			MODE_SAVE:
@@ -138,7 +138,7 @@ func _update_header() -> void:
 			MODE_LOAD:
 				subtitle_label.text = "选择 1 个槽位读取已有进度"
 			_:
-				subtitle_label.text = "选择进度槽位，管理当前游戏进度"
+				subtitle_label.text = "保存与读取避难所进度"
 	var save_manager := _get_save_manager()
 	if current_slot_label != null:
 		var current_slot := "slot_01"
@@ -209,7 +209,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	name_label.name = "NameLabel"
 	name_label.text = _slot_display_name(slot_name)
 	name_label.add_theme_font_size_override("font_size", 22)
-	name_label.add_theme_color_override("font_color", Color(0.94, 0.92, 0.86, 1.0))
+	name_label.add_theme_color_override("font_color", MenuUIStyle.TEXT_PRIMARY)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(name_label)
 
@@ -217,7 +217,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	badge.name = "Badge"
 	badge.text = _slot_badge(summary)
 	badge.add_theme_font_size_override("font_size", 13)
-	badge.add_theme_color_override("font_color", Color(0.95, 0.58, 0.20, 1.0) if bool(summary.get("exists", false)) else Color(0.52, 0.50, 0.46, 1.0))
+	badge.add_theme_color_override("font_color", MenuUIStyle.ACCENT_SOFT if bool(summary.get("exists", false)) else MenuUIStyle.TEXT_MUTED)
 	top.add_child(badge)
 
 	var detail := Label.new()
@@ -225,7 +225,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	detail.text = _slot_detail_text(summary)
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.add_theme_font_size_override("font_size", 14)
-	detail.add_theme_color_override("font_color", Color(0.70, 0.69, 0.64, 1.0))
+	detail.add_theme_color_override("font_color", MenuUIStyle.TEXT_SECONDARY)
 	rows.add_child(detail)
 
 	var actions := HBoxContainer.new()
@@ -273,56 +273,11 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 
 
 func _make_panel_style(summary: Dictionary) -> StyleBoxFlat:
-	var has_save := bool(summary.get("exists", false))
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.038, 0.037, 0.040, 0.975) if has_save else Color(0.028, 0.028, 0.032, 0.94)
-	style.border_width_left = 3
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
-	style.border_color = Color(0.82, 0.40, 0.10, 0.78) if has_save else Color(0.24, 0.23, 0.22, 0.86)
-	style.corner_radius_top_left = 14
-	style.corner_radius_top_right = 14
-	style.corner_radius_bottom_left = 14
-	style.corner_radius_bottom_right = 14
-	style.shadow_color = Color(0, 0, 0, 0.28)
-	style.shadow_size = 6
-	style.content_margin_left = 6
-	style.content_margin_right = 6
-	style.content_margin_top = 5
-	style.content_margin_bottom = 5
-	return style
+	return MenuUIStyle.make_card_style(bool(summary.get("exists", false)))
 
 
 func _apply_button_style(button: Button, primary: bool) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.18, 0.095, 0.035, 0.82) if primary else Color(0.060, 0.058, 0.060, 0.92)
-	normal.border_color = Color(0.86, 0.42, 0.10, 0.88) if primary else Color(0.30, 0.28, 0.25, 0.92)
-	normal.border_width_left = 1
-	normal.border_width_top = 1
-	normal.border_width_right = 1
-	normal.border_width_bottom = 1
-	normal.corner_radius_top_left = 8
-	normal.corner_radius_top_right = 8
-	normal.corner_radius_bottom_left = 8
-	normal.corner_radius_bottom_right = 8
-	normal.content_margin_left = 10
-	normal.content_margin_right = 10
-	normal.content_margin_top = 6
-	normal.content_margin_bottom = 6
-	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.28, 0.13, 0.04, 0.96) if primary else Color(0.12, 0.10, 0.085, 0.96)
-	hover.border_color = Color(1.0, 0.56, 0.16, 1.0)
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.38, 0.17, 0.05, 1.0) if primary else Color(0.16, 0.12, 0.09, 1.0)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", hover)
-	button.add_theme_color_override("font_color", Color(0.92, 0.90, 0.84, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.86, 1.0))
-	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.40, 0.37, 1.0))
-	button.add_theme_font_size_override("font_size", 15)
+	MenuUIStyle.apply_action_button(button, primary)
 
 
 func _slot_display_name(slot_name: String) -> String:
@@ -509,7 +464,7 @@ func _set_status(message: String, is_error: bool = false) -> void:
 	if status_label == null:
 		return
 	status_label.text = message
-	status_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.32, 1.0) if is_error else Color(0.72, 0.68, 0.58, 1.0))
+	status_label.add_theme_color_override("font_color", MenuUIStyle.TEXT_ERROR if is_error else MenuUIStyle.TEXT_MUTED)
 	status_label.modulate.a = 0.45
 	create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).tween_property(status_label, "modulate:a", 1.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 

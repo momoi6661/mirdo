@@ -21,38 +21,53 @@ fill = 1
 fill_from = Vector2(0.5, 0.5)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.015, 0.015, 0.018, 0.98)
+bg_color = Color(0.014, 0.012, 0.016, 0.985)
 border_width_right = 3
-border_color = Color(0.9, 0.3, 0.05, 0.9)
-corner_radius_top_right = 40
-corner_radius_bottom_right = 5
-corner_detail = 1
-shadow_size = 20
+border_color = Color(1, 0.48, 0.72, 0.82)
+corner_radius_top_right = 28
+corner_radius_bottom_right = 8
+corner_detail = 4
+shadow_color = Color(0, 0, 0, 0.48)
+shadow_size = 18
 
 [sub_resource type="StyleBoxLine" id="StyleBoxLine_separator"]
-color = Color(1, 1, 1, 0.15)
+color = Color(1, 0.78, 0.88, 0.18)
 grow_begin = -20.0
 grow_end = -20.0
 thickness = 2
 
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_btn_normal"]
-content_margin_left = 20.0
+[sub_resource type="StyleBoxFlat" id="StyleBoxEmpty_btn_normal"]
+content_margin_left = 28.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(0.95, 0.52, 0.72, 0.055)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_pressed"]
-content_margin_left = 35.0
-bg_color = Color(0.7, 0.2, 0.02, 0.3)
-skew = Vector2(0.1, 0)
-border_width_left = 6
-border_color = Color(0.7, 0.2, 0.02, 1)
-corner_detail = 1
+content_margin_left = 32.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 0.48, 0.68, 0.25)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
-content_margin_left = 35.0
-bg_color = Color(0.9, 0.3, 0.05, 0.15)
-skew = Vector2(0.1, 0)
-border_width_left = 6
-border_color = Color(0.9, 0.3, 0.05, 1)
-corner_detail = 1
+content_margin_left = 36.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 0.62, 0.78, 0.2)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [sub_resource type="Animation" id="Animation_RESET"]
 resource_name = "RESET"
@@ -289,23 +304,23 @@ theme_override_constants/separation = 15
 custom_minimum_size = Vector2(8, 55)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(0.9, 0.3, 0.05, 1)
+color = Color(1, 0.48, 0.72, 1)
 
 [node name="TitleGroup" type="VBoxContainer" parent="Control/SidePanel/VBoxContainer/HeaderBox" unique_id=511106494]
 layout_mode = 2
 
 [node name="TitleLabel" type="Label" parent="Control/SidePanel/VBoxContainer/HeaderBox/TitleGroup" unique_id=1565712520]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 38
-text = "暂停行动"
-uppercase = true
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 34
+text = "暂停"
+uppercase = false
 
 [node name="SubtitleLabel" type="Label" parent="Control/SidePanel/VBoxContainer/HeaderBox/TitleGroup" unique_id=895234452]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.4)
-theme_override_font_sizes/font_size = 12
-text = "SYSTEM INTERRUPTION // STANDBY"
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.72)
+theme_override_font_sizes/font_size = 14
+text = "避难所静默 · 时间仍在流逝"
 
 [node name="HSeparator" type="HSeparator" parent="Control/SidePanel/VBoxContainer" unique_id=778357946]
 layout_mode = 2
@@ -317,14 +332,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "继续任务"
+text = "  继续"
 alignment = 0
 
 [node name="DebugLoadButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1096618873]
@@ -333,14 +348,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "读取进度"
+text = "  读取"
 alignment = 0
 
 [node name="SaveGameButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1549748530]
@@ -348,14 +363,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "游戏进度"
+text = "  记录"
 alignment = 0
 
 [node name="OptionsButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1816499980]
@@ -363,14 +378,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "游戏设置"
+text = "  设置"
 alignment = 0
 
 [node name="MainMenuButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=789355765]
@@ -378,14 +393,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "返回标题"
+text = "  标题"
 alignment = 0
 
 [node name="ExitGameButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1335890699]
@@ -393,14 +408,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 focus_mode = 0
-theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
-theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_colors/font_pressed_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "退出游戏"
+text = "  退出"
 alignment = 0
 
 [node name="Spacer" type="Control" parent="Control/SidePanel/VBoxContainer" unique_id=811939930]
@@ -415,20 +430,20 @@ theme_override_constants/separation = 10
 custom_minimum_size = Vector2(10, 10)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(0.8, 0.2, 0.1, 1)
+color = Color(1, 0.48, 0.72, 1)
 
 [node name="VersionLabel" type="Label" parent="Control/SidePanel/VBoxContainer/FooterBox" unique_id=506180402]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.3)
+theme_override_colors/font_color = Color(0.62, 0.58, 0.56, 0.72)
 theme_override_font_sizes/font_size = 14
-text = "SYSTEM_LINK: ACTIVE"
+text = "记录会自动写入当前槽"
 
 [node name="EscHint" type="Label" parent="Control/SidePanel/VBoxContainer/FooterBox" unique_id=1349493874]
 layout_mode = 2
 size_flags_horizontal = 10
-theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.7)
 theme_override_font_sizes/font_size = 14
-text = "[ESC] 返回"
+text = "[ESC] 继续"
 
 
 [node name="AISettingsPanel" parent="." instance=ExtResource("3_ai_settings_panel")]

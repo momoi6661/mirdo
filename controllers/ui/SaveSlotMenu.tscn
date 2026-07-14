@@ -3,13 +3,13 @@
 [ext_resource type="Script" path="res://controllers/scripts/save_slot_menu.gd" id="1_save_slot_menu"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_drawer"]
-bg_color = Color(0.014, 0.014, 0.017, 0.985)
+bg_color = Color(0.014, 0.012, 0.016, 0.985)
 border_width_left = 3
-border_color = Color(0.78, 0.28, 0.08, 0.82)
-corner_radius_top_left = 42
+border_color = Color(1, 0.48, 0.72, 0.82)
+corner_radius_top_left = 28
 corner_radius_bottom_left = 8
-corner_detail = 1
-shadow_color = Color(0, 0, 0, 0.52)
+corner_detail = 4
+shadow_color = Color(0, 0, 0, 0.48)
 shadow_size = 18
 content_margin_left = 0.0
 content_margin_top = 0.0
@@ -17,29 +17,37 @@ content_margin_right = 0.0
 content_margin_bottom = 0.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header_line"]
-bg_color = Color(0.82, 0.36, 0.08, 0.90)
+bg_color = Color(1, 0.48, 0.72, 0.92)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_left = 3
 corner_radius_bottom_right = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button"]
-bg_color = Color(0.9, 0.3, 0.05, 0.14)
+bg_color = Color(1, 0.48, 0.72, 0.14)
 border_width_left = 4
-border_color = Color(0.9, 0.3, 0.05, 0.95)
+border_color = Color(1, 0.48, 0.72, 0.92)
 content_margin_left = 16.0
 content_margin_top = 8.0
 content_margin_right = 16.0
 content_margin_bottom = 8.0
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button_hover"]
-bg_color = Color(0.9, 0.3, 0.05, 0.28)
+bg_color = Color(1, 0.48, 0.72, 0.28)
 border_width_left = 4
-border_color = Color(1, 0.45, 0.12, 1)
+border_color = Color(1, 0.62, 0.8, 1)
 content_margin_left = 16.0
 content_margin_top = 8.0
 content_margin_right = 16.0
 content_margin_bottom = 8.0
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [node name="SaveSlotMenu" type="CanvasLayer"]
 process_mode = 3
@@ -114,16 +122,16 @@ size_flags_horizontal = 3
 [node name="TitleLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows/Header/TitleStack"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 34
-text = "游戏进度"
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 32
+text = "记录"
 
 [node name="SubtitleLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows/Header/TitleStack"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.52)
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.78)
 theme_override_font_sizes/font_size = 15
-text = "选择进度槽位，管理当前游戏进度"
+text = "保存与读取避难所进度"
 autowrap_mode = 3
 
 [node name="Toolbar" type="HBoxContainer" parent="Root/DrawerPanel/Margin/MainRows/Header"]
@@ -139,7 +147,7 @@ focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
-theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = "刷新"
 alignment = 0
 
@@ -151,14 +159,14 @@ focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
-theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 text = "返回"
 alignment = 0
 
 [node name="CurrentSlotLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.50)
+theme_override_colors/font_color = Color(0.72, 0.68, 0.66, 0.78)
 theme_override_font_sizes/font_size = 15
 text = "当前进度槽：进度槽 01"
 
@@ -176,7 +184,7 @@ theme_override_constants/separation = 8
 [node name="StatusLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.46)
+theme_override_colors/font_color = Color(0.72, 0.68, 0.66, 0.72)
 theme_override_font_sizes/font_size = 15
 text = "保存会覆盖目标槽位；读取会切换当前进度。"
 autowrap_mode = 3

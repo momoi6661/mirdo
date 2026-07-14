@@ -474,7 +474,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.78, 0.74, 0.86)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 26
-text = ""
+text = "避难所日志 · 小空"
 
 [node name="InfoRow" type="HBoxContainer" parent="Root/MainPage" unique_id=990064551]
 unique_name_in_owner = true
@@ -492,20 +492,21 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 18
-text = ""
+text = "生存陪伴"
 
 [node name="PlayersInfo" type="Label" parent="Root/MainPage/InfoRow" unique_id=493751262]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 18
+text = "单人 · AI 共处"
 
 [node name="RatingInfo" type="Label" parent="Root/MainPage/InfoRow" unique_id=925496754]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 18
-text = ""
+text = "资源有限 · 时间推进"
 
 [node name="MenuHeader" type="Label" parent="Root/MainPage" unique_id=1423917241]
 unique_name_in_owner = true
@@ -518,7 +519,7 @@ anchor_bottom = 0.29
 theme_override_colors/font_color = Color(0.62, 0.60, 0.54, 0.54)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 16
-text = "MENU SELECT"
+text = "选择行动"
 horizontal_alignment = 1
 
 [node name="MenuHighlight" type="ColorRect" parent="Root/MainPage" unique_id=2112791103]
