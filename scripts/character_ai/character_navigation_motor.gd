@@ -265,7 +265,8 @@ func move_to_position(target_position: Vector3, arrival_action: StringName = &""
 	_navigation_opened_doors.clear()
 	_forced_run = run
 	_seat_precise_navigation_active = seat_precise
-	_navigation_start_grace_left = 0.18
+	# 路径首帧尚未更新时，下面会自然回退到目标方向；不要先播放 walk 再原地等待。
+	_navigation_start_grace_left = 0.0
 	_turn_wait_left = 0.0
 	_turn_wait_elapsed = 0.0
 	_queued_move_action_after_turn = &""

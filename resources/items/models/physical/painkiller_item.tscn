@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/Inventory/InteracableItem.gd" id="1_interactable"]
 [ext_resource type="Resource" path="res://resources/items/painkiller.tres" id="2_item"]
 [ext_resource type="Script" path="res://scripts/system/save_component.gd" id="3_save"]
 [ext_resource type="PackedScene" path="res://resources/items/models/painkiller_model.tscn" id="4_model"]
+[ext_resource type="Script" path="res://components/character_pickable_item_component.gd" id="5_pickable"]
 
 [sub_resource type="CapsuleShape3D" id="Shape_item"]
 height = 0.18
@@ -22,6 +23,14 @@ outline_width = 0.1
 
 [node name="SaveComponent" type="Node" parent="."]
 script = ExtResource("3_save")
+
+[node name="CharacterPickableItem" type="Node3D" parent="."]
+script = ExtResource("5_pickable")
+visual_root_path = NodePath("../Visual")
+hold_position_offset = Vector3(0.025, -0.014, 0)
+hold_rotation_degrees = Vector3(4, 90, -6)
+hold_scale = Vector3(0.94, 0.94, 0.94)
+use_action = &"react_nod"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.07, 0)

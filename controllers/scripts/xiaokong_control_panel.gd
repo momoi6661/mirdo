@@ -268,10 +268,12 @@ func _on_send_dialogue_pressed() -> void:
 		return
 
 	if _controller.has_method("send_dialogue_text"):
-		_controller.call("send_dialogue_text", text)
 		dialogue_input.text = ""
 		if _controller.has_method("notify_player_input_draft_changed"):
 			_controller.call("notify_player_input_draft_changed", "")
+		_controller.call("send_dialogue_text", text)
+		if _controller.has_method("flush_pending_player_dialogue_now"):
+			_controller.call("flush_pending_player_dialogue_now")
 
 func _on_subtitle_queue_submitted(_new_text: String) -> void:
 	_on_queue_subtitle_pressed()

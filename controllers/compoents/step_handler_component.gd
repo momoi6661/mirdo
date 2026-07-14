@@ -7,18 +7,22 @@ extends Node
 
 @export_category("Step Settings")
 @export var MAX_STEP_HEIGHT: float = 0.3
-@export var MAX_CROUCH_STEP_HEIGHT: float = 0.6
+@export var MAX_CROUCH_STEP_HEIGHT: float = 0.35
 @export var camera_smooth_amount: float = 0.7
 @export var SLOPE_LIMIT: float = 45.0
-@export var camera_smooth_switch: bool = true
+@export var camera_smooth_switch: bool = false
+@export_range(0.0, 0.3, 0.01) var step_cooldown_sec: float = 0.08
+@export_range(0.01, 1.0, 0.01) var min_step_speed: float = 0.08
 
 var snap_stair_last_frame := false
 var last_frame_on_floor = -INF
 var camera_smooth_pos = null
 var is_crouch_adjusted: bool = false
+var _step_cooldown: float = 0.0
 
 var stairs_below_ray: RayCast3D
 var stairs_ahead_ray: RayCast3D
+var _stairs_ahead_base_position: Vector3 = Vector3.ZERO
 @export var camera_offset: Node3D
 @export_flags_3d_physics var step_detection_mask: int = 1
 
@@ -29,6 +33,10 @@ func _ready():
 		collision_shape = player.get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if camera_offset == null and player != null:
 		camera_offset = player.get_node_or_null("Marker3D/CameraOffset") as Node3D
+	if player != null:
+		# 使用 CharacterBody3D 原生 floor snap 处理下楼，避免旧版
+		# move_and_collide(velocity, true) 带来的重复碰撞测试和卡顿。
+		player.floor_snap_length = maxf(player.floor_snap_length, MAX_STEP_HEIGHT * 1.5)
 	call_deferred("setup_stair_rays")
 
 func setup_stair_rays():
@@ -66,6 +74,7 @@ func setup_stair_rays():
 				player_radius = collision_shape.shape.size.x / 2.0
 		
 		stairs_ahead_ray.position = Vector3(0, 0.25, -player_radius)  # 射线起点位置
+		_stairs_ahead_base_position = stairs_ahead_ray.position
 		stairs_ahead_ray.target_position = Vector3(0, -0.25, 0)  # 从起点向下0.5米
 		stairs_ahead_ray.enabled = true
 		# 同样使用和玩家相同的碰撞掩码
@@ -90,19 +99,25 @@ func _get_step_detection_mask() -> int:
 func handle_step_climbing(delta: float = 0.0) -> bool:
 	if player == null or stairs_ahead_ray == null or stairs_below_ray == null:
 		return false
+	_step_cooldown = maxf(_step_cooldown - delta, 0.0)
 
 	# 根据蹲伏状态调整射线位置
 	adjust_rays_for_crouch()
+	# 上一帧的预测会临时把射线移到台阶碰撞点；每帧恢复水平位置，
+	# 避免射线残留导致角色在楼梯边缘反复检测同一个点。
+	stairs_ahead_ray.position.x = _stairs_ahead_base_position.x
+	stairs_ahead_ray.position.z = _stairs_ahead_base_position.z
 	
 	# 检查并执行上台阶动作
-	if check_and_climb_step(delta):
+	if _step_cooldown <= 0.0 and check_and_climb_step(delta):
 		# 如果成功上台阶，更新最后在地面上的帧数
 		if player.is_on_floor():
 			# Engine.get_physics_frames()返回当前物理帧的序号
 			# 这是一个递增的数字，每物理帧增加1
 			# 用于计算时间差，判断是否在特定时间范围内
 			last_frame_on_floor = Engine.get_physics_frames()
-		return true  # 返回true → fps_controller会跳过move_and_slide()
+		_step_cooldown = step_cooldown_sec
+		return true  # 已经完成受控位移，本帧不再重复 move_and_slide
 	
 	return false  # 返回false → fps_controller会正常执行move_and_slide()
 
@@ -147,19 +162,11 @@ func check_snap_to_stairs():
 	var should_snap = !player.is_on_floor() and player.velocity.y <= 0 and (was_on_floor_last_frame or snap_stair_last_frame)
 	
 	if should_snap and floor_below:
-		# 创建一个物理测试结果对象
-		# PhysicsTestMotionResult3D用于存储物理测试的结果，包括碰撞点、法线、移动距离等信息
-		var result = PhysicsTestMotionResult3D.new()
-		# 测试玩家是否可以向下移动MAX_STEP_HEIGHT的距离
-		if body_test_motion_own(player.global_transform, Vector3(0, -MAX_STEP_HEIGHT * 2, 0), result):
-			# 保存相机位置，用于平滑过渡
-			save_camera_pos()
-			# 将玩家向下移动到碰撞点
-			player.position.y += result.get_travel().y
-			# 应用地面吸附，确保玩家正确贴合地面
-			apply_floor_snap_own()
-			snap_stair_last_frame = true
-			return
+		# CharacterBody3D 会沿 floor_snap_length 向下吸附。
+		# 这比手动修改 position.y 更稳定，不会和 move_and_slide 重复移动。
+		player.apply_floor_snap()
+		snap_stair_last_frame = true
+		return
 	
 	snap_stair_last_frame = false
 
@@ -186,6 +193,8 @@ func check_and_climb_step(delta) -> bool:
 	# 
 	# 结果：这一帧玩家想要水平移动0.08米
 	var expected_motion = player.velocity * Vector3(1, 0, 1) * delta
+	if expected_motion.length_squared() < min_step_speed * min_step_speed * delta * delta:
+		return false
 	
 	# 步骤2: 预测玩家的位置，向上抬高2倍台阶高度以确保能越过台阶
 	# 为什么要抬高？因为台阶可能比玩家高，抬高是为了确保能"跳"过去
@@ -328,18 +337,9 @@ func camera_smooth(delta):
 # 自定义地面吸附函数
 # 确保玩家正确贴合地面，特别是在上下楼梯后
 func apply_floor_snap_own():
-	if player.is_on_floor():
+	if player == null or player.is_on_floor():
 		return
-	
-	# 使用move_and_collide测试与地面的碰撞
-	# 第一个参数true表示仅测试而不实际移动
-	var result = player.move_and_collide(player.velocity, true)
-	if result and result.get_collider():
-		# 如果有碰撞且移动距离足够大，调整玩家位置
-		if result.get_travel().length() > 0.001:
-			# 计算向上的调整量，确保玩家站在地面上
-			var add_vel = Vector3.UP * Vector3.UP.dot(result.get_travel())
-			player.global_position += add_vel
+	player.apply_floor_snap()
 
 # 自定义物理测试函数
 # 这是对Godot物理系统的直接调用，用于在不实际移动物体的情况下测试碰撞

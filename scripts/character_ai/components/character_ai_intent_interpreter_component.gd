@@ -13,6 +13,10 @@ const INTENT_PLAY_ACTION := "play_action"
 const INTENT_SPEAK_HINT := "speak_hint"
 const INTENT_SET_EXPRESSION := "set_expression"
 const INTENT_GIVE_ITEM_TO_PLAYER := "give_item_to_player"
+const INTENT_PICK_UP_ITEM := "pick_up_item"
+const INTENT_USE_ITEM := "use_item"
+const INTENT_EAT_ITEM := "eat_item"
+const INTENT_TAKE_FROM_CONTAINER := "take_from_container"
 
 const COMMAND_ALIASES := {
 	"follow": INTENT_FOLLOW_PLAYER,
@@ -56,6 +60,22 @@ const COMMAND_ALIASES := {
 	"递给玩家": INTENT_GIVE_ITEM_TO_PLAYER,
 	"给玩家物品": INTENT_GIVE_ITEM_TO_PLAYER,
 	"给我物品": INTENT_GIVE_ITEM_TO_PLAYER,
+	"pick_up_item": INTENT_PICK_UP_ITEM,
+	"pickup_item": INTENT_PICK_UP_ITEM,
+	"take_item": INTENT_PICK_UP_ITEM,
+	"pick_up": INTENT_PICK_UP_ITEM,
+	"拿起": INTENT_PICK_UP_ITEM,
+	"拾取": INTENT_PICK_UP_ITEM,
+	"拿物品": INTENT_PICK_UP_ITEM,
+	"take_from_container": INTENT_TAKE_FROM_CONTAINER,
+	"take_from_storage": INTENT_TAKE_FROM_CONTAINER,
+	"从容器拿取": INTENT_TAKE_FROM_CONTAINER,
+	"use_item": INTENT_USE_ITEM,
+	"使用物品": INTENT_USE_ITEM,
+	"使用": INTENT_USE_ITEM,
+	"eat_item": INTENT_EAT_ITEM,
+	"吃掉": INTENT_EAT_ITEM,
+	"吃": INTENT_EAT_ITEM,
 }
 
 func interpret_payload(payload: Dictionary) -> Dictionary:
@@ -138,8 +158,22 @@ func _guess_intent(raw: String, canonical: String) -> String:
 		return INTENT_GIVE_ITEM_TO_PLAYER
 	if canonical.contains("offer") and canonical.contains("item"):
 		return INTENT_GIVE_ITEM_TO_PLAYER
+	if canonical.contains("take_from_container") or canonical.contains("take_from_storage"):
+		return INTENT_TAKE_FROM_CONTAINER
+	if canonical.contains("pick") or canonical.contains("take_item"):
+		return INTENT_PICK_UP_ITEM
+	if canonical.contains("use_item"):
+		return INTENT_USE_ITEM
+	if canonical.contains("eat_item"):
+		return INTENT_EAT_ITEM
 	if lower.find("给") >= 0 and (lower.find("物品") >= 0 or lower.find("道具") >= 0):
 		return INTENT_GIVE_ITEM_TO_PLAYER
+	if lower.find("拿") >= 0 or lower.find("拾取") >= 0:
+		return INTENT_PICK_UP_ITEM
+	if lower.find("使用") >= 0:
+		return INTENT_USE_ITEM
+	if lower.find("吃") >= 0:
+		return INTENT_EAT_ITEM
 	if lower.find("停止") >= 0 and lower.find("跟") >= 0:
 		return INTENT_STOP_FOLLOW
 	if (lower.find("跟着") >= 0 or lower.find("跟随") >= 0) and lower.find("别") < 0:

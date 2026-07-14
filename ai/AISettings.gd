@@ -403,6 +403,15 @@ func _normalize_base_url(value: String) -> String:
 		return DEFAULT_BASE_URL
 	while normalized.length() > 1 and normalized.ends_with("/"):
 		normalized = normalized.substr(0, normalized.length() - 1)
+	# OpenAI-compatible SDK 通常会访问 base_url + /chat/completions。
+	# 如果只填 http://host:port，就会请求到 /chat/completions 并 404；这里自动补 /v1。
+	var without_scheme := normalized
+	if without_scheme.begins_with("http://"):
+		without_scheme = without_scheme.substr("http://".length())
+	elif without_scheme.begins_with("https://"):
+		without_scheme = without_scheme.substr("https://".length())
+	if without_scheme.find("/") == -1 and (normalized.begins_with("http://") or normalized.begins_with("https://")):
+		normalized += "/v1"
 	return normalized
 
 

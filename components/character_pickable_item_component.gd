@@ -67,7 +67,8 @@ func get_marker_for_role(_role: String) -> Marker3D:
 func can_be_picked_by(_character_root: Node) -> bool:
 	return not _consumed and _resolve_item_data() != null
 
-func pick_up_by(character_root: Node, reason: String = "character_pick_up") -> Dictionary:
+## 拾取只把物品放到手上；use/eat 才会在动画后消耗它。
+func pick_up_by(character_root: Node, reason: String = "character_pick_up", consume_after_pickup: Variant = null) -> Dictionary:
 	if not can_be_picked_by(character_root):
 		return {"ok": false, "error": "item_not_pickable"}
 	_request_character_action(character_root, use_action)
@@ -76,7 +77,8 @@ func pick_up_by(character_root: Node, reason: String = "character_pick_up") -> D
 		return {"ok": false, "error": "attach_failed"}
 	if hide_world_item_while_held:
 		_set_world_item_visible(false)
-	if consume_after_attach:
+	var should_consume := consume_after_attach if consume_after_pickup == null else bool(consume_after_pickup)
+	if should_consume:
 		if consume_delay_sec > 0.0 and is_inside_tree():
 			await get_tree().create_timer(consume_delay_sec).timeout
 		return use_by(character_root, reason)

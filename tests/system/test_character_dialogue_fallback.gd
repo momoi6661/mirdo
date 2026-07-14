@@ -12,9 +12,14 @@ func _run() -> void:
 	await _test_queued_player_lines_are_merged_as_agent_ordered_messages()
 	await _test_pending_flush_waits_while_player_is_typing()
 	await _test_pending_flush_resumes_after_draft_goes_idle()
+	await _test_manual_flush_sends_pending_player_dialogue_immediately()
 	await _test_request_in_progress_does_not_speak_local_fallback()
+	await _test_ok_backend_parse_fallback_is_not_replaced_by_local_fallback()
 	await _test_chat_payload_includes_runtime_context()
 	await _test_autonomous_chat_payload_compacts_behavior_context()
+	await _test_chat_payload_exposes_active_task_chain()
+	await _test_chat_payload_includes_world_scene_summary()
+	await _test_dialogue_continue_status_schedules_autonomous_follow_up()
 	_finish()
 
 func _test_local_fallback_answers_status_and_command() -> void:
@@ -138,6 +143,30 @@ func _test_pending_flush_resumes_after_draft_goes_idle() -> void:
 	dialogue.queue_free()
 	await process_frame
 
+func _test_manual_flush_sends_pending_player_dialogue_immediately() -> void:
+	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	if script == null:
+		return
+	var host := Node.new()
+	root.add_child(host)
+	var manager := _FakeAIManagerAccept.new()
+	manager.name = "AIManager"
+	host.add_child(manager)
+	var dialogue := Node.new()
+	dialogue.set_script(script)
+	host.add_child(dialogue)
+	dialogue.set("ai_manager_path", dialogue.get_path_to(manager))
+	dialogue.set("player_dialogue_aggregate_delay_sec", 1.0)
+	await process_frame
+	dialogue.call("send_player_text", "第一句")
+	dialogue.call("notify_player_input_draft_changed", "还在输入")
+	var flushed: bool = bool(dialogue.call("flush_pending_player_dialogue_now"))
+	_expect(flushed, "manual flush should report pending player dialogue was flushed")
+	_expect(manager.request_count == 1, "manual flush should send pending dialogue to backend immediately")
+	_expect(String(manager.last_payload.get("player_text", "")) == "第一句", "manual flush should send the pending player text")
+	host.queue_free()
+	await process_frame
+
 func _test_request_in_progress_does_not_speak_local_fallback() -> void:
 	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
 	if script == null:
@@ -167,6 +196,33 @@ func _test_request_in_progress_does_not_speak_local_fallback() -> void:
 	_expect(bool(result.get("ok", false)), "busy AI manager should accept player request into queue")
 	_expect(bool(result.get("queued", false)), "busy AI manager should queue player request instead of failing")
 	_expect(subtitle.show_calls == 0, "request_in_progress should not make Mirdo speak a fallback line")
+	host.queue_free()
+	await process_frame
+
+func _test_ok_backend_parse_fallback_is_not_replaced_by_local_fallback() -> void:
+	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	if script == null:
+		return
+	var host := Node.new()
+	root.add_child(host)
+	var subtitle := _SubtitleSpy.new()
+	subtitle.name = "Subtitle"
+	host.add_child(subtitle)
+	var dialogue := Node.new()
+	dialogue.set_script(script)
+	host.add_child(dialogue)
+	dialogue.set("subtitle_target_path", dialogue.get_path_to(subtitle))
+	dialogue.set("_request_in_flight", true)
+	dialogue.set("_last_payload", {"player_text": "随便说点什么"})
+	await process_frame
+	dialogue.call("_on_ai_completed", {
+		"ok": true,
+		"dialogue": "老师，请再说一遍吧。",
+		"error": "invalid_model_json",
+		"fallback": true,
+	})
+	_expect(subtitle.show_calls == 1, "ok backend parse fallback should be shown directly")
+	_expect(subtitle.last_text == "老师，请再说一遍吧。", "ok backend parse fallback should not be replaced by local fallback line")
 	host.queue_free()
 	await process_frame
 
@@ -234,6 +290,89 @@ func _test_autonomous_chat_payload_compacts_behavior_context() -> void:
 	host.queue_free()
 	await process_frame
 
+func _test_chat_payload_exposes_active_task_chain() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var dialogue_script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	var dialogue := Node.new()
+	dialogue.set_script(dialogue_script)
+	host.add_child(dialogue)
+	var life := _FakeDetailedLife.new()
+	host.add_child(life)
+	dialogue.set("autonomous_life_path", dialogue.get_path_to(life))
+	dialogue.set("_autonomous_life", life)
+	await process_frame
+	var payload: Dictionary = dialogue.call("_build_chat_payload", "老师继续说", "")
+	var context: Dictionary = payload.get("context", {}) as Dictionary
+	var chain: Dictionary = context.get("task_chain", {}) as Dictionary
+	_expect(String(chain.get("chain_id", "")) == "toilet-chain", "payload should carry the active AI task chain id")
+	_expect(int(chain.get("chain_depth", 0)) == 2, "payload should carry the active AI task chain depth")
+	_expect(String(chain.get("status", "")) == "continue", "payload should carry the active AI task chain status")
+	host.queue_free()
+	await process_frame
+
+func _test_chat_payload_includes_world_scene_summary() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var dialogue_script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	var dialogue := Node.new()
+	dialogue.name = "Dialogue"
+	dialogue.set_script(dialogue_script)
+	host.add_child(dialogue)
+	var object := _FakeWorldObject.new()
+	object.name = "FoodCabinetObject"
+	host.add_child(object)
+	object.add_to_group(&"ai_world_object")
+	await process_frame
+	var payload: Dictionary = dialogue.call("_build_chat_payload", "食物柜里面有什么？", "")
+	var context: Dictionary = payload.get("context", {}) as Dictionary
+	_expect(context.has("world_scene"), "dialogue context should include world_scene summary so backend can answer scene questions")
+	var world_scene: Dictionary = context.get("world_scene", {}) as Dictionary
+	var objects: Array = world_scene.get("world_objects", []) as Array
+	_expect(objects.size() > 0, "world_scene should include semantic world objects")
+	if objects.size() > 0:
+		var first: Dictionary = objects[0] as Dictionary
+		_expect(String(first.get("id", "")) == "food_cabinet_runtime", "world_scene object should preserve AI object id")
+		_expect(String(first.get("description", "")).find("罐头") >= 0, "world_scene object should include object description")
+	host.queue_free()
+	await process_frame
+
+func _test_dialogue_continue_status_schedules_autonomous_follow_up() -> void:
+	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	var host := Node.new()
+	root.add_child(host)
+	var manager := _FakeAIManagerAccept.new()
+	manager.name = "AIManager"
+	host.add_child(manager)
+	var dialogue := Node.new()
+	dialogue.name = "Dialogue"
+	dialogue.set_script(script)
+	host.add_child(dialogue)
+	dialogue.set("ai_manager_path", dialogue.get_path_to(manager))
+	dialogue.set("auto_continue_dialogue_enabled", true)
+	dialogue.set("auto_continue_dialogue_delay_sec", 0.0)
+	dialogue.set("aggregate_player_dialogue_enabled", false)
+	dialogue.set("_request_in_flight", true)
+	dialogue.set("_last_payload", {"player_text": "讲讲食物柜情况", "context": {"request_source": "player"}})
+	await process_frame
+	dialogue.call("_on_ai_completed", {
+		"ok": true,
+		"dialogue": "老师，食物柜我先看一眼。",
+		"task_status": "continue",
+		"task_reason": "还有后续说明没说完。",
+		"next_decision_hint": "继续说明食物和水是否足够。",
+	})
+	await process_frame
+	await process_frame
+	_expect(manager.request_count == 1, "dialogue task_status=continue without command should auto request Mirdo to continue speaking")
+	if manager.request_count > 0:
+		_expect(String(manager.last_payload.get("player_text", "")).find("继续") >= 0, "auto continuation prompt should ask backend to continue naturally")
+		var context: Dictionary = manager.last_payload.get("context", {}) as Dictionary
+		_expect(String(context.get("request_source", "")) == "autonomous", "auto continuation should be autonomous, not a new player input")
+		_expect(String((context.get("source_decision", {}) as Dictionary).get("kind", "")) == "dialogue_follow_up", "auto continuation should mark dialogue_follow_up source decision")
+	host.queue_free()
+	await process_frame
+
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
@@ -274,6 +413,10 @@ class _FakeDetailedLife:
 			"navigating": true,
 			"current_kind": "go_to_nav_point",
 			"current_target": "food_cabinet",
+			"ai_task_chain_active": true,
+			"ai_task_chain_id": "toilet-chain",
+			"ai_task_chain_depth": 2,
+			"ai_task_chain_status": "continue",
 			"current_decision": {
 				"kind": "go_to_nav_point",
 				"target_nav_point": "food_cabinet",
@@ -285,8 +428,51 @@ class _FakeDetailedLife:
 			],
 		}
 
+class _FakeWorldObject:
+	extends Node3D
+	func build_ai_object_summary(_observer: Node3D = null) -> Dictionary:
+		return {
+			"id": "food_cabinet_runtime",
+			"name": "食物柜",
+			"type": "storage",
+			"description": "柜子里主要放罐头、饮水和少量干粮。",
+			"tags": ["food", "water", "supplies", "storage"],
+			"actions": ["inspect", "open"],
+			"distance": 3.2,
+		}
+
 class _SubtitleSpy:
 	extends Node
 	var show_calls := 0
-	func show_once(_text: String, _speaker: String = "") -> void:
+	var last_text := ""
+	func show_once(text: String, _speaker: String = "") -> void:
 		show_calls += 1
+		last_text = text
+
+class _FakeAIManagerAccept:
+	extends AIManager
+	var request_count := 0
+	var last_payload: Dictionary = {}
+	func build_chat_request(
+		player_text: String,
+		session_id: String = "default_session",
+		day: int = 1,
+		time_min: int = 0,
+		npc_stats: Dictionary = {},
+		given_item: String = "",
+		context: Dictionary = {},
+		_max_context_turns: int = -1
+	) -> Dictionary:
+		return {
+			"player_text": player_text,
+			"session_id": session_id,
+			"day": day,
+			"time_min": time_min,
+			"npc_stats": npc_stats,
+			"given_item": given_item,
+			"context": context,
+		}
+	func request_chat_once(payload: Dictionary, _context: Dictionary = {}) -> bool:
+		request_count += 1
+		last_payload = payload.duplicate(true)
+		return true

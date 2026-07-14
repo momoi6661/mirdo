@@ -19,13 +19,14 @@ signal dialogue_failed(error_text: String)
 @export var subtitle_target_path: NodePath
 @export var face_component_path: NodePath
 @export var ai_nav_point_group: StringName = &"ai_nav_point"
+@export var world_object_group: StringName = &"ai_world_object"
 @export_range(0, 256, 1) var max_nav_points_in_prompt: int = 128
 
 @export_category("NPC Contract")
 @export var npc_display_name: String = "Mirdo"
 @export_multiline var npc_role_prompt: String = "可爱的避难所少女 NPC，称呼玩家为老师，性格活泼、好奇、温柔。"
 @export_multiline var npc_personality_knowledge: String = "Mirdo 是一个可爱的 VRChat 风格原创少女角色。她活泼、好奇、亲近玩家，会把玩家称作老师；她在避难所里会主动观察食物柜、医疗柜、工具箱、装备柜、工作台和床铺，关心食物、水、药品和工具是否够用。她说话短、自然、带一点可爱的自言自语，但不会刷屏。"
-@export_multiline var response_contract_prompt: String = "后端回复应优先返回 JSON：dialogue 为 Mirdo 要说的话；expression 从 neutral/joy/fun/angry/sorrow/surprised/disappointed 中选择；action 从 available_body_actions 中选择；visemes 使用 aa、ih、ou、E、oh 五种，用顿号或逗号分隔。与老师互动时优先 tiny_wave/small_wave/small_nod/cute_explain/tilt_head_cute；点头用 react_nod，挥手用 react_wave/tiny_wave；需要回头或转向时可用 look_back/turn_left/turn_right/turn_180；坐着时优先 seated_idle/seated_sleepy，除非明确起身不要给站姿动作。"
+@export_multiline var response_contract_prompt: String = "后端回复应优先返回 JSON：dialogue 为 Mirdo 要说的话；expression 从 neutral/joy/fun/angry/sorrow/surprised/disappointed 中选择；action 从 available_body_actions 中选择；action_line 返回 0 到 4 个有因果的步骤，Godot 只执行首个 pending 步骤；visemes 使用 aa、ih、ou、E、oh 五种，用顿号或逗号分隔。与老师互动时优先 tiny_wave/small_wave/small_nod/cute_explain/tilt_head_cute；点头用 react_nod，挥手用 react_wave/tiny_wave；需要回头或转向时可用 look_back/turn_left/turn_right/turn_180；坐着时优先 seated_idle/seated_sleepy，除非明确起身不要给站姿动作。"
 @export var available_body_actions: PackedStringArray = PackedStringArray([
 	"idle_normal", "idle_relaxed", "idle_sleepy", "idle_alert", "idle_fidget", "listen", "happy_bounce",
 	"walk", "run", "seated_idle", "seated_sleepy",
@@ -54,12 +55,19 @@ signal dialogue_failed(error_text: String)
 @export_range(0.0, 5.0, 0.1) var player_dialogue_aggregate_max_wait_sec: float = 2.5
 @export_range(0.0, 1.5, 0.05) var player_dialogue_draft_idle_flush_sec: float = 0.35
 @export var queue_player_dialogue_while_busy: bool = true
-@export var queue_autonomous_dialogue_while_busy: bool = false
+@export var queue_autonomous_dialogue_while_busy: bool = true
 @export var merge_queued_player_dialogue: bool = true
 @export_range(120, 1200, 10) var max_merged_player_dialogue_chars: int = 420
 @export_range(0, 8, 1) var max_queued_dialogue_requests: int = 4
 @export_range(0.05, 2.0, 0.05) var queued_dialogue_retry_delay_sec: float = 0.25
 @export var always_log: bool = true
+
+@export_category("Dialogue Continuation")
+@export var auto_continue_dialogue_enabled: bool = true
+@export_range(0.0, 5.0, 0.05) var auto_continue_dialogue_delay_sec: float = 0.45
+@export_range(1, 8, 1) var auto_continue_dialogue_max_depth: int = 3
+@export_range(20, 220, 1) var auto_continue_dialogue_max_chars: int = 80
+@export var auto_continue_dialogue_prompt_prefix: String = "Mirdo 刚才的话还没有自然说完，请接着上一句继续说。"
 
 var _ai_manager: AIManager
 var _perception_component: Node
@@ -87,6 +95,11 @@ var _pending_player_flush_token: int = 0
 var _pending_player_first_input_ticks_msec: int = 0
 var _player_input_draft_text: String = ""
 var _player_input_draft_updated_msec: int = 0
+var _dialogue_continue_serial: int = 0
+@export_range(0, 256, 1) var max_world_scene_objects_in_prompt: int = 64
+@export_range(0, 128, 1) var max_world_scene_areas_in_prompt: int = 32
+@export var perception_area_group: StringName = &"ai_perception_area"
+@export var include_world_scene_summary: bool = true
 
 func _ready() -> void:
 	_refresh_refs()
@@ -128,6 +141,9 @@ func _send_dialogue_text(
 	if not source_decision.is_empty():
 		payload["source_decision"] = _compact_decision(source_decision)
 	_last_payload = payload.duplicate(true)
+	var trace_context: Dictionary = payload.get("context", {}) as Dictionary
+	var trace_chain: Dictionary = trace_context.get("task_chain", {}) as Dictionary
+	_log("request source=%s event=%s chain=%s text=%s" % [request_source, String(trace_context.get("event", "")), String(trace_chain.get("chain_id", "")), _preview_text(text)])
 	_stream_text = ""
 	_last_ai_error_text = ""
 	_ai_error_handled_during_send = false
@@ -164,6 +180,15 @@ func clear_queued_dialogue() -> void:
 func notify_player_input_draft_changed(draft_text: String) -> void:
 	_player_input_draft_text = draft_text.strip_edges()
 	_player_input_draft_updated_msec = Time.get_ticks_msec()
+
+func flush_pending_player_dialogue_now() -> bool:
+	_player_input_draft_text = ""
+	_player_input_draft_updated_msec = 0
+	if _pending_player_dialogue_parts.is_empty():
+		return false
+	_pending_player_flush_token += 1
+	_flush_pending_player_dialogue()
+	return true
 
 func _should_aggregate_player_dialogue(request_source: String, bypass_player_aggregation: bool) -> bool:
 	if bypass_player_aggregation:
@@ -405,6 +430,15 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 	var current_behavior := _build_current_behavior_context()
 	if not current_behavior.is_empty():
 		context_data["current_behavior"] = current_behavior
+		# 玩家输入可能打断动作回调；显式带回任务链，后端才能继续未完成的目标。
+		if bool(current_behavior.get("ai_task_chain_active", false)):
+			context_data["task_chain"] = {
+				"chain_id": String(current_behavior.get("ai_task_chain_id", "")).strip_edges(),
+				"chain_depth": int(current_behavior.get("ai_task_chain_depth", 0)),
+				"status": String(current_behavior.get("ai_task_chain_status", "continue")).strip_edges(),
+				"goal": String(current_behavior.get("current_kind", "")).strip_edges(),
+				"last_target": String(current_behavior.get("current_target", "")).strip_edges(),
+			}
 	var nav_points := _build_nav_point_context()
 	if not nav_points.is_empty():
 		context_data["ai_nav_points"] = nav_points
@@ -412,6 +446,13 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 	var action_contract := _build_action_contract_context()
 	if not action_contract.is_empty():
 		context_data["action_contract"] = action_contract
+	var world_scene := _build_world_scene_context()
+	if not world_scene.is_empty():
+		context_data["world_scene"] = world_scene
+	if request_source.strip_edges().to_lower() == "autonomous":
+		var event_context := _build_event_context(source_decision, perception, mind_state, resource_stats, current_behavior)
+		if not event_context.is_empty():
+			context_data["event_context"] = event_context
 	var ai_stats := _build_npc_stats_for_request(context_data)
 	if _ai_manager != null and _ai_manager.has_method("build_chat_request"):
 		return _ai_manager.call(
@@ -435,6 +476,35 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 		"given_item": given_item.strip_edges(),
 		"context": context_data,
 	}
+
+
+## 组合动作结果与动作完成瞬间的运行时快照，供后端 Agent 判断下一步。
+func _build_event_context(
+	source_decision: Dictionary,
+	perception: Dictionary,
+	mind_state: Dictionary,
+	resource_stats: Dictionary,
+	current_behavior: Dictionary,
+) -> Dictionary:
+	var raw_context: Variant = source_decision.get("event_context", {})
+	var event_context: Dictionary = raw_context.duplicate(true) if raw_context is Dictionary else {}
+	if event_context.is_empty() and String(source_decision.get("event", "")).strip_edges().is_empty():
+		return {}
+	for key in ["event_id", "event", "ok", "reason", "task_id", "chain_id", "chain_depth", "current_step_id", "target_object", "target_nav_point", "target_name", "target_description", "marker_role", "arrival_action", "action_step", "action_line"]:
+		if not event_context.has(key) and source_decision.has(key):
+			event_context[key] = source_decision[key]
+	var runtime_snapshot: Dictionary = {}
+	if not perception.is_empty():
+		runtime_snapshot["perception"] = perception.duplicate(true)
+	if not mind_state.is_empty():
+		runtime_snapshot["mind_state"] = mind_state.duplicate(true)
+	if not resource_stats.is_empty():
+		runtime_snapshot["resource_stats"] = resource_stats.duplicate(true)
+	if not current_behavior.is_empty():
+		runtime_snapshot["current_behavior"] = current_behavior.duplicate(true)
+	if not runtime_snapshot.is_empty():
+		event_context["runtime_snapshot"] = runtime_snapshot
+	return event_context
 
 
 func _build_ai_checkpoint_context(save_slot: String, clean_session_id: String) -> Dictionary:
@@ -529,7 +599,7 @@ func _build_npc_contract_context() -> Dictionary:
 		"response_contract": response_contract_prompt.strip_edges(),
 		"available_expressions": _packed_to_clean_array(available_expressions),
 		"available_visemes": _packed_to_clean_array(available_visemes),
-		"navigation_contract": "ai_nav_points/known_nav_points are Mirdo's remembered global map points with positions and action contract. perception is only current Area3D vision/nearby sensing. If movement is needed, prefer command='go_to_nav_point' or command_payload.intent='go_to_nav_point' with target_nav_point equal to one ai_nav_points.id; choose action from that point's action_options and expression from expression_options.",
+		"navigation_contract": "ai_nav_points/known_nav_points are Mirdo's remembered global map points with positions and action contract. perception is only current Area3D vision/nearby sensing. Return an action_line; its first step may use command='go_to_nav_point' with target_nav_point equal to one ai_nav_points.id. Choose action from that point's action_options and expression from expression_options.",
 	}
 	if compact_backend_context:
 		context["preferred_social_actions"] = ["listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "seated_idle"]
@@ -580,6 +650,62 @@ func _build_compact_perception_context() -> Dictionary:
 	var visible := _compact_entries(snapshot.get("visible_items", []), 8)
 	if not visible.is_empty():
 		compact["visible_items"] = visible
+	return compact
+
+
+func _build_world_scene_context() -> Dictionary:
+	if not include_world_scene_summary:
+		return {}
+	var tree := get_tree()
+	if tree == null:
+		return {}
+	var observer := _find_observer_node()
+	var scene := tree.current_scene
+	var context := {
+		"source": "godot_runtime_scene",
+		"scene_name": String(scene.name) if scene != null else "",
+		"world_objects_note": "Semantic objects currently registered in the Godot scene; use this to answer questions about facilities/items even when not in immediate vision.",
+	}
+	var objects := _collect_group_summaries(world_object_group, &"build_ai_object_summary", observer, max_world_scene_objects_in_prompt)
+	if not objects.is_empty():
+		context["world_objects"] = objects
+	var areas := _collect_group_summaries(perception_area_group, &"build_ai_area_summary", observer, max_world_scene_areas_in_prompt)
+	if not areas.is_empty():
+		context["world_areas"] = areas
+	if objects.is_empty() and areas.is_empty():
+		return {}
+	return context
+
+func _collect_group_summaries(group_name: StringName, method_name: StringName, observer: Node3D, limit: int) -> Array:
+	var out: Array = []
+	if limit <= 0:
+		return out
+	var tree := get_tree()
+	if tree == null:
+		return out
+	for candidate in tree.get_nodes_in_group(group_name):
+		if out.size() >= limit:
+			break
+		var node := candidate as Node
+		if node == null or not is_instance_valid(node) or not node.has_method(method_name):
+			continue
+		var value: Variant = node.call(method_name, observer)
+		if value is not Dictionary:
+			continue
+		var compact := _compact_world_scene_entry(value as Dictionary)
+		if not compact.is_empty():
+			out.append(compact)
+	_sort_compact_entries_by_distance(out)
+	return out
+
+func _compact_world_scene_entry(entry: Dictionary) -> Dictionary:
+	var compact := {}
+	for key in [
+		"id", "name", "type", "description", "tags", "actions", "supported_actions", "distance",
+		"marker_roles", "area_actions", "priority", "object_id", "area_id"
+	]:
+		if entry.has(key):
+			compact[key] = entry[key]
 	return compact
 
 func _build_mind_state_context() -> Dictionary:
@@ -687,7 +813,7 @@ func _compact_entries(entries_value: Variant, limit: int) -> Array:
 
 func _compact_current_behavior(snapshot: Dictionary) -> Dictionary:
 	var out := {}
-	for key in ["navigating", "current_kind", "current_target", "last_kind", "last_target", "has_resume", "resume_kind", "resume_target", "external_grace_left", "dwell_left"]:
+	for key in ["navigating", "current_kind", "current_target", "last_kind", "last_target", "has_resume", "resume_kind", "resume_target", "external_grace_left", "dwell_left", "ai_task_chain_active", "ai_task_chain_id", "ai_task_chain_depth", "ai_task_chain_status"]:
 		if snapshot.has(key):
 			out[key] = snapshot[key]
 	var current := _compact_decision(snapshot.get("current_decision", {}))
@@ -716,12 +842,17 @@ func _compact_decision(value: Variant) -> Dictionary:
 	var decision := value as Dictionary
 	var out := {}
 	for key in [
-		"kind", "event", "target_object", "target_nav_point", "target_ref", "target_name", "target_description", "marker_role",
+		"kind", "event", "event_id", "task_id", "ok", "target_object", "target_nav_point", "target_ref", "target_name", "target_description", "marker_role",
 		"action", "action_hint", "arrival_action", "arrival_expression", "face_target",
-		"dwell_time_sec", "resume_reason", "reason", "score", "feedback", "chain_depth", "chain_id"
+		"dwell_time_sec", "resume_reason", "reason", "score", "feedback", "chain_depth", "chain_id", "last_dialogue", "next_decision_hint"
 	]:
 		if decision.has(key):
 			out[key] = decision[key]
+	var event_context: Variant = decision.get("event_context", {})
+	if event_context is Dictionary:
+		for key in ["event_id", "task_id", "chain_id", "chain_depth", "ok"]:
+			if not out.has(key) and (event_context as Dictionary).has(key):
+				out[key] = (event_context as Dictionary)[key]
 	return out
 
 func _compact_action_contract(actions: Array) -> Array:
@@ -776,6 +907,11 @@ func _on_ai_stream_dialogue_finished(dialogue_text: String) -> void:
 		return
 	dialogue_stream_finished.emit(dialogue_text)
 
+## 读取后端动作线长度；对白续接只有在本回合没有动作线时才允许自动触发。
+func _action_line_size(ai_data: Dictionary) -> int:
+	var value: Variant = ai_data.get("action_line", [])
+	return (value as Array).size() if value is Array else 0
+
 func _on_ai_completed(final_data: Dictionary) -> void:
 	if not _request_in_flight:
 		return
@@ -786,6 +922,7 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		dialogue_text = _stream_text.strip_edges()
 	if dialogue_text.is_empty():
 		dialogue_text = "……"
+	_log("response status=%s current_step=%s action_line=%d dialogue=%s" % [String(final_data.get("task_status", "")), String(final_data.get("current_step_id", "")), _action_line_size(final_data), _preview_text(dialogue_text)])
 	if _should_suppress_error(dialogue_text, final_data):
 		_emit_local_fallback(_extract_error_reason(dialogue_text, final_data))
 		return
@@ -802,7 +939,72 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		"request_payload": _last_payload.duplicate(true),
 	}
 	dialogue_completed.emit(report)
+	_schedule_dialogue_continuation_if_needed(final_data, dialogue_text, route_summary)
 	_drain_queued_dialogue_deferred()
+
+func _schedule_dialogue_continuation_if_needed(ai_data: Dictionary, dialogue_text: String, route_summary: Dictionary = {}) -> bool:
+	if not auto_continue_dialogue_enabled:
+		return false
+	if _request_in_flight or not _queued_dialogue_requests.is_empty():
+		return false
+	if _action_line_size(ai_data) > 0:
+		return false
+	var status := String(ai_data.get("task_status", ai_data.get("dialogue_status", ""))).strip_edges().to_lower()
+	var wants_continue := status in ["continue", "wait"]
+	var hint := String(ai_data.get("next_decision_hint", ai_data.get("continue_hint", ""))).strip_edges()
+	if not wants_continue and hint.is_empty():
+		return false
+	var source: Dictionary = ai_data.get("source_decision", {}) as Dictionary if ai_data.get("source_decision", {}) is Dictionary else {}
+	var chain_id := String(ai_data.get("chain_id", source.get("chain_id", ""))).strip_edges()
+	if chain_id.is_empty():
+		chain_id = "dialogue:%s" % str(Time.get_ticks_msec())
+	var depth := int(ai_data.get("chain_depth", source.get("chain_depth", 0))) + 1
+	if depth > auto_continue_dialogue_max_depth:
+		return false
+	_dialogue_continue_serial += 1
+	var serial := _dialogue_continue_serial
+	var decision := {
+		"kind": "dialogue_follow_up",
+		"event": "dialogue_continue",
+		"chain_id": chain_id,
+		"chain_depth": depth,
+		"reason": String(ai_data.get("task_reason", "")).strip_edges(),
+		"last_dialogue": dialogue_text.strip_edges(),
+		"next_decision_hint": hint,
+	}
+	var prompt := _build_dialogue_continue_prompt(dialogue_text, ai_data, route_summary, decision)
+	var delay := maxf(0.0, auto_continue_dialogue_delay_sec)
+	if delay <= 0.01:
+		call_deferred("_request_dialogue_continuation", prompt, decision, serial)
+	else:
+		var timer := get_tree().create_timer(delay)
+		timer.timeout.connect(func() -> void:
+			_request_dialogue_continuation(prompt, decision, serial)
+		)
+	return true
+
+func _build_dialogue_continue_prompt(last_dialogue: String, ai_data: Dictionary, _route_summary: Dictionary, decision: Dictionary) -> String:
+	var hint := String(decision.get("next_decision_hint", "")).strip_edges()
+	var reason := String(decision.get("reason", "")).strip_edges()
+	var parts: Array[String] = [auto_continue_dialogue_prompt_prefix]
+	if not last_dialogue.strip_edges().is_empty():
+		parts.append("上一句=%s" % last_dialogue.strip_edges())
+	if not reason.is_empty():
+		parts.append("继续原因=%s" % reason)
+	if not hint.is_empty():
+		parts.append("后续提示=%s" % hint)
+	parts.append("请像自然连续对话一样接着说，不要重复上一句；如果已经说完，请在JSON里返回 task_status=complete；如果仍需要继续，再返回 task_status=continue。")
+	parts.append("如果确实要接一个新动作，应返回新的 action_line；否则只返回对白。dialogue不超过%d字。" % maxi(20, auto_continue_dialogue_max_chars))
+	if ai_data.has("memory_tags"):
+		parts.append("上一轮标签=%s" % str(ai_data.get("memory_tags")))
+	return "\n".join(parts)
+
+func _request_dialogue_continuation(prompt: String, decision: Dictionary, serial: int) -> bool:
+	if serial != _dialogue_continue_serial:
+		return false
+	if _request_in_flight or not _queued_dialogue_requests.is_empty():
+		return false
+	return bool(_send_dialogue_text(prompt, "", "autonomous", decision, true).get("ok", false))
 
 func _on_ai_error(error_text: String) -> void:
 	if not _request_in_flight:
@@ -1023,8 +1225,8 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 		"emotion": expression,
 		"expression": expression,
 		"action": action,
-		"command": command,
-		"intent": command,
+		"action_line": [{"step_id": "local-step", "action": action, "command": command, "command_payload": {"follow_target": "player"}}] if command in ["follow_player", "stop"] else [],
+		"current_step_id": "local-step" if command in ["follow_player", "stop"] else "",
 		"visemes": _simple_visemes_for_text(dialogue),
 		"local_fallback": true,
 		"fallback_reason": reason,
@@ -1038,12 +1240,16 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 func _pick_general_fallback_line(player_text: String, reason: String = "") -> String:
 	if not local_fallback_variety_enabled:
 		return fallback_reply_text.strip_edges() if not fallback_reply_text.strip_edges().is_empty() else "老师，我在听呢。"
+	if reason == "invalid_model_json":
+		return "老师，请再说一遍吧。"
+	if reason.begins_with("network_error") or reason.begins_with("http_"):
+		return "老师，后端连接好像有点不稳定。"
 	var options := [
 		"老师，我在听。刚才那句我可能没完全理解。",
-		"嗯，老师，我听见了。你可以再说具体一点吗？",
+		"嗯，老师，我听见了，我先整理一下。",
 		"老师，我有点没跟上，不过我会继续听你说。",
 		"我在哦，老师。你想让我靠近一点，还是先等一下？",
-		"老师，我收到啦。你再补一句，我就更明白了。",
+		"老师，我收到啦，我会按现在的情况判断。",
 	]
 	var seed_text := "%s|%s|%s" % [player_text, reason, Time.get_ticks_msec()]
 	var index := absi(seed_text.hash()) % options.size()
@@ -1109,6 +1315,8 @@ func _should_suppress_error(dialogue_text: String, data: Dictionary) -> bool:
 		return false
 	if data.has("ok") and not bool(data.get("ok", true)):
 		return true
+	if data.has("ok") and bool(data.get("ok", true)):
+		return dialogue_text.begins_with("模型调用失败")
 	var error_text := String(data.get("error", data.get("model_error", ""))).strip_edges()
 	return not error_text.is_empty() or dialogue_text.begins_with("模型调用失败")
 

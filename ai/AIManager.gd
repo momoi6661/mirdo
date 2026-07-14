@@ -885,8 +885,8 @@ func _finalize_stream_request() -> void:
 		var dialogue_done_fallback := _extract_dialogue_text(final_data).strip_edges()
 		if dialogue_done_fallback.is_empty():
 			dialogue_done_fallback = stream_dialogue_snapshot.strip_edges()
-		if not dialogue_done_fallback.is_empty():
-			on_ai_stream_dialogue_finished.emit(dialogue_done_fallback)
+		# 统一走一次性发射函数，避免 JSON 完成回调和 dialogue_done 事件重复显示同一句。
+		_emit_stream_dialogue_finished_once(dialogue_done_fallback)
 
 	_log("stream_request_ok chunks=%d final_keys=%s" % [emitted_chunks_count, str(final_data.keys())])
 	if debug_log:

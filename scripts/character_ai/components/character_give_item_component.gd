@@ -47,6 +47,7 @@ var _active_visual: Node3D
 var _active_interactable: Area3D
 var _offer_serial := 0
 var _offer_active := false
+var _last_created_hold_pose: Dictionary = {}
 
 func _ready() -> void:
 	_refresh_refs()
@@ -88,9 +89,10 @@ func offer_item_to_player(item: ItemData, player: Node = null, options: Dictiona
 	var holder := Node3D.new()
 	holder.name = offered_visual_name
 	attachment.add_child(holder)
-	holder.position = _option_vector3(options, "hold_position", Vector3.ZERO)
-	holder.rotation_degrees = _option_vector3(options, "hold_rotation_degrees", Vector3.ZERO)
-	holder.scale = _option_vector3(options, "hold_scale", Vector3.ONE)
+	var pose := _resolve_offer_pose_options(options)
+	holder.position = pose.get("position", Vector3.ZERO)
+	holder.rotation_degrees = pose.get("rotation_degrees", Vector3.ZERO)
+	holder.scale = pose.get("scale", Vector3.ONE)
 	_clear_owner_recursive(visual)
 	holder.add_child(visual)
 	visual.name = "ItemModel"
@@ -160,10 +162,12 @@ func _timeout_async(serial: int, timeout_sec: float) -> void:
 		_withdraw_active_offer("timeout", true)
 
 func _create_item_visual(item: ItemData) -> Node3D:
+	_last_created_hold_pose = _default_hold_pose_for_item(item)
 	var scene := item.get_scene()
 	if scene == null:
 		return _create_fallback_box_visual(item)
 	var instance := scene.instantiate()
+	_last_created_hold_pose = _resolve_hold_pose(instance, item)
 	var visual := _extract_visual_instance(instance)
 	if visual == null:
 		if instance != null:
@@ -171,6 +175,80 @@ func _create_item_visual(item: ItemData) -> Node3D:
 		return _create_fallback_box_visual(item)
 	_strip_runtime_nodes(visual)
 	return visual
+
+func _resolve_offer_pose_options(options: Dictionary) -> Dictionary:
+	var pose := _last_created_hold_pose.duplicate(true)
+	if pose.is_empty():
+		pose = {
+			"position": Vector3.ZERO,
+			"rotation_degrees": Vector3.ZERO,
+			"scale": Vector3.ONE,
+		}
+	pose["position"] = _option_vector3(options, "hold_position", pose.get("position", Vector3.ZERO))
+	pose["rotation_degrees"] = _option_vector3(options, "hold_rotation_degrees", pose.get("rotation_degrees", Vector3.ZERO))
+	pose["scale"] = _option_vector3(options, "hold_scale", pose.get("scale", Vector3.ONE))
+	return pose
+
+func _resolve_hold_pose(instance: Node, item: ItemData) -> Dictionary:
+	var pose := _default_hold_pose_for_item(item)
+	if instance == null:
+		return pose
+	var pickable := instance.get_node_or_null("CharacterPickableItem")
+	if pickable == null:
+		return pose
+	var position_value: Variant = _safe_get_property(pickable, "hold_position_offset", pose.get("position", Vector3.ZERO))
+	var rotation_value: Variant = _safe_get_property(pickable, "hold_rotation_degrees", pose.get("rotation_degrees", Vector3.ZERO))
+	var scale_value: Variant = _safe_get_property(pickable, "hold_scale", pose.get("scale", Vector3.ONE))
+	if position_value is Vector3:
+		pose["position"] = position_value
+	if rotation_value is Vector3:
+		pose["rotation_degrees"] = rotation_value
+	if scale_value is Vector3:
+		pose["scale"] = scale_value
+	return pose
+
+func _default_hold_pose_for_item(item: ItemData) -> Dictionary:
+	var item_key := _item_key(item)
+	var category := String(item.outing_category if item != null else "").strip_edges().to_lower()
+	var pose := {
+		"position": Vector3(0.025, -0.018, 0.0),
+		"rotation_degrees": Vector3(8.0, 90.0, -8.0),
+		"scale": Vector3.ONE,
+	}
+	if item_key.find("medkit") >= 0 or item_key.find("medical_kit") >= 0 or item_key.find("急救") >= 0 or item_key.find("医疗包") >= 0:
+		pose["position"] = Vector3(0.04, -0.03, -0.005)
+		pose["rotation_degrees"] = Vector3(10.0, 90.0, -6.0)
+		pose["scale"] = Vector3(0.58, 0.58, 0.58)
+	elif item_key.find("bandage") >= 0 or item_key.find("绷带") >= 0:
+		pose["position"] = Vector3(0.035, -0.018, 0.0)
+		pose["rotation_degrees"] = Vector3(8.0, 90.0, -8.0)
+		pose["scale"] = Vector3(0.72, 0.72, 0.72)
+	elif item_key.find("water") >= 0 or item_key.find("水") >= 0:
+		pose["position"] = Vector3(0.03, -0.02, 0.0)
+		pose["rotation_degrees"] = Vector3(8.0, 90.0, -8.0)
+	elif item_key.find("can") >= 0 or item_key.find("罐") >= 0:
+		pose["position"] = Vector3(0.025, -0.015, 0.0)
+		pose["rotation_degrees"] = Vector3(4.0, 90.0, -6.0)
+	elif item_key.find("disinfect") >= 0 or item_key.find("消毒") >= 0:
+		pose["position"] = Vector3(0.03, -0.022, 0.0)
+		pose["rotation_degrees"] = Vector3(8.0, 90.0, -6.0)
+		pose["scale"] = Vector3(0.64, 0.64, 0.64)
+	elif item_key.find("painkiller") >= 0 or item_key.find("止痛") >= 0:
+		pose["position"] = Vector3(0.025, -0.014, 0.0)
+		pose["rotation_degrees"] = Vector3(4.0, 90.0, -6.0)
+		pose["scale"] = Vector3(0.78, 0.78, 0.78)
+	elif category == "medical":
+		pose["scale"] = Vector3(0.72, 0.72, 0.72)
+	return pose
+
+func _item_key(item: ItemData) -> String:
+	if item == null:
+		return ""
+	var parts: PackedStringArray = []
+	parts.append(String(item.ItemName))
+	parts.append(String(item.resource_path))
+	parts.append(String(item.ItemModelScenePath))
+	return " ".join(parts).strip_edges().to_lower()
 
 func _extract_visual_instance(instance: Node) -> Node3D:
 	var visual := instance as Node3D

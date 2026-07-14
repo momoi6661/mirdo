@@ -199,6 +199,10 @@ func _test_intent_interpreter_normalizes_common_commands() -> void:
 	_expect(String(marker.get("intent", "")) == "go_to_marker", "go_to_marker should remain explicit")
 	_expect(String(marker.get("target_ref", "")) == "Bench_Sit", "target marker should become target_ref")
 
+	var pickup: Dictionary = interpreter.call("interpret_payload", {"command": "pick_up_item", "target_object": "bandage"})
+	_expect(String(pickup.get("intent", "")) == "pick_up_item", "pick_up_item should reach the item interaction path")
+	_expect(String(pickup.get("target_ref", "")) == "bandage", "pick_up_item should keep its target")
+
 	interpreter.queue_free()
 	await process_frame
 
@@ -270,13 +274,11 @@ func _test_action_executor_dialogue_interrupt_replaces_work_action() -> void:
 	executor.set("animation_behavior_path", executor.get_path_to(animation))
 	executor.set("navigation_motor_path", executor.get_path_to(motor))
 	await process_frame
-	executor.call("apply_ai_response", {"action": "work_count_supplies"})
+	executor.call("apply_ai_response", {"action_line": [{"step_id": "work", "action": "work_count_supplies", "command": ""}], "current_step_id": "work"})
 	var report: Dictionary = executor.call("interrupt_for_dialogue", &"listen", &"neutral", false)
-	_expect(bool(report.get("action_applied", false)), "dialogue interrupt should apply a body action")
-	_expect(animation.actions.size() >= 2, "dialogue interrupt should append a replacement action")
-	if animation.actions.size() >= 2:
-		_expect(animation.actions[-1] == &"listen", "dialogue interrupt should replace work action with listen")
-	_expect(motor.stop_calls >= 1, "dialogue interrupt should stop active navigation/motor state")
+	_expect(bool(report.get("action_applied", false)), "dialogue interrupt should acknowledge the player without dropping the task")
+	_expect(animation.actions.size() == 1, "moving dialogue should keep the current locomotion/action state")
+	_expect(motor.stop_calls == 0, "dialogue interrupt should preserve active navigation by default")
 	host.queue_free()
 	await process_frame
 
@@ -344,7 +346,7 @@ func _test_action_executor_stand_up_uses_stand_marker_without_navigation() -> vo
 
 	executor.set("_active_sit_marker_path", seat.get_path())
 	executor.set("_active_stand_marker_path", stand.get_path())
-	var report: Dictionary = executor.call("apply_ai_response", {"command": "stand_up"})
+	var report: Dictionary = executor.call("apply_ai_response", {"action_line": [{"step_id": "stand", "command": "stand_up"}], "current_step_id": "stand"})
 	_expect(bool(report.get("action_applied", false)), "stand_up should apply directly")
 	_expect(motor.move_calls == 0, "stand_up should not start NavigationAgent path from seat")
 	await process_frame
@@ -391,11 +393,15 @@ func _test_action_executor_emits_navigation_goal_finished_report_from_motor() ->
 	point.add_to_group("ai_nav_point")
 
 	var reports: Array[Dictionary] = []
+	var resolved_reports: Array[Dictionary] = []
 	executor.navigation_goal_finished.connect(func(report: Dictionary) -> void:
 		reports.append(report.duplicate(true))
 	)
+	executor.navigation_goal_resolved.connect(func(report: Dictionary) -> void:
+		resolved_reports.append(report.duplicate(true))
+	)
 	await process_frame
-	var started: bool = executor.call("_start_navigation_to_marker", point.get_path(), &"curious_peek", {"target_nav_point": "bathroom_mirror_look"}, {"intent": "go_to_nav_point", "target_nav_point": "bathroom_mirror_look"}, {"target_marker_path": String(point.get_path())})
+	var started: bool = executor.call("_start_navigation_to_marker", point.get_path(), &"curious_peek", {"target_nav_point": "bathroom_mirror_look", "task_id": "task-first"}, {"intent": "go_to_nav_point", "target_nav_point": "bathroom_mirror_look"}, {"target_marker_path": String(point.get_path())})
 	_expect(started, "executor should start navigation to semantic nav point")
 	motor.navigation_finished.emit(&"curious_peek")
 	await process_frame
@@ -411,6 +417,20 @@ func _test_action_executor_emits_navigation_goal_finished_report_from_motor() ->
 		_expect(String(report.get("target_description", "")).find("镜子") >= 0, "goal report should include nav point description")
 		_expect(String(report.get("action_hint", "")).find("洗手台") >= 0, "goal report should include nav point action hint")
 		_expect(String(report.get("marker_role", "")) == "look", "goal report should include marker role")
+	_expect(resolved_reports.size() == 1, "executor should synchronize a completed backend task")
+	if resolved_reports.size() > 0:
+		_expect(String(resolved_reports[0].get("task_id", "")) == "task-first", "completed task report should preserve task_id")
+		_expect(bool(resolved_reports[0].get("ok", false)), "completed task report should be successful")
+
+	started = executor.call("_start_navigation_to_marker", point.get_path(), &"curious_peek", {"target_nav_point": "bathroom_mirror_look", "task_id": "task-second"}, {"intent": "go_to_nav_point", "target_nav_point": "bathroom_mirror_look"}, {"target_marker_path": String(point.get_path())})
+	_expect(started, "executor should start the task that will be cancelled")
+	motor.navigation_cancelled.emit()
+	await process_frame
+	_expect(resolved_reports.size() == 2, "executor should synchronize a cancelled backend task")
+	if resolved_reports.size() > 1:
+		_expect(String(resolved_reports[1].get("event", "")) == "navigation_goal_cancelled", "cancelled task report should expose cancellation")
+		_expect(not bool(resolved_reports[1].get("ok", true)), "cancelled task report should be unsuccessful")
+		_expect(String(resolved_reports[1].get("task_id", "")) == "task-second", "cancelled task report should preserve task_id")
 
 	host.queue_free()
 	await process_frame

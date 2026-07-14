@@ -69,6 +69,37 @@ func notify_runtime_slots_changed() -> void:
 	_notify_shelter_runtime_changed()
 
 
+## 供 AI 角色从真实容器库存中取物。成功后会同步运行时库存、世界展示和存档源，
+## 因而不是只播放“拿东西”动画：对应格子的数量一定会减少。
+func take_item_for_ai(item_ref: String, amount: int = 1) -> Dictionary:
+	_ensure_runtime_storage()
+	_rebuild_runtime_slots_from_storage()
+	var wanted := item_ref.strip_edges().to_lower()
+	var take_amount := maxi(1, amount)
+	for slot in runtime_slots:
+		if slot == null or slot.item == null or slot.amount <= 0:
+			continue
+		if not wanted.is_empty() and not _item_matches_ai_ref(slot.item, wanted):
+			continue
+		var removed := mini(take_amount, slot.amount)
+		var item := slot.item
+		slot.amount -= removed
+		if slot.amount <= 0:
+			slot.item = null
+			slot.amount = 0
+		_sync_runtime_storage_from_runtime_slots()
+		_rebuild_runtime_slots_from_storage()
+		_refresh_world_display()
+		return {"ok": true, "item": item, "amount": removed, "remaining": slot.amount}
+	return {"ok": false, "error": "container_item_not_found", "item_ref": item_ref}
+
+
+func _item_matches_ai_ref(item: ItemData, wanted: String) -> bool:
+	var text := "%s %s %s" % [String(item.ItemName), String(item.resource_path), String(item.ItemModelScenePath)]
+	text = text.to_lower()
+	return text.find(wanted) >= 0 or (wanted in ["water", "water_bottle", "水", "水瓶"] and text.find("water") >= 0)
+
+
 func can_accept_item(item: ItemData) -> bool:
 	if item == null:
 		return false

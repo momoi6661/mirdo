@@ -7,14 +7,18 @@ func _init() -> void:
 
 func _run() -> void:
 	await _test_self_talk_falls_back_to_local_subtitle_when_dialogue_fails()
+	await _test_opening_dialogue_uses_agent_entry()
 	await _test_self_talk_uses_autonomous_backend_entry_and_decision_context()
 	await _test_external_navigation_goal_finished_requests_backend_decision_event()
+	await _test_external_goal_completion_waits_for_backend_reply()
 	await _test_autonomous_backend_task_requests_agent_decision_and_holds_grace()
 	await _test_external_navigation_goal_follow_up_falls_back_to_local_subtitle()
 	await _test_ai_dialogue_payload_marks_external_follow_up_source_decision()
 	await _test_external_goal_follow_up_propagates_chain_context_to_next_navigation()
 	await _test_external_goal_follow_up_continues_after_soft_chain_depth()
+	await _test_external_goal_context_preserves_executor_result()
 	await _test_current_behavior_snapshot_exposes_current_decision()
+	await _test_task_chain_lock_blocks_local_autonomous_think_until_ai_releases()
 	_finish()
 
 func _test_self_talk_falls_back_to_local_subtitle_when_dialogue_fails() -> void:
@@ -100,6 +104,8 @@ func _test_external_navigation_goal_finished_requests_backend_decision_event() -
 		"action_hint": "靠近后看一眼镜面和周围。",
 		"arrival_action": "curious_peek",
 		"marker_role": "look",
+		"task_id": "task-toilet",
+		"ok": true,
 	}
 	life.call("_on_external_navigation_goal_finished", report)
 	await process_frame
@@ -123,9 +129,61 @@ func _test_external_navigation_goal_finished_requests_backend_decision_event() -
 		_expect(String(decision.get("arrival_action", "")) == "curious_peek", "decision should carry arrival action")
 		_expect(int(decision.get("chain_depth", 0)) == 1, "decision should start follow-up chain depth at one")
 		_expect(not String(decision.get("chain_id", "")).is_empty(), "decision should include a chain id for derived follow-ups")
+		_expect(String(decision.get("task_id", "")) == "task-toilet", "decision should return the verified task id")
+		_expect(bool(decision.get("ok", false)), "decision should return the navigation result")
 	host.queue_free()
 	await process_frame
 
+func _test_external_goal_completion_waits_for_backend_reply() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var script := load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	var life := Node.new()
+	life.set_script(script)
+	host.add_child(life)
+	var dialogue := _CapturingAutonomousDialogue.new()
+	dialogue.name = "Dialogue"
+	host.add_child(dialogue)
+	var subtitle := _FakeSubtitle.new()
+	subtitle.name = "Subtitle"
+	host.add_child(subtitle)
+	life.set("dialogue_component_path", life.get_path_to(dialogue))
+	life.set("subtitle_target_path", life.get_path_to(subtitle))
+	life.set("external_goal_follow_up_enabled", true)
+	life.set("external_goal_follow_up_delay_sec", 0.0)
+	await process_frame
+	life.call("_on_external_navigation_goal_finished", {
+		"event": "navigation_goal_finished",
+		"target_name": "卫生间",
+		"target_nav_point": "toilet_look_point",
+	})
+	await process_frame
+	_expect(dialogue.requests.size() == 1, "external goal completion should still request the backend")
+	_expect(subtitle.lines.is_empty(), "successful backend request should not show a duplicate local progress subtitle")
+	host.queue_free()
+	await process_frame
+
+func _test_opening_dialogue_uses_agent_entry() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var script := load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	var life := Node.new()
+	life.set_script(script)
+	host.add_child(life)
+	var dialogue := _CapturingAutonomousDialogue.new()
+	dialogue.name = "Dialogue"
+	host.add_child(dialogue)
+	life.set("dialogue_component_path", life.get_path_to(dialogue))
+	life.set("_dialogue_component", dialogue)
+	life.set("opening_dialogue_enabled", true)
+	var ok: bool = life.call("_send_opening_dialogue")
+	_expect(ok, "opening dialogue should use the autonomous agent entry")
+	_expect(dialogue.requests.size() == 1, "opening dialogue should create exactly one agent request")
+	if dialogue.requests.size() > 0:
+		var decision: Dictionary = dialogue.requests[0].get("decision", {})
+		_expect(String(decision.get("kind", "")) == "opening_greeting", "opening request should carry its event kind")
+	host.queue_free()
+	await process_frame
 
 func _test_autonomous_backend_task_requests_agent_decision_and_holds_grace() -> void:
 	var host := Node.new()
@@ -172,7 +230,7 @@ func _test_autonomous_backend_task_requests_agent_decision_and_holds_grace() -> 
 		_expect(String(decision.get("kind", "")) == "autonomous_task", "autonomous backend task decision should use autonomous_task kind")
 		_expect(String(decision.get("event", "")) == "autonomous_task_request", "autonomous backend task should identify request event")
 		_expect(not String(decision.get("chain_id", "")).is_empty(), "autonomous task should start a chain id")
-		_expect(prompt.find("同时返回 command/command_payload") >= 0, "autonomous task prompt should allow dialogue and action together")
+		_expect(prompt.find("action_line") >= 0, "autonomous task prompt should describe the action line contract")
 		_expect(prompt.find("食物") >= 0 and (prompt.find("武器") >= 0 or prompt.find("装备") >= 0), "autonomous task prompt should include survival facility candidates")
 	var debug: Dictionary = life.call("get_autonomous_debug_snapshot")
 	_expect(float(debug.get("external_grace_left", 0.0)) >= 7.0, "autonomous task should hold external grace to protect AI task chain")
@@ -210,9 +268,9 @@ func _test_external_navigation_goal_follow_up_falls_back_to_local_subtitle() -> 
 	life.call("_on_external_navigation_goal_finished", report)
 	await process_frame
 	await process_frame
-	_expect(subtitle.lines.size() == 1, "external goal backend failure should emit local subtitle fallback")
+	_expect(subtitle.lines.size() == 1, "external goal backend failure should emit one local fallback")
 	if subtitle.lines.size() > 0:
-		_expect(String(subtitle.lines[0]).find("镜子") >= 0, "external goal fallback should mention mirror target")
+		_expect(String(subtitle.lines[-1]).find("镜子") >= 0, "external goal fallback should mention mirror target")
 	host.queue_free()
 	await process_frame
 
@@ -235,13 +293,56 @@ func _test_ai_dialogue_payload_marks_external_follow_up_source_decision() -> voi
 		"arrival_action": "curious_peek",
 		"chain_id": "bathroom_mirror_look:test",
 		"chain_depth": 1,
+		"event_context": {
+			"event_id": "event:task-toilet:1",
+			"intent": {"intent": "go_to_nav_point", "target_nav_point": "bathroom_mirror_look"},
+			"intent_report": {"ok": true, "target_marker_path": "Main/MirrorLook"},
+			"action_result": {"arrived": true, "arrival_action": "curious_peek"},
+		},
 	}
 	var payload: Dictionary = dialogue.call("_build_chat_payload", "到达后反馈", "", "autonomous", decision)
 	var context: Dictionary = payload.get("context", {})
 	_expect(String(context.get("request_source", "")) == "autonomous", "backend payload should mark external follow-up as autonomous")
 	_expect(String(context.get("event", "")) == "navigation_goal_finished", "backend payload should expose navigation finished event")
 	_expect(String((context.get("source_decision", {}) as Dictionary).get("kind", "")) == "external_goal_follow_up", "backend payload should include compact source decision")
+	_expect(String((context.get("source_decision", {}) as Dictionary).get("event_id", "")) == "event:task-toilet:1", "compact source decision should preserve event id")
 	_expect(int((context.get("source_decision", {}) as Dictionary).get("chain_depth", 0)) == 1, "backend payload should include follow-up chain depth")
+	var event_context: Dictionary = context.get("event_context", {})
+	_expect(String(event_context.get("event_id", "")) == "event:task-toilet:1", "backend payload should preserve event id")
+	_expect(String((event_context.get("intent_report", {}) as Dictionary).get("target_marker_path", "")) == "Main/MirrorLook", "backend payload should preserve executor intent report")
+	_expect(bool((event_context.get("action_result", {}) as Dictionary).get("arrived", false)), "backend payload should preserve action result")
+	host.queue_free()
+	await process_frame
+
+func _test_external_goal_context_preserves_executor_result() -> void:
+	var host := Node.new()
+	root.add_child(host)
+	var script := load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	_expect(script != null, "CharacterAutonomousLifeComponent script should load for event context")
+	if script == null:
+		return
+	var life := Node.new()
+	life.set_script(script)
+	host.add_child(life)
+	await process_frame
+	var decision: Dictionary = life.call("_build_external_goal_follow_up_decision", {
+		"event": "navigation_goal_finished",
+		"task_id": "task-toilet",
+		"chain_id": "toilet_chain",
+		"ok": true,
+		"command": "go_to_nav_point",
+		"target_nav_point": "toilet_look_point",
+		"intent": {"intent": "go_to_nav_point", "target_nav_point": "toilet_look_point"},
+		"intent_report": {"ok": true, "target_marker_path": "Main/ToiletLook", "chosen_action": "curious_peek"},
+		"payload": {"command": "go_to_nav_point", "task_id": "task-toilet"},
+		"action_result": {"arrived": true, "arrival_action": "curious_peek"},
+	})
+	var event_context: Dictionary = decision.get("event_context", {})
+	_expect(String(event_context.get("event", "")) == "navigation_goal_finished", "follow-up should preserve event name")
+	_expect(String(event_context.get("event_id", "")).begins_with("task-toilet:navigation_goal_finished:"), "generated event id should include task, event, and monotonic runtime suffix")
+	_expect(String(event_context.get("task_id", "")) == "task-toilet", "follow-up should preserve task id")
+	_expect(String((event_context.get("intent_report", {}) as Dictionary).get("target_marker_path", "")) == "Main/ToiletLook", "follow-up should preserve executor report")
+	_expect(String((event_context.get("action_result", {}) as Dictionary).get("arrival_action", "")) == "curious_peek", "follow-up should preserve action result")
 	host.queue_free()
 	await process_frame
 
@@ -321,6 +422,29 @@ func _test_current_behavior_snapshot_exposes_current_decision() -> void:
 	life.queue_free()
 	await process_frame
 
+func _test_task_chain_lock_blocks_local_autonomous_think_until_ai_releases() -> void:
+	var script := load("res://scripts/character_ai/components/character_autonomous_life_component.gd") as Script
+	var life := Node.new()
+	life.set_script(script)
+	root.add_child(life)
+	await process_frame
+	life.call("notify_ai_response_applied", {
+		"dialogue": "老师，我去看看镜子。",
+		"command": "go_to_nav_point",
+		"command_payload": {"target_nav_point": "bathroom_mirror_look", "chain_id": "mirror_chain", "chain_depth": 1},
+		"task_status": "continue",
+	})
+	var blocked: String = String(life.call("_get_block_reason", false))
+	_expect(blocked == "ai_task_chain_active", "AI task chain should block local autonomous decisions while waiting for execution/follow-up")
+	life.call("notify_ai_response_applied", {
+		"dialogue": "老师，镜子这里暂时没问题。",
+		"command": "",
+		"task_status": "complete",
+	})
+	blocked = String(life.call("_get_block_reason", false))
+	_expect(blocked != "ai_task_chain_active", "AI task chain complete should release local autonomous block")
+	life.queue_free()
+	await process_frame
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)

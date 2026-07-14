@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/Inventory/InteracableItem.gd" id="1_interactable"]
 [ext_resource type="Resource" path="res://resources/items/medkit.tres" id="2_item"]
 [ext_resource type="Script" path="res://scripts/system/save_component.gd" id="3_save"]
 [ext_resource type="PackedScene" path="res://levels/props/medical_supply_box_model.tscn" id="4_model"]
+[ext_resource type="Script" path="res://components/character_pickable_item_component.gd" id="5_pickable"]
 
 [sub_resource type="BoxShape3D" id="Shape_item"]
 size = Vector3(0.36, 0.24, 0.22)
@@ -21,6 +22,14 @@ outline_width = 0.1
 
 [node name="SaveComponent" type="Node" parent="."]
 script = ExtResource("3_save")
+
+[node name="CharacterPickableItem" type="Node3D" parent="."]
+script = ExtResource("5_pickable")
+visual_root_path = NodePath("../Visual")
+hold_position_offset = Vector3(0.04, -0.03, -0.005)
+hold_rotation_degrees = Vector3(10, 90, -6)
+hold_scale = Vector3(0.86, 0.86, 0.86)
+use_action = &"react_nod"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.13, 0)

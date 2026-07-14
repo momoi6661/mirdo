@@ -250,6 +250,14 @@ func notify_player_input_draft_changed(draft_text: String) -> void:
 	if _dialogue_component != null and _dialogue_component.has_method("notify_player_input_draft_changed"):
 		_dialogue_component.call("notify_player_input_draft_changed", draft_text)
 
+func flush_pending_player_dialogue_now() -> bool:
+	if _target == null and not _deferred_bind_target():
+		return false
+	_bind_dialogue_component_from_target()
+	if _dialogue_component != null and _dialogue_component.has_method("flush_pending_player_dialogue_now"):
+		return bool(_dialogue_component.call("flush_pending_player_dialogue_now"))
+	return false
+
 func send_debug_subtitle_test(text: String = "Subtitle debug test") -> bool:
 	var trimmed := text.strip_edges()
 	if trimmed.is_empty():
@@ -776,12 +784,25 @@ func _dialogue_uses_local_fallback_on_error() -> bool:
 	return false
 
 func _connect_dialogue_component_signals(component: Node) -> void:
+	# 控制器负责流式字幕的唯一呈现；关闭组件自己的最终句直出，避免同一句在
+	# stream_finished 与 dialogue_completed 两条路径各显示一次。
+	if _has_property(component, &"direct_subtitle_enabled"):
+		component.set("direct_subtitle_enabled", false)
 	_connect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
 	_connect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
 	_connect_dialogue_signal(component, &"dialogue_completed", Callable(self, "_on_dialogue_completed"))
 	_connect_dialogue_signal(component, &"dialogue_failed", Callable(self, "_on_dialogue_failed"))
 	_connect_dialogue_signal(component, &"model_probe_completed", Callable(self, "_on_model_probe_completed"))
 	_connect_dialogue_signal(component, &"model_probe_failed", Callable(self, "_on_model_probe_failed"))
+
+
+func _has_property(object: Object, property_name: StringName) -> bool:
+	if object == null:
+		return false
+	for entry in object.get_property_list():
+		if StringName(entry.get("name", "")) == property_name:
+			return true
+	return false
 
 func _disconnect_dialogue_component_signals(component: Node) -> void:
 	_disconnect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))

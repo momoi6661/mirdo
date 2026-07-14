@@ -4,13 +4,16 @@ signal service_starting
 signal service_start_failed(error_message: String)
 signal service_stopped
 
-@export var auto_start_enabled: bool = false
+# 游戏运行时自动启动同目录（或项目旁）的 Python Server。
+# 这个 Autoload 只会在运行项目时实例化，因此嵌入式运行和导出游戏都能自动唤起。
+@export var auto_start_enabled: bool = true
 @export var stop_on_exit: bool = true
 @export var server_host: String = "127.0.0.1"
 @export_range(1, 65535, 1) var server_port: int = 5678
 @export var use_https: bool = false
 @export var health_path: String = "/health"
-@export var server_dir_path: String = "res://../Server"
+# 留空时：导出游戏优先查找 exe 同目录；编辑器运行再回退到项目旁的 Server。
+@export var server_dir_path: String = ""
 @export var server_script_name: String = "run_server.py"
 @export var python_executable: String = ""
 @export_range(0.2, 10.0, 0.1) var health_timeout_sec: float = 1.0
@@ -38,6 +41,13 @@ func _process(delta: float) -> void:
 		return
 	_startup_elapsed_sec += delta
 	_poll_elapsed_sec += delta
+	if _startup_elapsed_sec >= startup_poll_interval_sec and _server_pid > 0 and not OS.is_process_running(_server_pid):
+		# 后端脚本可能因为“已有服务正在启动/已启动”而主动退出。
+		# 不马上判失败，先继续轮询 /health；这样可以避免并发启动时误报。
+		_server_pid = 0
+		_started_by_this_game = false
+		_log("server_process_exited_rechecking_health")
+		_poll_elapsed_sec = startup_poll_interval_sec
 	if _startup_elapsed_sec >= startup_timeout_sec:
 		_checking_after_spawn = false
 		var message := "server_start_timeout"
@@ -65,7 +75,7 @@ func shutdown_service_if_owned() -> void:
 		return
 	if _started_by_this_game and _server_pid > 0:
 		_log("stopping owned server pid=%d" % _server_pid)
-		OS.kill(_server_pid)
+		_stop_owned_backend_processes(_server_pid)
 		_server_pid = 0
 		_started_by_this_game = false
 		service_stopped.emit()
@@ -94,11 +104,48 @@ func _on_health_completed(result: int, response_code: int, _headers: PackedStrin
 		return
 	_start_server_process()
 
+func _stop_owned_backend_processes(root_pid: int) -> void:
+	# Windows 的 uv/venv Python 可能会出现“启动器进程 + 真正解释器子进程”。
+	# 只杀 root_pid 可能留下实际监听 5678 的子进程，所以这里同时清理进程树和端口监听者。
+	if OS.get_name() == "Windows":
+		var script := """
+$root = %d
+$port = %d
+$all = Get-CimInstance Win32_Process
+function Stop-Tree([int]$id) {
+    foreach ($child in $all | Where-Object { $_.ParentProcessId -eq $id }) {
+        Stop-Tree ([int]$child.ProcessId)
+    }
+    Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+}
+if ($root -gt 0) {
+    Stop-Tree $root
+}
+Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
+    Stop-Tree ([int]$_.OwningProcess)
+}
+""" % [root_pid, server_port]
+		OS.execute(
+			"powershell.exe",
+			PackedStringArray(["-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script]),
+			[],
+			true,
+			false
+		)
+		return
+	OS.kill(root_pid)
+
 func _start_server_process() -> void:
 	if _started_by_this_game and _server_pid > 0:
 		return
 	var command := _build_start_command()
 	var executable := String(command.get("executable", "")).strip_edges()
+	var script_path := String(command.get("script", "")).strip_edges()
+	if script_path.is_empty() or not FileAccess.file_exists(script_path):
+		var message := "server_script_missing:%s" % script_path
+		_log(message)
+		service_start_failed.emit(message)
+		return
 	var arguments: Array = command.get("arguments", [])
 	if executable.is_empty():
 		var message := "python_executable_missing"
@@ -153,14 +200,30 @@ func _resolve_server_python_executable(server_dir: String) -> String:
 	return _default_python_executable()
 
 func _server_script_path() -> String:
-	var server_dir := server_dir_path.strip_edges()
-	if server_dir.is_empty():
-		server_dir = "res://../Server"
-	var absolute_dir := ProjectSettings.globalize_path(server_dir)
 	var script_name := server_script_name.strip_edges()
 	if script_name.is_empty():
 		script_name = "run_server.py"
+	var configured_dir := server_dir_path.strip_edges()
+	var absolute_dir := ProjectSettings.globalize_path(configured_dir) if not configured_dir.is_empty() else _resolve_default_server_dir(script_name)
 	return absolute_dir.path_join(script_name)
+
+func _resolve_default_server_dir(script_name: String) -> String:
+	# 发布结构：Server/Mirdo.exe 与 Server/run_server.py 同目录。
+	var executable_dir := OS.get_executable_path().get_base_dir()
+	if FileAccess.file_exists(executable_dir.path_join(script_name)):
+		return executable_dir
+
+	# 编辑器结构兼容两种摆放：项目与 Server 并列，或项目位于 Server 子目录。
+	var project_dir := ProjectSettings.globalize_path("res://")
+	var project_server_dirs: Array[String] = [
+		project_dir.path_join("..").simplify_path(),
+		project_dir.path_join("../Server").simplify_path(),
+	]
+	for project_server_dir in project_server_dirs:
+		if FileAccess.file_exists(project_server_dir.path_join(script_name)):
+			return project_server_dir
+
+	return executable_dir if not executable_dir.is_empty() else project_dir
 
 func _default_python_executable() -> String:
 	if OS.get_name() == "Windows":

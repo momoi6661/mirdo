@@ -6,6 +6,8 @@ signal ai_response_application_finished(report: Dictionary)
 signal navigation_started(target_marker_path: NodePath, arrival_action: StringName)
 signal navigation_finished(arrival_action: StringName)
 signal navigation_goal_finished(report: Dictionary)
+## 带 task_id 的导航任务结束时发出；无论抵达、取消还是启动失败，后端都能收到一次真实结果。
+signal navigation_goal_resolved(report: Dictionary)
 signal navigation_cancelled()
 signal stand_up_finished()
 
@@ -55,6 +57,7 @@ signal stand_up_finished()
 @export var stand_snap_if_no_root_motion: bool = false
 @export var auto_stand_before_navigation: bool = true
 @export var debug_log: bool = false
+@export var preserve_navigation_during_dialogue: bool = true
 
 var _intent_interpreter: Node
 var _animation_behavior: Node
@@ -68,6 +71,7 @@ var _follow_active: bool = false
 var _navigation_target_position: Vector3 = Vector3.ZERO
 var _navigation_target_marker_path: NodePath
 var _navigation_goal_context: Dictionary = {}
+var _navigation_goal_result_sent: bool = false
 var _pending_arrival_action: StringName = &""
 var _moving_action: StringName = &""
 var _pending_sit_marker_path: NodePath
@@ -82,6 +86,8 @@ var _seat_alignment_serial: int = 0
 var _stand_relocate_serial: int = 0
 var _queued_navigation_after_stand: Dictionary = {}
 var _face_player_hold_left: float = 0.0
+var _carried_item: ItemData
+var _carried_amount: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -129,6 +135,10 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 				report["chosen_action"] = &"stand_up"
 		"pick_up_item", "use_item", "eat_item":
 			if _resolve_pickable_item_marker(intent, report):
+				report["chosen_action"] = &"work_take_item"
+		"take_from_container":
+			_resolve_object_marker(intent, report)
+			if bool(report.get("ok", false)):
 				report["chosen_action"] = &"work_take_item"
 		"give_item_to_player":
 			report["ok"] = _resolve_gift_item(intent) != null
@@ -238,14 +248,17 @@ func interrupt_for_dialogue(action: StringName = &"listen", expression: StringNa
 		"navigation_cancelled": false,
 		"was_seated": _active_sit_marker_path != NodePath(),
 	}
-	_cancel_transient_navigation_for_dialogue()
-	report["navigation_cancelled"] = true
+	var was_navigating := is_navigating()
+	if not preserve_navigation_during_dialogue or not was_navigating:
+		_cancel_transient_navigation_for_dialogue()
+		report["navigation_cancelled"] = was_navigating
 	if face_player:
 		_face_player()
 	if expression != &"" and _face_component != null and _face_component.has_method("set_face_expression"):
 		report["expression_applied"] = bool(_face_component.call("set_face_expression", expression))
 	var chosen := _resolve_dialogue_interrupt_action(action)
-	report["action_applied"] = _request_body_action(chosen)
+	# 行走中的短对话只转头回应，不覆盖 walk，也不丢掉原任务。
+	report["action_applied"] = true if was_navigating and preserve_navigation_during_dialogue else _request_body_action(chosen)
 	report["action"] = String(chosen)
 	ai_response_application_finished.emit(report.duplicate(true))
 	return report
@@ -328,7 +341,9 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 	if marker == null and target.has_method("get_nav_marker"):
 		marker = target.call("get_nav_marker") as Marker3D
 	if _is_sit_action(StringName(String(intent.get("action", "")))) or role.to_lower() == "sit":
-		marker = _resolve_sit_marker_for_point(marker) if marker != null else null
+		var resolved_sit_marker := _resolve_sit_marker_for_point(marker) if marker != null else null
+		# 调用方已经明确指定 sit 角色时，语义物体的角色映射就是坐点。
+		marker = resolved_sit_marker if resolved_sit_marker != null else (marker if role.to_lower() == "sit" else null)
 	if marker == null:
 		report["errors"].append("target_marker_not_found")
 		return
@@ -338,7 +353,7 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 	report["target_object_type"] = String(summary.get("type", _safe_get(target, "object_type", ""))).strip_edges()
 	report["target_object_tags"] = _to_string_array(summary.get("tags", _safe_get(target, "tags", [])))
 	report["target_marker_path"] = String(marker.get_path())
-	report["marker_role"] = _get_marker_role(marker)
+	report["marker_role"] = role if role.to_lower() == "sit" else _get_marker_role(marker)
 
 func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
 	var target_ref := String(intent.get("target_nav_point", intent.get("target_ref", ""))).strip_edges()
@@ -444,6 +459,8 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	var actual_arrival_action := arrival_action
 	if _is_sit_action(arrival_action):
 		var seat_marker := _resolve_sit_marker_for_point(marker)
+		if seat_marker == null and String(intent.get("marker_role", "")).strip_edges().to_lower() == "sit":
+			seat_marker = marker
 		if seat_marker == null:
 			_log("sit navigation skipped: semantic sit marker missing for %s" % String(marker.get_path()))
 			return false
@@ -470,20 +487,30 @@ func _start_navigation_to_marker(marker_path: NodePath, arrival_action: StringNa
 	_navigation_target_marker_path = actual_marker.get_path()
 	_navigation_target_position = actual_marker.global_position
 	_navigation_goal_context = _build_navigation_goal_context(actual_marker, actual_arrival_action, payload, intent, intent_report)
+	_navigation_goal_result_sent = false
 	_navigation_active = true
 	_follow_active = false
 	_moving_action = &""
 	if _navigation_motor != null and _navigation_motor.has_method("move_to_marker"):
 		if not bool(_navigation_motor.call("move_to_marker", actual_marker, actual_arrival_action, false)):
+			var failed_goal_context := _navigation_goal_context.duplicate(true)
 			_navigation_active = false
 			_navigation_target_marker_path = NodePath()
 			_navigation_goal_context = {}
 			_seat_exact_navigation_active = false
+			_emit_navigation_goal_resolved(failed_goal_context, "navigation_goal_start_failed", false)
 			return false
 	elif _navigation_agent != null:
 		_navigation_agent.target_desired_distance = arrival_distance
 		_navigation_agent.path_desired_distance = maxf(0.05, arrival_distance * 0.5)
 		_navigation_agent.target_position = _navigation_target_position
+	elif _navigation_motor != null and _navigation_motor.has_method("navigate_to"):
+		if not bool(_navigation_motor.call("navigate_to", _navigation_target_position)):
+			_navigation_active = false
+			_navigation_target_marker_path = NodePath()
+			_navigation_goal_context = {}
+			_emit_navigation_goal_resolved({}, "navigation_goal_start_failed", false)
+			return false
 	if _navigation_motor == null:
 		_request_body_action(walk_action)
 	_log("navigation started marker=%s arrival_action=%s" % [String(actual_marker.get_path()), String(actual_arrival_action)])
@@ -529,10 +556,12 @@ func _finish_navigation() -> void:
 		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
+	_face_arrival_target(goal_context)
 	if finished_action != &"":
 		_request_body_action(finished_action)
 	else:
 		_request_body_action(stop_action)
+	_complete_pickable_interaction(goal_context)
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_pending_arrival_action = &""
 	navigation_finished.emit(finished_action)
@@ -568,11 +597,14 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
+	_face_arrival_target(goal_context)
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
+	_complete_pickable_interaction(goal_context)
 	navigation_finished.emit(finished_action)
 	_emit_navigation_goal_finished(finished_action, finished_marker_path, goal_context)
 
 func _on_motor_navigation_cancelled() -> void:
+	var goal_context := _navigation_goal_context.duplicate(true)
 	_navigation_active = false
 	_follow_active = false
 	_navigation_goal_context = {}
@@ -582,9 +614,53 @@ func _on_motor_navigation_cancelled() -> void:
 	_seat_alignment_serial += 1
 	_navigation_target_marker_path = NodePath()
 	_moving_action = &""
+	_emit_navigation_goal_resolved(goal_context, "navigation_goal_cancelled", false)
 	navigation_cancelled.emit()
 
+## 导航抵达后才操作物品，避免角色在远处就把世界物体拿走。
+func _complete_pickable_interaction(goal_context: Dictionary) -> void:
+	var intent: Variant = goal_context.get("intent", {})
+	if intent is not Dictionary:
+		return
+	var intent_name := String((intent as Dictionary).get("intent", "")).strip_edges()
+	if intent_name == "take_from_container":
+		_complete_container_take(intent as Dictionary, goal_context)
+		return
+	if intent_name not in ["pick_up_item", "use_item", "eat_item"]:
+		return
+	var target_ref := String((intent as Dictionary).get("target_ref", "")).strip_edges()
+	var target := _find_pickable_item(target_ref)
+	if target == null or not target.has_method("pick_up_by"):
+		_log("pickable interaction target missing: %s" % target_ref)
+		goal_context["action_result"] = {"ok": false, "error": "pickable_interaction_target_missing", "target_ref": target_ref, "interaction": intent_name}
+		return
+	# use/eat 不再把“拿起+消耗”塞进一个异步 call：先拿到手上，再短暂停顿后喝/吃。
+	# 这样 Mirdo 的动作顺序是：导航到水边 -> 拿起水 -> 喝水，而不是原地瞬间消耗。
+	var pick_result: Variant = target.call("pick_up_by", _actor, "ai_%s" % intent_name, false)
+	var pick_report := pick_result as Dictionary if pick_result is Dictionary else {"ok": true, "started": true}
+	goal_context["action_result"] = {
+		"ok": bool(pick_report.get("ok", true)),
+		"interaction": intent_name,
+		"target_ref": target_ref,
+		"pick_result": pick_report.duplicate(true),
+		"consume_scheduled": intent_name != "pick_up_item",
+	}
+	if intent_name != "pick_up_item" and bool(pick_report.get("ok", true)):
+		_consume_pickable_after_arrival(target, intent_name, target_ref)
+
+func _consume_pickable_after_arrival(target: Node, intent_name: String, target_ref: String) -> void:
+	# 等拿起动画/手部模型稍微就位后再消耗，让玩家能看到“拿水→喝水”的因果。
+	if is_inside_tree():
+		await get_tree().create_timer(0.35).timeout
+	if target == null or not is_instance_valid(target) or not target.has_method("use_by"):
+		_log("consume skipped, target invalid: %s" % target_ref)
+		return
+	var consume_result: Variant = target.call("use_by", _actor, "ai_%s" % intent_name)
+	_log("pickable consumed target=%s intent=%s result=%s" % [target_ref, intent_name, str(consume_result)])
+
 func _build_navigation_goal_context(marker: Marker3D, arrival_action: StringName, payload: Dictionary, intent: Dictionary, intent_report: Dictionary) -> Dictionary:
+	var action_step_value: Variant = payload.get("action_step", {})
+	var action_line_value: Variant = payload.get("action_line", [])
 	var context := {
 		"arrival_action": String(arrival_action),
 		"target_marker_path": String(marker.get_path()) if marker != null else "",
@@ -594,9 +670,13 @@ func _build_navigation_goal_context(marker: Marker3D, arrival_action: StringName
 		"intent_report": intent_report.duplicate(true),
 		"target_object": String(intent.get("target_ref", intent_report.get("target_object_id", payload.get("target_object", "")))).strip_edges(),
 		"target_nav_point": String(intent.get("target_nav_point", payload.get("target_nav_point", ""))).strip_edges(),
+		"task_id": String(payload.get("task_id", "")).strip_edges(),
 		"marker_role": String(intent.get("marker_role", payload.get("marker_role", ""))).strip_edges(),
 		"chain_id": String(payload.get("chain_id", "")).strip_edges(),
 		"chain_depth": int(payload.get("chain_depth", 0)),
+		"current_step_id": String(payload.get("current_step_id", "")).strip_edges(),
+		"action_step": (action_step_value as Dictionary).duplicate(true) if action_step_value is Dictionary else {},
+		"action_line": (action_line_value as Array).duplicate(true) if action_line_value is Array else [],
 		"action_hint": "",
 		"target_description": "",
 		"target_name": "",
@@ -629,8 +709,22 @@ func _emit_navigation_goal_finished(finished_action: StringName, finished_marker
 	report["finished_marker_path"] = String(finished_marker_path)
 	report["event"] = "navigation_goal_finished"
 	navigation_goal_finished.emit(report)
+	_emit_navigation_goal_resolved(report, "navigation_goal_finished", true)
+
+## 只同步带 task_id 的模型任务，避免把本地漫游也误报给正在等待结果的后端。
+func _emit_navigation_goal_resolved(goal_context: Dictionary, event: String, ok: bool) -> void:
+	if _navigation_goal_result_sent:
+		return
+	if String(goal_context.get("task_id", "")).strip_edges().is_empty():
+		return
+	_navigation_goal_result_sent = true
+	var report := goal_context.duplicate(true)
+	report["event"] = event
+	report["ok"] = ok
+	navigation_goal_resolved.emit(report)
 
 func _stop_navigation(play_stop: bool = true) -> void:
+	var goal_context := _navigation_goal_context.duplicate(true)
 	if play_stop:
 		_queued_navigation_after_stand = {}
 	if _navigation_motor != null and _navigation_motor.has_method("stop_navigation") and bool(_navigation_motor.call("is_navigating") if _navigation_motor.has_method("is_navigating") else true):
@@ -654,9 +748,11 @@ func _stop_navigation(play_stop: bool = true) -> void:
 		_actor.velocity.z = 0.0
 	if play_stop:
 		_request_body_action(stop_action)
+		_emit_navigation_goal_resolved(goal_context, "navigation_goal_cancelled", false)
 		navigation_cancelled.emit()
 
 func _cancel_transient_navigation_for_dialogue() -> void:
+	var goal_context := _navigation_goal_context.duplicate(true)
 	_queued_navigation_after_stand = {}
 	_pending_sit_marker_path = NodePath()
 	_pending_seat_marker_after_approach_path = NodePath()
@@ -678,6 +774,7 @@ func _cancel_transient_navigation_for_dialogue() -> void:
 			_navigation_motor.call("stop_navigation", false)
 		if _navigation_motor.has_method("reset_navigation_state"):
 			_navigation_motor.call("reset_navigation_state")
+	_emit_navigation_goal_resolved(goal_context, "navigation_goal_cancelled", false)
 	navigation_cancelled.emit()
 
 func _resolve_dialogue_interrupt_action(requested: StringName) -> StringName:
@@ -721,49 +818,44 @@ func _face_direction(direction: Vector3, delta: float) -> void:
 
 func _normalize_ai_payload(ai_data: Dictionary) -> Dictionary:
 	var out := ai_data.duplicate(true)
-	var command_payload_value: Variant = out.get("command_payload", {})
-	if command_payload_value is Dictionary:
-		var command_payload := command_payload_value as Dictionary
-		for key in command_payload.keys():
-			if not out.has(key) or String(out.get(key, "")).strip_edges().is_empty():
-				out[key] = command_payload[key]
-		var source_decision_value: Variant = out.get("source_decision", {})
-		if source_decision_value is Dictionary:
-			var source_decision := source_decision_value as Dictionary
-			if source_decision.has("chain_id") and not command_payload.has("chain_id"):
-				command_payload["chain_id"] = source_decision.get("chain_id", "")
-			if source_decision.has("chain_depth") and not command_payload.has("chain_depth"):
-				command_payload["chain_depth"] = int(source_decision.get("chain_depth", 0))
-			if source_decision.has("chain_id") and not out.has("chain_id"):
-				out["chain_id"] = source_decision.get("chain_id", "")
-			if source_decision.has("chain_depth") and not out.has("chain_depth"):
-				out["chain_depth"] = int(source_decision.get("chain_depth", 0))
-		if String(out.get("command", "")).strip_edges().is_empty():
-			var nested_command := String(command_payload.get("command", command_payload.get("intent", ""))).strip_edges()
-			if not nested_command.is_empty():
-				out["command"] = nested_command
-		if String(out.get("target_object", "")).strip_edges().is_empty():
-			var nested_target := String(command_payload.get("target_object", command_payload.get("target_ref", ""))).strip_edges()
-			if not nested_target.is_empty():
-				out["target_object"] = nested_target
-		if String(out.get("target_nav_point", "")).strip_edges().is_empty():
-			var nested_point := String(command_payload.get("target_nav_point", command_payload.get("nav_point", command_payload.get("point_id", "")))).strip_edges()
-			if not nested_point.is_empty():
-				out["target_nav_point"] = nested_point
-		if String(out.get("marker_role", "")).strip_edges().is_empty():
-			var nested_role := String(command_payload.get("marker_role", command_payload.get("role", ""))).strip_edges()
-			if not nested_role.is_empty():
-				out["marker_role"] = nested_role
-		if String(out.get("target_marker_path", "")).strip_edges().is_empty():
-			var nested_marker_path := String(command_payload.get("target_marker_path", command_payload.get("marker_path", ""))).strip_edges()
-			if not nested_marker_path.is_empty():
-				out["target_marker_path"] = nested_marker_path
-		if String(out.get("chain_id", "")).strip_edges().is_empty():
-			var nested_chain_id := String(command_payload.get("chain_id", "")).strip_edges()
-			if not nested_chain_id.is_empty():
-				out["chain_id"] = nested_chain_id
-		if int(out.get("chain_depth", 0)) <= 0 and int(command_payload.get("chain_depth", 0)) > 0:
-			out["chain_depth"] = int(command_payload.get("chain_depth", 0))
+	# 新协议只接受 action_line；旧的顶层 command 不再进入执行器。
+	out.erase("command")
+	out.erase("command_payload")
+	out.erase("intent")
+	var action_line_value: Variant = out.get("action_line", [])
+	if action_line_value is Array and not (action_line_value as Array).is_empty():
+		var action_line := action_line_value as Array
+		var current_step_id := String(out.get("current_step_id", "")).strip_edges()
+		var step: Dictionary = {}
+		for candidate in action_line:
+			if not candidate is Dictionary:
+				continue
+			var candidate_dict := candidate as Dictionary
+			if current_step_id.is_empty() or String(candidate_dict.get("step_id", "")).strip_edges() == current_step_id:
+				step = candidate_dict.duplicate(true)
+				break
+		if not step.is_empty():
+			current_step_id = String(step.get("step_id", current_step_id)).strip_edges()
+			out["current_step_id"] = current_step_id
+			out["action_step"] = step.duplicate(true)
+			var step_payload_value: Variant = step.get("command_payload", {})
+			var step_payload: Dictionary = step_payload_value.duplicate(true) if step_payload_value is Dictionary else {}
+			# 执行器内部统一读取当前步骤；对外协议仍只有 action_line。
+			out["command"] = String(step.get("command", "")).strip_edges()
+			out["command_payload"] = step_payload
+			for key in step_payload.keys():
+				# 当前步骤是执行真相，不能用顶层同名字段覆盖它；也避免把 Dictionary/Array
+				# 强制转 String 造成运行时错误。
+				out[key] = step_payload[key]
+			for key in ["action", "reason", "expected_result", "success_next_step", "failure_next_step", "status"]:
+				if not step.has(key):
+					continue
+				if key == "action" and String(step.get(key, "")).strip_edges().is_empty():
+					continue
+				out[key] = step[key]
+		else:
+			out["command"] = ""
+			out["command_payload"] = {}
 	for nested_key in ["face", "facial", "mouth", "lip_sync", "lipsync"]:
 		var nested_face: Variant = out.get(nested_key, {})
 		if nested_face is Dictionary:
@@ -812,7 +904,7 @@ func _start_give_item_to_player(intent: Dictionary, payload: Dictionary) -> Dict
 	if item == null:
 		return {"ok": false, "error": "gift_item_missing"}
 	var options := {
-		"amount": maxi(1, int(intent.get("amount", payload.get("amount", 1)))),
+		"amount": maxi(1, _carried_amount if _carried_item != null else int(intent.get("amount", payload.get("amount", 1)))),
 		"action": String(payload.get("action", "work_reach")),
 		"expression": String(payload.get("expression", "face_fun")),
 	}
@@ -823,9 +915,14 @@ func _start_give_item_to_player(intent: Dictionary, payload: Dictionary) -> Dict
 		options["timeout_sec"] = float(payload.get("timeout_sec", 10.0))
 	var player := _find_player()
 	var result: Dictionary = _give_item_component.call("offer_item_to_player", item, player, options)
+	if bool(result.get("ok", false)) and item == _carried_item:
+		_carried_item = null
+		_carried_amount = 0
 	return result
 
 func _resolve_gift_item(intent: Dictionary) -> ItemData:
+	if _carried_item != null:
+		return _carried_item
 	var item_path := String(intent.get("item_path", "")).strip_edges()
 	if item_path.is_empty():
 		var raw: Variant = intent.get("raw", {})
@@ -848,6 +945,46 @@ func _resolve_gift_item(intent: Dictionary) -> ItemData:
 		"water", "water_bottle", "水", "水瓶":
 			return load("res://resources/items/water_bottle.tres") as ItemData
 	return null
+
+## 抵达容器后才减少库存，并把取出的 ItemData 保存到角色手中，供动作线下一步递给玩家。
+func _complete_container_take(intent: Dictionary, goal_context: Dictionary) -> void:
+	var target_ref := String(intent.get("target_ref", "")).strip_edges()
+	var target := _find_world_object(target_ref)
+	var inventory_node := _find_container_inventory_node(target)
+	if inventory_node == null:
+		goal_context["action_result"] = {"ok": false, "error": "container_inventory_missing", "target_ref": target_ref}
+		return
+	var result: Dictionary = inventory_node.call("take_item_for_ai", String(intent.get("item_id", "")), maxi(1, int(intent.get("amount", 1))))
+	if bool(result.get("ok", false)):
+		_carried_item = result.get("item", null) as ItemData
+		_carried_amount = int(result.get("amount", 1))
+	goal_context["action_result"] = result
+
+
+func _find_container_inventory_node(root: Node) -> Node:
+	if root == null:
+		return null
+	if root.has_method("take_item_for_ai"):
+		return root
+	for child in root.get_children():
+		var found := _find_container_inventory_node(child as Node)
+		if found != null:
+			return found
+	return null
+
+
+## 到达设施后面向设施本身；只有显式 look_at_player 或玩家搭话时才看玩家。
+func _face_arrival_target(goal_context: Dictionary) -> void:
+	if _actor == null:
+		return
+	var target_ref := String(goal_context.get("target_object", "")).strip_edges()
+	var target := _find_world_object(target_ref) as Node3D
+	if target == null:
+		return
+	var direction := target.global_position - _actor.global_position
+	direction.y = 0.0
+	if direction.length() > 0.01:
+		_face_direction(direction.normalized(), 1.0)
 
 func _extract_body_action(payload: Dictionary) -> StringName:
 	var action_text := String(payload.get("body_action", payload.get("action", ""))).strip_edges()
@@ -1093,6 +1230,8 @@ func _relocate_actor_to_stand_marker(stand_marker: Marker3D) -> bool:
 		var align_ok := bool(await _navigation_motor.call("align_to_marker_async", stand_marker, true, stand_relocate_duration_sec))
 		if align_ok:
 			return true
+	if _navigation_motor != null and _navigation_motor.has_method("snap_to_marker"):
+		return bool(_navigation_motor.call("snap_to_marker", stand_marker, true))
 	if _actor == null:
 		return false
 	var planar := stand_marker.global_position - _actor.global_position
@@ -1161,12 +1300,11 @@ func _ensure_seat_exit_completed_before_navigation(arrival_action: StringName) -
 	return offset.length() <= maxf(0.02, stand_ready_max_planar_distance)
 
 func _resolve_stand_root_motion_wait_time() -> float:
-	var fallback := maxf(stand_root_motion_wait_sec, stand_relocate_delay_sec)
 	if _animation_behavior != null and _animation_behavior.has_method("get_action_duration"):
-		var duration := float(_animation_behavior.call("get_action_duration", &"stand_up", fallback))
+		var duration := float(_animation_behavior.call("get_action_duration", &"stand_up", stand_root_motion_wait_sec))
 		if duration > 0.0:
 			return maxf(0.0, duration - stand_root_motion_end_margin_sec)
-	return fallback
+	return maxf(0.0, stand_relocate_delay_sec)
 
 func _start_seat_after_approach() -> void:
 	var seat_path := _pending_seat_marker_after_approach_path
@@ -1452,6 +1590,8 @@ func _refresh_refs() -> void:
 		_face_component = _find_sibling_with_method(&"set_face_expression")
 	if _navigation_motor == null:
 		_navigation_motor = _find_sibling_with_method(&"move_to_marker")
+	if _navigation_motor == null:
+		_navigation_motor = _find_ancestor_with_method(&"navigate_to")
 	if _give_item_component == null:
 		_give_item_component = _find_sibling_with_method(&"offer_item_to_player")
 	if _actor == null:
@@ -1467,6 +1607,14 @@ func _find_sibling_with_method(method_name: StringName) -> Node:
 		var node := child as Node
 		if node != null and node != self and node.has_method(method_name):
 			return node
+	return null
+
+func _find_ancestor_with_method(method_name: StringName) -> Node:
+	var current := get_parent()
+	while current != null:
+		if current.has_method(method_name):
+			return current
+		current = current.get_parent()
 	return null
 
 func _find_actor_from_parent() -> CharacterBody3D:

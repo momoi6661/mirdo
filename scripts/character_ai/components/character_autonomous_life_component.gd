@@ -19,6 +19,7 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var animation_behavior_path: NodePath
 @export var navigation_motor_path: NodePath
 @export var action_executor_path: NodePath
+@export var task_manager_path: NodePath
 @export var action_scheduler_path: NodePath
 @export var supply_user_path: NodePath
 @export var dialogue_component_path: NodePath
@@ -50,6 +51,11 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(20, 220, 1) var autonomous_backend_task_max_chars: int = 80
 @export_range(0.5, 30.0, 0.1) var autonomous_backend_task_grace_sec: float = 8.0
 @export var autonomous_backend_task_prompt_prefix: String = "Mirdo 在避难所里主动思考下一件自然的小事。请像游戏AI Agent一样决定是否说话、做动作或去检查一个设施。"
+
+@export_category("Opening Dialogue")
+@export var opening_dialogue_enabled: bool = false
+@export_range(0.0, 15.0, 0.1) var opening_dialogue_delay_sec: float = 1.2
+@export var opening_dialogue_prompt: String = "这是老师进入避难所后的开场。Mirdo 主动用符合人格的一句自然中文打招呼，并带出一个眼前的小观察或轻问题；不要假装发生了不存在的事。"
 
 @export_category("Timing")
 @export_range(0.5, 60.0, 0.1) var think_interval_min: float = 4.0
@@ -121,6 +127,7 @@ var _state_component: Node
 var _animation_behavior: Node
 var _navigation_motor: Node
 var _action_executor: Node
+var _task_manager: Node
 var _action_scheduler: Node
 var _supply_user: Node
 var _dialogue_component: Node
@@ -159,6 +166,13 @@ var _task_stack: Array[Dictionary] = []
 var _self_executor_signal_suppress_depth: int = 0
 var _external_goal_follow_up_serial: int = 0
 var _autonomous_task_serial: int = 0
+var _event_context_serial: int = 0
+var _ai_task_chain_active: bool = false
+var _ai_task_chain_id: String = ""
+var _ai_task_chain_depth: int = 0
+var _ai_task_chain_hold_left: float = 0.0
+var _ai_task_chain_last_status: String = ""
+var _opening_dialogue_sent: bool = false
 
 func _ready() -> void:
 	_rng.randomize()
@@ -167,6 +181,7 @@ func _ready() -> void:
 	_bind_external_control_signals()
 	_external_grace_left = maxf(_external_grace_left, startup_delay_sec)
 	_schedule_next_think()
+	_schedule_opening_dialogue()
 	set_process(true)
 	set_physics_process(true)
 
@@ -213,13 +228,72 @@ func notify_dialogue_started() -> void:
 	_interrupt_body_for_dialogue()
 
 func notify_ai_response_applied(_ai_data: Dictionary = {}) -> void:
+	_update_ai_task_chain_from_response(_ai_data)
 	var hard_command := _is_hard_external_ai_data(_ai_data)
 	if hard_command:
 		_clear_resume_token("external_ai_command")
 	notify_external_control(not hard_command)
 
+func _update_ai_task_chain_from_response(ai_data: Dictionary) -> void:
+	if ai_data.is_empty():
+		return
+	var payload: Dictionary = {}
+	var action_line_value: Variant = ai_data.get("action_line", [])
+	if action_line_value is Array:
+		var current_step_id := String(ai_data.get("current_step_id", "")).strip_edges()
+		for value in action_line_value as Array:
+			if value is Dictionary and (current_step_id.is_empty() or String((value as Dictionary).get("step_id", "")).strip_edges() == current_step_id):
+				var step := value as Dictionary
+				var raw_payload: Variant = step.get("command_payload", {})
+				payload = raw_payload.duplicate(true) if raw_payload is Dictionary else {}
+				break
+	var source: Dictionary = ai_data.get("source_decision", {}) as Dictionary if ai_data.get("source_decision", {}) is Dictionary else {}
+	var chain_id := String(payload.get("chain_id", ai_data.get("chain_id", source.get("chain_id", "")))).strip_edges()
+	var depth := int(payload.get("chain_depth", ai_data.get("chain_depth", source.get("chain_depth", 0))))
+	var status := String(ai_data.get("task_status", ai_data.get("status", ""))).strip_edges().to_lower()
+	var has_action_line := _is_hard_external_ai_data(ai_data)
+	if status in ["complete", "cancel", "done", "finished"]:
+		_release_ai_task_chain(status)
+		return
+	if has_action_line or not chain_id.is_empty() or status in ["continue", "wait"]:
+		_ai_task_chain_active = true
+		if not chain_id.is_empty():
+			_ai_task_chain_id = chain_id
+		_ai_task_chain_depth = maxi(_ai_task_chain_depth, depth)
+		_ai_task_chain_last_status = status if not status.is_empty() else "continue"
+		_ai_task_chain_hold_left = maxf(_ai_task_chain_hold_left, external_goal_follow_up_chain_grace_sec)
+		_external_grace_left = maxf(_external_grace_left, minf(external_goal_follow_up_chain_grace_sec, maxf(1.2, external_goal_follow_up_delay_sec + 0.8)))
+
+func _release_ai_task_chain(status: String = "complete") -> void:
+	_ai_task_chain_active = false
+	_ai_task_chain_id = ""
+	_ai_task_chain_depth = 0
+	_ai_task_chain_hold_left = 0.0
+	_ai_task_chain_last_status = status
+
 func force_think_now() -> bool:
 	return _think(true)
+
+## 开场也是一次 Agent 事件：让模型结合记忆、知识库和当前场景决定第一句话。
+func _schedule_opening_dialogue() -> void:
+	if not opening_dialogue_enabled:
+		return
+	if opening_dialogue_delay_sec <= 0.0:
+		call_deferred("_send_opening_dialogue")
+		return
+	var timer := get_tree().create_timer(opening_dialogue_delay_sec)
+	timer.timeout.connect(_send_opening_dialogue)
+
+func _send_opening_dialogue() -> bool:
+	if _opening_dialogue_sent or not opening_dialogue_enabled:
+		return false
+	_opening_dialogue_sent = true
+	_refresh_refs()
+	if _dialogue_component == null or not _dialogue_component.has_method("send_autonomous_text"):
+		return false
+	var decision := {"kind": "opening_greeting", "event": "game_started", "chain_depth": 0}
+	var result: Variant = _dialogue_component.call("send_autonomous_text", opening_dialogue_prompt, decision)
+	return bool((result as Dictionary).get("ok", false)) if result is Dictionary else bool(result)
 
 func request_player_social_approach(reason: String = "awareness", stop_distance: float = -1.0) -> bool:
 	_refresh_refs()
@@ -353,11 +427,16 @@ func _start_give_item_decision(decision: Dictionary) -> bool:
 		autonomous_decision_skipped.emit("give_item_executor_missing")
 		return false
 	var payload := {
-		"command": "give_item_to_player",
-		"item_id": String(decision.get("item_id", "bandage")),
-		"action": String(decision.get("action", decision.get("arrival_action", "work_reach"))),
-		"expression": String(decision.get("arrival_expression", decision.get("expression", "face_fun"))),
 		"dialogue": String(decision.get("dialogue", "老师，这个给你。")),
+		"action_line": [{
+			"step_id": "give-item",
+			"command": "give_item_to_player",
+			"command_payload": {"item_id": String(decision.get("item_id", "bandage"))},
+			"action": String(decision.get("action", decision.get("arrival_action", "work_reach"))),
+			"reason": "把准备好的物品交给老师",
+		}],
+		"current_step_id": "give-item",
+		"expression": String(decision.get("arrival_expression", decision.get("expression", "face_fun"))),
 		"timeout_sec": float(decision.get("timeout_sec", 10.0)),
 	}
 	var report_value: Variant = _action_executor.call("apply_ai_response", payload)
@@ -477,17 +556,24 @@ func _start_navigation_via_action_executor(decision: Dictionary, is_object: bool
 	if _action_executor == null or not _action_executor.has_method("apply_ai_response"):
 		return false
 	var intent_name := "go_to_object" if is_object else "go_to_nav_point"
-	var payload := {
-		"command": intent_name,
-		"intent": intent_name,
+	var step_payload := {
 		"target_object": String(decision.get("target_object", "")).strip_edges(),
 		"target_nav_point": String(decision.get("target_nav_point", "")).strip_edges(),
 		"target_marker_path": String(decision.get("target_path", "")).strip_edges(),
 		"marker_role": String(decision.get("marker_role", "approach")).strip_edges(),
-		"action": String(decision.get("arrival_action", String(idle_action))).strip_edges(),
-		"expression": String(decision.get("arrival_expression", "")).strip_edges(),
 		"chain_id": String(decision.get("chain_id", "")).strip_edges(),
 		"chain_depth": int(decision.get("chain_depth", 0)),
+	}
+	var payload := {
+		"action_line": [{
+			"step_id": "autonomous-navigation",
+			"command": intent_name,
+			"command_payload": step_payload,
+			"action": String(decision.get("arrival_action", String(idle_action))).strip_edges(),
+			"reason": "自主行为选择了一个当前目标",
+		}],
+		"current_step_id": "autonomous-navigation",
+		"expression": String(decision.get("arrival_expression", "")).strip_edges(),
 	}
 	var target_ref := String(decision.get("target_object", decision.get("target_nav_point", ""))).strip_edges()
 	var ignore_cooldown := bool(decision.get("ignore_resume_cooldown", false))
@@ -929,14 +1015,17 @@ func get_task_stack_debug_snapshot() -> Dictionary:
 func _is_hard_external_ai_data(ai_data: Dictionary) -> bool:
 	if ai_data.is_empty():
 		return false
-	var hard_keys := ["target_object", "target_nav_point", "target_marker_path", "follow", "command", "intent"]
-	for key in hard_keys:
-		var text := String(ai_data.get(key, "")).strip_edges().to_lower()
-		if text.is_empty():
+	var action_line_value: Variant = ai_data.get("action_line", [])
+	if not action_line_value is Array:
+		return false
+	var current_step_id := String(ai_data.get("current_step_id", "")).strip_edges()
+	for value in action_line_value as Array:
+		if not value is Dictionary:
 			continue
-		if key in ["command", "intent"] and text in ["talk", "dialogue", "chat", "speak", "expression", "emote"]:
+		var step := value as Dictionary
+		if not current_step_id.is_empty() and String(step.get("step_id", "")).strip_edges() != current_step_id:
 			continue
-		return true
+		return not String(step.get("command", "")).strip_edges().is_empty()
 	return false
 
 func get_resume_debug_snapshot() -> Dictionary:
@@ -966,6 +1055,10 @@ func get_current_behavior_snapshot() -> Dictionary:
 		"task_stack_size": _task_stack.size(),
 		"external_grace_left": _external_grace_left,
 		"dwell_left": _dwell_left,
+		"ai_task_chain_active": _ai_task_chain_active,
+		"ai_task_chain_id": _ai_task_chain_id,
+		"ai_task_chain_depth": _ai_task_chain_depth,
+		"ai_task_chain_status": _ai_task_chain_last_status,
 	}
 
 func get_autonomous_debug_snapshot() -> Dictionary:
@@ -1238,7 +1331,7 @@ func _build_autonomous_backend_task_prompt(snapshot: Dictionary) -> String:
 	var resource_text := _format_resource_focus(resource)
 	var candidates := _summarize_autonomous_task_candidates(snapshot)
 	var recent := "last_kind=%s,last_target=%s" % [_last_decision_kind, _last_decision_target]
-	return "%s\n当前关注：%s。资源状态：%s。候选设施：%s。最近行为：%s。请返回JSON字段dialogue/expression/action/visemes；dialogue不超过%d字。可以只说一句，也可以同时返回 command/command_payload 去检查一个设施；优先围绕食物、水、医疗、武器装备、工具、门口/外出风险。不要重复刚刚去过的目标；如果要移动，target_nav_point 必须来自 known_nav_points/ai_nav_points，或 target_object 来自 perception。" % [
+	return "%s\n当前关注：%s。资源状态：%s。候选设施：%s。最近行为：%s。请返回JSON字段dialogue/expression/action/visemes/action_line；dialogue不超过%d字。action_line最多4步，只有首步立即执行，后续步骤必须等待真实结果；优先围绕食物、水、医疗、武器装备、工具、门口/外出风险。不要重复刚刚去过的目标；如果要移动，target_nav_point 必须来自 known_nav_points/ai_nav_points，或 target_object 来自 perception。" % [
 		autonomous_backend_task_prompt_prefix,
 		focus,
 		resource_text,
@@ -1416,6 +1509,14 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 	var action_hint := String(goal_report.get("action_hint", "")).strip_edges()
 	var arrival := String(goal_report.get("arrival_action", "")).strip_edges()
 	var marker_role := String(goal_report.get("marker_role", "")).strip_edges()
+	var payload: Dictionary = goal_report.get("payload", {}) as Dictionary if goal_report.get("payload", {}) is Dictionary else {}
+	var current_step_id := String(goal_report.get("current_step_id", payload.get("current_step_id", ""))).strip_edges()
+	var action_step: Dictionary = goal_report.get("action_step", payload.get("action_step", {})) as Dictionary if goal_report.get("action_step", payload.get("action_step", {})) is Dictionary else {}
+	var action_line: Array = goal_report.get("action_line", payload.get("action_line", [])) as Array if goal_report.get("action_line", payload.get("action_line", [])) is Array else []
+	var previous_dialogue := String(payload.get("dialogue", "")).strip_edges()
+	var previous_reason := String(payload.get("task_reason", "")).strip_edges()
+	var next_hint := String(payload.get("next_decision_hint", "")).strip_edges()
+	var action_result: Dictionary = goal_report.get("action_result", {}) as Dictionary if goal_report.get("action_result", {}) is Dictionary else {}
 	var parts: Array[String] = []
 	if not target.is_empty():
 		parts.append("目标=%s" % target)
@@ -1433,6 +1534,20 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 		parts.append("到达动作=%s" % arrival)
 	if not marker_role.is_empty():
 		parts.append("点位角色=%s" % marker_role)
+	if not previous_dialogue.is_empty():
+		parts.append("上一句=%s" % previous_dialogue)
+	if not previous_reason.is_empty():
+		parts.append("上一轮原因=%s" % previous_reason)
+	if not next_hint.is_empty():
+		parts.append("下一步提示=%s" % next_hint)
+	if not action_result.is_empty():
+		parts.append("动作结果=%s" % JSON.stringify(action_result))
+	if not current_step_id.is_empty():
+		parts.append("动作线当前步骤=%s" % current_step_id)
+	if not action_step.is_empty():
+		parts.append("当前步骤详情=%s" % JSON.stringify(_compact_event_value(action_step)))
+	if not action_line.is_empty():
+		parts.append("动作线=%s" % JSON.stringify(_compact_event_value(action_line)).left(900))
 	var chain_depth := _external_goal_chain_depth(goal_report) + 1
 	var context := "目标位置"
 	if not parts.is_empty():
@@ -1441,8 +1556,10 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 		chain_depth,
 		external_goal_follow_up_soft_chain_depth,
 	]
-	return "%s\n当前结果上下文：%s。\n%s\n请返回JSON字段dialogue/expression/action/visemes；dialogue不超过%d字；如果需要继续执行下一步，可以返回 command/command_payload 指向新的目标；如果没有必要继续，就不要返回 command。不要重复移动到刚刚到达的同一目标。" % [
+	var result := "已到达并完成观察" if bool(goal_report.get("ok", false)) else "未能完成导航"
+	return "%s\n当前执行结果：%s。当前结果上下文：%s。\n%s\n请返回 action_line（0 到 4 步）以及 dialogue/expression/action/visemes；dialogue不超过%d字。只有新的首步需要立刻执行，后续步骤写成等待观察的条件计划，不要重复移动到刚刚到达的同一目标。" % [
 		external_goal_follow_up_prompt_prefix,
+		result,
 		context,
 		chain_hint,
 		maxi(20, external_goal_follow_up_max_chars),
@@ -1450,16 +1567,29 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 
 func _build_external_goal_follow_up_decision(goal_report: Dictionary) -> Dictionary:
 	var previous_chain_depth := _external_goal_chain_depth(goal_report)
+	var event := String(goal_report.get("event", "navigation_goal_finished")).strip_edges()
+	if event.is_empty():
+		event = "navigation_goal_finished"
 	var chain_id := String(goal_report.get("chain_id", "")).strip_edges()
+	var task_id := String(goal_report.get("task_id", "")).strip_edges()
 	if chain_id.is_empty():
 		var raw_payload: Variant = goal_report.get("payload", {})
 		if raw_payload is Dictionary:
 			chain_id = String((raw_payload as Dictionary).get("chain_id", "")).strip_edges()
+			if task_id.is_empty():
+				task_id = String((raw_payload as Dictionary).get("task_id", "")).strip_edges()
 	if chain_id.is_empty():
 		chain_id = "%s:%s" % [String(goal_report.get("target_nav_point", goal_report.get("target_object", ""))).strip_edges(), str(Time.get_ticks_msec())]
+	var chain_depth := previous_chain_depth + 1
+	var event_context := _build_external_event_context(goal_report, event, task_id, chain_id, chain_depth)
+	var action_line_value: Variant = event_context.get("action_line", [])
+	var action_step_value: Variant = event_context.get("action_step", {})
 	return {
 		"kind": "external_goal_follow_up",
-		"event": "navigation_goal_finished",
+		"event": event,
+		"event_id": String(event_context.get("event_id", "")).strip_edges(),
+		"task_id": task_id,
+		"ok": bool(goal_report.get("ok", event == "navigation_goal_finished")),
 		"target_nav_point": String(goal_report.get("target_nav_point", "")).strip_edges(),
 		"target_object": String(goal_report.get("target_object", "")).strip_edges(),
 		"target_name": String(goal_report.get("target_name", "")).strip_edges(),
@@ -1467,9 +1597,97 @@ func _build_external_goal_follow_up_decision(goal_report: Dictionary) -> Diction
 		"action_hint": String(goal_report.get("action_hint", "")).strip_edges(),
 		"arrival_action": String(goal_report.get("arrival_action", "")).strip_edges(),
 		"marker_role": String(goal_report.get("marker_role", "")).strip_edges(),
+		"current_step_id": String(event_context.get("current_step_id", "")).strip_edges(),
+		"action_step": action_step_value,
+		"action_line": action_line_value,
 		"chain_id": chain_id,
-		"chain_depth": previous_chain_depth + 1,
+		"chain_depth": chain_depth,
+		"event_context": event_context,
 	}
+
+## 将执行器的真实结果压缩成后端可消费的事件快照，避免丢失因果字段。
+func _build_external_event_context(
+	goal_report: Dictionary,
+	event: String,
+	task_id: String,
+	chain_id: String,
+	chain_depth: int,
+) -> Dictionary:
+	var payload: Dictionary = goal_report.get("payload", {}) as Dictionary if goal_report.get("payload", {}) is Dictionary else {}
+	var intent: Dictionary = goal_report.get("intent", {}) as Dictionary if goal_report.get("intent", {}) is Dictionary else {}
+	var intent_report: Dictionary = goal_report.get("intent_report", {}) as Dictionary if goal_report.get("intent_report", {}) is Dictionary else {}
+	var action_result: Dictionary = goal_report.get("action_result", {}) as Dictionary if goal_report.get("action_result", {}) is Dictionary else {}
+	if action_result.is_empty():
+		action_result = {
+			"ok": bool(goal_report.get("ok", false)),
+			"event": event,
+			"arrival_action": String(goal_report.get("arrival_action", "")).strip_edges(),
+			"finished_marker_path": String(goal_report.get("finished_marker_path", "")).strip_edges(),
+		}
+	var event_id := String(goal_report.get("event_id", "")).strip_edges()
+	if event_id.is_empty():
+		_event_context_serial += 1
+		var event_scope := task_id if not task_id.is_empty() else String(goal_report.get("target_nav_point", goal_report.get("target_object", ""))).strip_edges()
+		if event_scope.is_empty():
+			event_scope = "mirdo"
+		event_id = "%s:%s:%d:%d" % [event_scope, event, Time.get_ticks_msec(), _event_context_serial]
+	var next_hint := String(payload.get("next_decision_hint", "")).strip_edges()
+	var previous_dialogue := String(payload.get("dialogue", "")).strip_edges()
+	var current_step_id := String(goal_report.get("current_step_id", payload.get("current_step_id", ""))).strip_edges()
+	var action_step_value: Variant = goal_report.get("action_step", payload.get("action_step", {}))
+	var action_line_value: Variant = goal_report.get("action_line", payload.get("action_line", []))
+	return {
+		"event_id": event_id,
+		"event": event,
+		"ok": bool(goal_report.get("ok", event == "navigation_goal_finished")),
+		"reason": String(goal_report.get("reason", goal_report.get("error", ""))).strip_edges().left(240),
+		"task_id": task_id,
+		"chain_id": chain_id,
+		"chain_depth": chain_depth,
+		"current_step_id": current_step_id,
+		"action_step": _compact_event_value(action_step_value),
+		"action_line": _compact_event_value(action_line_value),
+		"intent": _compact_event_value(intent),
+		"intent_report": _compact_event_value(intent_report),
+		"action_result": _compact_event_value(action_result),
+		"target_object": String(goal_report.get("target_object", payload.get("target_object", ""))).strip_edges(),
+		"target_nav_point": String(goal_report.get("target_nav_point", payload.get("target_nav_point", ""))).strip_edges(),
+		"target_name": String(goal_report.get("target_name", "")).strip_edges(),
+		"target_description": String(goal_report.get("target_description", "")).strip_edges().left(320),
+		"marker_role": String(goal_report.get("marker_role", payload.get("marker_role", ""))).strip_edges(),
+		"arrival_action": String(goal_report.get("arrival_action", "")).strip_edges(),
+		"previous_dialogue": previous_dialogue.left(240),
+		"next_decision_hint": next_hint.left(320),
+	}
+
+## 递归限制事件字典大小，避免把模型原始 payload 全量送入下一回合。
+func _compact_event_value(value: Variant, depth: int = 0) -> Variant:
+	if depth >= 2:
+		return String(value).left(320) if value is String else value
+	if value is Dictionary:
+		var compact: Dictionary = {}
+		for key in (value as Dictionary).keys():
+			if compact.size() >= 24:
+				break
+			compact[String(key)] = _compact_event_value((value as Dictionary)[key], depth + 1)
+		return compact
+	if value is Array:
+		var compact_array: Array = []
+		for item in value as Array:
+			if compact_array.size() >= 12:
+				break
+			compact_array.append(_compact_event_value(item, depth + 1))
+		return compact_array
+	if value is PackedStringArray:
+		var compact_packed: Array[String] = []
+		for item in value as PackedStringArray:
+			if compact_packed.size() >= 12:
+				break
+			compact_packed.append(String(item).left(160))
+		return compact_packed
+	if value is String:
+		return String(value).left(320)
+	return value
 
 func _external_goal_chain_depth(goal_report: Dictionary) -> int:
 	var depth := int(goal_report.get("chain_depth", 0))
@@ -1663,6 +1881,8 @@ func _build_snapshot() -> Dictionary:
 	return snapshot
 
 func _get_block_reason(ignore_grace: bool) -> String:
+	if not ignore_grace and _ai_task_chain_active:
+		return "ai_task_chain_active"
 	if not ignore_grace and _external_grace_left > 0.0:
 		return "external_grace"
 	if not ignore_grace and _movement_cooldown_left > 0.0:
@@ -1751,10 +1971,13 @@ func _is_currently_seated() -> bool:
 	return false
 
 func _bind_external_control_signals() -> void:
-	if _action_executor != null:
+	if _task_manager != null:
+		_connect_signal_if_exists(_task_manager, "task_started", "_on_external_task_started")
+		_connect_signal_if_exists(_task_manager, "task_resolved", "_on_external_task_resolved")
+	elif _action_executor != null:
 		_connect_signal_if_exists(_action_executor, "ai_response_application_started", "_on_external_ai_started")
 		_connect_signal_if_exists(_action_executor, "navigation_started", "_on_external_navigation_started")
-		_connect_signal_if_exists(_action_executor, "navigation_goal_finished", "_on_external_navigation_goal_finished")
+		_connect_signal_if_exists(_action_executor, "navigation_goal_resolved", "_on_external_navigation_goal_finished")
 	if _dialogue_component != null:
 		_connect_signal_if_exists(_dialogue_component, "dialogue_requested", "_on_dialogue_requested")
 		_connect_signal_if_exists(_dialogue_component, "dialogue_completed", "_on_dialogue_completed")
@@ -1779,6 +2002,12 @@ func _on_external_ai_started(_ai_data: Dictionary = {}) -> void:
 		return
 	notify_external_control()
 
+
+func _on_external_task_started(_task: Dictionary = {}) -> void:
+	if _self_executor_signal_suppress_depth > 0:
+		return
+	notify_external_control()
+
 func _on_external_navigation_started(_target_marker_path: NodePath = NodePath(), _external_arrival_action: StringName = &"") -> void:
 	if _self_executor_signal_suppress_depth > 0:
 		_log("ignore self executor navigation_started target=%s action=%s" % [String(_target_marker_path), String(_external_arrival_action)])
@@ -1788,6 +2017,13 @@ func _on_external_navigation_started(_target_marker_path: NodePath = NodePath(),
 func _on_external_navigation_goal_finished(report: Dictionary = {}) -> void:
 	if _self_executor_signal_suppress_depth > 0:
 		_log("ignore self executor navigation_goal_finished")
+		return
+	_schedule_external_goal_follow_up(report)
+
+
+## TaskManager 把导航、取物和玩家接受结果统一成同一种任务事件。
+func _on_external_task_resolved(report: Dictionary = {}) -> void:
+	if _self_executor_signal_suppress_depth > 0:
 		return
 	_schedule_external_goal_follow_up(report)
 
@@ -1854,6 +2090,10 @@ func _tick_timers(delta: float) -> void:
 			_clear_resume_token("ttl_expired")
 	if _resume_after_grace_left > 0.0:
 		_resume_after_grace_left = maxf(0.0, _resume_after_grace_left - delta)
+	if _ai_task_chain_hold_left > 0.0:
+		_ai_task_chain_hold_left = maxf(0.0, _ai_task_chain_hold_left - delta)
+		if _ai_task_chain_hold_left <= 0.0 and _ai_task_chain_last_status != "wait":
+			_release_ai_task_chain("timeout")
 	_tick_task_stack(delta)
 	_movement_cooldown_left = maxf(0.0, _movement_cooldown_left - delta)
 	_player_social_approach_cooldown_left = maxf(0.0, _player_social_approach_cooldown_left - delta)
@@ -1922,6 +2162,8 @@ func _refresh_refs() -> void:
 		_navigation_motor = _find_sibling_with_method(&"move_to_marker")
 	if _action_executor == null:
 		_action_executor = _find_sibling_with_method(&"apply_ai_response")
+	if _task_manager == null:
+		_task_manager = _find_sibling_with_method(&"get_active_task")
 	if _action_scheduler == null:
 		_action_scheduler = _find_sibling_with_method(&"request_sequence")
 	if _supply_user == null:

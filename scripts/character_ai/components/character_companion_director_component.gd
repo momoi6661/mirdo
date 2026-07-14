@@ -2,7 +2,7 @@ extends Node
 class_name CharacterCompanionDirectorComponent
 
 @export var rest_tags: PackedStringArray = PackedStringArray(["rest", "seat", "bed"])
-@export var inspect_tags: PackedStringArray = PackedStringArray(["storage", "supplies", "food", "medical", "equipment", "tool", "material", "cabinet"])
+@export var inspect_tags: PackedStringArray = PackedStringArray(["wander", "patrol", "inspect", "storage", "supplies", "food", "medical", "equipment", "tool", "material", "cabinet"])
 @export var ambient_actions: PackedStringArray = PackedStringArray(["idle_fidget", "look_around", "curious_peek", "tilt_head_cute", "small_happy_bounce"])
 @export var perception_component_path: NodePath
 @export var action_router_path: NodePath
@@ -31,6 +31,7 @@ var _movement_cooldown_left: float = 0.0
 var _rest_repeat_suppression_left: float = 0.0
 var _speech_cooldown_left: float = 0.0
 var _last_autonomous_target_id: String = ""
+var _last_autonomous_target_ref: String = ""
 var _last_ambient_action: String = ""
 
 func _ready() -> void:
@@ -103,10 +104,12 @@ func _try_dispatch_autonomous_movement() -> void:
 		"command": "go_to_object",
 		"target_object": target_ref,
 		"marker_role": _choose_activity_marker_role(target_object),
+		"autonomous_kind": String(target_object.get("autonomous_kind", "wander")),
 		"source": "autonomous_companion",
 	}
 	_action_router.call("apply_ai_response", payload)
 	_last_autonomous_target_id = target_ref
+	_last_autonomous_target_ref = target_ref
 	mark_autonomous_movement_started()
 
 func pick_preferred_rest_object(snapshot: Dictionary) -> Dictionary:
@@ -127,23 +130,36 @@ func pick_preferred_rest_object(snapshot: Dictionary) -> Dictionary:
 
 func pick_preferred_activity_object(snapshot: Dictionary) -> Dictionary:
 	var objects: Array = snapshot.get("nearby_objects", [])
+	var last_target := _last_autonomous_target_ref if not _last_autonomous_target_ref.is_empty() else _last_autonomous_target_id
 	var inspect_candidates: Array[Dictionary] = []
 	var rest_candidates: Array[Dictionary] = []
 	for entry in objects:
 		if entry is not Dictionary:
 			continue
 		var object_entry: Dictionary = entry
-		if _extract_object_ref(object_entry) == _last_autonomous_target_id:
+		if _extract_object_ref(object_entry) == last_target:
 			continue
 		if _has_any_inspect_tag(object_entry):
 			inspect_candidates.append(object_entry)
 		elif _has_any_rest_tag(object_entry):
 			rest_candidates.append(object_entry)
 	if not inspect_candidates.is_empty():
-		return _pick_weighted_nearest(inspect_candidates)
-	if not rest_candidates.is_empty() and _rest_repeat_suppression_left <= 0.0 and _rng.randf() <= autonomous_rest_chance:
-		return _pick_weighted_nearest(rest_candidates)
+		var inspect_target := _pick_weighted_nearest(inspect_candidates)
+		inspect_target["autonomous_kind"] = "wander"
+		return inspect_target
+	if not rest_candidates.is_empty() and _rest_repeat_suppression_left <= 0.0:
+		# 没有可检查目标时，休息点是唯一自然的自主活动，不再被随机数吞掉。
+		var rest_target := _pick_weighted_nearest(rest_candidates, false)
+		rest_target["autonomous_kind"] = "rest"
+		return rest_target
 	return {}
+
+## 兼容语义测试与旧调用方：自主行为统一走同一套活动选择规则。
+func pick_preferred_autonomous_object(snapshot: Dictionary) -> Dictionary:
+	var target := pick_preferred_activity_object(snapshot)
+	if not target.is_empty() and not target.has("autonomous_kind"):
+		target["autonomous_kind"] = "wander"
+	return target
 
 func _try_dispatch_ambient_action() -> void:
 	if ambient_actions.is_empty():
@@ -160,7 +176,7 @@ func _try_dispatch_ambient_action() -> void:
 	_last_ambient_action = action
 	mark_autonomous_movement_started()
 
-func _pick_weighted_nearest(candidates: Array[Dictionary]) -> Dictionary:
+func _pick_weighted_nearest(candidates: Array[Dictionary], allow_variation: bool = true) -> Dictionary:
 	if candidates.is_empty():
 		return {}
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -169,7 +185,8 @@ func _pick_weighted_nearest(candidates: Array[Dictionary]) -> Dictionary:
 		return score_a < score_b
 	)
 	var pool_size := mini(candidates.size(), 3)
-	return candidates[_rng.randi_range(0, pool_size - 1)].duplicate(true)
+	var selected_index := _rng.randi_range(0, pool_size - 1) if allow_variation else 0
+	return candidates[selected_index].duplicate(true)
 
 func _pick_ambient_action() -> String:
 	var candidates: Array[String] = []

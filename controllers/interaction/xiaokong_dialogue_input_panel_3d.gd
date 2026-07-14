@@ -773,13 +773,14 @@ func _submit_input_text() -> void:
 	var clean: String = _input_text.strip_edges()
 	if clean.is_empty():
 		return
+	_input_text = ""
+	_refresh_input_text_visual()
+	input_draft_changed.emit("", _current_payload.duplicate(true))
 	dialogue_submit_requested.emit(clean, _current_payload.duplicate(true))
+	input_draft_changed.emit("", _current_payload.duplicate(true))
 	if auto_close_on_submit:
 		hide_panel()
 	else:
-		_input_text = ""
-		_refresh_input_text_visual()
-		input_draft_changed.emit("", _current_payload.duplicate(true))
 		_set_input_focus(true)
 
 func _append_input_text(segment: String) -> void:

@@ -17,13 +17,14 @@ signal destination_reached
 @export var follow_hold_distance: float = 2.7
 @export var follow_target_update_min_delta: float = 0.45
 @export var use_negative_z_forward: bool = false
-@export var turn_in_place_enter_angle_deg: float = 65.0
-@export var turn_in_place_exit_angle_deg: float = 25.0
-@export var turn_request_cooldown_sec: float = 0.08
+@export var turn_in_place_enter_angle_deg: float = 110.0
+@export var turn_in_place_exit_angle_deg: float = 50.0
+@export var turn_request_cooldown_sec: float = 0.18
 @export var auto_open_navigation_doors: bool = true
 @export var door_open_check_distance: float = 1.1
 @export var door_open_alignment_dot: float = 0.2
 @export var door_open_cooldown_sec: float = 0.65
+@export_range(0.05, 0.5, 0.01) var door_check_interval: float = 0.12
 
 var _active := false
 var _target_position: Vector3 = Vector3.ZERO
@@ -39,6 +40,8 @@ var _turn_request_angle := 0.0
 var _turn_request_cooldown := 0.0
 var _door_open_cooldowns: Dictionary = {}
 var _arrival_confirm_elapsed := 0.0
+var _door_check_elapsed := 0.0
+var _target_settle_frames: int = 0
 
 @onready var _body: CharacterBody3D = _resolve_body()
 @onready var _agent: NavigationAgent3D = get_node_or_null(navigation_agent_path) as NavigationAgent3D
@@ -76,6 +79,20 @@ func _physics_process(delta: float) -> void:
 		_follow_target = null
 		_follow_hold_active = false
 
+	# NavigationServer3D 在场景刚加载时还没有同步地图。
+	# 此时直接读取 next_path_position 通常会得到当前位置，表现为原地抖动。
+	if not _is_navigation_map_ready():
+		_emit_idle_motion()
+		return
+	if _target_settle_frames > 0:
+		_target_settle_frames -= 1
+		_emit_idle_motion()
+		return
+	# 地图同步后再补写一次目标，确保首个目标不会被旧地图吞掉。
+	if _agent.target_position.distance_to(_target_position) > 0.02:
+		_target_position = _project_to_navigation_map(_target_position)
+		_agent.target_position = _target_position
+
 	if _agent.is_navigation_finished():
 		_complete_destination_reached()
 		return
@@ -98,7 +115,10 @@ func _physics_process(delta: float) -> void:
 	else:
 		_emit_idle_motion()
 		return
-	_try_open_navigation_door(desired_direction)
+	_door_check_elapsed += delta
+	if _door_check_elapsed >= door_check_interval:
+		_door_check_elapsed = 0.0
+		_try_open_navigation_door(desired_direction)
 
 	var signed_angle := _compute_signed_turn_angle(desired_direction)
 	signed_angle = _stabilize_signed_angle(signed_angle)
@@ -145,6 +165,8 @@ func stop_navigation() -> void:
 	_turn_request_action = &""
 	_turn_request_angle = 0.0
 	_last_turn_sign = 1.0
+	_target_settle_frames = 0
+	_door_check_elapsed = 0.0
 	_door_open_cooldowns.clear()
 	_arrival_confirm_elapsed = 0.0
 	_emit_idle_motion()
@@ -205,8 +227,10 @@ func _set_target_position(world_position: Vector3) -> void:
 	_repath_elapsed = 0.0
 	_reported_reached = false
 	_arrival_confirm_elapsed = 0.0
+	_target_settle_frames = 2
 	if _agent.is_inside_tree() and _body != null and _body.get_world_3d() != null:
-		_agent.target_position = _target_position
+		if _is_navigation_map_ready():
+			_agent.target_position = _target_position
 
 func _complete_destination_reached() -> void:
 	if _follow_target == null:
@@ -260,7 +284,15 @@ func _project_to_navigation_map(world_position: Vector3) -> Vector3:
 	var nav_map: RID = _agent.get_navigation_map()
 	if not nav_map.is_valid():
 		return world_position
+	if NavigationServer3D.map_get_iteration_id(nav_map) == 0:
+		return world_position
 	return NavigationServer3D.map_get_closest_point(nav_map, world_position)
+
+func _is_navigation_map_ready() -> bool:
+	if _agent == null or not _agent.is_inside_tree() or _body == null or _body.get_world_3d() == null:
+		return false
+	var nav_map: RID = _agent.get_navigation_map()
+	return nav_map.is_valid() and NavigationServer3D.map_get_iteration_id(nav_map) > 0
 
 func _compute_signed_turn_angle(desired_direction: Vector3) -> float:
 	if _body == null or desired_direction.length_squared() <= 0.0001:

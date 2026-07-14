@@ -246,7 +246,7 @@ collision_layer = 4
 collision_mask = 33
 wall_min_slide_angle = 0.7853982
 script = ExtResource("1_pgc1p")
-MOUSE_SENSITIVITY = 0.25
+MOUSE_SENSITIVITY = 0.003
 CAMERA_CONTROLLER = NodePath("Marker3D/CameraOffset/Camera3D")
 step_handler = NodePath("Components/StepHandler")
 pickup_handler = NodePath("Components/PickupHandler")
@@ -316,7 +316,8 @@ script = ExtResource("12_step")
 player = NodePath("../..")
 collision_shape = NodePath("../../CollisionShape3D")
 MAX_STEP_HEIGHT = 0.2
-MAX_CROUCH_STEP_HEIGHT = 0.7
+MAX_CROUCH_STEP_HEIGHT = 0.35
+camera_smooth_switch = false
 camera_offset = NodePath("../../Marker3D/CameraOffset")
 
 [node name="PickupHandler" type="Node" parent="Components" unique_id=1410065402 node_paths=PackedStringArray("player", "pickup_holder", "arm_end")]

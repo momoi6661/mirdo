@@ -1,5 +1,7 @@
 # Godot AI 接口（当前调试版）
 
+> 当前行为协议为 `action_line` v2：不要发送或读取顶层 `command`/`command_payload`。Godot 每次只执行 `current_step_id`，完成后回传动作结果。
+
 ## 1. 这版的主链路
 
 当前默认以 **流式** 为主（SSE）：
@@ -31,31 +33,56 @@
 }
 ```
 
-### 2.1 行为命令字段（导航+动作联动）
+### 2.1 动作线字段（导航+动作联动）
 
-后端现在可以额外返回 `command`（或 `intent`）来直接驱动导航机制：
+后端只返回 `action_line`，不再使用顶层 `command` 或 `command_payload`：
 
 ```gdscript
 {
-  "command": "follow_player" | "stop_follow" | "go_sleep" | "go_table_sit" | "go_to_marker",
-  "target_marker": "可选，指定具体 Marker3D 名称（推荐）",
-  "location": "可选，地点关键词（如 浴室/厨房/toilet/kitchen）"
+  "current_step_id": "inspect-food-cabinet",
+  "action_line": [
+    {
+      "step_id": "inspect-food-cabinet",
+      "action": "work_count_supplies",
+      "command": "go_to_object",
+      "command_payload": {"target_object": "food_cabinet_runtime", "marker_role": "approach"},
+      "reason": "先到柜前确认库存",
+      "expected_result": "到达后观察柜内物品",
+      "wait_for_result": true,
+      "status": "pending"
+    }
+  ]
 }
 ```
 
 说明：
 
-- `follow_player`：小空持续跟随玩家，并自动启用头部 LookAt（IK）看向玩家。
-- `stop_follow`：停止跟随/停止当前导航。
-- `go_sleep`：导航到床位点（优先床躺点），到达后先吸附到目标 Marker，再触发 `Laying`。
-- `go_table_sit`：导航到桌边/凳子坐点，到达后先吸附到目标 Marker，再触发 `SittingIdle`。
-- `go_to_marker`：导航到任意地点 Marker（如 `Bathroom_Room_Mark3D`、`Toilet_Mark3D`、`Kitchen_Room_Mark3D` 等），不强制触发姿态动作。
-- `go_to_marker` 支持 `target_marker/marker_name/marker/destination_marker`，也支持 `location/room/destination/poi/place` 文本字段自动映射到 Mark3D。
-- 如果目标 Marker 带有 `metadata/xiaokong_action`（例如厕所点位 `SittingIdle`），`go_to_marker` 到点后会自动执行该动作。
-- 如果目标 Marker 带有 `metadata/xiaokong_ik_mode`，到点后会自动激活 IK 互动（看向/单手触碰/双手触碰），用于洗手池、淋浴、做饭台、工作台、办公桌等点位。
-- 如果同时返回 `move_target + action`，且 `action` 为 `SittingIdle`/`Laying`，会自动改为“先走到点再播动作”。
-- `command/target_marker/move_target` 也支持放在 `action_hint` 或 `navigation` 子字段中（用于不同后端实现兼容）。
-- 中文/自然语言命令会做容错识别（例如“跟着我”“去睡觉”“去桌边坐下”“去浴室/去厨房/去厕所/去洗手/去洗澡/去做饭/去办公桌”），但后端仍建议优先返回标准枚举值。
+- `action_line` 可以有 0 到 4 步；Godot 每回合只执行 `current_step_id`，其余步骤必须等待真实回调。
+- `go_to_object` 的 `target_object` 必须来自本回合 perception；`go_to_nav_point` 的 `target_nav_point` 必须来自 known_nav_points。
+- `follow_player`/`stop_follow`/`look_at_player` 不需要导航目标；拿取、喝水和吃东西必须使用当前可感知的 pickable 物体。
+- 到达或交互完成后，Godot 将 `current_step_id`、`action_step`、`action_line` 和 `action_result` 放进事件上下文，后端再规划下一条动作线。
+
+### 2.3 TaskManager 等待模型任务
+
+Mirdo 场景中的 `Components/CharacterAITaskManager` 是所有异步 Agent 任务的统一等待层。
+它不会替模型规划，也不会阻塞 HTTP 请求，而是把执行器事件统一成以下生命周期：
+
+```text
+task_started -> task_waiting -> task_resolved
+                              ├─ task_succeeded
+                              └─ task_failed
+```
+
+目前统一接入：
+
+- 导航抵达、导航失败、导航取消
+- `pick_up_item`、`take_from_container`、`use_item`、`eat_item`
+- `give_item_to_player` 的玩家接受、拒绝或超时
+- 没有异步事件源的短动作提交结果
+
+事件至少包含 `task_id`、`step_id`、`command`、`ok`、`event` 和 `action_result`。Godot 收到
+`task_resolved` 后，`CharacterAutonomousLifeComponent` 会把它作为 `source_decision` 再送回
+Server，由 Agent 决定下一步；因此不要在 Godot 本地偷偷执行 action_line 的后续步骤。
 
 ### 2.2 Marker 互动 IK 元数据（可选）
 

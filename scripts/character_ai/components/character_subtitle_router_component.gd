@@ -19,6 +19,7 @@ class_name CharacterSubtitleRouterComponent
 @export var occlusion_ignore_camera_owner: bool = true
 @export var occlusion_ignore_anchor_owner: bool = true
 @export var debug_log: bool = false
+@export_range(0.0, 3.0, 0.05) var duplicate_suppress_window_sec: float = 1.2
 
 var _world_subtitle: Node
 var _player_overlay: Node
@@ -34,6 +35,9 @@ var _world_seen_for_current_line: bool = false
 var _overlay_refresh_left: float = 0.0
 var _line_lifetime_left: float = 0.0
 var _last_visibility_reason: String = ""
+var _last_shown_text: String = ""
+var _last_shown_speaker: String = ""
+var _last_shown_ticks_msec: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
@@ -41,8 +45,13 @@ func _ready() -> void:
 
 func show_once(text: String, speaker: String = "") -> void:
 	_refresh_refs()
-	_active_text = text.strip_edges()
-	_active_speaker = speaker.strip_edges()
+	var clean_text := text.strip_edges()
+	var clean_speaker := speaker.strip_edges()
+	if _should_suppress_duplicate_line(clean_text, clean_speaker):
+		return
+	_remember_displayed_line(clean_text, clean_speaker)
+	_active_text = clean_text
+	_active_speaker = clean_speaker
 	_streaming = false
 	_line_active = not _active_text.is_empty()
 	_overlay_visible_for_current_line = false
@@ -103,6 +112,20 @@ func cancel_now() -> void:
 
 func play_text(text: String, speaker: String = "") -> void:
 	show_once(text, speaker)
+
+func _should_suppress_duplicate_line(text: String, speaker: String) -> bool:
+	# 对话链路里同时可能收到 stream_finished 与 completed；这里做最后一道 UI 去重。
+	if duplicate_suppress_window_sec <= 0.0 or text.is_empty():
+		return false
+	if text != _last_shown_text or speaker != _last_shown_speaker:
+		return false
+	var elapsed_sec := float(Time.get_ticks_msec() - _last_shown_ticks_msec) / 1000.0
+	return elapsed_sec <= duplicate_suppress_window_sec
+
+func _remember_displayed_line(text: String, speaker: String) -> void:
+	_last_shown_text = text
+	_last_shown_speaker = speaker
+	_last_shown_ticks_msec = Time.get_ticks_msec()
 
 func enqueue_text(text: String, speaker: String = "") -> int:
 	show_once(text, speaker)

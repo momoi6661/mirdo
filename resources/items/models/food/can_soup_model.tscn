@@ -28,7 +28,7 @@ script = ExtResource("3_save")
 script = ExtResource("5_pickable")
 visual_root_path = NodePath("../CanSoupModel")
 hold_position_offset = Vector3(0.025, -0.015, 0.0)
-hold_rotation_degrees = Vector3(88, 0, 8)
+hold_rotation_degrees = Vector3(4, 90, -6)
 hold_scale = Vector3(1, 1, 1)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]

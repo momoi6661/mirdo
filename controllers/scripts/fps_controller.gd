@@ -5,7 +5,11 @@ extends CharacterBody3D
 @export var SPEED_CROUCH:float =2.0
 @export var JUMP_VELOCITY : float = 4.5
 @export var ACCEL:float=10.0
-@export var MOUSE_SENSITIVITY : float = 0.5
+# 鼠标事件已经是“本帧移动了多少像素”，这里直接换算成弧度。
+# 旧实现又乘了一次 delta，导致帧率越高越慢；修复后使用小的“弧度/像素”值。
+@export_range(0.0005, 0.02, 0.0005) var MOUSE_SENSITIVITY : float = 0.003
+@export_range(8.0, 240.0, 1.0) var max_mouse_delta: float = 80.0
+@export var recapture_mouse_on_focus: bool = true
 @export var TILT_LOWER_LIMIT := deg_to_rad(-90.0)
 @export var TILT_UPPER_LIMIT := deg_to_rad(90.0)
 @export var CAMERA_CONTROLLER : Camera3D
@@ -91,6 +95,8 @@ var _footstep_was_moving: bool = false
 var _mouse_rotation : Vector3
 var _player_rotation : Vector3
 var _camera_rotation : Vector3
+var _window_has_focus: bool = true
+var _mouse_mode_before_focus_out: int = Input.MOUSE_MODE_CAPTURED
 
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
@@ -104,10 +110,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			if vp_text != null:
 				vp_text.set_input_as_handled()
 		return
-	_mouse_input = event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
+	_mouse_input = event is InputEventMouseMotion and _window_has_focus and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
 	if _mouse_input:
-		_rotation_input = -event.relative.x * MOUSE_SENSITIVITY
-		_tilt_input = -event.relative.y * MOUSE_SENSITIVITY
+		# 累积事件而不是覆盖事件，避免高回报率鼠标丢帧；每帧上限避免窗口切回时突然甩视角。
+		var motion := event as InputEventMouseMotion
+		var relative := motion.relative.limit_length(max_mouse_delta)
+		_rotation_input = clampf(_rotation_input - relative.x * MOUSE_SENSITIVITY, -0.35, 0.35)
+		_tilt_input = clampf(_tilt_input - relative.y * MOUSE_SENSITIVITY, -0.35, 0.35)
+		get_viewport().set_input_as_handled()
+
+func _notification(what: int) -> void:
+	# 窗口失焦时释放鼠标和按键，避免点击到编辑器后角色继续移动或视角漂移。
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_window_has_focus = false
+		_mouse_mode_before_focus_out = Input.mouse_mode
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_release_ui_captured_movement_input()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_window_has_focus = true
+		if recapture_mouse_on_focus and _should_capture_mouse_after_focus():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _should_capture_mouse_after_focus() -> bool:
+	if get_tree() == null or get_tree().paused:
+		return false
+	return not _is_dialogue_panel_open() and not _is_inventory_panel_open() and not _is_status_panel_open() and not is_ui_text_input_focused()
 
 var _drop_timer: float = 0.0
 var _is_holding_drop: bool = false
@@ -457,9 +484,11 @@ func _spawn_dropped_inventory_item(item: ItemData, amount: int) -> void:
 		dropped_item.global_position = spawn_pos + Vector3(spread_x, 0.0, spread_z)
 
 func _update_camera(delta):
-	_mouse_rotation.x += _tilt_input * delta
+	# _tilt_input/_rotation_input 已在输入阶段按像素换算，不再乘 delta。
+	# 这样视角速度与渲染/物理帧率无关，也不会出现低帧时突然加速。
+	_mouse_rotation.x += _tilt_input
 	_mouse_rotation.x = clamp(_mouse_rotation.x, TILT_LOWER_LIMIT, TILT_UPPER_LIMIT)
-	_mouse_rotation.y += _rotation_input * delta
+	_mouse_rotation.y += _rotation_input
 	
 	_player_rotation = Vector3(0.0,_mouse_rotation.y,0.0)
 	_camera_rotation = Vector3(_mouse_rotation.x,0.0,0.0)
@@ -501,7 +530,7 @@ func _update_camera(delta):
 	_tilt_input = 0.0
 
 func get_input_direction():
-	if is_ui_text_input_focused() or _is_custom_text_input_active():
+	if is_gameplay_input_blocked():
 		return Vector3.ZERO
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
@@ -571,7 +600,7 @@ func _is_status_panel_open() -> bool:
 	return false
 
 func is_gameplay_input_blocked() -> bool:
-	return _is_custom_text_input_active() or is_ui_text_input_focused()
+	return not _window_has_focus or (get_tree() != null and get_tree().paused) or _is_custom_text_input_active() or is_ui_text_input_focused()
 
 func _resolve_xiaokong_control_component() -> Node:
 	if _xiaokong_control_component != null and is_instance_valid(_xiaokong_control_component):
@@ -677,6 +706,9 @@ func _on_global_xiaokong_dialogue_requested(payload: Dictionary) -> void:
 
 func _on_xiaokong_dialogue_panel_submit(text: String, payload: Dictionary) -> void:
 	_send_dialogue_to_xiaokong(text, payload)
+	var controller_node := _resolve_xiaokong_control_component()
+	if controller_node != null and is_instance_valid(controller_node) and controller_node.has_method("flush_pending_player_dialogue_now"):
+		controller_node.call("flush_pending_player_dialogue_now")
 
 func _on_xiaokong_dialogue_panel_input_draft_changed(draft_text: String, payload: Dictionary) -> void:
 	_notify_dialogue_input_draft_to_xiaokong(draft_text, payload)
@@ -749,9 +781,11 @@ func apply_movement(allow_move: bool, stop_when_no_input: bool, head_bob_target:
 	if !is_climbing:
 		move_and_slide()
 		handle_rigid_body_collisions()
-		
-		if step_handler:
-			step_handler.handle_after_move_slide(delta)
+
+	if step_handler:
+		# 上台阶检测已经完成了本帧的受控位移；仍然执行收尾吸附，
+		# 让下楼和相机状态不会因为跳过 move_and_slide 而断一帧。
+		step_handler.handle_after_move_slide(delta)
 
 	_update_footstep_audio(delta, vertical_velocity_before_slide)
 
@@ -1135,7 +1169,8 @@ func push_rigid_body(rigid_body: RigidBody3D, collision: KinematicCollision3D):
 func _ready():
 	randomize()
 	_speed=SPEED_DEFAULT
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if _window_has_focus:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_resolve_footstep_player()
 	_autoload_footstep_clips()
 	_apply_footstep_volume()
