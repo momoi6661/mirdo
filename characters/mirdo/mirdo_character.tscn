@@ -2109,6 +2109,7 @@ busy_soft_actions = PackedStringArray("small_nod", "tilt_head_cute")
 
 [node name="CharacterReturnGreeting" type="Node" parent="Components" unique_id=1765314904]
 script = ExtResource("80_return_greeting")
+dialogue_component_path = NodePath("../AIDialogueComponent")
 subtitle_target_path = NodePath("../CharacterSubtitleRouter")
 
 [node name="CharacterActionExpression" type="Node" parent="Components" unique_id=821712066]
@@ -2161,6 +2162,7 @@ navigation_agent_path = NodePath("../../NavigationAgent3D")
 [node name="CharacterGiveItem" type="Node" parent="Components" unique_id=1846621401]
 script = ExtResource("86_give_item")
 character_root_path = NodePath("../..")
+dialogue_component_path = NodePath("../AIDialogueComponent")
 animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
 face_component_path = NodePath("../FaceComponent")
 navigation_motor_path = NodePath("../..")

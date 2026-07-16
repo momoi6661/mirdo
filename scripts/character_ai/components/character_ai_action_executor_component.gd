@@ -10,6 +10,7 @@ signal navigation_goal_finished(report: Dictionary)
 signal navigation_goal_resolved(report: Dictionary)
 signal navigation_cancelled()
 signal stand_up_finished()
+signal sit_down_finished()
 
 @export var intent_interpreter_path: NodePath
 @export var perception_component_path: NodePath
@@ -47,6 +48,9 @@ signal stand_up_finished()
 @export var stand_snap_after_root_motion_if_far: bool = true
 @export_category("Seat Pose")
 @export var seat_use_root_motion: bool = true
+## 坐下和站起都属于 root-motion 姿态过渡；坐下沿用站起的等待/收敛策略。
+@export_range(0.0, 4.0, 0.01) var seat_root_motion_wait_sec: float = 1.0
+@export_range(0.0, 1.0, 0.01) var seat_root_motion_end_margin_sec: float = 0.08
 @export_range(0.0, 1.0, 0.01) var seat_pre_align_duration_sec: float = 0.12
 @export_range(0.0, 3.0, 0.01) var seat_pre_align_max_planar_distance: float = 1.6
 @export_range(0.0, 2.0, 0.01) var seat_exact_navigation_min_distance: float = 0.28
@@ -330,11 +334,31 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 		return
 	var target := _find_world_object(target_ref)
 	if target == null:
-		report["errors"].append("target_object_not_found")
+		# 语义目录中的 waypoint 没有世界实体脚本；仍允许通过 target_ref 导航，
+		# 但 Marker 的解析继续只发生在 Godot 内部。
+		var fallback_role := String(intent.get("marker_role", "approach"))
+		var fallback_affordance := String(intent.get("affordance", "")).strip_edges().to_lower()
+		if String(intent.get("intent", "")).strip_edges().to_lower() == "sit_down" or fallback_affordance in ["sit", "sit_down", "seated_idle"]:
+			fallback_role = "sit"
+		var waypoint := _find_ai_nav_point_with_role(target_ref, fallback_role)
+		if waypoint == null:
+			report["errors"].append("target_object_not_found")
+			return
+		_target_report_from_nav_point(waypoint, target_ref, report)
 		return
 	var role := String(intent.get("marker_role", "approach")).strip_edges()
+	var intent_name := String(intent.get("intent", "")).strip_edges().to_lower()
+	var affordance := String(intent.get("affordance", "")).strip_edges().to_lower()
+	if intent_name == "sit_down":
+		role = "sit"
 	if role.is_empty():
 		role = "approach"
+	if target.has_method("resolve_ai_affordance") and affordance != "" and role == "approach":
+		var affordance_value: Variant = target.call("resolve_ai_affordance", affordance)
+		if affordance_value is Dictionary:
+			var resolved_role := String((affordance_value as Dictionary).get("marker_role", "")).strip_edges()
+			if not resolved_role.is_empty():
+				role = resolved_role
 	var marker: Marker3D = null
 	if target.has_method("get_marker_for_role"):
 		marker = target.call("get_marker_for_role", role) as Marker3D
@@ -356,15 +380,16 @@ func _resolve_object_marker(intent: Dictionary, report: Dictionary) -> void:
 	report["marker_role"] = role if role.to_lower() == "sit" else _get_marker_role(marker)
 
 func _resolve_nav_point_marker(intent: Dictionary, report: Dictionary) -> void:
-	var target_ref := String(intent.get("target_nav_point", intent.get("target_ref", ""))).strip_edges()
+	var target_ref := String(intent.get("target_nav_point", intent.get("target_ref", intent.get("target_entity_id", "")))).strip_edges()
 	if target_ref.is_empty():
 		report["errors"].append("target_nav_point_empty")
 		return
-	var marker := _find_ai_nav_point(target_ref)
+	var marker_role := String(intent.get("marker_role", intent.get("role", ""))).strip_edges()
+	var marker := _find_ai_nav_point_with_role(target_ref, marker_role)
 	if marker == null:
 		report["errors"].append("target_nav_point_not_found")
 		return
-	var marker_role := String(_safe_get(marker, "marker_role", "")).strip_edges()
+	marker_role = String(_safe_get(marker, "marker_role", marker_role)).strip_edges()
 	report["ok"] = true
 	report["target_object_id"] = target_ref
 	report["target_object_type"] = String(_safe_get(marker, "point_type", "")).strip_edges()
@@ -696,6 +721,13 @@ func _build_navigation_goal_context(marker: Marker3D, arrival_action: StringName
 				context["arrival_action"] = String(summary.get("arrival_action", "")).strip_edges()
 			if String(context.get("target_object", "")).is_empty():
 				context["target_object"] = String(summary.get("target_object_id", "")).strip_edges()
+	var semantic_target := _find_world_object(String(context.get("target_object", "")).strip_edges())
+	if semantic_target != null and semantic_target.has_method("build_ai_entity_summary"):
+		var entity_value: Variant = semantic_target.call("build_ai_entity_summary", _actor)
+		if entity_value is Dictionary:
+			var entity := entity_value as Dictionary
+			context["target_name"] = String(entity.get("name", context.get("target_name", ""))).strip_edges()
+			context["target_description"] = String(entity.get("description", context.get("target_description", ""))).strip_edges()
 	if String(context.get("target_name", "")).is_empty():
 		context["target_name"] = String(payload.get("target_name", payload.get("target", ""))).strip_edges()
 	if String(context.get("target_description", "")).is_empty():
@@ -1046,7 +1078,21 @@ func _expression_from_emotion(emotion: String) -> String:
 	return "neutral"
 
 func _choose_body_action_for_target(report: Dictionary, intent: Dictionary) -> StringName:
-	var role := String(intent.get("marker_role", report.get("marker_role", "approach"))).strip_edges().to_lower()
+	var role := String(report.get("marker_role", intent.get("marker_role", "approach"))).strip_edges().to_lower()
+	var intent_name := String(intent.get("intent", "")).strip_edges().to_lower()
+	var affordance := String(intent.get("affordance", "")).strip_edges().to_lower()
+	if intent_name == "sit_down":
+		role = "sit"
+	elif String(intent.get("marker_role", "")).strip_edges().to_lower() not in ["", "approach"]:
+		role = String(intent.get("marker_role", role)).strip_edges().to_lower()
+	var affordance_actions := {
+		"sit": &"sit_down", "sit_down": &"sit_down", "seated_idle": &"sit_down",
+		"take_item": &"work_take_item", "take_from_container": &"work_take_item",
+		"drink": &"work_drink", "use": &"work_reach", "inspect": &"work_inspect_cabinet",
+		"open": &"work_inspect_cabinet", "check": &"work_check_shelf",
+	}
+	if affordance_actions.has(affordance):
+		return affordance_actions[affordance]
 	var object_type := String(report.get("target_object_type", "")).strip_edges().to_lower()
 	var tags := _to_string_array(report.get("target_object_tags", []))
 	var tag_text := ",".join(tags).to_lower()
@@ -1074,16 +1120,26 @@ func _find_world_object(target_ref: String) -> Node:
 		var node := candidate as Node
 		if node == null or not is_instance_valid(node):
 			continue
-		if _get_world_object_id(node) == target_ref:
+		# 拾取组件挂在物品根节点下；允许用 AI 摘要 id、场景实例名或根节点路径定位，
+		# 这样抵达后面向目标和拾取阶段使用的是同一个语义引用。
+		if _get_world_object_id(node) == target_ref or _node_matches_pickable_ref(node, target_ref):
 			return node
+		var parent := node.get_parent()
+		if parent != null and (_get_world_object_id(parent) == target_ref or _node_matches_pickable_ref(parent, target_ref)):
+			return parent
 		if String(node.name) == target_ref:
 			return node
 	return null
 
 func _find_ai_nav_point(target_ref: String) -> Marker3D:
+	return _find_ai_nav_point_with_role(target_ref, "")
+
+func _find_ai_nav_point_with_role(target_ref: String, requested_role: String = "") -> Marker3D:
 	var tree := get_tree()
 	if tree == null:
 		return null
+	var fallback: Marker3D = null
+	var role := requested_role.strip_edges().to_lower()
 	for candidate in tree.get_nodes_in_group(ai_nav_point_group):
 		var node := candidate as Node
 		if node == null or not is_instance_valid(node):
@@ -1095,9 +1151,29 @@ func _find_ai_nav_point(target_ref: String) -> Marker3D:
 				id = String((value as Dictionary).get("id", "")).strip_edges()
 		if id.is_empty():
 			id = String(_safe_get(node, "point_id", "")).strip_edges()
-		if id == target_ref or String(node.name) == target_ref:
-			return node as Marker3D
-	return null
+		var target_object_id := String(_safe_get(node, "target_object_id", "")).strip_edges()
+		var matches := id == target_ref or String(node.name) == target_ref or target_object_id == target_ref
+		if not matches:
+			continue
+		var marker := node as Marker3D
+		if marker == null:
+			continue
+		var marker_role := String(_safe_get(marker, "marker_role", "")).strip_edges().to_lower()
+		if role.is_empty() or marker_role == role:
+			return marker
+		if fallback == null:
+			fallback = marker
+	return fallback
+
+func _target_report_from_nav_point(marker: Marker3D, target_ref: String, report: Dictionary) -> void:
+	if marker == null:
+		return
+	report["ok"] = true
+	report["target_object_id"] = target_ref
+	report["target_object_type"] = String(_safe_get(marker, "point_type", "waypoint")).strip_edges()
+	report["target_object_tags"] = _to_string_array(_safe_get(marker, "tags", []))
+	report["target_marker_path"] = String(marker.get_path())
+	report["marker_role"] = String(_safe_get(marker, "marker_role", "approach")).strip_edges()
 
 func _find_pickable_item(target_ref: String) -> Node:
 	var tree := get_tree()
@@ -1300,11 +1376,15 @@ func _ensure_seat_exit_completed_before_navigation(arrival_action: StringName) -
 	return offset.length() <= maxf(0.02, stand_ready_max_planar_distance)
 
 func _resolve_stand_root_motion_wait_time() -> float:
+	return _resolve_posture_action_wait_time(&"stand_up", stand_relocate_delay_sec, stand_root_motion_end_margin_sec)
+
+## 统一解析坐下/站起的动画等待时间，避免两套姿态逻辑互相漂移。
+func _resolve_posture_action_wait_time(action_name: StringName, fallback: float, end_margin: float) -> float:
 	if _animation_behavior != null and _animation_behavior.has_method("get_action_duration"):
-		var duration := float(_animation_behavior.call("get_action_duration", &"stand_up", stand_root_motion_wait_sec))
+		var duration := float(_animation_behavior.call("get_action_duration", action_name, fallback))
 		if duration > 0.0:
-			return maxf(0.0, duration - stand_root_motion_end_margin_sec)
-	return maxf(0.0, stand_relocate_delay_sec)
+			return maxf(0.0, duration - maxf(0.0, end_margin))
+	return maxf(0.0, fallback)
 
 func _start_seat_after_approach() -> void:
 	var seat_path := _pending_seat_marker_after_approach_path
@@ -1320,6 +1400,7 @@ func _start_seat_after_approach() -> void:
 		_update_seat_state_after_arrival(sit_action, seat_path)
 		_seat_alignment_active = false
 		navigation_finished.emit(sit_action)
+		_emit_navigation_goal_finished(sit_action, seat_path, _navigation_goal_context.duplicate(true))
 		return
 	if not seat_use_root_motion:
 		if _navigation_motor != null and _navigation_motor.has_method("align_to_marker"):
@@ -1335,10 +1416,21 @@ func _start_seat_after_approach() -> void:
 		await _pre_align_for_root_motion_seat(seat_marker)
 	if serial != _seat_alignment_serial:
 		return
-	_request_body_action(sit_action)
+	var requested := _request_body_action(sit_action)
+	# 和站起一样，等待姿态动画的 root-motion 完成后再占用座位、通知任务完成。
+	var wait_time := _resolve_posture_action_wait_time(sit_action, seat_root_motion_wait_sec, seat_root_motion_end_margin_sec)
+	var tree := get_tree()
+	if requested and tree != null and wait_time > 0.0:
+		await tree.create_timer(wait_time).timeout
+	if serial != _seat_alignment_serial:
+		return
+	if not requested:
+		_log("sit action request failed: %s" % String(sit_action))
 	_update_seat_state_after_arrival(sit_action, seat_path)
 	_seat_alignment_active = false
+	sit_down_finished.emit()
 	navigation_finished.emit(sit_action)
+	_emit_navigation_goal_finished(sit_action, seat_path, _navigation_goal_context.duplicate(true))
 
 func _start_seat_exact_navigation_after_approach() -> void:
 	var seat_path := _pending_seat_marker_after_approach_path

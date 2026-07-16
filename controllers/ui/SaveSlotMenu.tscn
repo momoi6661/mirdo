@@ -3,43 +3,40 @@
 [ext_resource type="Script" path="res://controllers/scripts/save_slot_menu.gd" id="1_save_slot_menu"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_drawer"]
-bg_color = Color(0.014, 0.012, 0.016, 0.985)
-border_width_left = 3
-border_color = Color(1, 0.48, 0.72, 0.82)
+bg_color = Color(0.20, 0.16, 0.25, 0.97)
 corner_radius_top_left = 28
-corner_radius_bottom_left = 8
+corner_radius_bottom_left = 28
 corner_detail = 4
-shadow_color = Color(0, 0, 0, 0.48)
-shadow_size = 18
+shadow_color = Color(0.04, 0.02, 0.08, 0.34)
+shadow_size = 24
+shadow_offset = Vector2(-5, 0)
 content_margin_left = 0.0
 content_margin_top = 0.0
 content_margin_right = 0.0
 content_margin_bottom = 0.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header_line"]
-bg_color = Color(1, 0.48, 0.72, 0.92)
+bg_color = Color(0.97, 0.54, 0.62, 0.96)
 corner_radius_top_left = 3
 corner_radius_top_right = 3
 corner_radius_bottom_left = 3
 corner_radius_bottom_right = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button"]
-bg_color = Color(1, 0.48, 0.72, 0.14)
-border_width_left = 4
-border_color = Color(1, 0.48, 0.72, 0.92)
+bg_color = Color(0.31, 0.25, 0.39, 0.82)
 content_margin_left = 16.0
 content_margin_top = 8.0
 content_margin_right = 16.0
 content_margin_bottom = 8.0
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_toolbar_button_hover"]
-bg_color = Color(1, 0.48, 0.72, 0.28)
-border_width_left = 4
-border_color = Color(1, 0.62, 0.8, 1)
+bg_color = Color(0.55, 0.32, 0.43, 0.94)
+border_width_left = 3
+border_color = Color(0.98, 0.49, 0.55, 0.72)
 content_margin_left = 16.0
 content_margin_top = 8.0
 content_margin_right = 16.0
@@ -74,7 +71,7 @@ color = Color(0, 0, 0, 0.20)
 
 [node name="DrawerPanel" type="Panel" parent="Root"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(720, 0)
+custom_minimum_size = Vector2(560, 0)
 layout_mode = 1
 anchors_preset = 11
 anchor_left = 1.0
@@ -83,7 +80,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 720.0
+offset_right = 560.0
 offset_bottom = 0.0
 grow_horizontal = 0
 grow_vertical = 2
@@ -94,16 +91,16 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 48.0
-offset_top = 62.0
-offset_right = -42.0
-offset_bottom = -38.0
+offset_left = 34.0
+offset_top = 58.0
+offset_right = -34.0
+offset_bottom = -32.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="MainRows" type="VBoxContainer" parent="Root/DrawerPanel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 
 [node name="Header" type="HBoxContainer" parent="Root/DrawerPanel/Margin/MainRows"]
 layout_mode = 2
@@ -124,14 +121,14 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 32
-text = "记录"
+text = "我的进度"
 
 [node name="SubtitleLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows/Header/TitleStack"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.78)
 theme_override_font_sizes/font_size = 15
-text = "保存与读取避难所进度"
+text = "给每一次冒险留一颗小小的锚点"
 autowrap_mode = 3
 
 [node name="Toolbar" type="HBoxContainer" parent="Root/DrawerPanel/Margin/MainRows/Header"]
@@ -141,26 +138,26 @@ theme_override_constants/separation = 10
 
 [node name="RefreshButton" type="Button" parent="Root/DrawerPanel/Margin/MainRows/Header/Toolbar"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(86, 42)
+custom_minimum_size = Vector2(100, 44)
 layout_mode = 2
 focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
-text = "刷新"
+text = "↻ 刷新"
 alignment = 0
 
 [node name="BackButton" type="Button" parent="Root/DrawerPanel/Margin/MainRows/Header/Toolbar"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(86, 42)
+custom_minimum_size = Vector2(100, 44)
 layout_mode = 2
 focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_toolbar_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_toolbar_button_hover")
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
-text = "返回"
+text = "完成"
 alignment = 0
 
 [node name="CurrentSlotLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
@@ -168,7 +165,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.68, 0.66, 0.78)
 theme_override_font_sizes/font_size = 15
-text = "当前进度槽：进度槽 01"
+text = "正在陪伴：进度槽 01"
 
 [node name="ScrollContainer" type="ScrollContainer" parent="Root/DrawerPanel/Margin/MainRows"]
 layout_mode = 2
@@ -179,23 +176,23 @@ horizontal_scroll_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+theme_override_constants/separation = 12
 
 [node name="StatusLabel" type="Label" parent="Root/DrawerPanel/Margin/MainRows"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.68, 0.66, 0.72)
 theme_override_font_sizes/font_size = 15
-text = "保存会覆盖目标槽位；读取会切换当前进度。"
+text = "保存会覆盖目标槽位，读取会回到那一刻。"
 autowrap_mode = 3
 
 [node name="ConfirmDeleteDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
 process_mode = 3
-title = "清理进度"
+title = "要把它放下吗？"
 dialog_text = "确定清理这个进度槽吗？"
 ok_button_text = "清理"
-cancel_button_text = "取消"
+cancel_button_text = "先留着"
 
 [node name="UISoundPlayer" type="AudioStreamPlayer" parent="."]
 unique_name_in_owner = true

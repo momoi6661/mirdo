@@ -61,6 +61,8 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(0.5, 60.0, 0.1) var think_interval_min: float = 4.0
 @export_range(0.5, 90.0, 0.1) var think_interval_max: float = 9.0
 @export_range(0.0, 120.0, 0.1) var startup_delay_sec: float = 3.0
+@export_range(0.0, 120.0, 0.1) var startup_movement_grace_sec: float = 8.0
+@export_range(0.0, 120.0, 0.1) var save_load_movement_grace_sec: float = 20.0
 @export_range(0.0, 120.0, 0.1) var external_grace_sec: float = 8.0
 @export var resume_after_external_grace: bool = true
 @export_range(0.0, 120.0, 0.1) var resume_token_ttl_sec: float = 18.0
@@ -138,6 +140,7 @@ var _navigation_agent: NavigationAgent3D
 var _rng := RandomNumberGenerator.new()
 var _think_left := 0.0
 var _external_grace_left := 0.0
+var _startup_movement_grace_left := 0.0
 var _movement_cooldown_left := 0.0
 var _player_social_approach_cooldown_left := 0.0
 var _sit_cooldown_left := 0.0
@@ -172,6 +175,9 @@ var _ai_task_chain_id: String = ""
 var _ai_task_chain_depth: int = 0
 var _ai_task_chain_hold_left: float = 0.0
 var _ai_task_chain_last_status: String = ""
+## 最近一次老师引导是否暂时禁止自动恢复；下一次新引导会重新评估。
+var _guidance_resume_blocked: bool = false
+var _last_task_control_mode: String = "none"
 var _opening_dialogue_sent: bool = false
 
 func _ready() -> void:
@@ -179,7 +185,9 @@ func _ready() -> void:
 	_refresh_refs()
 	_bind_navigation_motor_signals()
 	_bind_external_control_signals()
+	_bind_save_manager_signals()
 	_external_grace_left = maxf(_external_grace_left, startup_delay_sec)
+	_startup_movement_grace_left = maxf(0.0, startup_movement_grace_sec)
 	_schedule_next_think()
 	_schedule_opening_dialogue()
 	set_process(true)
@@ -191,6 +199,10 @@ func _process(delta: float) -> void:
 		_dwell_left = maxf(0.0, _dwell_left - delta)
 		return
 	if not enabled or _navigation_active:
+		return
+	# Do not let the autonomous planner or a saved task resume while the
+	# initial/current save is restoring the player's and Mirdo's transforms.
+	if _startup_movement_grace_left > 0.0:
 		return
 	if _try_resume_saved_task():
 		return
@@ -224,15 +236,50 @@ func notify_external_control_for(hold_sec: float, capture_resume: bool = true) -
 		stop_autonomous_navigation(true)
 
 func notify_dialogue_started() -> void:
+	_guidance_resume_blocked = false
 	notify_external_control()
 	_interrupt_body_for_dialogue()
 
 func notify_ai_response_applied(_ai_data: Dictionary = {}) -> void:
+	var control_mode := _apply_task_control(_ai_data)
+	if control_mode == "cancel":
+		# 取消是终态控制信号；即使模型误填了旧 action_line，也不能
+		# 在老师明确停止后重新恢复旧链。
+		return
 	_update_ai_task_chain_from_response(_ai_data)
 	var hard_command := _is_hard_external_ai_data(_ai_data)
 	if hard_command:
 		_clear_resume_token("external_ai_command")
 	notify_external_control(not hard_command)
+
+func _apply_task_control(ai_data: Dictionary) -> String:
+	"""把 Agent 对当前任务的判断转换为本地暂停/恢复策略。"""
+	var raw_control: Variant = ai_data.get("task_control", {})
+	if not raw_control is Dictionary:
+		_last_task_control_mode = "none"
+		return "none"
+	var control := raw_control as Dictionary
+	var mode := String(control.get("mode", "none")).strip_edges().to_lower()
+	_last_task_control_mode = mode
+	match mode:
+		"cancel":
+			_guidance_resume_blocked = false
+			_clear_resume_token("player_cancelled_task")
+			_release_ai_task_chain("cancelled_by_player")
+		"replace":
+			_guidance_resume_blocked = false
+			_clear_resume_token("player_replaced_task")
+			_release_ai_task_chain("replaced_by_player")
+		"pause":
+			_guidance_resume_blocked = not bool(control.get("resume_after_reply", true))
+			# notify_dialogue_started 已经捕获了可恢复决策；这里只延长
+			# 对话宽限，避免模型回复尚未落地时自主规划抢占恢复点。
+			_external_grace_left = maxf(_external_grace_left, external_grace_sec)
+		"continue":
+			_guidance_resume_blocked = false
+		"none":
+			pass
+	return mode
 
 func _update_ai_task_chain_from_response(ai_data: Dictionary) -> void:
 	if ai_data.is_empty():
@@ -298,6 +345,11 @@ func _send_opening_dialogue() -> bool:
 func request_player_social_approach(reason: String = "awareness", stop_distance: float = -1.0) -> bool:
 	_refresh_refs()
 	if not enabled or _actor == null or _navigation_motor == null:
+		return false
+	# The player-awareness component starts one frame before SaveManager's
+	# boot auto-load. Do not let that transient state start a path toward the
+	# player while the saved scene/transform is still being restored.
+	if _startup_movement_grace_left > 0.0 or _external_grace_left > 0.0 or _resume_after_grace_left > 0.0 or _ai_task_chain_active:
 		return false
 	if _player_social_approach_cooldown_left > 0.0:
 		return false
@@ -955,6 +1007,8 @@ func _clear_resume_token(reason: String = "") -> void:
 func _try_resume_saved_task() -> bool:
 	if not resume_after_external_grace or (_resume_token.is_empty() and _task_stack.is_empty()):
 		return false
+	if _guidance_resume_blocked:
+		return false
 	if _external_grace_left > 0.0 or _resume_after_grace_left > 0.0:
 		return false
 	if _is_external_action_busy():
@@ -1059,6 +1113,8 @@ func get_current_behavior_snapshot() -> Dictionary:
 		"ai_task_chain_id": _ai_task_chain_id,
 		"ai_task_chain_depth": _ai_task_chain_depth,
 		"ai_task_chain_status": _ai_task_chain_last_status,
+		"task_control_mode": _last_task_control_mode,
+		"guidance_resume_blocked": _guidance_resume_blocked,
 	}
 
 func get_autonomous_debug_snapshot() -> Dictionary:
@@ -1471,15 +1527,19 @@ func _request_external_goal_follow_up(goal_report: Dictionary, serial: int) -> b
 	if not external_goal_follow_up_enabled:
 		return false
 	_refresh_refs()
-	var prompt := _build_external_goal_follow_up_prompt(goal_report)
-	if prompt.is_empty():
-		return false
 	var decision := _build_external_goal_follow_up_decision(goal_report)
 	var result_value: Variant = null
-	if _dialogue_component != null and _dialogue_component.has_method("send_autonomous_text"):
-		result_value = _dialogue_component.call("send_autonomous_text", prompt, decision)
+	var fallback_prompt := _build_external_goal_follow_up_prompt(goal_report)
+	# 正常路径是一次 Godot tool-result 请求；只有旧版 Dialogue 组件才退回
+	# autonomous 文本，避免把动作完成伪装成玩家/角色发言。
+	if _dialogue_component != null and _dialogue_component.has_method("send_action_result"):
+		result_value = _dialogue_component.call("send_action_result", goal_report, decision)
+	elif _dialogue_component != null and _dialogue_component.has_method("send_autonomous_text"):
+		if fallback_prompt.is_empty():
+			return false
+		result_value = _dialogue_component.call("send_autonomous_text", fallback_prompt, decision)
 	elif _dialogue_component != null and _dialogue_component.has_method("send_player_text"):
-		result_value = _dialogue_component.call("send_player_text", prompt)
+		result_value = _dialogue_component.call("send_player_text", fallback_prompt)
 	var ok := false
 	if result_value is Dictionary:
 		ok = bool((result_value as Dictionary).get("ok", false))
@@ -1497,14 +1557,11 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 	var target_name := String(goal_report.get("target_name", "")).strip_edges()
 	var target_nav_point := String(goal_report.get("target_nav_point", "")).strip_edges()
 	var target_object := String(goal_report.get("target_object", "")).strip_edges()
-	var marker_name := String(goal_report.get("target_marker_name", "")).strip_edges()
 	var target := target_name
 	if target.is_empty():
 		target = target_nav_point
 	if target.is_empty():
 		target = target_object
-	if target.is_empty():
-		target = marker_name
 	var description := String(goal_report.get("target_description", "")).strip_edges()
 	var action_hint := String(goal_report.get("action_hint", "")).strip_edges()
 	var arrival := String(goal_report.get("arrival_action", "")).strip_edges()
@@ -1524,8 +1581,6 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 		parts.append("target_nav_point=%s" % target_nav_point)
 	if not target_object.is_empty():
 		parts.append("target_object=%s" % target_object)
-	if not marker_name.is_empty():
-		parts.append("marker=%s" % marker_name)
 	if not description.is_empty():
 		parts.append("目标说明=%s" % description)
 	if not action_hint.is_empty():
@@ -1621,8 +1676,8 @@ func _build_external_event_context(
 		action_result = {
 			"ok": bool(goal_report.get("ok", false)),
 			"event": event,
+			"target_ref": String(goal_report.get("target_object", goal_report.get("target_nav_point", ""))).strip_edges(),
 			"arrival_action": String(goal_report.get("arrival_action", "")).strip_edges(),
-			"finished_marker_path": String(goal_report.get("finished_marker_path", "")).strip_edges(),
 		}
 	var event_id := String(goal_report.get("event_id", "")).strip_edges()
 	if event_id.is_empty():
@@ -1663,10 +1718,20 @@ func _build_external_event_context(
 ## 递归限制事件字典大小，避免把模型原始 payload 全量送入下一回合。
 func _compact_event_value(value: Variant, depth: int = 0) -> Variant:
 	if depth >= 2:
+		if value is Dictionary:
+			var shallow: Dictionary = {}
+			for key in (value as Dictionary).keys():
+				if _is_internal_navigation_key(String(key)):
+					continue
+				var nested: Variant = (value as Dictionary)[key]
+				shallow[String(key)] = String(nested).left(240) if nested is String else nested
+			return shallow
 		return String(value).left(320) if value is String else value
 	if value is Dictionary:
 		var compact: Dictionary = {}
 		for key in (value as Dictionary).keys():
+			if _is_internal_navigation_key(String(key)):
+				continue
 			if compact.size() >= 24:
 				break
 			compact[String(key)] = _compact_event_value((value as Dictionary)[key], depth + 1)
@@ -1689,6 +1754,15 @@ func _compact_event_value(value: Variant, depth: int = 0) -> Variant:
 		return String(value).left(320)
 	return value
 
+func _is_internal_navigation_key(key: String) -> bool:
+	var lowered := key.to_lower()
+	return lowered in [
+		"path", "target_marker_path", "finished_marker_path", "marker_path",
+		"approach_marker_path", "sit_marker_path", "stand_marker_path",
+		"position", "global_position", "local_position", "forward", "face_target_path",
+		"nav_marker_path", "look_marker_path"
+	]
+
 func _external_goal_chain_depth(goal_report: Dictionary) -> int:
 	var depth := int(goal_report.get("chain_depth", 0))
 	var raw_payload: Variant = goal_report.get("payload", {})
@@ -1705,7 +1779,13 @@ func _emit_local_external_goal_follow_up(goal_report: Dictionary) -> bool:
 	if line.is_empty():
 		return false
 	_refresh_refs()
-	if _subtitle_target != null and _subtitle_target.has_method("show_once"):
+	if _dialogue_component != null and _dialogue_component.has_method("present_local_dialogue"):
+		_dialogue_component.call("present_local_dialogue", line, {
+			"emotion": "开心",
+			"expression": "joy",
+			"action": "cute_explain",
+		})
+	elif _subtitle_target != null and _subtitle_target.has_method("show_once"):
 		_subtitle_target.call("show_once", line, "Mirdo")
 	else:
 		_log("local_external_goal_follow_up: %s" % line)
@@ -1762,7 +1842,13 @@ func _emit_local_self_talk(decision: Dictionary) -> bool:
 	if line.is_empty():
 		return false
 	_refresh_refs()
-	if _subtitle_target != null and _subtitle_target.has_method("show_once"):
+	if _dialogue_component != null and _dialogue_component.has_method("present_local_dialogue"):
+		_dialogue_component.call("present_local_dialogue", line, {
+			"emotion": "平静",
+			"expression": "neutral",
+			"action": "tilt_head_cute",
+		})
+	elif _subtitle_target != null and _subtitle_target.has_method("show_once"):
 		_subtitle_target.call("show_once", line, "Mirdo")
 	else:
 		_log("local_self_talk: %s" % line)
@@ -1883,6 +1969,8 @@ func _build_snapshot() -> Dictionary:
 func _get_block_reason(ignore_grace: bool) -> String:
 	if not ignore_grace and _ai_task_chain_active:
 		return "ai_task_chain_active"
+	if not ignore_grace and _startup_movement_grace_left > 0.0:
+		return "startup_movement_grace"
 	if not ignore_grace and _external_grace_left > 0.0:
 		return "external_grace"
 	if not ignore_grace and _movement_cooldown_left > 0.0:
@@ -1891,18 +1979,27 @@ func _get_block_reason(ignore_grace: bool) -> String:
 		return "external_action_busy"
 	return ""
 
-func _face_player(delta: float) -> void:
+func _face_player(_delta: float) -> void:
 	var player := _find_player()
 	if player == null or _actor == null:
 		return
+	var frame_delta := get_process_delta_time()
+	if frame_delta <= 0.0:
+		frame_delta = 1.0 / 60.0
+	var turn_requested := false
 	if _navigation_motor != null and _navigation_motor.has_method("request_turn_toward_position"):
-		_navigation_motor.call("request_turn_toward_position", player.global_position)
+		turn_requested = bool(_navigation_motor.call("request_turn_toward_position", player.global_position))
+	# A turn-state animation owns large turns. Calling face_position with the
+	# dwell/action duration (0.4-1.0 s) used to turn the body in one frame because
+	# the motor interpreted that value as a physics delta.
+	if turn_requested:
+		return
 	if _navigation_motor != null and _navigation_motor.has_method("face_position"):
-		_navigation_motor.call("face_position", player.global_position, delta)
+		_navigation_motor.call("face_position", player.global_position, minf(frame_delta, 0.05))
 		return
 	var direction := player.global_position - _actor.global_position
 	direction.y = 0.0
-	_face_direction(direction.normalized(), delta)
+	_face_direction(direction.normalized(), minf(frame_delta, 0.05))
 
 func _face_direction(direction: Vector3, delta: float) -> void:
 	if _actor == null or direction.length() < 0.01:
@@ -1981,6 +2078,29 @@ func _bind_external_control_signals() -> void:
 	if _dialogue_component != null:
 		_connect_signal_if_exists(_dialogue_component, "dialogue_requested", "_on_dialogue_requested")
 		_connect_signal_if_exists(_dialogue_component, "dialogue_completed", "_on_dialogue_completed")
+
+func _bind_save_manager_signals() -> void:
+	var save_manager := get_node_or_null("/root/SaveManager")
+	if save_manager == null:
+		return
+	if save_manager.has_signal("load_started"):
+		var started_cb := Callable(self, "_on_save_load_started")
+		if not save_manager.is_connected("load_started", started_cb):
+			save_manager.connect("load_started", started_cb)
+	if save_manager.has_signal("load_finished"):
+		var finished_cb := Callable(self, "_on_save_load_finished")
+		if not save_manager.is_connected("load_finished", finished_cb):
+			save_manager.connect("load_finished", finished_cb)
+
+func _on_save_load_started(_slot_name: String) -> void:
+	_startup_movement_grace_left = maxf(_startup_movement_grace_left, save_load_movement_grace_sec)
+
+func _on_save_load_finished(_slot_name: String, success: bool) -> void:
+	if success:
+		# Keep awareness-driven approach blocked briefly after the saved
+		# transform is restored, avoiding a post-load turn/path on the first
+		# stable frame.
+		_startup_movement_grace_left = maxf(_startup_movement_grace_left, save_load_movement_grace_sec)
 
 func _bind_navigation_motor_signals() -> void:
 	if _navigation_motor == null:
@@ -2080,6 +2200,7 @@ func _on_motor_navigation_failed(reason: String = "") -> void:
 	autonomous_decision_skipped.emit("navigation_failed:%s" % reason)
 
 func _tick_timers(delta: float) -> void:
+	_startup_movement_grace_left = maxf(0.0, _startup_movement_grace_left - delta)
 	var had_external_grace := _external_grace_left > 0.0
 	_external_grace_left = maxf(0.0, _external_grace_left - delta)
 	if had_external_grace and _external_grace_left <= 0.0 and not _resume_token.is_empty():

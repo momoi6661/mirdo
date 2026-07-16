@@ -97,6 +97,7 @@ var _player_rotation : Vector3
 var _camera_rotation : Vector3
 var _window_has_focus: bool = true
 var _mouse_mode_before_focus_out: int = Input.MOUSE_MODE_CAPTURED
+var _mouse_sensitivity_scale: float = 1.0
 
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
@@ -104,20 +105,34 @@ func _resolve_global_node() -> Node:
 	return get_node_or_null(NodePath("/root/Global"))
 
 func _unhandled_input(event: InputEvent) -> void:
+	# 先在 _input 阶段处理鼠标，避免 3D 控件或对话面板提前吞掉鼠标事件。
+	# 这里保留同一个处理函数作为未被 UI 消费时的兜底入口。
+	if _handle_mouse_look_event(event):
+		return
 	if is_ui_text_input_focused() or _is_custom_text_input_active():
 		if event is InputEventKey:
 			var vp_text := get_viewport()
 			if vp_text != null:
 				vp_text.set_input_as_handled()
 		return
-	_mouse_input = event is InputEventMouseMotion and _window_has_focus and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
-	if _mouse_input:
-		# 累积事件而不是覆盖事件，避免高回报率鼠标丢帧；每帧上限避免窗口切回时突然甩视角。
-		var motion := event as InputEventMouseMotion
-		var relative := motion.relative.limit_length(max_mouse_delta)
-		_rotation_input = clampf(_rotation_input - relative.x * MOUSE_SENSITIVITY, -0.35, 0.35)
-		_tilt_input = clampf(_tilt_input - relative.y * MOUSE_SENSITIVITY, -0.35, 0.35)
-		get_viewport().set_input_as_handled()
+
+func _handle_mouse_look_event(event: InputEvent) -> bool:
+	if not event is InputEventMouseMotion:
+		return false
+	if is_ui_text_input_focused() or _is_custom_text_input_active():
+		return false
+	if not _window_has_focus or Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+		return false
+
+	_mouse_input = true
+	# 累积事件而不是覆盖事件，避免高回报率鼠标丢帧；每帧上限避免窗口切回时突然甩视角。
+	var motion := event as InputEventMouseMotion
+	var relative := motion.relative.limit_length(max_mouse_delta)
+	var sensitivity := MOUSE_SENSITIVITY * _mouse_sensitivity_scale
+	_rotation_input = clampf(_rotation_input - relative.x * sensitivity, -0.35, 0.35)
+	_tilt_input = clampf(_tilt_input - relative.y * sensitivity, -0.35, 0.35)
+	get_viewport().set_input_as_handled()
+	return true
 
 func _notification(what: int) -> void:
 	# 窗口失焦时释放鼠标和按键，避免点击到编辑器后角色继续移动或视角漂移。
@@ -144,6 +159,9 @@ var _xiaokong_control_component: Node = null
 var _player_interaction_component: Node = null
 
 func _input(event):
+	# 在 GUI 处理前消费鼠标移动，避免界面控件吞掉第一人称视角输入。
+	if _handle_mouse_look_event(event):
+		return
 	if _is_custom_text_input_active():
 		var key_event := event as InputEventKey
 		if key_event != null:
@@ -217,6 +235,9 @@ func _toggle_dialogue_mouse_mode() -> void:
 
 
 func _process(delta):
+	# 摄像机属于玩家视觉层，直接由玩家节点驱动，不依赖 StateMachine 是否
+	# 被 UI、存档或行为锁定。这样角色移动/状态切换时镜头始终保持跟随。
+	_update_camera(delta)
 	# 只要按住 T 键，就累加时间
 	if _is_holding_drop:
 		_drop_timer += delta
@@ -489,12 +510,11 @@ func _update_camera(delta):
 	_mouse_rotation.x += _tilt_input
 	_mouse_rotation.x = clamp(_mouse_rotation.x, TILT_LOWER_LIMIT, TILT_UPPER_LIMIT)
 	_mouse_rotation.y += _rotation_input
-	
-	_player_rotation = Vector3(0.0,_mouse_rotation.y,0.0)
-	_camera_rotation = Vector3(_mouse_rotation.x,0.0,0.0)
-	
-	marker_3d.transform.basis = Basis.from_euler(_camera_rotation)
-	global_transform.basis = Basis.from_euler(_player_rotation)
+
+	# 使用“身体偏航 + 头部俯仰”的父子层级：身体负责角色方向，Marker3D
+	# 负责上下看。不要直接重写 global_transform，否则存档/父节点变换会
+	# 与摄像机方向脱节。
+	_apply_view_rotation()
 	
 	_time+=delta
 	
@@ -522,9 +542,13 @@ func _update_camera(delta):
 	_was_on_floor=is_on_floor()
 	
 	camera_offset.position=head_bob+Vector3(0,_jump_y_offset,0)
-	
-	CAMERA_CONTROLLER.global_transform=camera_offset.get_global_transform_interpolated()
-	CAMERA_CONTROLLER.rotation.z = 0.0
+
+	# Camera3D 已经是 CameraOffset 的子节点，位置和方向会随父节点自动跟随。
+	# 不要每帧覆盖 global_transform：这会绕过父子层级和插值，导致镜头
+	# 偶尔停在旧位置，表现为摄像头不跟随角色或转向滞后。
+	if CAMERA_CONTROLLER != null and is_instance_valid(CAMERA_CONTROLLER):
+		# 只清除滚转，不改写由 Marker3D/CameraOffset 继承来的位置与方向。
+		CAMERA_CONTROLLER.rotation.z = 0.0
 	
 	_rotation_input = 0.0
 	_tilt_input = 0.0
@@ -797,6 +821,13 @@ func _release_ui_captured_movement_input() -> void:
 	velocity.z = 0.0
 	_rotation_input = 0.0
 	_tilt_input = 0.0
+
+func _apply_view_rotation() -> void:
+	# 统一应用角色与镜头方向，加载存档和运行时输入都走同一条链路。
+	_player_rotation = Vector3(0.0, _mouse_rotation.y, 0.0)
+	_camera_rotation = Vector3(_mouse_rotation.x, 0.0, 0.0)
+	rotation = _player_rotation
+	marker_3d.rotation = _camera_rotation
 
 func _resolve_footstep_player() -> void:
 	_footstep_player = get_node_or_null(footstep_player_path) as AudioStreamPlayer3D
@@ -1165,10 +1196,34 @@ func handle_rigid_body_collisions():
 
 func push_rigid_body(rigid_body: RigidBody3D, collision: KinematicCollision3D):
 	pass # 保留空函数防止有其他地方调用
+
+
+func _load_mouse_sensitivity() -> void:
+	var user_settings := get_node_or_null("/root/GameUserSettings")
+	if user_settings == null:
+		return
+	_mouse_sensitivity_scale = clampf(float(user_settings.get("mouse_sensitivity")), 0.5, 2.0)
+	if user_settings.has_signal("mouse_sensitivity_changed"):
+		var callback := Callable(self, "_on_mouse_sensitivity_changed")
+		if not user_settings.mouse_sensitivity_changed.is_connected(callback):
+			user_settings.mouse_sensitivity_changed.connect(callback)
+
+
+func _on_mouse_sensitivity_changed(value: float) -> void:
+	_mouse_sensitivity_scale = clampf(value, 0.5, 2.0)
 	
 func _ready():
 	randomize()
+	# Keep the authored scene facing direction for a fresh scene. The movement
+	# loop rebuilds the body/camera basis from _mouse_rotation every frame, so a
+	# zero-initialized value silently overwrote the PlayerController transform
+	# and made the render scene start by looking at the wall. Save loading still
+	# replaces this value later when the slot contains a saved view.
+	_mouse_rotation = Vector3(marker_3d.rotation.x, rotation.y, 0.0)
+	_player_rotation = Vector3(0.0, _mouse_rotation.y, 0.0)
+	_camera_rotation = Vector3(_mouse_rotation.x, 0.0, 0.0)
 	_speed=SPEED_DEFAULT
+	_load_mouse_sensitivity()
 	if _window_has_focus:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_resolve_footstep_player()
@@ -1289,8 +1344,7 @@ func _load_custom_save_data(data: Dictionary) -> void:
 	_mouse_rotation = data.get("mouse_rotation", _mouse_rotation)
 	_player_rotation = Vector3(0, _mouse_rotation.y, 0)
 	_camera_rotation = Vector3(_mouse_rotation.x, 0, 0)
-	global_transform.basis = Basis.from_euler(_player_rotation)
-	marker_3d.transform.basis = Basis.from_euler(_camera_rotation)
+	_apply_view_rotation()
 	
 	# 3. 恢复基础变量并压制状态机
 	is_crouching = bool(data.get("is_crouching", is_crouching))

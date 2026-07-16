@@ -4,6 +4,10 @@ class_name CharacterAIDialogueComponent
 signal dialogue_requested(payload: Dictionary)
 signal dialogue_chunk_received(chunk: String)
 signal dialogue_stream_finished(dialogue_text: String)
+## 收到可播放的 TTS 后立即通知界面显示本句；dialogue_completed 仍等待音频结束。
+signal dialogue_presenting(report: Dictionary)
+## 玩家像 Codex steer 一样修改正在生成/播放的回合时通知呈现层撤下旧输出。
+signal dialogue_interrupted(report: Dictionary)
 signal dialogue_completed(report: Dictionary)
 signal dialogue_failed(error_text: String)
 
@@ -20,16 +24,20 @@ signal dialogue_failed(error_text: String)
 @export var face_component_path: NodePath
 @export var ai_nav_point_group: StringName = &"ai_nav_point"
 @export var world_object_group: StringName = &"ai_world_object"
-@export_range(0, 256, 1) var max_nav_points_in_prompt: int = 128
+## 后端只接收少量相关实体；导航点本身留在 Godot 内部解析。
+@export_range(0, 64, 1) var max_nav_points_in_prompt: int = 12
+@export_range(0, 64, 1) var max_navigation_entities_in_prompt: int = 12
+@export var include_navigation_catalog: bool = true
 
 @export_category("NPC Contract")
 @export var npc_display_name: String = "Mirdo"
 @export_multiline var npc_role_prompt: String = "可爱的避难所少女 NPC，称呼玩家为老师，性格活泼、好奇、温柔。"
 @export_multiline var npc_personality_knowledge: String = "Mirdo 是一个可爱的 VRChat 风格原创少女角色。她活泼、好奇、亲近玩家，会把玩家称作老师；她在避难所里会主动观察食物柜、医疗柜、工具箱、装备柜、工作台和床铺，关心食物、水、药品和工具是否够用。她说话短、自然、带一点可爱的自言自语，但不会刷屏。"
-@export_multiline var response_contract_prompt: String = "后端回复应优先返回 JSON：dialogue 为 Mirdo 要说的话；expression 从 neutral/joy/fun/angry/sorrow/surprised/disappointed 中选择；action 从 available_body_actions 中选择；action_line 返回 0 到 4 个有因果的步骤，Godot 只执行首个 pending 步骤；visemes 使用 aa、ih、ou、E、oh 五种，用顿号或逗号分隔。与老师互动时优先 tiny_wave/small_wave/small_nod/cute_explain/tilt_head_cute；点头用 react_nod，挥手用 react_wave/tiny_wave；需要回头或转向时可用 look_back/turn_left/turn_right/turn_180；坐着时优先 seated_idle/seated_sleepy，除非明确起身不要给站姿动作。"
+@export_multiline var response_contract_prompt: String = "后端回复应优先返回 JSON：dialogue 为 Mirdo 要说的话；task_control.mode 用 none/continue/pause/replace/cancel 判断这句话与当前任务的关系：普通回应继续，临时插话暂停后恢复，新明确目标替换，明确停止才取消；expression 从 neutral/joy/fun/angry/sorrow/surprised/disappointed 中选择；action 从 available_body_actions 中选择；action_line 返回 0 到 4 个有因果的步骤，Godot 只执行首个 pending 步骤；visemes 使用 aa、ih、ou、E、oh 五种，用顿号或逗号分隔。与老师互动时优先 tiny_wave/small_wave/small_nod/cute_explain/tilt_head_cute；点头用 react_nod，挥手用 react_wave/tiny_wave；需要回头或转向时可用 look_back/turn_left/turn_right/turn_180；坐着时优先 seated_idle/seated_sleepy，除非明确起身不要给站姿动作。"
 @export var available_body_actions: PackedStringArray = PackedStringArray([
 	"idle_normal", "idle_relaxed", "idle_sleepy", "idle_alert", "idle_fidget", "listen", "happy_bounce",
 	"walk", "run", "seated_idle", "seated_sleepy",
+	"sit_down", "stand_up",
 	"work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies",
 	"work_reach", "work_take_item", "work_place_item", "work_drink", "work_explain",
 	"react_nod", "react_wave", "tiny_wave", "rub_eye", "sleepy_yawn", "cute_startle",
@@ -62,6 +70,21 @@ signal dialogue_failed(error_text: String)
 @export_range(0.05, 2.0, 0.05) var queued_dialogue_retry_delay_sec: float = 0.25
 @export var always_log: bool = true
 
+@export_category("实时引导")
+## 玩家在 Mirdo 说话时补充或改口，立即停止旧语音并重新进入 Agent；
+## 自主事件仍排队，不能用这个入口抢断玩家对白。
+@export var interrupt_presentation_on_player_guidance: bool = true
+
+@export_category("TTS 呈现")
+## 默认关闭；勾选后，本组件会在每次 Agent 完成对白时请求语音。
+@export var tts_enabled: bool = false
+## 对应 Server/data/tts/characters 下的声线配置文件。
+@export var tts_voice_profile: String = "mirdo_ja"
+## -1 表示使用声线配置的默认 speaker_id；非负值覆盖本次请求。
+@export var tts_speaker_id: int = -1
+## 开启后 Agent 会额外返回 dialogue_ja，VOICEVOX 使用日语字段合成。
+@export var tts_generate_japanese: bool = false
+
 @export_category("Dialogue Continuation")
 @export var auto_continue_dialogue_enabled: bool = true
 @export_range(0.0, 5.0, 0.05) var auto_continue_dialogue_delay_sec: float = 0.45
@@ -80,6 +103,14 @@ var _action_semantics: Node
 var _action_executor: Node
 var _subtitle_target: Node
 var _face_component: Node
+var _voice_player: AIVoicePlayer
+var _speech_gate_active: bool = false
+var _tts_expected_for_request: bool = false
+var _pending_voice_report: Dictionary = {}
+var _pending_voice_dialogue: String = ""
+var _pending_voice_ai_data: Dictionary = {}
+var _pending_voice_route_summary: Dictionary = {}
+var _queued_local_dialogues: Array[Dictionary] = []
 var _request_in_flight: bool = false
 var _last_payload: Dictionary = {}
 var _stream_text: String = ""
@@ -96,6 +127,10 @@ var _pending_player_first_input_ticks_msec: int = 0
 var _player_input_draft_text: String = ""
 var _player_input_draft_updated_msec: int = 0
 var _dialogue_continue_serial: int = 0
+## 每个客户端输入拥有单调递增序号；新输入可替代尚未输出的旧请求。
+var _client_sequence: int = 0
+var _active_client_request_id: String = ""
+var _request_epoch: int = 0
 @export_range(0, 256, 1) var max_world_scene_objects_in_prompt: int = 64
 @export_range(0, 128, 1) var max_world_scene_areas_in_prompt: int = 32
 @export var perception_area_group: StringName = &"ai_perception_area"
@@ -103,24 +138,132 @@ var _dialogue_continue_serial: int = 0
 
 func _ready() -> void:
 	_refresh_refs()
+	_load_global_tts_settings()
 	_bind_ai_signals()
+	_ensure_voice_player()
 
 func chat(text: String, given_item: String = "") -> bool:
 	var result := send_player_text(text, given_item)
 	return bool(result.get("ok", false))
 
 func send_player_text(player_text: String, given_item: String = "") -> Dictionary:
-	return _send_dialogue_text(player_text, given_item, "player", {})
+	# 老师输入优先级高于自主闲聊：还没显示的自主台词直接丢弃，
+	# 避免玩家已经改口后又播放一条过时的自言自语。
+	if not player_text.strip_edges().is_empty() and not _queued_local_dialogues.is_empty():
+		_queued_local_dialogues.clear()
+		_log("autonomous_dialogue_queue_cleared_by_player_guidance")
+	# 空闲时仍保留很短的输入聚合窗口；已有生成或语音输出时，Enter 提交
+	# 就是明确的 steer 边界，应立即打断，不能再等待 0.45 秒聚合计时器。
+	var steer_now := _request_in_flight or _speech_gate_active
+	return _send_dialogue_text(player_text, given_item, "player", {}, steer_now)
 
 func send_autonomous_text(prompt_text: String, autonomous_decision: Dictionary = {}) -> Dictionary:
 	return _send_dialogue_text(prompt_text, "", "autonomous", autonomous_decision)
+
+## 让本地兜底台词也走同一条 TTS/字幕屏障。
+##
+## 自主生活、回程欢迎等不一定需要再次调用模型，但它们仍然是角色说出的
+## 话。调用方只提供已经确定的短句，组件负责按“subtitle → 播放完成 → 下一步”
+## 的顺序呈现，避免某个本地分支绕过 TTS 导致对白重叠。
+func present_local_dialogue(text: String, ai_data: Dictionary = {}) -> bool:
+	_refresh_refs()
+	var dialogue_text := text.strip_edges()
+	if dialogue_text.is_empty():
+		return false
+	if _speech_gate_active or _request_in_flight:
+		# 本地生活台词不丢失，也不打断当前 Agent 回合；等当前对白/语音
+		# 完成后再按入队顺序呈现。
+		if _queued_local_dialogues.size() >= 4:
+			_queued_local_dialogues.pop_front()
+		_queued_local_dialogues.append({"text": dialogue_text, "ai_data": ai_data.duplicate(true)})
+		return true
+	var data := ai_data.duplicate(true)
+	data["dialogue"] = dialogue_text
+	data["task_status"] = "complete"
+	if not data.has("emotion"):
+		data["emotion"] = "平静"
+	if not data.has("expression"):
+		data["expression"] = "neutral"
+	if not data.has("visemes"):
+		data["visemes"] = _simple_visemes_for_text(dialogue_text)
+	var report := {
+		"ok": true,
+		"dialogue": dialogue_text,
+		"ai_data": data.duplicate(true),
+		"route_summary": {},
+		"local_dialogue": true,
+	}
+	if _has_playable_tts(data):
+		_speech_gate_active = true
+		_pending_voice_report = report
+		_pending_voice_dialogue = dialogue_text
+		_pending_voice_ai_data = data.duplicate(true)
+		_pending_voice_route_summary = {}
+		# 本地台词也遵循同一时序：先显示字幕，再请求/播放语音。
+		dialogue_presenting.emit(report.duplicate(true))
+		if _play_tts_response(data):
+			return true
+		_clear_pending_voice_state()
+	_finish_dialogue_presentation(report, dialogue_text, data, {})
+	return true
+
+## 控制器在流式回调阶段调用它，TTS 开启时不要提前把字幕推到屏幕。
+func waits_for_tts_presentation() -> bool:
+	# “开启 TTS”不等于“本回合有语音”。只有已经拿到可播放音频并
+	# 进入 speech gate 时，控制器才需要等待 playback_finished；请求期间先
+	# 缓冲流式字幕，若最终没有 tts.audio_url，dialogue_completed 会立即释放。
+	return _tts_expected_for_request or _speech_gate_active
+
+func is_tts_playback_active() -> bool:
+	return _speech_gate_active
+
+## 将 Godot 工具执行结果按 Agent tool-result 协议回传；服务端会返回下一步。
+## 这里不创建“玩家说了某句话”的假消息，也不自己猜测后续动作。
+func send_action_result(goal_report: Dictionary, source_decision: Dictionary = {}) -> Dictionary:
+	_refresh_refs()
+	var decision := source_decision.duplicate(true)
+	var event_context: Dictionary = decision.get("event_context", {}) as Dictionary if decision.get("event_context", {}) is Dictionary else {}
+	var event := String(decision.get("event", goal_report.get("event", "navigation_goal_finished"))).strip_edges()
+	if event.is_empty():
+		event = "navigation_goal_finished"
+	var raw_payload: Dictionary = goal_report.get("payload", {}) as Dictionary if goal_report.get("payload", {}) is Dictionary else {}
+	var raw_command_payload: Dictionary = raw_payload.get("command_payload", {}) as Dictionary if raw_payload.get("command_payload", {}) is Dictionary else {}
+	var tool_call_id := String(goal_report.get("tool_call_id", raw_payload.get("tool_call_id", raw_command_payload.get("tool_call_id", "")))).strip_edges()
+	if tool_call_id.is_empty():
+		tool_call_id = String(decision.get("tool_call_id", "")).strip_edges()
+	if tool_call_id.is_empty():
+		tool_call_id = String(goal_report.get("event_id", decision.get("event_id", event_context.get("event_id", "")))).strip_edges()
+	if tool_call_id.is_empty():
+		tool_call_id = "%s:%s:%s" % [String(decision.get("task_id", "")), String(decision.get("current_step_id", "")), event]
+	var action_result: Dictionary = event_context.get("action_result", {}) as Dictionary if event_context.get("action_result", {}) is Dictionary else {}
+	if action_result.is_empty():
+		action_result = goal_report.get("action_result", {}) as Dictionary if goal_report.get("action_result", {}) is Dictionary else {}
+	var command := String(goal_report.get("command", raw_payload.get("command", ""))).strip_edges()
+	var observation := event_context.duplicate(true)
+	var protocol_fields := {
+		"tool_call_id": tool_call_id,
+		"task_id": String(decision.get("task_id", goal_report.get("task_id", ""))).strip_edges(),
+		"chain_id": String(decision.get("chain_id", goal_report.get("chain_id", ""))).strip_edges(),
+		"step_id": String(decision.get("current_step_id", goal_report.get("current_step_id", ""))).strip_edges(),
+		"command": command if not command.is_empty() else String(decision.get("command", "")).strip_edges(),
+		"target_ref": String(goal_report.get("target_object", goal_report.get("target_nav_point", ""))).strip_edges(),
+		"event": event,
+		"status": "succeeded" if bool(goal_report.get("ok", decision.get("ok", false))) else "failed",
+		"ok": bool(goal_report.get("ok", decision.get("ok", false))),
+		"action_result": action_result,
+		"observation": observation,
+	}
+	var prompt := "（Godot 工具结果：%s；请依据真实结果决定下一步。）" % event
+	return _send_dialogue_text(prompt, "", "godot_tool_result", decision, true, "godot_tool_result", protocol_fields)
 
 func _send_dialogue_text(
 	player_text: String,
 	given_item: String = "",
 	request_source: String = "player",
 	source_decision: Dictionary = {},
-	bypass_player_aggregation: bool = false
+	bypass_player_aggregation: bool = false,
+	transport_mode: String = "chat",
+	protocol_fields: Dictionary = {}
 ) -> Dictionary:
 	_refresh_refs()
 	_bind_ai_signals()
@@ -132,14 +275,36 @@ func _send_dialogue_text(
 	if _ai_manager == null:
 		_emit_local_fallback("ai_manager_missing")
 		return {"ok": false, "error": "ai_manager_missing"}
+	# 模型尚未返回时，玩家的改口不是“排队再说一句”，而是替换当前
+	# 草稿。取消 Godot 的 HTTPRequest 后，服务端仍可能完成旧模型调用，
+	# 但 client_sequence 会让它在持久化前变成 superseded。
+	if _request_in_flight and request_source.strip_edges() == "player" and not _sending_request:
+		return _replace_inflight_player_request(text, given_item, source_decision)
+	if _speech_gate_active:
+		if request_source.strip_edges() == "player" and interrupt_presentation_on_player_guidance:
+			return _replace_presented_player_response(text, given_item, source_decision)
+		if _can_queue_dialogue_request(request_source):
+			return _enqueue_dialogue_text(text, given_item, request_source, source_decision)
+		return {"ok": false, "error": "speech_in_progress"}
 	if _request_in_flight:
 		if _can_queue_dialogue_request(request_source):
 			return _enqueue_dialogue_text(text, given_item, request_source, source_decision)
 		return {"ok": false, "error": "request_in_flight"}
 
 	var payload := _build_chat_payload(text, given_item, request_source, source_decision)
+	_client_sequence += 1
+	var request_id := "godot:%s:%d:%d" % [npc_display_name.to_lower(), Time.get_ticks_msec(), _client_sequence]
+	payload["client_request_id"] = request_id
+	payload["client_sequence"] = _client_sequence
+	if not _active_client_request_id.is_empty():
+		payload["supersedes_request_id"] = _active_client_request_id
+	_active_client_request_id = request_id
+	_request_epoch += 1
 	if not source_decision.is_empty():
 		payload["source_decision"] = _compact_decision(source_decision)
+	if not protocol_fields.is_empty():
+		for key in protocol_fields.keys():
+			payload[String(key)] = protocol_fields[key]
 	_last_payload = payload.duplicate(true)
 	var trace_context: Dictionary = payload.get("context", {}) as Dictionary
 	var trace_chain: Dictionary = trace_context.get("task_chain", {}) as Dictionary
@@ -147,12 +312,15 @@ func _send_dialogue_text(
 	_stream_text = ""
 	_last_ai_error_text = ""
 	_ai_error_handled_during_send = false
+	_tts_expected_for_request = tts_enabled
 	_request_in_flight = true
 	dialogue_requested.emit(payload.duplicate(true))
 
 	var sent := false
 	_sending_request = true
-	if use_streaming_request and _ai_manager.has_method("request_chat_stream"):
+	if transport_mode == "godot_tool_result" and _ai_manager.has_method("request_godot_action_result"):
+		sent = bool(_ai_manager.call("request_godot_action_result", payload, {"type": "godot_tool_result", "npc": npc_display_name}))
+	elif use_streaming_request and _ai_manager.has_method("request_chat_stream"):
 		sent = bool(_ai_manager.call("request_chat_stream", payload, {"type": "character_dialogue", "npc": npc_display_name}))
 	elif _ai_manager.has_method("request_chat_once"):
 		sent = bool(_ai_manager.call("request_chat_once", payload, {"type": "character_dialogue", "npc": npc_display_name}))
@@ -163,13 +331,101 @@ func _send_dialogue_text(
 		var error_text := _last_ai_error_text if not _last_ai_error_text.strip_edges().is_empty() else "request_failed"
 		if error_text == "request_in_progress" and _can_queue_dialogue_request(request_source):
 			_request_in_flight = false
+			_tts_expected_for_request = false
 			var queued := _enqueue_dialogue_text(text, given_item, request_source, source_decision, true)
 			_schedule_queued_dialogue_retry(queued_dialogue_retry_delay_sec)
 			return queued
 		if not _ai_error_handled_during_send:
 			_handle_dialogue_error(error_text)
+		_tts_expected_for_request = false
 		return {"ok": false, "error": error_text}
 	return {"ok": true, "payload": payload}
+
+func _replace_inflight_player_request(text: String, given_item: String, source_decision: Dictionary) -> Dictionary:
+	var previous_id := _active_client_request_id
+	var previous_sequence := _client_sequence
+	# 先让旧回调失去资格，再取消 HTTPRequest，避免 cancel_request 触发的
+	# network_error 被误当成本地兜底对白。
+	_request_in_flight = false
+	_tts_expected_for_request = false
+	if _ai_manager != null and _ai_manager.has_method("cancel_request"):
+		_ai_manager.call("cancel_request")
+	_stream_text = ""
+	_last_ai_error_text = ""
+	_ai_error_handled_during_send = false
+	dialogue_interrupted.emit({
+		"phase": "generation",
+		"target_request_id": previous_id,
+		"target_client_sequence": previous_sequence,
+		"reason": "player_guidance",
+	})
+	# 玩家原话保持干净；“这是引导而不是普通新消息”通过结构化字段交给
+	# PydanticAI instructions，不再手写一段系统说明污染对话与记忆。
+	var result := _send_dialogue_text(
+		text,
+		given_item,
+		"player",
+		source_decision,
+		true,
+		"chat",
+		_build_steering_protocol("generation", previous_id, previous_sequence, ""),
+	)
+	_log("dialogue_request_replaced previous=%s latest=%s" % [previous_id, _active_client_request_id])
+	return result
+
+
+func _replace_presented_player_response(text: String, given_item: String, source_decision: Dictionary) -> Dictionary:
+	"""停止正在播放的旧对白，并把玩家最新输入作为实时引导重新提交。"""
+	var previous_id := _active_client_request_id
+	var previous_sequence := _client_sequence
+	var interrupted_dialogue := _pending_voice_dialogue.strip_edges()
+	var interrupted_report := _pending_voice_report.duplicate(true)
+	# 必须先关闭 speech gate，再 stop()。AIVoicePlayer.stop 会同步发出
+	# playback_failed；旧回调看到 gate 已关闭后就不会错误完成旧字幕。
+	_clear_pending_voice_state()
+	_tts_expected_for_request = false
+	_dialogue_continue_serial += 1
+	_queued_dialogue_requests.clear()
+	if _voice_player != null and is_instance_valid(_voice_player):
+		_voice_player.stop()
+	dialogue_interrupted.emit({
+		"phase": "presentation",
+		"target_request_id": previous_id,
+		"target_client_sequence": previous_sequence,
+		"interrupted_dialogue": interrupted_dialogue,
+		"previous_report": interrupted_report,
+		"reason": "player_guidance",
+	})
+	var result := _send_dialogue_text(
+		text,
+		given_item,
+		"player",
+		source_decision,
+		true,
+		"chat",
+		_build_steering_protocol("presentation", previous_id, previous_sequence, interrupted_dialogue),
+	)
+	_log("dialogue_presentation_steered previous=%s latest=%s" % [previous_id, _active_client_request_id])
+	return result
+
+
+func _build_steering_protocol(
+	phase: String,
+	target_request_id: String,
+	target_sequence: int,
+	interrupted_dialogue: String,
+) -> Dictionary:
+	"""构造与后端 ChatRequest.steering 对应的稳定协议字段。"""
+	return {
+		"steering": {
+			"mode": "interrupt",
+			"phase": phase,
+			"target_request_id": target_request_id,
+			"target_client_sequence": maxi(0, target_sequence),
+			"interrupted_dialogue": interrupted_dialogue.left(500),
+			"reason": "player_guidance",
+		},
+	}
 
 func get_queued_dialogue_count() -> int:
 	return _queued_dialogue_requests.size()
@@ -319,6 +575,23 @@ func _enqueue_dialogue_text(
 	}
 	if entry["player_text"].is_empty():
 		return {"ok": false, "error": "empty_text"}
+	if String(entry.get("request_source", "player")) == "player":
+		# 玩家指导是最高优先级：清掉还没发出的自主请求，再只保留
+		# 最新一条玩家意图；当前正在播放的对白不会被强行截断。
+		for index in range(_queued_dialogue_requests.size() - 1, -1, -1):
+			var queued_source := String((_queued_dialogue_requests[index] as Dictionary).get("request_source", "player"))
+			if queued_source != "player":
+				_queued_dialogue_requests.remove_at(index)
+	# 语音正在播时只保留最后一条玩家意图。这样连续改口不会形成一串
+	# 过时对白，也不会让后端在十几条旧消息后才看到最终目标。
+	if String(entry.get("request_source", "player")) == "player":
+		for index in range(_queued_dialogue_requests.size() - 1, -1, -1):
+			var pending := _queued_dialogue_requests[index] as Dictionary
+			if String(pending.get("request_source", "player")) != "player":
+				continue
+			_queued_dialogue_requests[index] = entry
+			_log("dialogue_pending_replaced count=%d text=%s" % [_queued_dialogue_requests.size(), _preview_text(String(entry.get("player_text", "")))])
+			return {"ok": true, "queued": true, "replaced": true, "queue_size": _queued_dialogue_requests.size()}
 	if _try_merge_queued_dialogue(entry):
 		_log("dialogue_merged count=%d text=%s" % [
 			_queued_dialogue_requests.size(),
@@ -412,9 +685,12 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 		var compact_source_decision := _compact_decision(source_decision)
 		context_data["source_decision"] = compact_source_decision
 		context_data["event"] = String(compact_source_decision.get("event", context_data.get("event", ""))).strip_edges()
-	var blackboard := _build_blackboard_context()
-	if not blackboard.is_empty():
-		context_data["blackboard"] = blackboard
+	# 紧凑协议已经把感知、状态、任务链和世界摘要分别发送。
+	# 完整 blackboard 既重复又可能包含大量运行时调试数据，只在显式关闭紧凑模式时发送。
+	if not compact_backend_context:
+		var blackboard := _build_blackboard_context()
+		if not blackboard.is_empty():
+			context_data["blackboard"] = blackboard
 	var perception := _build_compact_perception_context()
 	if not perception.is_empty():
 		context_data["perception"] = perception
@@ -439,17 +715,19 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 				"goal": String(current_behavior.get("current_kind", "")).strip_edges(),
 				"last_target": String(current_behavior.get("current_target", "")).strip_edges(),
 			}
-	var nav_points := _build_nav_point_context()
-	if not nav_points.is_empty():
-		context_data["ai_nav_points"] = nav_points
-		context_data["known_nav_points"] = nav_points
+	var navigation_catalog := _build_navigation_catalog()
+	if not navigation_catalog.is_empty():
+		# 新协议只发送一份语义导航目录，避免同一批实体被序列化两次。
+		context_data["navigation_catalog"] = navigation_catalog
+		if not compact_backend_context:
+			context_data["known_nav_points"] = navigation_catalog
 	var action_contract := _build_action_contract_context()
 	if not action_contract.is_empty():
 		context_data["action_contract"] = action_contract
 	var world_scene := _build_world_scene_context()
 	if not world_scene.is_empty():
 		context_data["world_scene"] = world_scene
-	if request_source.strip_edges().to_lower() == "autonomous":
+	if request_source.strip_edges().to_lower() in ["autonomous", "godot_tool_result"]:
 		var event_context := _build_event_context(source_decision, perception, mind_state, resource_stats, current_behavior)
 		if not event_context.is_empty():
 			context_data["event_context"] = event_context
@@ -464,9 +742,10 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 			ai_stats,
 			given_item.strip_edges(),
 			context_data,
-			-1
+			-1,
+			_build_tts_options()
 		)
-	return {
+	var fallback_payload := {
 		"day": 1,
 		"time": 0,
 		"time_min": 0,
@@ -475,7 +754,47 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 		"player_text": player_text,
 		"given_item": given_item.strip_edges(),
 		"context": context_data,
+		"use_tts": tts_enabled,
+		"tts_voice_profile": _effective_tts_voice_profile(),
+		"generate_japanese": tts_enabled and tts_generate_japanese,
 	}
+	if tts_speaker_id >= 0:
+		fallback_payload["tts_speaker_id"] = tts_speaker_id
+	return fallback_payload
+
+func _build_tts_options() -> Dictionary:
+	var options := {
+		"use_tts": tts_enabled,
+		"tts_voice_profile": _effective_tts_voice_profile(),
+		"generate_japanese": tts_enabled and tts_generate_japanese,
+	}
+	if tts_speaker_id >= 0:
+		options["tts_speaker_id"] = tts_speaker_id
+	return options
+
+func _effective_tts_voice_profile() -> String:
+	var profile := tts_voice_profile.strip_edges()
+	return profile if not profile.is_empty() else "mirdo_ja"
+
+
+## 从全局设置读取玩家在设置面板选择的声线，避免只改 UI 却仍使用场景默认值。
+func _load_global_tts_settings() -> void:
+	var settings := get_node_or_null("/root/AISettings")
+	if settings == null:
+		return
+	if settings.has_method("get_tts_settings"):
+		var values: Variant = settings.call("get_tts_settings")
+		if values is Dictionary:
+			tts_enabled = bool(values.get("enabled", tts_enabled))
+			tts_voice_profile = String(values.get("voice_profile", tts_voice_profile)).strip_edges()
+			tts_speaker_id = int(values.get("speaker_id", tts_speaker_id))
+			tts_generate_japanese = bool(values.get("generate_japanese", tts_generate_japanese))
+	if settings.has_signal("settings_changed") and not settings.settings_changed.is_connected(_on_global_tts_settings_changed):
+		settings.settings_changed.connect(_on_global_tts_settings_changed)
+
+
+func _on_global_tts_settings_changed(_settings: Dictionary = {}) -> void:
+	_load_global_tts_settings()
 
 
 ## 组合动作结果与动作完成瞬间的运行时快照，供后端 Agent 判断下一步。
@@ -599,7 +918,7 @@ func _build_npc_contract_context() -> Dictionary:
 		"response_contract": response_contract_prompt.strip_edges(),
 		"available_expressions": _packed_to_clean_array(available_expressions),
 		"available_visemes": _packed_to_clean_array(available_visemes),
-		"navigation_contract": "ai_nav_points/known_nav_points are Mirdo's remembered global map points with positions and action contract. perception is only current Area3D vision/nearby sensing. Return an action_line; its first step may use command='go_to_nav_point' with target_nav_point equal to one ai_nav_points.id. Choose action from that point's action_options and expression from expression_options.",
+		"navigation_contract": "navigation_catalog contains semantic entities and optional waypoints. Never invent ids. Use command='go_to_object' with target_ref equal to an entity id and marker_role/affordance for the intended capability; use go_to_nav_point only for a waypoint id. Godot resolves approach/sit/stand markers locally and reports the real result.",
 	}
 	if compact_backend_context:
 		context["preferred_social_actions"] = ["listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "seated_idle"]
@@ -666,7 +985,7 @@ func _build_world_scene_context() -> Dictionary:
 		"scene_name": String(scene.name) if scene != null else "",
 		"world_objects_note": "Semantic objects currently registered in the Godot scene; use this to answer questions about facilities/items even when not in immediate vision.",
 	}
-	var objects := _collect_group_summaries(world_object_group, &"build_ai_object_summary", observer, max_world_scene_objects_in_prompt)
+	var objects := _collect_group_summaries(world_object_group, &"build_ai_entity_summary", observer, max_world_scene_objects_in_prompt)
 	if not objects.is_empty():
 		context["world_objects"] = objects
 	var areas := _collect_group_summaries(perception_area_group, &"build_ai_area_summary", observer, max_world_scene_areas_in_prompt)
@@ -687,9 +1006,16 @@ func _collect_group_summaries(group_name: StringName, method_name: StringName, o
 		if out.size() >= limit:
 			break
 		var node := candidate as Node
-		if node == null or not is_instance_valid(node) or not node.has_method(method_name):
+		if node == null or not is_instance_valid(node):
 			continue
-		var value: Variant = node.call(method_name, observer)
+		# 新协议使用 entity_summary；旧场景物体仍可提供 object_summary，
+		# 这样升级后不会让已经摆好的柜子/物品从知识上下文里消失。
+		var summary_method := method_name
+		if not node.has_method(summary_method) and method_name == &"build_ai_entity_summary" and node.has_method(&"build_ai_object_summary"):
+			summary_method = &"build_ai_object_summary"
+		if not node.has_method(summary_method):
+			continue
+		var value: Variant = node.call(summary_method, observer)
 		if value is not Dictionary:
 			continue
 		var compact := _compact_world_scene_entry(value as Dictionary)
@@ -701,8 +1027,8 @@ func _collect_group_summaries(group_name: StringName, method_name: StringName, o
 func _compact_world_scene_entry(entry: Dictionary) -> Dictionary:
 	var compact := {}
 	for key in [
-		"id", "name", "type", "description", "tags", "actions", "supported_actions", "distance",
-		"marker_roles", "area_actions", "priority", "object_id", "area_id"
+		"id", "name", "type", "kind", "description", "tags", "actions", "affordances", "supported_actions", "distance",
+		"availability", "area_actions", "priority", "object_id", "area_id"
 	]:
 		if entry.has(key):
 			compact[key] = entry[key]
@@ -748,37 +1074,58 @@ func _build_current_behavior_context() -> Dictionary:
 			return _compact_current_behavior(resume_value as Dictionary) if compact_backend_context else (resume_value as Dictionary).duplicate(true)
 	return {}
 
-func _build_nav_point_context() -> Array:
+## 构造语义导航目录。
+##
+## 一个柜子/床/长凳是一个实体，内部可以拥有多个 approach/sit/stand 点；
+## 后端只看到实体 id、能力和距离桶，不看到坐标或 NodePath。
+func _build_navigation_catalog() -> Array:
+	if not include_navigation_catalog:
+		return []
 	var tree := get_tree()
-	if tree == null or max_nav_points_in_prompt <= 0:
+	if tree == null or max_navigation_entities_in_prompt <= 0:
 		return []
 	var observer := _find_observer_node()
-	var out: Array = []
-	for candidate in tree.get_nodes_in_group(ai_nav_point_group):
+	var result: Array = []
+	var seen: Dictionary = {}
+	for candidate in tree.get_nodes_in_group(world_object_group):
 		var node := candidate as Node
-		if node == null or not is_instance_valid(node):
+		if node == null or not is_instance_valid(node) or not node.has_method("build_ai_entity_summary"):
 			continue
-		if not node.has_method("build_ai_nav_point_summary"):
-			continue
-		var value: Variant = node.call("build_ai_nav_point_summary", observer)
+		var value: Variant = node.call("build_ai_entity_summary", observer)
 		if value is not Dictionary:
 			continue
-		var entry := value as Dictionary
-		if bool(entry.get("enabled", true)) == false:
+		var entity := (value as Dictionary).duplicate(true)
+		var entity_id := String(entity.get("id", "")).strip_edges()
+		if entity_id.is_empty() or seen.has(entity_id):
 			continue
-		var compact := {}
-		for key in [
-			"id", "name", "type", "description", "tags", "arrival_action", "arrival_expression",
-			"action_options", "expression_options", "action_hint", "target_object_id",
-			"face_mode", "marker_role", "position", "global_position", "forward",
-			"knowledge_scope", "map_role", "distance", "cooldown_sec", "dwell_time_sec"
-		]:
-			if entry.has(key):
-				compact[key] = entry[key]
-		if not compact.is_empty():
-			out.append(compact)
-	_sort_compact_entries_by_distance(out)
-	return out.slice(0, mini(max_nav_points_in_prompt, out.size()))
+		entity["target_ref"] = entity_id
+		entity["knowledge_scope"] = "world_entities"
+		entity["map_role"] = "semantic_entity"
+		seen[entity_id] = true
+		result.append(entity)
+
+	# 只有没有实体归属的巡游/观察点才进入后端，避免一个设施重复出现。
+	for candidate in tree.get_nodes_in_group(ai_nav_point_group):
+		var node := candidate as Node
+		if node == null or not is_instance_valid(node) or not node.has_method("build_ai_navigation_summary"):
+			continue
+		var value: Variant = node.call("build_ai_navigation_summary", observer)
+		if value is not Dictionary:
+			continue
+		var waypoint := (value as Dictionary).duplicate(true)
+		if String(waypoint.get("kind", "")) != "waypoint":
+			continue
+		var waypoint_id := String(waypoint.get("id", "")).strip_edges()
+		if waypoint_id.is_empty() or seen.has(waypoint_id):
+			continue
+		seen[waypoint_id] = true
+		result.append(waypoint)
+	_sort_compact_entries_by_distance(result)
+	return result.slice(0, mini(max_navigation_entities_in_prompt, result.size()))
+
+## 旧方法名保留给现有调试代码，但返回的内容已经是语义目录。
+func _build_nav_point_context() -> Array:
+	return _build_navigation_catalog()
 
 func _find_observer_node() -> Node3D:
 	var current: Node = self
@@ -806,14 +1153,21 @@ func _compact_entries(entries_value: Variant, limit: int) -> Array:
 		var compact := {}
 		for key in ["id", "name", "type", "description", "tags", "actions", "distance", "marker_roles"]:
 			if entry.has(key):
-				compact[key] = entry[key]
+				if key == "marker_roles" and entry[key] is Dictionary:
+					# 对话上下文只需要知道能力角色，不发送 Godot 的 NodePath。
+					var roles: Array = []
+					for raw_role in (entry[key] as Dictionary).keys():
+						roles.append(String(raw_role))
+					compact[key] = roles
+				else:
+					compact[key] = entry[key]
 		if not compact.is_empty():
 			out.append(compact)
 	return out
 
 func _compact_current_behavior(snapshot: Dictionary) -> Dictionary:
 	var out := {}
-	for key in ["navigating", "current_kind", "current_target", "last_kind", "last_target", "has_resume", "resume_kind", "resume_target", "external_grace_left", "dwell_left", "ai_task_chain_active", "ai_task_chain_id", "ai_task_chain_depth", "ai_task_chain_status"]:
+	for key in ["navigating", "current_kind", "current_target", "last_kind", "last_target", "has_resume", "resume_kind", "resume_target", "external_grace_left", "dwell_left", "ai_task_chain_active", "ai_task_chain_id", "ai_task_chain_depth", "ai_task_chain_status", "task_control_mode", "guidance_resume_blocked"]:
 		if snapshot.has(key):
 			out[key] = snapshot[key]
 	var current := _compact_decision(snapshot.get("current_decision", {}))
@@ -857,7 +1211,7 @@ func _compact_decision(value: Variant) -> Dictionary:
 
 func _compact_action_contract(actions: Array) -> Array:
 	var preferred := [
-		"listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "seated_idle", "seated_sleepy",
+		"listen", "tiny_wave", "small_nod", "cute_explain", "tilt_head_cute", "sit_down", "stand_up", "seated_idle", "seated_sleepy",
 		"work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies", "work_take_item", "work_drink",
 		"look_around", "curious_peek", "rub_eye", "sleepy_yawn", "walk", "run", "turn_left", "turn_right", "turn_180"
 	]
@@ -922,15 +1276,21 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		dialogue_text = _stream_text.strip_edges()
 	if dialogue_text.is_empty():
 		dialogue_text = "……"
-	_log("response status=%s current_step=%s action_line=%d dialogue=%s" % [String(final_data.get("task_status", "")), String(final_data.get("current_step_id", "")), _action_line_size(final_data), _preview_text(dialogue_text)])
+	_log("response seq=%d request=%s superseded=%s status=%s current_step=%s action_line=%d dialogue=%s" % [
+		int(final_data.get("client_sequence", 0)),
+		String(final_data.get("client_request_id", "")),
+		str(bool(final_data.get("superseded", false))),
+		String(final_data.get("task_status", "")),
+		String(final_data.get("current_step_id", "")),
+		_action_line_size(final_data),
+		_preview_text(dialogue_text),
+	])
 	if _should_suppress_error(dialogue_text, final_data):
 		_emit_local_fallback(_extract_error_reason(dialogue_text, final_data))
 		return
 	var route_summary := {}
 	if auto_apply_ai_response:
 		route_summary = _apply_ai_response(final_data)
-	if direct_subtitle_enabled:
-		_show_subtitle(dialogue_text)
 	var report := {
 		"ok": true,
 		"dialogue": dialogue_text,
@@ -938,9 +1298,20 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		"route_summary": route_summary,
 		"request_payload": _last_payload.duplicate(true),
 	}
-	dialogue_completed.emit(report)
-	_schedule_dialogue_continuation_if_needed(final_data, dialogue_text, route_summary)
-	_drain_queued_dialogue_deferred()
+	# 先建立等待状态，再启动下载，避免缓存命中时同步播放造成竞态。
+	if _has_playable_tts(final_data):
+		_speech_gate_active = true
+		_pending_voice_report = report
+		_pending_voice_dialogue = dialogue_text
+		_pending_voice_ai_data = final_data.duplicate(true)
+		_pending_voice_route_summary = route_summary.duplicate(true)
+		# 先通知字幕层，再启动音频请求。这样即使命中 Godot 的内存缓存，
+		# 也不会出现“声音先响、字幕后出现”；下一句仍等 playback_finished。
+		dialogue_presenting.emit(report.duplicate(true))
+		if _play_tts_response(final_data):
+			return
+		_clear_pending_voice_state()
+	_finish_dialogue_presentation(report, dialogue_text, final_data, route_summary)
 
 func _schedule_dialogue_continuation_if_needed(ai_data: Dictionary, dialogue_text: String, route_summary: Dictionary = {}) -> bool:
 	if not auto_continue_dialogue_enabled:
@@ -1015,6 +1386,7 @@ func _on_ai_error(error_text: String) -> void:
 
 func _handle_dialogue_error(error_text: String) -> void:
 	_request_in_flight = false
+	_tts_expected_for_request = false
 	if _should_speak_local_fallback_for_error(error_text):
 		_emit_local_fallback(error_text)
 		return
@@ -1022,6 +1394,7 @@ func _handle_dialogue_error(error_text: String) -> void:
 	dialogue_failed.emit(error_text)
 	if not _sending_request:
 		_drain_queued_dialogue_deferred()
+		_drain_queued_local_dialogue_deferred()
 
 func _should_speak_local_fallback_for_error(error_text: String) -> bool:
 	var reason := error_text.strip_edges()
@@ -1082,6 +1455,7 @@ func _apply_face_only(ai_data: Dictionary) -> void:
 		_face_component.call("play_external_visemes", visemes)
 
 func _emit_local_fallback(reason: String) -> void:
+	_tts_expected_for_request = false
 	var player_text := String(_last_payload.get("player_text", "")).strip_edges()
 	var given_item := String(_last_payload.get("given_item", "")).strip_edges()
 	var data := _build_local_dialogue_response(player_text, given_item, reason)
@@ -1101,6 +1475,7 @@ func _emit_local_fallback(reason: String) -> void:
 		"fallback_reason": reason,
 	})
 	_drain_queued_dialogue_deferred()
+	_drain_queued_local_dialogue_deferred()
 
 func _build_local_dialogue_response(player_text: String, given_item: String = "", reason: String = "local_fallback") -> Dictionary:
 	var text := player_text.strip_edges()
@@ -1222,6 +1597,9 @@ func _build_local_dialogue_response(player_text: String, given_item: String = ""
 		action = "tilt_head_cute"
 	var data := {
 		"dialogue": _limit_text(dialogue, 42),
+		"command": command,
+		"intent": command,
+		"command_payload": {"target_hint": target_hint} if not target_hint.is_empty() else {},
 		"emotion": expression,
 		"expression": expression,
 		"action": action,
@@ -1300,8 +1678,117 @@ func _simple_visemes_for_text(text: String) -> String:
 
 func _show_subtitle(text: String) -> void:
 	var subtitle := _resolve_subtitle_target()
-	if subtitle != null and subtitle.has_method("show_once"):
+	if subtitle == null:
+		return
+	# Agent 的完整响应已经收齐；不要把网络 chunk 再模拟成逐字打字机。
+	# TTS 回合由 dialogue_presenting 提前显示，这个方法只作为无 TTS/回退路径。
+	if subtitle.has_method("show_once_immediate"):
+		subtitle.call("show_once_immediate", text, npc_display_name.strip_edges())
+	elif subtitle.has_method("show_once"):
 		subtitle.call("show_once", text, npc_display_name.strip_edges())
+
+func _finish_dialogue_presentation(
+	report: Dictionary,
+	dialogue_text: String,
+	ai_data: Dictionary,
+	route_summary: Dictionary,
+) -> void:
+	_speech_gate_active = false
+	_tts_expected_for_request = false
+	# TTS 回合在 dialogue_presenting 时已经把整句字幕立即渲染并锁住；
+	# 播放完成这里只释放队列，不能再次 show_once，否则会把同一句重新变成
+	# 打字机动画，表现为“最后一句重复/音频结束后又慢慢显示一次”。
+	var tts_value: Variant = ai_data.get("tts", {})
+	var subtitle_already_presented := false
+	if tts_value is Dictionary:
+		var tts := tts_value as Dictionary
+		subtitle_already_presented = bool(tts.get("generated", false)) and not String(tts.get("audio_url", "")).strip_edges().is_empty()
+	if direct_subtitle_enabled and not subtitle_already_presented:
+		_show_subtitle(dialogue_text)
+	dialogue_completed.emit(report)
+	_schedule_dialogue_continuation_if_needed(ai_data, dialogue_text, route_summary)
+	_drain_queued_dialogue_deferred()
+	_drain_queued_local_dialogue_deferred()
+
+func _drain_queued_local_dialogue_deferred() -> void:
+	if _queued_local_dialogues.is_empty() or _request_in_flight or _speech_gate_active:
+		return
+	call_deferred("_drain_queued_local_dialogue")
+
+func _drain_queued_local_dialogue() -> void:
+	if _queued_local_dialogues.is_empty() or _request_in_flight or _speech_gate_active:
+		return
+	var entry: Dictionary = _queued_local_dialogues.pop_front() as Dictionary
+	var local_data: Dictionary = entry.get("ai_data", {}) as Dictionary
+	present_local_dialogue(String(entry.get("text", "")), local_data)
+
+func _clear_pending_voice_state() -> void:
+	_speech_gate_active = false
+	_pending_voice_report = {}
+	_pending_voice_dialogue = ""
+	_pending_voice_ai_data = {}
+	_pending_voice_route_summary = {}
+
+func _ensure_voice_player() -> void:
+	if _voice_player != null and is_instance_valid(_voice_player):
+		return
+	_voice_player = AIVoicePlayer.new()
+	_voice_player.name = "AIVoicePlayer"
+	add_child(_voice_player)
+	_voice_player.playback_finished.connect(_on_tts_playback_finished)
+	_voice_player.playback_failed.connect(_on_tts_playback_failed)
+
+
+func _has_playable_tts(ai_data: Dictionary) -> bool:
+	if not tts_enabled:
+		return false
+	var value: Variant = ai_data.get("tts", {})
+	if not value is Dictionary:
+		return false
+	var tts := value as Dictionary
+	return bool(tts.get("generated", false)) and not String(tts.get("audio_url", "")).strip_edges().is_empty()
+
+func _play_tts_response(ai_data: Dictionary) -> bool:
+	if not tts_enabled:
+		return false
+	_ensure_voice_player()
+	if _voice_player == null or _ai_manager == null:
+		return false
+	var response := ai_data.duplicate(true)
+	var tts_value: Variant = response.get("tts", {})
+	if not tts_value is Dictionary:
+		return false
+	var tts := tts_value as Dictionary
+	if not bool(tts.get("generated", false)):
+		return false
+	var audio_path := String(tts.get("audio_url", "")).strip_edges()
+	if audio_path.is_empty():
+		return false
+	if _ai_manager.has_method("resolve_asset_url"):
+		tts["audio_url"] = _ai_manager.call("resolve_asset_url", audio_path)
+		response["tts"] = tts
+	return _voice_player.play_response(response)
+
+func _on_tts_playback_finished(_cache_key: String) -> void:
+	if not _speech_gate_active or _pending_voice_report.is_empty():
+		return
+	var report := _pending_voice_report.duplicate(true)
+	var dialogue_text := _pending_voice_dialogue
+	var ai_data := _pending_voice_ai_data.duplicate(true)
+	var route_summary := _pending_voice_route_summary.duplicate(true)
+	_clear_pending_voice_state()
+	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary)
+
+func _on_tts_playback_failed(reason: String, _metadata: Dictionary) -> void:
+	_log("tts_playback_failed reason=%s" % reason)
+	if not _speech_gate_active or _pending_voice_report.is_empty():
+		return
+	var report := _pending_voice_report.duplicate(true)
+	var dialogue_text := _pending_voice_dialogue
+	var ai_data := _pending_voice_ai_data.duplicate(true)
+	var route_summary := _pending_voice_route_summary.duplicate(true)
+	_clear_pending_voice_state()
+	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary)
 
 func _extract_dialogue(data: Dictionary) -> String:
 	for key in ["dialogue", "reply", "text", "message", "summary"]:
@@ -1404,4 +1891,3 @@ func _packed_to_clean_array(values: PackedStringArray) -> Array:
 func _log(message: String) -> void:
 	if always_log:
 		print("[CharacterAIDialogue] %s" % message)
-

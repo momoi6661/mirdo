@@ -861,11 +861,13 @@ func _is_selected_option_category(category: String) -> bool:
 	return category == "option_selected" or category == "option_disabled_selected"
 
 func _update_world_transform(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	var anchor_node := _resolve_display_anchor()
 	var has_anchor_basis := false
 	var anchor_basis := Basis.IDENTITY
 	var anchor_is_camera_owned := false
-	if anchor_node != null and anchor_node != self and is_instance_valid(anchor_node):
+	if anchor_node != null and anchor_node != self and is_instance_valid(anchor_node) and anchor_node.is_inside_tree():
 		has_anchor_basis = true
 		anchor_basis = anchor_node.global_basis
 		anchor_is_camera_owned = _is_camera_owned_anchor(anchor_node)
@@ -873,7 +875,7 @@ func _update_world_transform(delta: float) -> void:
 	else:
 		global_position = _local_offset
 
-	if _pivot == null:
+	if _pivot == null or not is_instance_valid(_pivot) or not _pivot.is_inside_tree():
 		return
 	if _follow_camera_rotation:
 		if _camera == null or not is_instance_valid(_camera):

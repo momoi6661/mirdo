@@ -27,7 +27,7 @@ var _active_task: Dictionary = {}
 var _task_serial: int = 0
 var _timeout_serial: int = 0
 
-const NAVIGATION_COMMANDS := ["go_to_nav_point", "go_to_object", "pick_up_item", "take_from_container", "use_item", "eat_item"]
+const NAVIGATION_COMMANDS := ["go_to_nav_point", "go_to_object", "sit_down", "pick_up_item", "take_from_container", "use_item", "eat_item"]
 
 func _ready() -> void:
 	_refresh_refs()

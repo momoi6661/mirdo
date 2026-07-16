@@ -6,31 +6,34 @@ signal options_requested
 signal main_menu_requested
 signal exit_requested
 
-@onready var continue_button = %ContinueButton
-@onready var save_button = %SaveGameButton
-@onready var options_button = %OptionsButton
-@onready var main_menu_button = %MainMenuButton
-@onready var exit_button = %ExitGameButton
-@onready var animation_player = %AnimationPlayer
+@onready var continue_button: Button = %ContinueButton
+@onready var save_button: Button = %SaveGameButton
+@onready var options_button: Button = %OptionsButton
+@onready var main_menu_button: Button = %MainMenuButton
+@onready var exit_button: Button = %ExitGameButton
+@onready var side_panel: Control = get_node_or_null("Control/SidePanel")
+@onready var animation_player: AnimationPlayer = %AnimationPlayer
 @onready var ai_settings_panel = get_node_or_null("%AISettingsPanel")
 @onready var save_slot_menu = get_node_or_null("%SaveSlotMenu")
-
-@onready var ui_sound_player=%UISoundPlayer
-
-# 临时调试用的加载按钮（如果 UI 节点中不存在则为 null，不会报错）
-@onready var debug_load_button = get_node_or_null("%DebugLoadButton")
+@onready var ui_sound_player: AudioStreamPlayer = %UISoundPlayer
 
 var is_transitioning: bool = false
-var pre_pause_mouse_mode: int = Input.MOUSE_MODE_CAPTURED
+var pre_pause_mouse_mode: Input.MouseMode = Input.MOUSE_MODE_CAPTURED
 
 var sound_library: Dictionary = {
 	"button_hover": "uid://bcmrth5ffkdj1",
 	"button_click": "uid://b0e7nekr1tt3k",
 	"menu_open": "uid://rub4iei5paoa",
-	"menu_close": "uid://dm15ase4xcwm8"
+	"menu_close": "uid://dm15ase4xcwm8",
 }
 
+
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_apply_visual_theme()
+	if get_viewport() != null and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
+	_on_viewport_size_changed()
 	if continue_button and not continue_button.pressed.is_connected(_on_continue_pressed):
 		continue_button.pressed.connect(_on_continue_pressed)
 	if save_button and not save_button.pressed.is_connected(_on_save_pressed):
@@ -41,67 +44,86 @@ func _ready() -> void:
 		main_menu_button.pressed.connect(_on_main_menu_pressed)
 	if exit_button and not exit_button.pressed.is_connected(_on_exit_pressed):
 		exit_button.pressed.connect(_on_exit_pressed)
-		
-	# 临时调试加载按钮连接
-	if debug_load_button and not debug_load_button.pressed.is_connected(_on_debug_load_pressed):
-		debug_load_button.pressed.connect(_on_debug_load_pressed)
-	
 	_connect_button_hover_sounds()
 	_connect_ai_settings_panel()
 	_connect_save_slot_menu()
-	
 	if get_parent() == get_tree().root:
 		show_menu()
 	else:
 		hide()
 
+
+func _apply_visual_theme() -> void:
+	var title := get_node_or_null("Control/SidePanel/VBoxContainer/HeaderBox/TitleGroup/TitleLabel") as Label
+	var subtitle := get_node_or_null("Control/SidePanel/VBoxContainer/HeaderBox/TitleGroup/SubtitleLabel") as Label
+	var version_label := get_node_or_null("Control/SidePanel/VBoxContainer/FooterBox/VersionLabel") as Label
+	var esc_hint := get_node_or_null("Control/SidePanel/VBoxContainer/FooterBox/EscHint") as Label
+	var decor_bar := get_node_or_null("Control/SidePanel/VBoxContainer/HeaderBox/DecorBar") as ColorRect
+	var status_icon := get_node_or_null("Control/SidePanel/VBoxContainer/FooterBox/StatusIcon") as ColorRect
+	MenuUIStyle.apply_display_label(title, 38, MenuUIStyle.TEXT_PRIMARY)
+	MenuUIStyle.apply_body_label(subtitle, 15, MenuUIStyle.TEXT_SECONDARY)
+	MenuUIStyle.apply_body_label(version_label, 13, MenuUIStyle.TEXT_MUTED)
+	MenuUIStyle.apply_body_label(esc_hint, 13, MenuUIStyle.ACCENT_DEEP)
+	if decor_bar:
+		decor_bar.color = MenuUIStyle.ACCENT_SOFT
+	if status_icon:
+		status_icon.color = MenuUIStyle.ACCENT_MINT
+	for button in [continue_button, save_button, options_button, main_menu_button, exit_button]:
+		if button != null:
+			MenuUIStyle.apply_menu_button(button, MenuUIStyle.body_font())
+			button.custom_minimum_size.y = 54.0
+			button.focus_mode = Control.FOCUS_ALL
+			button.add_theme_color_override("font_color", MenuUIStyle.TEXT_PRIMARY)
+			button.add_theme_color_override("font_hover_color", MenuUIStyle.TEXT_PRIMARY)
+
+
+func _on_viewport_size_changed() -> void:
+	if side_panel == null:
+		return
+	var viewport_size := get_viewport().get_visible_rect().size
+	var compact := viewport_size.x < 900.0
+	var panel_width: float = minf(480.0, maxf(360.0, viewport_size.x * 0.38))
+	var target_width: float = minf(420.0, viewport_size.x) if compact else panel_width
+	side_panel.offset_right = target_width
+	side_panel.offset_bottom = 0.0
+
+
 func show_menu() -> void:
-	if is_transitioning or visible: return
+	if is_transitioning or visible:
+		return
 	is_transitioning = true
-	
-	# 记录打开 ESC 前的鼠标状态（比如是不是开着背包）
 	pre_pause_mouse_mode = Input.mouse_mode
-	
 	show()
-	if animation_player:
-		animation_player.play("fade_in")
-	
 	_play_ui_sound("menu_open")
-	
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
-	
-	if animation_player and animation_player.is_playing():
-		await animation_player.animation_finished
-	
-	if visible and animation_player:
-		animation_player.play("idle_pulse") # 开启呼吸动画
-	
+	if animation_player:
+		animation_player.play("fade_in")
+		animation_player.queue("idle_pulse")
+	if continue_button:
+		continue_button.grab_focus()
 	is_transitioning = false
 
+
 func hide_menu() -> void:
-	if is_transitioning or not visible: return
+	if is_transitioning or not visible:
+		return
 	is_transitioning = true
-	
 	_play_ui_sound("menu_close")
-	
 	if save_slot_menu != null and save_slot_menu.visible:
 		save_slot_menu.hide()
 	if ai_settings_panel != null and ai_settings_panel.visible:
 		if ai_settings_panel.has_method("_flush_auto_save"):
 			ai_settings_panel.call("_flush_auto_save")
 		ai_settings_panel.hide()
-	
 	if animation_player:
 		animation_player.play("fade_out")
 		await animation_player.animation_finished
-	
 	hide()
-	
-	# 恢复到打开 ESC 前的鼠标状态！如果之前开着背包，它依然是 VISIBLE
 	Input.mouse_mode = pre_pause_mouse_mode
 	get_tree().paused = false
 	is_transitioning = false
+
 
 func _connect_ai_settings_panel() -> void:
 	if ai_settings_panel == null:
@@ -120,37 +142,41 @@ func _connect_save_slot_menu() -> void:
 func _on_ai_settings_back_requested() -> void:
 	if visible:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if options_button:
+			options_button.grab_focus()
 
 
 func _on_save_slot_back_requested() -> void:
 	if visible:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if save_button:
+			save_button.grab_focus()
+
 
 func _connect_button_hover_sounds() -> void:
-	var buttons = [continue_button, save_button, options_button, main_menu_button, exit_button]
-	if debug_load_button:
-		buttons.append(debug_load_button)
-		
-	for button in buttons:
+	for button in [continue_button, save_button, options_button, main_menu_button, exit_button]:
 		if button and not button.mouse_entered.is_connected(_on_button_hover):
 			button.mouse_entered.connect(_on_button_hover)
+
 
 func _play_ui_sound(sound_type: String) -> void:
 	if not ui_sound_player or not sound_library.has(sound_type):
 		return
-	
 	ui_sound_player.stream = load(sound_library[sound_type])
 	if ui_sound_player.stream:
 		ui_sound_player.play()
 
+
 func _on_button_hover() -> void:
 	_play_ui_sound("button_hover")
+
 
 func _on_continue_pressed() -> void:
 	_play_ui_sound("button_click")
 	_auto_save_current_progress()
 	emit_signal("continue_requested")
 	hide_menu()
+
 
 func _on_save_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -163,18 +189,6 @@ func _on_save_pressed() -> void:
 	if save_manager != null and save_manager.has_method("save_game"):
 		save_manager.call("save_game")
 
-func _on_debug_load_pressed() -> void:
-	_play_ui_sound("button_click")
-	if save_slot_menu != null and save_slot_menu.has_method("open_panel"):
-		save_slot_menu.call("open_panel", "progress")
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		return
-
-	var save_manager := get_tree().root.get_node_or_null("SaveManager")
-	if save_manager != null and save_manager.has_method("auto_load_game"):
-		save_manager.call("auto_load_game")
-	else:
-		print("[PauseMenu] 找不到 SaveManager！")
 
 func _on_options_pressed() -> void:
 	_play_ui_sound("button_click")
@@ -182,11 +196,13 @@ func _on_options_pressed() -> void:
 	if ai_settings_panel != null and ai_settings_panel.has_method("open_panel"):
 		ai_settings_panel.call("open_panel")
 
+
 func _on_main_menu_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("main_menu_requested")
 	_auto_save_current_progress()
-	await _return_to_main_menu_with_transition()
+	_return_to_main_menu_with_transition()
+
 
 func _return_to_main_menu_with_transition() -> void:
 	if is_transitioning:
@@ -223,11 +239,13 @@ func _ensure_transition_ui() -> Node:
 	get_tree().root.add_child(instance)
 	return instance
 
+
 func _on_exit_pressed() -> void:
 	_play_ui_sound("button_click")
 	emit_signal("exit_requested")
 	_auto_save_current_progress()
 	get_tree().quit()
+
 
 func _input(event: InputEvent) -> void:
 	if _is_ui_text_input_focused():
@@ -240,6 +258,13 @@ func _input(event: InputEvent) -> void:
 				save_slot_menu.hide()
 			get_viewport().set_input_as_handled()
 			return
+		if ai_settings_panel != null and ai_settings_panel.visible:
+			if ai_settings_panel.has_method("close_panel"):
+				ai_settings_panel.call("close_panel")
+			else:
+				ai_settings_panel.hide()
+			get_viewport().set_input_as_handled()
+			return
 		if visible:
 			emit_signal("continue_requested")
 			_auto_save_current_progress()
@@ -248,7 +273,6 @@ func _input(event: InputEvent) -> void:
 			if _close_world_panel_before_pause():
 				get_viewport().set_input_as_handled()
 				return
-			# 允许在测试时按 ESC 呼出菜单
 			show_menu()
 
 
@@ -258,6 +282,7 @@ func _auto_save_current_progress() -> void:
 		save_manager.call("auto_save_current_game")
 	elif save_manager != null and save_manager.has_method("save_current_game"):
 		save_manager.call("save_current_game")
+
 
 func _close_world_panel_before_pause() -> bool:
 	var tree := get_tree()
@@ -273,19 +298,15 @@ func _close_world_panel_before_pause() -> bool:
 			return true
 	return false
 
+
 func _is_ui_text_input_focused() -> bool:
 	if ai_settings_panel != null and ai_settings_panel.visible:
-		return true
+		if ai_settings_panel.has_method("is_text_input_focused") and bool(ai_settings_panel.call("is_text_input_focused")):
+			return true
 	var viewport := get_viewport()
 	if viewport == null:
 		return false
 	var focus_owner := viewport.gui_get_focus_owner()
 	if focus_owner == null:
 		return false
-	if focus_owner is LineEdit:
-		return true
-	if focus_owner is TextEdit:
-		return true
-	if focus_owner is CodeEdit:
-		return true
-	return false
+	return focus_owner is LineEdit or focus_owner is TextEdit or focus_owner is CodeEdit

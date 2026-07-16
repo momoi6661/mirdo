@@ -24,101 +24,117 @@
 [ext_resource type="Resource" path="res://levels/outing/location_rules/bunker.tres" id="rule_bunker"]
 
 [sub_resource type="StyleBoxFlat" id="PanelDark"]
-bg_color = Color(0.055, 0.048, 0.044, 0.94)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.35, 0.32, 0.28, 0.72)
-corner_radius_top_left = 24
-corner_radius_top_right = 24
-corner_radius_bottom_right = 24
-corner_radius_bottom_left = 24
-
-[sub_resource type="StyleBoxFlat" id="GreenStrip"]
-bg_color = Color(0.135, 0.105, 0.075, 0.88)
+bg_color = Color(0.014, 0.012, 0.016, 0.985)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.76, 0.64, 0.39, 0.34)
+border_color = Color(1, 0.48, 0.72, 0.42)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+shadow_color = Color(0, 0, 0, 0.42)
+shadow_size = 14
+
+[sub_resource type="StyleBoxFlat" id="GreenStrip"]
+bg_color = Color(0.42, 0.12, 0.28, 0.34)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.48, 0.72, 0.28)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="ButtonDark"]
-bg_color = Color(0.09, 0.08, 0.07, 0.72)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.86, 0.82, 0.68, 0.72)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-
-[sub_resource type="StyleBoxFlat" id="ButtonHover"]
-bg_color = Color(0.15, 0.12, 0.085, 0.88)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.76, 0.18, 0.92)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-
-[sub_resource type="StyleBoxFlat" id="ButtonPressed"]
-bg_color = Color(0.23, 0.17, 0.09, 0.94)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.63, 0.08, 1)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
-
-[sub_resource type="StyleBoxFlat" id="PanelModal"]
-bg_color = Color(0.035, 0.033, 0.032, 0.985)
+bg_color = Color(0.060, 0.050, 0.060, 0.92)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.86, 0.64, 0.26, 0.72)
+border_color = Color(0.36, 0.30, 0.34, 0.88)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="ButtonHover"]
+bg_color = Color(1, 0.62, 0.78, 0.20)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.62, 0.80, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="ButtonPressed"]
+bg_color = Color(0.70, 0.20, 0.42, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.48, 0.72, 0.90)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="PanelModal"]
+bg_color = Color(0.014, 0.012, 0.016, 0.985)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.48, 0.72, 0.72)
 corner_radius_top_left = 22
 corner_radius_top_right = 22
 corner_radius_bottom_right = 22
 corner_radius_bottom_left = 22
-shadow_color = Color(0, 0, 0, 0.62)
-shadow_size = 22
-shadow_offset = Vector2(0, 10)
+shadow_color = Color(0, 0, 0, 0.52)
+shadow_size = 18
+shadow_offset = Vector2(0, 8)
 
 [sub_resource type="StyleBoxFlat" id="ResultHeaderPanel"]
-bg_color = Color(0.105, 0.072, 0.045, 0.92)
-border_width_left = 0
+bg_color = Color(0.045, 0.030, 0.040, 0.94)
+border_width_left = 3
+border_width_top = 0
+border_width_right = 0
 border_width_bottom = 1
-border_color = Color(0.92, 0.62, 0.22, 0.52)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+border_color = Color(1, 0.48, 0.72, 0.62)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="ResultBodyPanel"]
-bg_color = Color(0.045, 0.041, 0.037, 0.92)
+bg_color = Color(0.030, 0.024, 0.032, 0.90)
 border_width_left = 0
 border_width_top = 0
 border_width_right = 0
 border_width_bottom = 0
-border_color = Color(0.58, 0.49, 0.32, 0)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+border_color = Color(0.40, 0.32, 0.36, 0)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [node name="OutingMapRoot" type="Control" unique_id=1022625567]
 layout_mode = 3
@@ -271,13 +287,13 @@ theme_override_constants/separation = 0
 
 [node name="HeaderTitle" type="Label" parent="MapHudHeader/HeaderMargin/HeaderBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.68, 0.12, 0.95)
+theme_override_colors/font_color = Color(1, 0.48, 0.72, 0.95)
 theme_override_font_sizes/font_size = 20
 text = "外出地图"
 
 [node name="HeaderHint" type="Label" parent="MapHudHeader/HeaderMargin/HeaderBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.82, 0.68, 0.72)
+theme_override_colors/font_color = Color(0.62, 0.58, 0.56, 0.72)
 theme_override_font_sizes/font_size = 13
 text = "拖动地图 · 点击地点查看详情 · 探索向外发现区域"
 
@@ -317,17 +333,17 @@ alignment = 1
 custom_minimum_size = Vector2(84, 2)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(0.86, 0.66, 0.22, 0.42)
+color = Color(1, 0.48, 0.72, 0.28)
 
 [node name="LeftDot" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
 custom_minimum_size = Vector2(5, 5)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(1, 0.68, 0.12, 0.72)
+color = Color(1, 0.48, 0.72, 0.72)
 
 [node name="CenterMark" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.68, 0.12, 0.82)
+theme_override_colors/font_color = Color(1, 0.48, 0.72, 0.82)
 theme_override_font_sizes/font_size = 16
 text = "◆"
 horizontal_alignment = 1
@@ -337,18 +353,18 @@ vertical_alignment = 1
 custom_minimum_size = Vector2(5, 5)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(1, 0.68, 0.12, 0.72)
+color = Color(1, 0.48, 0.72, 0.72)
 
 [node name="RightRule" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox/DetailOrnament"]
 custom_minimum_size = Vector2(84, 2)
 layout_mode = 2
 size_flags_vertical = 4
-color = Color(0.86, 0.66, 0.22, 0.42)
+color = Color(1, 0.48, 0.72, 0.28)
 
 [node name="TitleLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1292356424]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.67, 0.12, 1)
+theme_override_colors/font_color = Color(1, 0.48, 0.72, 1)
 theme_override_font_sizes/font_size = 29
 text = "地点"
 horizontal_alignment = 1
@@ -356,7 +372,7 @@ horizontal_alignment = 1
 [node name="DescriptionLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=171861867]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.84, 0.79, 0.69, 1)
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.86)
 theme_override_font_sizes/font_size = 15
 text = "地点描述"
 horizontal_alignment = 1
@@ -365,7 +381,7 @@ autowrap_mode = 3
 [node name="Divider" type="ColorRect" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1990886255]
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.52, 0.48, 0.38, 0.42)
+color = Color(1, 0.78, 0.88, 0.18)
 
 [node name="ThreatRow" type="HBoxContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1792884322]
 layout_mode = 2
@@ -375,7 +391,7 @@ theme_override_constants/separation = 16
 unique_name_in_owner = true
 custom_minimum_size = Vector2(88, 28)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.84, 0.78, 1)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 16
 text = "Threat"
 
@@ -388,7 +404,7 @@ theme_override_constants/separation = 5
 [node name="DiscoverLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1198683998]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.76, 0.08, 1)
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 1)
 theme_override_font_sizes/font_size = 16
 
 [node name="BaseStrip" type="PanelContainer" parent="RightPanel/RightPanelMargin/RightPanelBox" unique_id=1639110115]
@@ -397,7 +413,7 @@ theme_override_styles/panel = SubResource("GreenStrip")
 
 [node name="BaseLabel" type="Label" parent="RightPanel/RightPanelMargin/RightPanelBox/BaseStrip" unique_id=624272410]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.91, 0.98, 0.89, 1)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 15
 text = "探索重点  ·  物资优先，按携带道具调整风险"
 autowrap_mode = 3
@@ -412,7 +428,7 @@ theme_override_constants/separation = 8
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.89, 0.78, 1)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("ButtonDark")
 theme_override_styles/focus = SubResource("ButtonHover")
@@ -433,7 +449,7 @@ offset_left = -420.0
 offset_top = -54.0
 offset_right = 420.0
 offset_bottom = -24.0
-theme_override_colors/font_color = Color(0.86, 0.83, 0.67, 0.58)
+theme_override_colors/font_color = Color(0.62, 0.58, 0.56, 0.72)
 theme_override_font_sizes/font_size = 16
 text = "左键拖动大地图 · 点击地点展开详情 · 探索会沿道路向外发现新区域"
 horizontal_alignment = 1
@@ -448,7 +464,7 @@ offset_left = -190.0
 offset_top = 10.0
 offset_right = -28.0
 offset_bottom = 42.0
-theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 0.9)
 theme_override_font_sizes/font_size = 15
 theme_override_styles/normal = SubResource("ButtonDark")
 theme_override_styles/hover = SubResource("ButtonHover")
@@ -465,7 +481,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.58)
+color = Color(0, 0, 0, 0.50)
 
 [node name="PreparePanel" type="PanelContainer" parent="PrepareOverlay" unique_id=1080736788]
 unique_name_in_owner = true
@@ -497,13 +513,13 @@ theme_override_constants/separation = 11
 [node name="PrepareTitleLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1278404520]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.72, 0.14, 1)
+theme_override_colors/font_color = Color(1, 0.48, 0.72, 1)
 theme_override_font_sizes/font_size = 28
 
 [node name="PrepareIntroLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1381354817]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.84, 0.8, 0.7, 1)
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.86)
 theme_override_font_sizes/font_size = 16
 text = "可以空手探索，也可以带辅助物资。AI 会根据地点规则、威胁、路线和携带物生成经历与带回物资。"
 autowrap_mode = 3
@@ -511,7 +527,7 @@ autowrap_mode = 3
 [node name="BaseCarryLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=224318291]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.88, 0.82, 1)
+theme_override_colors/font_color = Color(0.78, 0.92, 0.80, 1)
 theme_override_font_sizes/font_size = 17
 text = "点击左侧加入物资；点击已选格子减少1件。"
 
@@ -527,7 +543,7 @@ theme_override_constants/separation = 8
 
 [node name="LoadoutTitleLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.72, 0.14, 0.95)
+theme_override_colors/font_color = Color(1, 0.48, 0.72, 0.95)
 theme_override_font_sizes/font_size = 18
 text = "本次外出携带栏（点击已选格子减少1件）"
 
@@ -541,7 +557,7 @@ columns = 6
 [node name="CapacityLabel" type="Label" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=1252811174]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.91, 0.78, 1)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 18
 
 [node name="PrepareButtonRow" type="HBoxContainer" parent="PrepareOverlay/PreparePanel/PrepareMargin/PrepareBox" unique_id=762774442]
@@ -552,7 +568,7 @@ theme_override_constants/separation = 12
 unique_name_in_owner = true
 custom_minimum_size = Vector2(250, 52)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 1, 0.9, 1)
+theme_override_colors/font_color = Color(1, 0.96, 0.92, 1)
 theme_override_styles/normal = SubResource("ButtonDark")
 theme_override_styles/focus = SubResource("ButtonHover")
 theme_override_styles/pressed = SubResource("ButtonPressed")
@@ -563,7 +579,7 @@ text = "确认外出"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 52)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 0.9)
 theme_override_styles/normal = SubResource("ButtonDark")
 theme_override_styles/focus = SubResource("ButtonHover")
 theme_override_styles/pressed = SubResource("ButtonPressed")
@@ -585,7 +601,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.62)
+color = Color(0, 0, 0, 0.55)
 
 [node name="ResultPanel" type="PanelContainer" parent="ResultOverlay" unique_id=1844850762]
 unique_name_in_owner = true
@@ -605,10 +621,10 @@ theme_override_styles/panel = SubResource("PanelModal")
 
 [node name="ResultMargin" type="MarginContainer" parent="ResultOverlay/ResultPanel" unique_id=1373282983]
 layout_mode = 2
-theme_override_constants/margin_left = 42
-theme_override_constants/margin_top = 34
-theme_override_constants/margin_right = 42
-theme_override_constants/margin_bottom = 34
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 28
 
 [node name="ResultBox" type="VBoxContainer" parent="ResultOverlay/ResultPanel/ResultMargin" unique_id=1325065390]
 layout_mode = 2
@@ -631,23 +647,23 @@ theme_override_constants/separation = 3
 
 [node name="ResultKickerLabel" type="Label" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.76, 0.28, 0.86)
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.86)
 theme_override_font_sizes/font_size = 14
-text = "EXPEDITION REPORT // AI NARRATIVE PAGE"
+text = "外出结算"
 
 [node name="ResultTitleLabel" type="Label" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.91, 0.72, 1)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 34
 text = "外出行动报告"
 
 [node name="ResultSubtitleLabel" type="Label" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultHeader/ResultHeaderMargin/ResultHeaderBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.8, 0.66, 0.88)
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.86)
 theme_override_font_sizes/font_size = 15
-text = "物资已结算，准备返回庇护所。"
+text = "物资已结算，可返回庇护所"
 
 [node name="ResultBody" type="PanelContainer" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox"]
 layout_mode = 2
@@ -663,10 +679,10 @@ theme_override_constants/margin_bottom = 18
 
 [node name="ResultLabel" type="RichTextLabel" parent="ResultOverlay/ResultPanel/ResultMargin/ResultBox/ResultBody/ResultBodyMargin" unique_id=299446946]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 620)
+custom_minimum_size = Vector2(0, 520)
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_colors/default_color = Color(0.9, 0.86, 0.76, 1)
+theme_override_colors/default_color = Color(0.90, 0.88, 0.84, 1)
 theme_override_font_sizes/normal_font_size = 19
 bbcode_enabled = true
 fit_content = false
@@ -676,7 +692,7 @@ scroll_active = true
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.9, 0.82, 0.9)
+theme_override_colors/font_color = Color(0.90, 0.88, 0.84, 0.9)
 theme_override_styles/normal = SubResource("ButtonDark")
 theme_override_styles/focus = SubResource("ButtonHover")
 theme_override_styles/pressed = SubResource("ButtonPressed")

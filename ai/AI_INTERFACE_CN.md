@@ -45,7 +45,7 @@
       "step_id": "inspect-food-cabinet",
       "action": "work_count_supplies",
       "command": "go_to_object",
-      "command_payload": {"target_object": "food_cabinet_runtime", "marker_role": "approach"},
+      "command_payload": {"target_ref": "food_cabinet", "affordance": "inspect", "marker_role": "approach"},
       "reason": "先到柜前确认库存",
       "expected_result": "到达后观察柜内物品",
       "wait_for_result": true,
@@ -58,9 +58,27 @@
 说明：
 
 - `action_line` 可以有 0 到 4 步；Godot 每回合只执行 `current_step_id`，其余步骤必须等待真实回调。
-- `go_to_object` 的 `target_object` 必须来自本回合 perception；`go_to_nav_point` 的 `target_nav_point` 必须来自 known_nav_points。
+- `go_to_object` 的 `target_ref` 必须来自 `navigation_catalog` 或本回合 perception；`go_to_nav_point` 的 `target_nav_point` 必须来自目录中的 waypoint。后端不发送坐标、朝向或 Marker 路径。
 - `follow_player`/`stop_follow`/`look_at_player` 不需要导航目标；拿取、喝水和吃东西必须使用当前可感知的 pickable 物体。
 - 到达或交互完成后，Godot 将 `current_step_id`、`action_step`、`action_line` 和 `action_result` 放进事件上下文，后端再规划下一条动作线。
+
+### 2.1.1 语义导航目录
+
+Godot 每回合可以在 `context.navigation_catalog` 提供少量候选实体：
+
+```json
+{
+  "id": "food_cabinet",
+  "target_ref": "food_cabinet",
+  "kind": "storage",
+  "affordances": ["open", "inspect", "take_item"],
+  "availability": {"items": [{"id": "water_bottle", "amount": 2}]},
+  "relation": "known"
+}
+```
+
+`approach/sit/stand/face` 是 Godot 内部 Marker 角色。Agent 只选择实体和能力，
+由 Godot 解析路径、等待导航同步、执行交互并返回真实结果。
 
 ### 2.3 TaskManager 等待模型任务
 
@@ -83,6 +101,36 @@ task_started -> task_waiting -> task_resolved
 事件至少包含 `task_id`、`step_id`、`command`、`ok`、`event` 和 `action_result`。Godot 收到
 `task_resolved` 后，`CharacterAutonomousLifeComponent` 会把它作为 `source_decision` 再送回
 Server，由 Agent 决定下一步；因此不要在 Godot 本地偷偷执行 action_line 的后续步骤。
+
+### 2.4 Agent tool-result 回传（按需一次请求）
+
+动作完成后不再持续推送运行时事件。`CharacterAutonomousLifeComponent` 调用
+`CharacterAIDialogueComponent.send_action_result()`，由 `AIManager` 向
+`POST /godot/action-result` 发起一次请求；响应就是下一轮 Mirdo Agent 的普通
+`ChatResponse`，其中 `response_kind=godot_tool_result`，可继续包含新的首个
+`action_line` 步骤。
+
+```json
+{
+  "session_id": "save_slot_1",
+  "tool_call_id": "task:water:step_1:arrival",
+  "task_id": "task:water",
+  "step_id": "go_to_cabinet",
+  "command": "go_to_object",
+  "target_ref": "water_cabinet",
+  "event": "navigation_goal_finished",
+  "status": "succeeded",
+  "ok": true,
+  "action_result": {"ok": true, "target_ref": "water_cabinet"},
+  "observation": {"nearby": ["water_cabinet"]},
+  "source_decision": {"chain_id": "water:1", "chain_depth": 1},
+  "context": {"request_source": "godot_tool_result"}
+}
+```
+
+Server 会把这个结果作为 Graph 的事实输入，更新等待中的 task、加载记忆和
+知识，再让 PydanticAI Agent 选择“解释结果 / 询问 / 下一步动作”；不会把它
+存成玩家说过的话，也不会在没有 Godot 结果时自行猜测动作是否成功。
 
 ### 2.2 Marker 互动 IK 元数据（可选）
 

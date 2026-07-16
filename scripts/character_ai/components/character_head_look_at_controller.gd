@@ -263,23 +263,49 @@ func _update_proxy_position(desired_position: Vector3, delta: float) -> void:
 	_proxy_target.global_position = _current_target_position
 
 func _compute_desired_weight(target_position: Vector3) -> float:
-	if _external_hold_left > 0.0:
-		return _external_weight
-	var player := _resolve_player_target()
-	var distance := INF
-	if player != null and _actor != null:
-		distance = _actor.global_position.distance_to(player.global_position)
 	var base := 0.0
-	if player != null and distance <= look_distance:
-		var range := maxf(0.05, look_distance - strong_look_distance)
-		var near_factor := clampf((look_distance - distance) / range, 0.0, 1.0)
-		base = lerpf(idle_weight, near_idle_weight, near_factor)
-	if _dialogue_hold_left > 0.0:
-		base = maxf(base, dialogue_weight)
-	base = minf(base, _contextual_action_weight_cap())
-	if not _is_target_inside_front_arc(target_position):
-		base = 0.0
+	if _external_hold_left > 0.0:
+		base = _external_weight
+	else:
+		var player := _resolve_player_target()
+		var distance := INF
+		if player != null and _actor != null:
+			distance = _actor.global_position.distance_to(player.global_position)
+		if player != null and distance <= look_distance:
+			var distance_range := maxf(0.05, look_distance - strong_look_distance)
+			var near_factor := clampf((look_distance - distance) / distance_range, 0.0, 1.0)
+			base = lerpf(idle_weight, near_idle_weight, near_factor)
+		if _dialogue_hold_left > 0.0:
+			base = maxf(base, dialogue_weight)
+		base = minf(base, _contextual_action_weight_cap())
+
+	# External reactions used to bypass this check, so a reaction requested while
+	# the player was behind Mirdo could keep the head clamped at +/-65 degrees.
+	# Fade the look weight at the edge of the natural head arc instead of making
+	# the head chase a target it cannot safely reach.
+	base *= _front_arc_weight(target_position)
 	return clampf(base, 0.0, 1.0)
+
+func _front_arc_weight(target_position: Vector3) -> float:
+	if _actor == null:
+		return 1.0
+	var offset := target_position - _get_head_world_position()
+	var flat_offset := Vector3(offset.x, 0.0, offset.z)
+	if flat_offset.length_squared() <= 0.0001:
+		return 1.0
+	var forward := (-_actor.global_basis.z if use_negative_z_forward else _actor.global_basis.z).normalized()
+	var flat_forward := Vector3(forward.x, 0.0, forward.z)
+	if flat_forward.length_squared() <= 0.0001:
+		return 1.0
+	var yaw := rad_to_deg(acos(clampf(flat_forward.normalized().dot(flat_offset.normalized()), -1.0, 1.0)))
+	var fade_width := 12.0
+	var fade_start := maxf(0.0, max_yaw_degrees - fade_width)
+	var fade_end := max_yaw_degrees + 8.0
+	if yaw >= fade_end:
+		return 0.0
+	if yaw <= fade_start:
+		return 1.0
+	return 1.0 - smoothstep(fade_start, fade_end, yaw)
 
 func _contextual_action_weight_cap() -> float:
 	var action_text := String(_last_action)

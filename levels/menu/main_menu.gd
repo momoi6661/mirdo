@@ -33,11 +33,21 @@ const ERROR_3D_OVERLAY_SCENE := "res://levels/menu/error_overlay/error_3d_overla
 @onready var model_line_edit: LineEdit = %ModelLineEdit
 @onready var api_key_line_edit: LineEdit = %ApiKeyLineEdit
 @onready var proxy_url_line_edit: LineEdit = %ProxyUrlLineEdit
+@onready var tts_enabled_check: CheckButton = %TtsEnabledCheck
+@onready var tts_voice_label: Label = %TtsVoiceLabel
+@onready var tts_voice_option: OptionButton = %TtsVoiceOption
+@onready var tts_japanese_check: CheckButton = %TtsJapaneseCheck
 @onready var test_model_button: Button = %TestModelButton
 @onready var settings_status_label: Label = %StatusLabelSettings
 @onready var auto_save_timer: Timer = %AutoSaveTimer
 @onready var save_slot_menu: SaveSlotMenu = %SaveSlotMenu
 @onready var ui_sound_player: AudioStreamPlayer = %UISoundPlayer
+@onready var master_volume_slider: HSlider = get_node_or_null("%MasterVolumeSlider")
+@onready var music_volume_slider: HSlider = get_node_or_null("%MusicVolumeSlider")
+@onready var ui_volume_slider: HSlider = get_node_or_null("%UiVolumeSlider")
+@onready var mouse_sensitivity_slider: HSlider = get_node_or_null("%MouseSensitivitySlider")
+@onready var fullscreen_check: CheckButton = get_node_or_null("%FullscreenCheck")
+@onready var confirm_new_game_dialog: ConfirmationDialog = null
 
 var _busy := false
 var _settings_open := false
@@ -70,6 +80,16 @@ var _sound_library: Dictionary = {
 	"menu_open": "uid://rub4iei5paoa",
 }
 
+## 设置页显示名称和后端稳定 ID 一一对应，避免玩家手动填写 speaker_id。
+const TTS_VOICES: Array[Dictionary] = [
+	{"label": "もち子さん / 麻糬子（默认） · ID 20", "profile": "mirdo_ja", "speaker_id": 20},
+	{"label": "猫使ビィ / 猫使比伊 · ID 58", "profile": "mirdo_ja_bii", "speaker_id": 58},
+	{"label": "雨晴はう / 雨晴羽 · ID 10", "profile": "mirdo_ja_hau", "speaker_id": 10},
+	{"label": "琴詠ニア / 琴咏妮娅 · ID 74", "profile": "mirdo_ja_kotone", "speaker_id": 74},
+	{"label": "Voidoll · ID 89", "profile": "mirdo_ja_voidoll", "speaker_id": 89},
+	{"label": "あんこもん / 红豆萌 · ID 113", "profile": "mirdo_ja_ankomon", "speaker_id": 113},
+]
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -77,11 +97,18 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_play_menu_bgm()
 	_capture_page_positions()
+	if get_viewport() != null and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
+	_build_tts_voice_options()
 	_connect_buttons()
+	_connect_user_settings_controls()
+	_apply_user_settings_visual_theme()
+	_ensure_new_game_confirm_dialog()
 	_update_continue_state()
 	_play_intro_tween()
 	_play_background_loop()
 	call_deferred("_start_passive_service_health_check")
+	call_deferred("_focus_primary_button")
 	if auto_continue_when_save_exists:
 		call_deferred("_auto_start_or_new_game")
 
@@ -199,7 +226,17 @@ func _start_or_load_game(status_text: String) -> void:
 func _on_new_game_pressed() -> void:
 	if _busy:
 		return
-	_play_ui_sound("button_click")	
+	_play_ui_sound("button_click")
+	if _has_current_save() and confirm_new_game_dialog != null:
+		confirm_new_game_dialog.dialog_text = "开始新游戏会覆盖当前进度槽。确定继续？"
+		confirm_new_game_dialog.popup_centered()
+		return
+	await _start_new_game()
+
+
+func _start_new_game() -> void:
+	if _busy:
+		return
 	var save_manager := _get_save_manager()
 	if save_manager == null or not save_manager.has_method("start_new_game"):
 		_set_status("找不到 SaveManager，无法新游戏。", true)
@@ -271,6 +308,7 @@ func _on_settings_pressed() -> void:
 	if _busy or _settings_open:
 		return
 	_play_ui_sound("button_click")
+	_connect_user_settings_controls()
 	await _slide_to_settings_page()
 
 
@@ -294,12 +332,129 @@ func _connect_ai_settings_fields() -> void:
 	for line_edit in [base_url_line_edit, model_line_edit, api_key_line_edit, proxy_url_line_edit]:
 		if line_edit != null and not line_edit.text_changed.is_connected(_on_ai_field_text_changed):
 			line_edit.text_changed.connect(_on_ai_field_text_changed)
+	if tts_enabled_check != null and not tts_enabled_check.toggled.is_connected(_on_tts_changed):
+		tts_enabled_check.toggled.connect(_on_tts_changed)
+	if tts_japanese_check != null and not tts_japanese_check.toggled.is_connected(_on_tts_changed):
+		tts_japanese_check.toggled.connect(_on_tts_changed)
+	if tts_voice_option != null and not tts_voice_option.item_selected.is_connected(_on_tts_voice_selected):
+		tts_voice_option.item_selected.connect(_on_tts_voice_selected)
 	if auto_save_timer != null:
 		auto_save_timer.one_shot = true
 		auto_save_timer.wait_time = 0.35
 		if not auto_save_timer.timeout.is_connected(_on_auto_save_timer_timeout):
 			auto_save_timer.timeout.connect(_on_auto_save_timer_timeout)
 	_load_ai_fields_from_settings()
+
+
+func _connect_user_settings_controls() -> void:
+	var user := _get_user_settings()
+	if user != null:
+		if master_volume_slider != null:
+			master_volume_slider.value = float(user.get("master_volume"))
+		if music_volume_slider != null:
+			music_volume_slider.value = float(user.get("music_volume"))
+		if ui_volume_slider != null:
+			ui_volume_slider.value = float(user.get("ui_volume"))
+		if mouse_sensitivity_slider != null:
+			mouse_sensitivity_slider.value = float(user.get("mouse_sensitivity"))
+		if fullscreen_check != null:
+			var requested_fullscreen := bool(user.get("fullscreen"))
+			fullscreen_check.button_pressed = requested_fullscreen
+	if master_volume_slider != null and not master_volume_slider.value_changed.is_connected(_on_master_volume_changed):
+		master_volume_slider.value_changed.connect(_on_master_volume_changed)
+	if music_volume_slider != null and not music_volume_slider.value_changed.is_connected(_on_music_volume_changed):
+		music_volume_slider.value_changed.connect(_on_music_volume_changed)
+	if ui_volume_slider != null and not ui_volume_slider.value_changed.is_connected(_on_ui_volume_changed):
+		ui_volume_slider.value_changed.connect(_on_ui_volume_changed)
+	if mouse_sensitivity_slider != null and not mouse_sensitivity_slider.value_changed.is_connected(_on_mouse_sensitivity_changed):
+		mouse_sensitivity_slider.value_changed.connect(_on_mouse_sensitivity_changed)
+	if fullscreen_check != null and not fullscreen_check.toggled.is_connected(_on_fullscreen_toggled):
+		fullscreen_check.toggled.connect(_on_fullscreen_toggled)
+	if user != null and user.has_signal("fullscreen_state_changed") and not user.fullscreen_state_changed.is_connected(_on_fullscreen_state_changed):
+		user.fullscreen_state_changed.connect(_on_fullscreen_state_changed)
+
+
+func _apply_user_settings_visual_theme() -> void:
+	for slider in [master_volume_slider, music_volume_slider, ui_volume_slider, mouse_sensitivity_slider]:
+		MenuUIStyle.apply_slider(slider)
+
+
+func _ensure_new_game_confirm_dialog() -> void:
+	if confirm_new_game_dialog != null and is_instance_valid(confirm_new_game_dialog):
+		return
+	confirm_new_game_dialog = ConfirmationDialog.new()
+	confirm_new_game_dialog.name = "ConfirmNewGameDialog"
+	confirm_new_game_dialog.title = "开始新游戏"
+	confirm_new_game_dialog.dialog_text = "开始新游戏会覆盖当前进度槽。确定继续？"
+	confirm_new_game_dialog.ok_button_text = "开始"
+	confirm_new_game_dialog.cancel_button_text = "取消"
+	confirm_new_game_dialog.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(confirm_new_game_dialog)
+	MenuUIStyle.apply_confirmation_dialog(confirm_new_game_dialog)
+	confirm_new_game_dialog.confirmed.connect(_on_confirm_new_game)
+
+
+func _on_confirm_new_game() -> void:
+	await _start_new_game()
+
+
+func _focus_primary_button() -> void:
+	if continue_button != null and not continue_button.disabled:
+		continue_button.grab_focus()
+	elif new_game_button != null:
+		new_game_button.grab_focus()
+
+
+func _get_user_settings() -> Node:
+	return get_tree().root.get_node_or_null("GameUserSettings")
+
+
+func _on_master_volume_changed(value: float) -> void:
+	var user := _get_user_settings()
+	if user != null and user.has_method("set_master_volume"):
+		user.call("set_master_volume", value, true)
+	_set_settings_status("主音量已更新")
+
+
+func _on_music_volume_changed(value: float) -> void:
+	var user := _get_user_settings()
+	if user != null and user.has_method("set_music_volume"):
+		user.call("set_music_volume", value, true)
+	_set_settings_status("音乐音量已更新")
+
+
+func _on_ui_volume_changed(value: float) -> void:
+	var user := _get_user_settings()
+	if user != null and user.has_method("set_ui_volume"):
+		user.call("set_ui_volume", value, true)
+	_set_settings_status("界面音量已更新")
+
+
+func _on_mouse_sensitivity_changed(value: float) -> void:
+	var user := _get_user_settings()
+	if user != null and user.has_method("set_mouse_sensitivity"):
+		user.call("set_mouse_sensitivity", value, true)
+	_set_settings_status("视角灵敏度：%d%%" % roundi(value * 100.0))
+
+
+func _on_fullscreen_toggled(enabled: bool) -> void:
+	var user := _get_user_settings()
+	var applied := false
+	if user != null and user.has_method("set_fullscreen"):
+		applied = bool(user.call("set_fullscreen", enabled, true))
+	if applied:
+		_set_settings_status("全屏已%s" % ("开启" if enabled else "关闭"))
+	else:
+		if fullscreen_check != null:
+			fullscreen_check.set_pressed_no_signal(enabled)
+		_set_settings_status("全屏偏好已保存；编辑器嵌入运行需独立窗口才会生效")
+
+
+func _on_fullscreen_state_changed(requested: bool, applied: bool) -> void:
+	if fullscreen_check != null:
+		fullscreen_check.set_pressed_no_signal(requested)
+	if requested and not applied:
+		_set_settings_status("全屏偏好已保存；编辑器嵌入运行需独立窗口才会生效")
 
 
 func _load_ai_fields_from_settings() -> void:
@@ -316,8 +471,81 @@ func _load_ai_fields_from_settings() -> void:
 		api_key_line_edit.text = String(provider.get("api_key", settings.get("api_key") if settings != null else ""))
 	if proxy_url_line_edit != null:
 		proxy_url_line_edit.text = String(provider.get("proxy_url", settings.get("proxy_url") if settings != null else ""))
+	_load_tts_fields_from_settings(settings)
 	_is_loading_ai_fields = false
 	_set_settings_status("设置会自动保存")
+
+
+func _build_tts_voice_options() -> void:
+	if tts_voice_option == null:
+		return
+	# 把语音设置放到页面前部，玩家打开“设置”时无需先滚到底部寻找。
+	_prioritize_tts_section()
+	tts_voice_option.clear()
+	for voice in TTS_VOICES:
+		tts_voice_option.add_item(String(voice["label"]))
+		tts_voice_option.set_item_metadata(tts_voice_option.item_count - 1, voice.duplicate(true))
+
+
+func _prioritize_tts_section() -> void:
+	var rows := get_node_or_null("Root/SettingsPage/SettingsMargin/Rows") as VBoxContainer
+	var audio_title := get_node_or_null("Root/SettingsPage/SettingsMargin/Rows/AudioTitle") as Control
+	if rows == null or audio_title == null:
+		return
+	var ordered: Array[Control] = [tts_enabled_check, tts_voice_label, tts_voice_option, tts_japanese_check]
+	# Godot 4 的 Node 没有 get_child_index；子节点通过 get_index() 查询自己在父节点中的位置。
+	var insert_index: int = audio_title.get_index() + 1
+	for control in ordered:
+		if control == null or control.get_parent() != rows:
+			continue
+		rows.move_child(control, insert_index)
+		insert_index += 1
+
+
+func _load_tts_fields_from_settings(settings: Node) -> void:
+	if settings == null:
+		return
+	var values: Dictionary = settings.call("get_tts_settings") if settings.has_method("get_tts_settings") else {}
+	if tts_enabled_check != null:
+		tts_enabled_check.set_pressed_no_signal(bool(values.get("enabled", false)))
+	if tts_japanese_check != null:
+		tts_japanese_check.set_pressed_no_signal(bool(values.get("generate_japanese", false)))
+	var profile := String(values.get("voice_profile", "mirdo_ja"))
+	var speaker_id := int(values.get("speaker_id", -1))
+	var selected := 0
+	if tts_voice_option != null:
+		for index in tts_voice_option.item_count:
+			var metadata: Variant = tts_voice_option.get_item_metadata(index)
+			if metadata is Dictionary and (String(metadata.get("profile", "")) == profile or int(metadata.get("speaker_id", -1)) == speaker_id):
+				selected = index
+				break
+		tts_voice_option.select(selected)
+
+
+func _on_tts_changed(_enabled: bool) -> void:
+	if _is_loading_ai_fields:
+		return
+	_save_tts_settings()
+
+
+func _on_tts_voice_selected(_index: int) -> void:
+	if _is_loading_ai_fields:
+		return
+	_save_tts_settings()
+
+
+func _save_tts_settings() -> void:
+	var settings := _get_ai_settings()
+	if settings == null or not settings.has_method("set_tts_settings") or tts_voice_option == null:
+		return
+	var metadata: Variant = tts_voice_option.get_selected_metadata()
+	if not metadata is Dictionary:
+		return
+	var voice := metadata as Dictionary
+	var enabled := tts_enabled_check != null and tts_enabled_check.button_pressed
+	var generate_japanese := tts_japanese_check != null and tts_japanese_check.button_pressed
+	settings.call("set_tts_settings", enabled, String(voice.get("profile", "mirdo_ja")), int(voice.get("speaker_id", 20)), generate_japanese, true)
+	_set_settings_status("语音设置已保存：%s" % String(voice.get("label", "")))
 
 
 func _on_ai_field_text_changed(_new_text: String) -> void:
@@ -676,6 +904,24 @@ func _capture_page_positions() -> void:
 		settings_page.visible = false
 
 
+func _on_viewport_size_changed() -> void:
+	var viewport_width := get_viewport().get_visible_rect().size.x
+	_main_page_settings_position = Vector2(-viewport_width, 0.0)
+	_settings_page_offscreen_position = Vector2(viewport_width, 0.0)
+	if background != null:
+		background.pivot_offset = get_viewport().get_visible_rect().size * 0.5
+	if _settings_open:
+		if main_page != null:
+			main_page.position = _main_page_settings_position
+		if settings_page != null:
+			settings_page.position = Vector2.ZERO
+	else:
+		if main_page != null:
+			main_page.position = Vector2.ZERO
+		if settings_page != null:
+			settings_page.position = _settings_page_offscreen_position
+
+
 func _slide_to_settings_page() -> void:
 	if main_page == null or settings_page == null:
 		return
@@ -737,13 +983,11 @@ func _kill_page_tween() -> void:
 
 func _set_buttons_disabled(disabled: bool) -> void:
 	for button in [continue_button, new_game_button, progress_button, settings_button, quit_button]:
-		if button != null:
-			button.mouse_filter = Control.MOUSE_FILTER_IGNORE if disabled else Control.MOUSE_FILTER_STOP
-	_update_continue_state()
-	if disabled and false:
-		for button in [continue_button, new_game_button, progress_button, settings_button, quit_button]:
-			if button != null:
-				button.disabled = true
+		if button == null:
+			continue
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE if disabled else Control.MOUSE_FILTER_STOP
+	if not disabled:
+		_update_continue_state()
 
 
 func _set_status(text: String, is_error: bool = false) -> void:

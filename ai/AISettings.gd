@@ -12,6 +12,7 @@ const DEFAULT_MODEL := ""
 const DEFAULT_PROXY_URL := ""
 const DEFAULT_CONFIG_PATH := "user://ai_settings.cfg"
 const CONFIG_SECTION := "provider"
+const TTS_CONFIG_SECTION := "tts"
 const SERVER_BASE_URL := "http://127.0.0.1:5678"
 const SERVER_HEALTH_PATH := "/health"
 const SERVER_MODEL_PROBE_PATH := "/model/probe"
@@ -20,6 +21,12 @@ var base_url: String = DEFAULT_BASE_URL
 var api_key: String = DEFAULT_API_KEY
 var model: String = DEFAULT_MODEL
 var proxy_url: String = DEFAULT_PROXY_URL
+
+## TTS 是呈现层设置，不参与模型 Provider 配置。
+var tts_enabled: bool = false
+var tts_voice_profile: String = "mirdo_ja"
+var tts_speaker_id: int = -1
+var tts_generate_japanese: bool = false
 
 var _config_path: String = DEFAULT_CONFIG_PATH
 var _test_request: HTTPRequest
@@ -55,6 +62,7 @@ func load_settings() -> bool:
 	var err := config.load(_config_path)
 	if err != OK:
 		_set_values(DEFAULT_BASE_URL, DEFAULT_API_KEY, DEFAULT_MODEL, DEFAULT_PROXY_URL, false)
+		_set_tts_values(false, "mirdo_ja", -1, false, false)
 		return false
 
 	var loaded_base_url := String(config.get_value(CONFIG_SECTION, "base_url", DEFAULT_BASE_URL))
@@ -62,6 +70,13 @@ func load_settings() -> bool:
 	var loaded_model := String(config.get_value(CONFIG_SECTION, "model", DEFAULT_MODEL))
 	var loaded_proxy_url := String(config.get_value(CONFIG_SECTION, "proxy_url", DEFAULT_PROXY_URL))
 	_set_values(loaded_base_url, loaded_api_key, loaded_model, loaded_proxy_url, false)
+	_set_tts_values(
+		bool(config.get_value(TTS_CONFIG_SECTION, "enabled", false)),
+		String(config.get_value(TTS_CONFIG_SECTION, "voice_profile", "mirdo_ja")),
+		int(config.get_value(TTS_CONFIG_SECTION, "speaker_id", -1)),
+		bool(config.get_value(TTS_CONFIG_SECTION, "generate_japanese", false)),
+		false
+	)
 	return true
 
 
@@ -71,6 +86,10 @@ func save_settings() -> bool:
 	config.set_value(CONFIG_SECTION, "api_key", api_key)
 	config.set_value(CONFIG_SECTION, "model", model)
 	config.set_value(CONFIG_SECTION, "proxy_url", proxy_url)
+	config.set_value(TTS_CONFIG_SECTION, "enabled", tts_enabled)
+	config.set_value(TTS_CONFIG_SECTION, "voice_profile", tts_voice_profile)
+	config.set_value(TTS_CONFIG_SECTION, "speaker_id", tts_speaker_id)
+	config.set_value(TTS_CONFIG_SECTION, "generate_japanese", tts_generate_japanese)
 	var err := config.save(_config_path)
 	if err != OK:
 		var message := "save_failed_%d" % err
@@ -108,6 +127,23 @@ func update_model(value: String, auto_save: bool = true) -> bool:
 
 func update_proxy_url(value: String, auto_save: bool = true) -> bool:
 	return set_provider_settings_with_proxy(base_url, api_key, model, value, auto_save)
+
+
+## 更新 TTS 选择；speaker_id 为 -1 时由声线 profile 决定。
+func set_tts_settings(enabled: bool, voice_profile: String, speaker_id: int = -1, generate_japanese: bool = false, auto_save: bool = true) -> bool:
+	var changed := _set_tts_values(enabled, voice_profile, speaker_id, generate_japanese, true)
+	if auto_save:
+		return save_settings()
+	return changed
+
+
+func get_tts_settings() -> Dictionary:
+	return {
+		"enabled": tts_enabled,
+		"voice_profile": tts_voice_profile,
+		"speaker_id": tts_speaker_id,
+		"generate_japanese": tts_generate_japanese,
+	}
 
 
 func is_model_test_busy() -> bool:
@@ -392,6 +428,21 @@ func _set_values(new_base_url: String, new_api_key: String, new_model: String, n
 	api_key = normalized_api_key
 	model = normalized_model
 	proxy_url = normalized_proxy_url
+	if changed and emit_change:
+		settings_changed.emit(get_provider_settings())
+	return changed
+
+
+func _set_tts_values(new_enabled: bool, new_profile: String, new_speaker_id: int, new_generate_japanese: bool, emit_change: bool) -> bool:
+	var normalized_profile := new_profile.strip_edges()
+	if normalized_profile.is_empty():
+		normalized_profile = "mirdo_ja"
+	var normalized_speaker_id := new_speaker_id if new_speaker_id >= 0 else -1
+	var changed := tts_enabled != new_enabled or tts_voice_profile != normalized_profile or tts_speaker_id != normalized_speaker_id or tts_generate_japanese != new_generate_japanese
+	tts_enabled = new_enabled
+	tts_voice_profile = normalized_profile
+	tts_speaker_id = normalized_speaker_id
+	tts_generate_japanese = new_generate_japanese
 	if changed and emit_change:
 		settings_changed.emit(get_provider_settings())
 	return changed

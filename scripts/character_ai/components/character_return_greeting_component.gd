@@ -11,6 +11,7 @@ signal greeting_finished(payload: Dictionary)
 @export var face_component_path: NodePath = NodePath("../FaceComponent")
 @export var head_look_controller_path: NodePath = NodePath("../CharacterHeadLookAtController")
 @export var autonomous_life_path: NodePath = NodePath("../CharacterAutonomousLife")
+@export var dialogue_component_path: NodePath = NodePath("../AIDialogueComponent")
 @export var mind_state_path: NodePath = NodePath("../CharacterMindState")
 @export var state_component_path: NodePath = NodePath("../StateComponent")
 @export var subtitle_target_path: NodePath = NodePath("../WorldSubtitleComponent")
@@ -43,6 +44,7 @@ var _animation_behavior: Node
 var _face_component: Node
 var _head_look_controller: Node
 var _autonomous_life: Node
+var _dialogue_component: Node
 var _mind_state: Node
 var _state_component: Node
 var _subtitle_target: Node
@@ -171,10 +173,15 @@ func _compute_one_shot_greeting_position(player: Node3D) -> Vector3:
 
 func _show_greeting_line(payload: Dictionary) -> void:
 	_refresh_refs_light()
-	if _subtitle_target == null or not _subtitle_target.has_method("show_once"):
-		return
 	var line := _pick_greeting_line(payload)
-	_subtitle_target.call("show_once", line, speaker_name.strip_edges())
+	if _dialogue_component != null and _dialogue_component.has_method("present_local_dialogue"):
+		_dialogue_component.call("present_local_dialogue", line, {
+			"emotion": "开心",
+			"expression": "joy",
+			"action": String(close_action),
+		})
+	elif _subtitle_target != null and _subtitle_target.has_method("show_once"):
+		_subtitle_target.call("show_once", line, speaker_name.strip_edges())
 
 func _pick_greeting_line(payload: Dictionary) -> String:
 	var location_name := String(payload.get("location_name", "")).strip_edges()
@@ -263,6 +270,7 @@ func _refresh_refs() -> void:
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
 	_head_look_controller = get_node_or_null(head_look_controller_path) if head_look_controller_path != NodePath() else null
 	_autonomous_life = get_node_or_null(autonomous_life_path) if autonomous_life_path != NodePath() else null
+	_dialogue_component = get_node_or_null(dialogue_component_path) if dialogue_component_path != NodePath() else null
 	_mind_state = get_node_or_null(mind_state_path) if mind_state_path != NodePath() else null
 	_state_component = get_node_or_null(state_component_path) if state_component_path != NodePath() else null
 	_subtitle_target = get_node_or_null(subtitle_target_path) if subtitle_target_path != NodePath() else null
@@ -280,6 +288,8 @@ func _refresh_refs_light() -> void:
 		_head_look_controller = get_node_or_null(head_look_controller_path) if head_look_controller_path != NodePath() else null
 	if _autonomous_life == null or not is_instance_valid(_autonomous_life):
 		_autonomous_life = get_node_or_null(autonomous_life_path) if autonomous_life_path != NodePath() else null
+	if _dialogue_component == null or not is_instance_valid(_dialogue_component):
+		_dialogue_component = get_node_or_null(dialogue_component_path) if dialogue_component_path != NodePath() else null
 	if _mind_state == null or not is_instance_valid(_mind_state):
 		_mind_state = get_node_or_null(mind_state_path) if mind_state_path != NodePath() else null
 	if _state_component == null or not is_instance_valid(_state_component):

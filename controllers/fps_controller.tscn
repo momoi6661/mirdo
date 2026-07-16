@@ -379,8 +379,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
 [node name="CameraOffset" type="Node3D" parent="Marker3D" unique_id=2006593265]
 
 [node name="Camera3D" type="Camera3D" parent="Marker3D/CameraOffset" unique_id=2006032877]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3412707, 0)
-top_level = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+current = true
 cull_mask = 1
 
 [node name="MitaWarmParticles" type="Node3D" parent="Marker3D/CameraOffset/Camera3D" unique_id=510205205]

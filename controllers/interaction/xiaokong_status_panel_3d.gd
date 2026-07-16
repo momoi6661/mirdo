@@ -536,8 +536,10 @@ func _resolve_anchor_mark() -> Node3D:
 
 
 func _update_follow_transform(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	var anchor := _resolve_anchor_mark()
-	if not auto_follow_anchor or anchor == null:
+	if not auto_follow_anchor or anchor == null or not is_instance_valid(anchor) or not anchor.is_inside_tree():
 		return
 
 	var viewport := get_viewport()

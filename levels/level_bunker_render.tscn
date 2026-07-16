@@ -202,7 +202,7 @@ vertices = PackedVector3Array(2.339568, 0, -4.010972, 3.634578, 0, -4.003727, 3.
 affect_navigation_mesh = true
 
 [node name="PlayerController" parent="." unique_id=1610761508 instance=ExtResource("3_suxrs")]
-transform = Transform3D(0.08430137, 0, 0.9964403, 0, 1, 0, -0.9964403, 0, 0.08430137, 1.0093768, -0.011259079, 0.004717231)
+transform = Transform3D(0.08430137, 0, 0.9964403, 0, 1, 0, -0.9964403, 0, 0.08430137, 1.6399866, -0.011259079, -0.013332903)
 
 [node name="TimeComponent" type="Node" parent="." unique_id=1795443122 groups=["TimeSource"]]
 script = ExtResource("9_time_component")

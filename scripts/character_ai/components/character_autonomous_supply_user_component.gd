@@ -128,9 +128,16 @@ func _run_supply_flow(task: Dictionary) -> void:
 		_finish_supply(report, false)
 		return
 	_apply_expression(positive_expression)
-	await _play_action(take_action, take_wait_fallback_sec)
-	var item: Resource = taken.get("item", null) as Resource
-	var consume_report := _consume_item(item, "mirdo_autonomous_supply_%s" % String(task.get("need", "")))
+	var loose_object := taken.get("loose_object", null) as Node
+	var consume_report: Dictionary
+	if loose_object != null:
+		# CharacterPickableItemComponent owns the take animation, visual attachment,
+		# consumption and world-item cleanup for loose objects.
+		consume_report = await _pick_up_loose_item(loose_object, task)
+	else:
+		await _play_action(take_action, take_wait_fallback_sec)
+		var item: Resource = taken.get("item", null) as Resource
+		consume_report = _consume_item(item, "mirdo_autonomous_supply_%s" % String(task.get("need", "")))
 	report["consume_report"] = consume_report
 	report["ok"] = bool(consume_report.get("ok", false))
 	if not bool(report["ok"]):
@@ -145,9 +152,11 @@ func _navigate_to_supply(task: Dictionary) -> bool:
 	_navigation_ok = false
 	var object_id := String(task.get("object_id", "")).strip_edges()
 	var marker_path := String(task.get("marker_path", "")).strip_edges()
+	var is_loose_item := task.get("loose_object", null) != null
+	var navigation_command := "pick_up_item" if is_loose_item else "go_to_object"
 	var payload := {
-		"command": "go_to_object",
-		"intent": "go_to_object",
+		"command": navigation_command,
+		"intent": navigation_command,
 		"target_object": object_id,
 		"target_object_id": object_id,
 		"target_marker_path": marker_path,
@@ -188,6 +197,12 @@ func _play_action(action_name: StringName, fallback_duration: float) -> void:
 		await get_tree().create_timer(duration).timeout
 
 func _take_one_item_from_task(task: Dictionary) -> Dictionary:
+	var loose_object := task.get("loose_object", null) as Node
+	if loose_object != null:
+		var loose_item := task.get("item", null) as ItemData
+		if loose_item == null or not is_instance_valid(loose_object):
+			return {}
+		return {"item": loose_item, "loose_object": loose_object, "remaining": 0}
 	var container := task.get("container", null) as Node
 	var storage := _resolve_container_storage(container)
 	if storage == null:
@@ -216,6 +231,28 @@ func _consume_item(item: Resource, reason: String) -> Dictionary:
 	if _item_consumer == null or not _item_consumer.has_method("consume_item"):
 		return {"ok": false, "error": "consumer_missing"}
 	return _item_consumer.call("consume_item", item, reason) as Dictionary
+
+func _pick_up_loose_item(loose_object: Node, task: Dictionary) -> Dictionary:
+	if loose_object == null or not is_instance_valid(loose_object):
+		return {"ok": false, "error": "pickable_missing"}
+	if not loose_object.has_method("pick_up_by"):
+		_log("loose item has no pick_up_by: %s" % String(loose_object.name))
+		return {"ok": false, "error": "pickable_missing"}
+	if loose_object.has_method("can_be_picked_by") and not bool(loose_object.call("can_be_picked_by", _actor)):
+		return {"ok": false, "error": "item_not_pickable"}
+	var reason := "mirdo_autonomous_supply_%s" % String(task.get("need", ""))
+	var result_value: Variant = await loose_object.call("pick_up_by", _actor, reason)
+	var result: Dictionary = result_value if result_value is Dictionary else {}
+	if result.is_empty():
+		return {"ok": false, "error": "pick_up_invalid_result"}
+	if bool(result.get("ok", false)):
+		supply_item_taken.emit(
+			String(task.get("need", "")),
+			String(task.get("object_id", "")),
+			_item_name(task.get("item", null)),
+			0,
+		)
+	return result
 
 func _finish_supply(report: Dictionary, success: bool) -> void:
 	_busy = false
@@ -279,7 +316,86 @@ func _find_supply_target(need: String) -> Dictionary:
 				"item": slot.get("item", null),
 				"marker_path": String(marker.get_path()) if marker != null and marker.is_inside_tree() else "",
 			}
+	for entry in tree.get_nodes_in_group(&"ai_pickable_item"):
+		var object_node := entry as Node
+		if not _is_valid_loose_item_candidate(object_node):
+			continue
+		var item := _resolve_pickable_item_data(object_node)
+		if item == null or not _item_matches_need(item, need):
+			continue
+		var marker := _resolve_object_marker(object_node)
+		if marker == null:
+			continue
+		var distance := _actor.global_position.distance_to(marker.global_position) if _actor != null else 0.0
+		var score := distance
+		if score < best_score:
+			best_score = score
+			best = {
+				"object": object_node,
+				"object_id": _get_pickable_item_id(object_node, item),
+				"loose_object": object_node,
+				"item": item,
+				"marker_path": String(marker.get_path()) if marker.is_inside_tree() else "",
+			}
 	return best
+
+func _is_valid_loose_item_candidate(object_node: Node) -> bool:
+	if object_node == null or not is_instance_valid(object_node) or not object_node.is_inside_tree():
+		return false
+	if not object_node.has_method("pick_up_by"):
+		return false
+	if object_node.has_method("can_be_picked_by") and not bool(object_node.call("can_be_picked_by", _actor)):
+		return false
+	var item_root := _resolve_pickable_item_root(object_node)
+	if item_root != null and not item_root.visible:
+		return false
+	return true
+
+func _resolve_pickable_item_data(object_node: Node) -> ItemData:
+	if object_node == null:
+		return null
+	if object_node.has_method("_resolve_item_data"):
+		var resolved_value: Variant = object_node.call("_resolve_item_data")
+		if resolved_value is ItemData:
+			return resolved_value as ItemData
+	var cursor: Node = object_node
+	var depth := 0
+	while cursor != null and depth < 8:
+		var value: Variant = _safe_get(cursor, "item_data", null)
+		if value is ItemData:
+			return value as ItemData
+		cursor = cursor.get_parent()
+		depth += 1
+	return null
+
+func _resolve_pickable_item_root(object_node: Node) -> Node3D:
+	if object_node == null:
+		return null
+	if object_node.has_method("_resolve_item_root"):
+		var resolved_value: Variant = object_node.call("_resolve_item_root")
+		if resolved_value is Node3D:
+			return resolved_value as Node3D
+	var cursor: Node = object_node
+	var depth := 0
+	while cursor != null and depth < 8:
+		if _safe_get(cursor, "item_data", null) is ItemData:
+			return cursor as Node3D
+		cursor = cursor.get_parent()
+		depth += 1
+	return null
+
+func _get_pickable_item_id(object_node: Node, item: ItemData) -> String:
+	if object_node != null and object_node.has_method("build_ai_pickable_summary"):
+		var summary_value: Variant = object_node.call("build_ai_pickable_summary", _actor)
+		if summary_value is Dictionary:
+			var summary_id := String((summary_value as Dictionary).get("id", "")).strip_edges()
+			if not summary_id.is_empty():
+				return summary_id
+	if item != null:
+		var item_name := String(item.ItemName).strip_edges()
+		if not item_name.is_empty():
+			return item_name.to_snake_case()
+	return _get_world_object_id(_resolve_pickable_item_root(object_node) if object_node != null else null)
 
 func _is_food_supply_object(node: Node) -> bool:
 	if node == null:

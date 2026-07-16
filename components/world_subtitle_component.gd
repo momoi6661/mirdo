@@ -83,6 +83,8 @@ var _talk_state_initialized: bool = false
 var _talk_state_active: bool = false
 var _typing_sfx_player: AudioStreamPlayer
 var _typing_sfx_elapsed: float = 999.0
+## TTS 播放期间由对话控制器锁住字幕，避免固定 show_time 先到期。
+var _external_hold: bool = false
 
 func _ready() -> void:
 	_letters_root = get_node_or_null(letters_root_path) as Node3D
@@ -183,7 +185,15 @@ func show_once(text: String, speaker: String = "") -> void:
 	_emit_subtitle_text_changed()
 	_update_face_talk_state()
 
+func show_once_immediate(text: String, speaker: String = "") -> void:
+	"""立即完成整句字幕渲染，适合需要和 TTS 起播点对齐的对白。"""
+	show_once(text, speaker)
+	if _playing and not _effective_text().is_empty():
+		_render_all_available_text_now()
+		_emit_subtitle_text_changed()
+
 func cancel_now() -> void:
+	_external_hold = false
 	_playing = false
 	_streaming = false
 	_target_text = ""
@@ -205,6 +215,17 @@ func get_active_subtitle_speaker() -> String:
 
 func is_subtitle_active() -> bool:
 	return _playing and not _effective_text().strip_edges().is_empty()
+
+func set_external_hold(held: bool) -> void:
+	"""让外部语音时钟接管字幕生命周期；释放时重新开始停留计时。"""
+	_external_hold = held
+	if held:
+		_hold_left = maxf(_hold_left, show_time)
+	else:
+		_hold_left = show_time
+
+func is_external_hold_active() -> bool:
+	return _external_hold
 
 func _emit_subtitle_text_changed() -> void:
 	subtitle_text_changed.emit(_effective_text(), _speaker_text, _streaming)
@@ -276,6 +297,8 @@ func _process(delta: float) -> void:
 		return
 
 	_update_face_talk_state()
+	if _external_hold:
+		return
 	_hold_left = maxf(0.0, _hold_left - delta)
 	if _hold_left <= 0.0:
 		_queue_out_all()
@@ -283,7 +306,7 @@ func _process(delta: float) -> void:
 		_cleanup_left = queue_clear_delay
 		_update_face_talk_state()
 
-func _spawn_character(char_text: String) -> void:
+func _spawn_character(char_text: String, animate: bool = true) -> void:
 	if char_text == "\n":
 		return
 	var instance := letter_scene.instantiate()
@@ -295,15 +318,16 @@ func _spawn_character(char_text: String) -> void:
 		letter_node.set("text", char_text)
 	if letter_node.has_method("set_character"):
 		letter_node.call("set_character", char_text)
-	if letter_node.has_method("start_animation"):
+	if animate and letter_node.has_method("start_animation"):
 		letter_node.call("start_animation")
-	elif letter_node.has_method("play_start"):
+	elif animate and letter_node.has_method("play_start"):
 		letter_node.call("play_start")
 	_active_letters.append({
 		"id": letter_node.get_instance_id(),
 		"render_index": _active_letters.size(),
 	})
-	_play_typing_sfx(char_text)
+	if animate:
+		_play_typing_sfx(char_text)
 	_relayout_letters()
 
 func _queue_out_all() -> void:
@@ -378,7 +402,7 @@ func _render_all_available_text_now() -> void:
 	var full_length := full_text.length()
 	while _displayed_count < full_length:
 		var next_char := full_text.substr(_displayed_count, 1)
-		_spawn_character(next_char)
+		_spawn_character(next_char, false)
 		_displayed_count += 1
 	_spawn_timer = 0.0
 

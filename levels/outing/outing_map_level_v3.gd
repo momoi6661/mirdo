@@ -1095,7 +1095,7 @@ func _confirm_expedition() -> void:
 	var result_title := String(ai_result.get("title", "外出行动报告")).strip_edges()
 	if result_title.is_empty():
 		result_title = "外出行动报告"
-	_update_story_result_page(result_title, "探索完成，正在回放这次外出的完整经历。", result_story, result_body, "返回庇护所", false, true)
+	_update_story_result_page(result_title, "探索完成，回放外出经历", result_story, result_body, "返回庇护所", false, true)
 
 
 func _empty_string_array() -> Array[String]:
@@ -1142,9 +1142,7 @@ func _update_story_result_page(title: String, subtitle: String, story_body: Stri
 	if result_overlay != null and result_overlay.has_method("play_story_then_summary"):
 		result_overlay.call("play_story_then_summary", title, subtitle, story_body, summary_body, button_text, button_disabled)
 	else:
-		_update_result_page(title, subtitle, story_body + "
-
-" + summary_body, button_text, button_disabled, returns_to_bunker)
+		_update_result_page(title, subtitle, story_body + "\n\n" + summary_body, button_text, button_disabled, returns_to_bunker)
 
 
 func _build_loadout_commit_preview_summary() -> Dictionary:
@@ -1208,15 +1206,15 @@ func _show_ai_failure_result(rule: Resource, ai_result: Dictionary) -> void:
 	if result_title_label != null:
 		result_title_label.text = title
 	if result_subtitle_label != null:
-		result_subtitle_label.text = "后端已连接，但模型/API 没有返回可用结算；本次不消耗物资、不保存地图进展。"
+		result_subtitle_label.text = "AI 结算失败，本次未写入进度"
 	_set_result_return_button("关闭并重试", false, false)
 	var error_text := String(ai_result.get("error", "unknown_backend_ai_error")).strip_edges()
 	var summary := String(ai_result.get("summary", "后端 AI 结算没有完成。")).strip_edges()
 	var experience: Array = ai_result.get("experience", []) if ai_result.get("experience", []) is Array else []
 	var text := ""
 	text += _bb_section("AI 结算失败")
-	text += "[color=#f0e0bb]%s[/color]\n" % summary
-	text += "[color=#ff765d]错误：%s[/color]\n\n" % error_text
+	text += "[color=#e6e1d6]%s[/color]\n" % summary
+	text += "[color=#ff8594]错误：%s[/color]\n\n" % error_text
 	text += _bb_section("本次未写入")
 	text += "• 未扣除外出携带物。\n"
 	text += "• 未加入带回物资。\n"
@@ -1229,8 +1227,8 @@ func _show_ai_failure_result(rule: Resource, ai_result: Dictionary) -> void:
 			var line := String(line_raw).strip_edges()
 			if not line.is_empty():
 				text += "• %s\n" % line
-	text += "\n[color=#8f8674]目标：%s。请检查 API base_url / model / key，或稍后重试。[/color]" % String(rule.get("display_name"))
-	_update_result_page(title, "后端已连接，但模型/API 没有返回可用结算；本次不消耗物资、不保存地图进展。", text, "关闭并重试", false, false)
+	text += "\n[color=#9e9590]目标：%s。请检查 API base_url / model / key，或稍后重试。[/color]" % String(rule.get("display_name"))
+	_update_result_page(title, "AI 结算失败，本次未写入进度", text, "关闭并重试", false, false)
 
 
 func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: String, progress: float) -> void:
@@ -1244,13 +1242,13 @@ func _show_expedition_stage(rule: Resource, stage_name: String, stage_detail: St
 	if result_title_label != null:
 		result_title_label.text = "外出行动进行中"
 	if result_subtitle_label != null:
-		result_subtitle_label.text = "正在整理路线、风险和现场记录。"
-	var body := "[center][color=#ffb529][font_size=28]外出行动进行中[/font_size][/color][/center]\n\n"
-	body += "[color=#d8c790]目标[/color]  %s\n" % String(rule.get("display_name"))
-	body += "[color=#d8c790]阶段[/color]  %s\n%s\n\n" % [stage_name, stage_detail]
+		result_subtitle_label.text = "整理路线、风险与记录"
+	var body := "[center][color=#ff7ab8][font_size=28]外出行动进行中[/font_size][/color][/center]\n\n"
+	body += "[color=#c7c2b8]目标[/color]  %s\n" % String(rule.get("display_name"))
+	body += "[color=#c7c2b8]阶段[/color]  %s\n%s\n\n" % [stage_name, stage_detail]
 	body += _format_expedition_progress_line(progress)
-	body += "\n[color=#8f8674]后端 AI 正在按地点内置探索规则生成完整探索故事：离开庇护所、靠近地点、现场意外、物资取舍和撤离返程。[/color]"
-	_update_result_page("外出行动进行中", "正在整理路线、风险和现场记录。", body, "行动结算中……", true, true)
+	body += "\n[color=#9e9590]后端 AI 正在按地点内置探索规则生成完整探索故事：离开庇护所、靠近地点、现场意外、物资取舍和撤离返程。[/color]"
+	_update_result_page("外出行动进行中", "整理路线、风险与记录", body, "行动结算中……", true, true)
 
 
 func _format_expedition_progress_line(progress: float) -> String:
@@ -1262,7 +1260,7 @@ func _format_expedition_progress_line(progress: float) -> String:
 		phase = "现场结算"
 	elif percent >= 15:
 		phase = "离开庇护所"
-	return "[color=#ffd447]行动进度[/color]  %s · %d%%\n\n" % [phase, percent]
+	return "[color=#ff7ab8]行动进度[/color]  %s · %d%%\n\n" % [phase, percent]
 
 
 func _build_expedition_story_report(payload: Dictionary) -> String:
@@ -1272,27 +1270,27 @@ func _build_expedition_story_report(payload: Dictionary) -> String:
 	var summary := String(ai.get("summary", "")).strip_edges() if ai != null else ""
 	var story := String(ai.get("story", ai.get("narrative", ""))).strip_edges() if ai != null else ""
 	var text := ""
-	text += "[color=#8f8674]地点[/color]  %s    [color=#8f8674]威胁[/color]  %d/5    [color=#8f8674]耗时[/color]  %s\n" % [
+	text += "[color=#9e9590]地点[/color]  %s    [color=#9e9590]威胁[/color]  %d/5    [color=#9e9590]耗时[/color]  %s\n" % [
 		String(rule.get("display_name")) if rule != null else "未知地点",
 		int(rule.get("threat_level")) if rule != null else 0,
 		_format_duration(int(time_info.get("total", 0))),
 	]
-	text += "[color=#3f382c]────────────────────────[/color]\n\n"
-	text += "[color=#ffd447][font_size=23]外出经历[/font_size][/color]\n\n"
+	text += "[color=#4a3a42]────────────────────────[/color]\n\n"
+	text += "[color=#ff7ab8][font_size=23]外出经历[/font_size][/color]\n\n"
 	if not summary.is_empty():
-		text += "[color=#d8c790]%s[/color]\n\n" % summary
+		text += "[color=#c7c2b8]%s[/color]\n\n" % summary
 	if not story.is_empty():
 		text += _format_story_text(story)
 	else:
 		var experience: Array = ai.get("experience", []) if ai != null and ai.get("experience", []) is Array else []
 		if experience.is_empty():
-			text += "[color=#f0e0bb]这次外出只留下了断续记录：你离开庇护所、快速搜索目标外围，然后在尸群靠近前撤回。[/color]\n\n"
+			text += "[color=#e6e1d6]这次外出只留下了断续记录：你离开庇护所、快速搜索目标外围，然后在尸群靠近前撤回。[/color]\n\n"
 		else:
 			for line_raw in experience:
 				var line := String(line_raw).strip_edges()
 				if not line.is_empty():
-					text += "[color=#f0e0bb]%s[/color]\n\n" % line
-	text += "[color=#8f8674]——记录播放完毕后，会显示物资、状态和地图进展。[/color]"
+					text += "[color=#e6e1d6]%s[/color]\n\n" % line
+	text += "[color=#9e9590]——记录播放完毕后，会显示物资、状态和地图进展。[/color]"
 	return text
 
 
@@ -1310,28 +1308,28 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	if result_title_label != null:
 		result_title_label.text = title
 	if result_subtitle_label != null:
-		result_subtitle_label.text = "连接不到后端，使用本地保守结算；结果仍会保存。" if local_fallback else "后端 AI 已生成经历；物资写入庇护所库存。"
+		result_subtitle_label.text = "本地结算完成，结果已保存" if local_fallback else "经历已生成，物资已入库"
 
 	var summary := String(ai.get("summary", "")).strip_edges() if ai != null else ""
 	var story := String(ai.get("story", ai.get("narrative", ""))).strip_edges() if ai != null else ""
 	var experience: Array = ai.get("experience", []) if ai != null and ai.get("experience", []) is Array else []
 	var text := ""
-	text += "[color=#8f8674]地点[/color]  %s    [color=#8f8674]威胁[/color]  %d/5    [color=#8f8674]耗时[/color]  %s\n" % [
+	text += "[color=#9e9590]地点[/color]  %s    [color=#9e9590]威胁[/color]  %d/5    [color=#9e9590]耗时[/color]  %s\n" % [
 		String(rule.get("display_name")),
 		int(rule.get("threat_level")),
 		_format_duration(int(time_info.get("total", 0))),
 	]
-	text += "[color=#8f8674]路程[/color]  %s    [color=#8f8674]搜索[/color]  %s\n" % [
+	text += "[color=#9e9590]路程[/color]  %s    [color=#9e9590]搜索[/color]  %s\n" % [
 		_format_duration(int(time_info.get("route", 0))),
 		_format_duration(int(time_info.get("search", 0))),
 	]
-	text += "[color=#d8c790]判断[/color]  %s\n" % String(payload.get("risk", "未记录异常。"))
+	text += "[color=#c7c2b8]判断[/color]  %s\n" % String(payload.get("risk", "未记录异常。"))
 	text += _bb_divider()
 
 	text += _bb_section("行动复盘")
 	if not summary.is_empty():
-		text += "[color=#d8c790]%s[/color]\n" % summary
-	text += "[color=#8f8674]完整故事已先行回放；这里保留关键记录和结算变化。[/color]\n"
+		text += "[color=#c7c2b8]%s[/color]\n" % summary
+	text += "[color=#9e9590]完整故事已先行回放；这里保留关键记录和结算变化。[/color]\n"
 	text += _bb_divider()
 
 	text += _bb_section("关键记录")
@@ -1342,7 +1340,7 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 		for line_raw in experience:
 			var line := String(line_raw).strip_edges()
 			if not line.is_empty():
-				text += "[color=#8f8674]%02d[/color]  %s\n" % [log_index, line]
+				text += "[color=#9e9590]%02d[/color]  %s\n" % [log_index, line]
 				log_index += 1
 	text += _bb_divider()
 
@@ -1356,8 +1354,8 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	text += "消耗：%s\n" % _format_count_dictionary(commit.get("consumed_names", {}), "无")
 	var damaged_text := _format_count_dictionary(commit.get("damaged_names", {}), "无")
 	if damaged_text != "无":
-		text += "[color=#ff765d]损坏：%s[/color]\n" % damaged_text
-	text += "[color=#8f8674]取出%d件 / 归还%d件 / 消耗%d件 / 损坏%d件[/color]\n" % [
+		text += "[color=#ff8594]损坏：%s[/color]\n" % damaged_text
+	text += "[color=#9e9590]取出%d件 / 归还%d件 / 消耗%d件 / 损坏%d件[/color]\n" % [
 		int(commit.get("committed", 0)),
 		int(commit.get("returned", 0)),
 		int(commit.get("consumed", 0)),
@@ -1369,26 +1367,26 @@ func _build_expedition_result_report(payload: Dictionary) -> String:
 	text += _format_loot_entries(payload.get("loot", []))
 	var lost_count := int(deposit.get("lost", 0))
 	if lost_count > 0:
-		text += "[color=#ff765d]外出带回包空间不足，丢失%d件。[/color]\n" % lost_count
+		text += "[color=#ff8594]外出带回包空间不足，丢失%d件。[/color]\n" % lost_count
 	else:
-		text += "[color=#9bd887]带回物资已写入庇护所库存。[/color]\n"
+		text += "[color=#c7ebcc]带回物资已写入庇护所库存。[/color]\n"
 	text += _bb_divider()
 
 	text += _bb_section("地图进展")
 	if unlocked.is_empty():
 		text += "外缘发现：暂无新地点。本次主要补充资源和确认路线状态。\n"
 	else:
-		text += "[color=#ffd447]沿道路向外发现：%s[/color]\n" % " / ".join(unlocked)
-	text += "[color=#8f8674]提示：未解锁地点运行时不会显示；继续探索相邻地点会逐步扩展地图。[/color]"
+		text += "[color=#ff7ab8]沿道路向外发现：%s[/color]\n" % " / ".join(unlocked)
+	text += "[color=#9e9590]提示：未解锁地点运行时不会显示；继续探索相邻地点会逐步扩展地图。[/color]"
 	return text
 
 
 func _bb_section(title: String) -> String:
-	return "[color=#ffd447][font_size=21]%s[/font_size][/color]\n" % title
+	return "[color=#ff7ab8][font_size=21]%s[/font_size][/color]\n" % title
 
 
 func _bb_divider() -> String:
-	return "\n[color=#3f382c]────────────────────────[/color]\n"
+	return "\n[color=#4a3a42]────────────────────────[/color]\n"
 
 
 func _format_story_text(story: String) -> String:
@@ -1401,7 +1399,7 @@ func _format_story_text(story: String) -> String:
 		var paragraph := String(paragraph_raw).strip_edges()
 		if paragraph.is_empty():
 			continue
-		result += "[color=#f0e0bb]%s[/color]\n\n" % paragraph
+		result += "[color=#e6e1d6]%s[/color]\n\n" % paragraph
 	return result
 
 
@@ -1493,31 +1491,10 @@ func _refresh_ai_settings_for_outing() -> void:
 
 
 func _ensure_ai_service_running_for_outing() -> void:
-	var supervisor := get_node_or_null("/root/AIServiceSupervisor")
-	if supervisor == null or not supervisor.has_method("ensure_service_running"):
-		return
-	supervisor.call("ensure_service_running")
-	var start_msec := Time.get_ticks_msec()
-	var max_wait_msec := 1800
-	var ready_signal_seen := false
-	var failed_signal_seen := false
-	if supervisor.has_signal("service_ready"):
-		supervisor.connect("service_ready", func() -> void:
-			ready_signal_seen = true
-		, CONNECT_ONE_SHOT)
-	if supervisor.has_signal("service_start_failed"):
-		supervisor.connect("service_start_failed", func(_message: String) -> void:
-			failed_signal_seen = true
-		, CONNECT_ONE_SHOT)
-	while Time.get_ticks_msec() - start_msec < max_wait_msec:
-		if ready_signal_seen:
-			print("[OutingAI] AIServiceSupervisor ready.")
-			return
-		if failed_signal_seen:
-			push_warning("[OutingAI] AIServiceSupervisor 启动失败，稍后请求会回退本地结算。")
-			return
-		await get_tree().process_frame
-	push_warning("[OutingAI] 等待 AIServiceSupervisor 超时，继续尝试请求后端。")
+	# 当前版本不在外出流程里自动启动后端。
+	# 后端已经由用户手动启动时，下面的 HTTPRequest 会直接请求；
+	# 未启动时则走已有的网络错误/本地保守结算，不阻塞游戏也不重复拉起进程。
+	return
 
 
 func _build_ai_expedition_payload(rule: Resource, commit_summary: Dictionary, unlocked_locations: Array[String]) -> Dictionary:
@@ -1851,9 +1828,9 @@ func _get_valid_state_component_from_player(player_node: Node) -> Node:
 func _format_status_cost(cost_variant: Variant) -> String:
 	var cost := cost_variant as Dictionary
 	if cost == null or cost.is_empty():
-		return "[color=#8f8674]未找到角色状态组件，本次未写入生命/饥饿/口渴。[/color]\n"
+		return "[color=#9e9590]未找到角色状态组件，本次未写入生命/饥饿/口渴。[/color]\n"
 	var reduction_percent := int(round(float(cost.get("damage_reduction", 0.0)) * 100.0))
-	return "[color=#d8c790]饥饿[/color] -%d  [color=#d8c790]口渴[/color] -%d  [color=#d8c790]生命[/color] -%d\n[color=#8f8674]武器/工具减伤：%d%%（原始生命风险 %d）[/color]\n" % [
+	return "[color=#c7c2b8]饥饿[/color] -%d  [color=#c7c2b8]口渴[/color] -%d  [color=#c7c2b8]生命[/color] -%d\n[color=#9e9590]武器/工具减伤：%d%%（原始生命风险 %d）[/color]\n" % [
 		int(cost.get("hunger_cost", 0)),
 		int(cost.get("thirst_cost", 0)),
 		int(cost.get("health_damage", 0)),
@@ -2007,7 +1984,7 @@ func _format_loot_entries(entries: Array) -> String:
 		var added := int(entry.get("added", 0))
 		var tag := String(entry.get("tag", "物资"))
 		var state := "已入包" if added >= amount else "入包%d/%d" % [added, amount]
-		lines.append("• %s x%d  [color=#8f8674](线索：%s / %s)[/color]" % [item.ItemName, amount, tag, state])
+		lines.append("• %s x%d  [color=#9e9590](线索：%s / %s)[/color]" % [item.ItemName, amount, tag, state])
 	return "\n".join(lines) + "\n"
 
 

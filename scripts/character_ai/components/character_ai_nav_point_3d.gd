@@ -47,6 +47,43 @@ func build_ai_nav_point_summary(observer: Node3D = null) -> Dictionary:
 	_apply_node_semantics(summary, observer)
 	return summary
 
+## 构造发送给 Agent 的语义导航摘要。
+##
+## 旧的 build_ai_nav_point_summary() 仍供 Godot 执行器使用；这个方法专门
+## 给对话上下文使用，刻意移除坐标、朝向和 NodePath，避免后端依赖场景实现。
+func build_ai_navigation_summary(observer: Node3D = null) -> Dictionary:
+	var raw := build_ai_nav_point_summary(observer)
+	var target_id := String(raw.get("target_object_id", "")).strip_edges()
+	var point_kind := "affordance_anchor" if not target_id.is_empty() else "waypoint"
+	var affordances: Array = []
+	for value in raw.get("action_options", []):
+		var action := String(value).strip_edges()
+		if not action.is_empty() and not affordances.has(action):
+			affordances.append(action)
+	var result := {
+		"id": String(raw.get("id", "")).strip_edges(),
+		"target_ref": target_id if not target_id.is_empty() else String(raw.get("id", "")).strip_edges(),
+		"name": String(raw.get("name", "")).strip_edges(),
+		"kind": point_kind,
+		"type": String(raw.get("type", "")).strip_edges(),
+		"description": String(raw.get("description", "")).strip_edges(),
+		"tags": raw.get("tags", []),
+		"affordances": affordances,
+		"arrival_action": String(raw.get("arrival_action", "")).strip_edges(),
+		"arrival_expression": String(raw.get("arrival_expression", "")).strip_edges(),
+		"action_hint": String(raw.get("action_hint", "")).strip_edges(),
+		"marker_role": String(raw.get("marker_role", "")).strip_edges(),
+		"distance": float(raw.get("distance", 0.0)),
+		"priority": float(raw.get("priority", 0.0)),
+		"cooldown_sec": float(raw.get("cooldown_sec", 0.0)),
+		"dwell_time_sec": float(raw.get("dwell_time_sec", 0.0)),
+		"knowledge_scope": String(raw.get("knowledge_scope", "global_map")),
+		"map_role": String(raw.get("map_role", "known_nav_point")),
+	}
+	if not target_id.is_empty():
+		result["entity_id"] = target_id
+	return result
+
 func get_marker() -> Marker3D:
 	return self
 

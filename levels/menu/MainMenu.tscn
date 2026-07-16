@@ -4,10 +4,21 @@
 [ext_resource type="PackedScene" path="res://controllers/ui/SaveSlotMenu.tscn" id="2_save_slot_menu"]
 [ext_resource type="FontFile" uid="uid://b1vswy8cdyffc" path="res://fonts/Silver.ttf" id="3_silver"]
 [ext_resource type="FontFile" uid="uid://ksnfb6kcb7xn" path="res://fonts/SmileySans-Oblique.ttf" id="4_smiley"]
-[ext_resource type="Shader" path="res://levels/menu/horror_background_noise.gdshader" id="5_horror_shader"]
-[ext_resource type="Shader" path="res://levels/menu/classic_horror_static.gdshader" id="6_static_shader"]
-[ext_resource type="Shader" path="res://levels/menu/mita_gradient_background.gdshader" id="7_mita_gradient"]
-[ext_resource type="Shader" path="res://levels/menu/mita_clean_breath_background.gdshader" id="8_clean_breath"]
+[ext_resource type="Shader" uid="uid://bpiux2qy5ip14" path="res://levels/menu/horror_background_noise.gdshader" id="5_horror_shader"]
+[ext_resource type="Shader" uid="uid://661o7m40d1hh" path="res://levels/menu/classic_horror_static.gdshader" id="6_static_shader"]
+[ext_resource type="Shader" uid="uid://bhdwjg6i811me" path="res://levels/menu/mita_clean_breath_background.gdshader" id="8_clean_breath"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_clean_breath"]
+shader = ExtResource("8_clean_breath")
+shader_parameter/center_color = Color(0.86, 0.2, 0.52, 1)
+shader_parameter/side_color = Color(0.42, 0.055, 0.25, 1)
+shader_parameter/side_falloff = 1.65
+shader_parameter/edge_darkness = 0.055
+shader_parameter/breath_strength = 0.1
+shader_parameter/spark_strength = 0.18
+shader_parameter/block_strength = 0.095
+shader_parameter/grain_strength = 0.008
+shader_parameter/motion_speed = 0.36
 
 [sub_resource type="Gradient" id="Gradient_bg"]
 offsets = PackedFloat32Array(0, 0.42, 1)
@@ -33,35 +44,11 @@ shader = ExtResource("6_static_shader")
 shader_parameter/snow_strength = 0.31
 shader_parameter/big_noise_strength = 0.16
 shader_parameter/horizontal_tear_strength = 0.17
-shader_parameter/green_tint = 0.30
+shader_parameter/green_tint = 0.3
 shader_parameter/red_tint = 0.08
 shader_parameter/vignette_strength = 0.76
 shader_parameter/silhouette_strength = 0.22
 shader_parameter/flicker_speed = 7.5
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_mita_gradient"]
-shader = ExtResource("7_mita_gradient")
-shader_parameter/center_color = Color(0.82, 0.18, 0.50, 1)
-shader_parameter/side_color = Color(0.36, 0.055, 0.22, 1)
-shader_parameter/top_color = Color(0.50, 0.085, 0.32, 1)
-shader_parameter/side_falloff = 1.18
-shader_parameter/vignette_strength = 0.075
-shader_parameter/pattern_strength = 0.055
-shader_parameter/motion_speed = 0.42
-shader_parameter/breath_strength = 0.13
-shader_parameter/spark_strength = 0.20
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_clean_breath"]
-shader = ExtResource("8_clean_breath")
-shader_parameter/center_color = Color(0.86, 0.20, 0.52, 1)
-shader_parameter/side_color = Color(0.42, 0.055, 0.25, 1)
-shader_parameter/side_falloff = 1.65
-shader_parameter/edge_darkness = 0.055
-shader_parameter/breath_strength = 0.10
-shader_parameter/spark_strength = 0.18
-shader_parameter/block_strength = 0.095
-shader_parameter/grain_strength = 0.008
-shader_parameter/motion_speed = 0.36
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_button_normal"]
 content_margin_left = 34.0
@@ -80,9 +67,8 @@ content_margin_left = 38.0
 content_margin_top = 12.0
 content_margin_right = 24.0
 content_margin_bottom = 12.0
-bg_color = Color(1.0, 0.48, 0.68, 0.25)
-border_width_left = 0
-border_color = Color(0.78, 0.75, 0.66, 0.0)
+bg_color = Color(1, 0.48, 0.68, 0.25)
+border_color = Color(0.78, 0.75, 0.66, 0)
 corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
@@ -93,16 +79,12 @@ content_margin_left = 42.0
 content_margin_top = 12.0
 content_margin_right = 24.0
 content_margin_bottom = 12.0
-bg_color = Color(1.0, 0.62, 0.78, 0.20)
-border_width_left = 0
-border_color = Color(0.78, 0.75, 0.66, 0.0)
+bg_color = Color(1, 0.62, 0.78, 0.2)
+border_color = Color(0.78, 0.75, 0.66, 0)
 corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="StyleBox_settings_page"]
-bg_color = Color(0, 0, 0, 0)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_field"]
 content_margin_left = 14.0
@@ -114,19 +96,19 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(1.0, 0.78, 0.88, 0.24)
+border_color = Color(1, 0.78, 0.88, 0.24)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_field_focus"]
 content_margin_left = 14.0
 content_margin_top = 8.0
 content_margin_right = 14.0
 content_margin_bottom = 8.0
-bg_color = Color(0.66, 0.10, 0.38, 0.42)
+bg_color = Color(0.66, 0.1, 0.38, 0.42)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(1.0, 0.86, 0.94, 0.78)
+border_color = Color(1, 0.86, 0.94, 0.78)
 
 [node name="MainMenu" type="CanvasLayer" unique_id=929744421]
 process_mode = 3
@@ -143,16 +125,17 @@ grow_vertical = 2
 
 [node name="Background" type="TextureRect" parent="Root" unique_id=169302305]
 unique_name_in_owner = true
+material = SubResource("ShaderMaterial_clean_breath")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-material = SubResource("ShaderMaterial_clean_breath")
 texture = SubResource("GradientTexture2D_bg")
 expand_mode = 1
-stretch_mode = 5
+# Fill ultrawide/tall fullscreen surfaces instead of letterboxing the 16:9 design texture.
+stretch_mode = 6
 
 [node name="HorrorBackWall" type="ColorRect" parent="Root" unique_id=914802361]
 visible = false
@@ -174,7 +157,7 @@ anchor_top = 0.12
 anchor_right = 0.22
 anchor_bottom = 0.82
 mouse_filter = 2
-color = Color(0.010, 0.009, 0.008, 0.34)
+color = Color(0.01, 0.009, 0.008, 0.34)
 
 [node name="CorridorRightWall" type="ColorRect" parent="Root" unique_id=914802363]
 visible = false
@@ -185,7 +168,7 @@ anchor_top = 0.1
 anchor_right = 1.08
 anchor_bottom = 0.88
 mouse_filter = 2
-color = Color(0.015, 0.013, 0.012, 0.30)
+color = Color(0.015, 0.013, 0.012, 0.3)
 
 [node name="DoorRecess" type="ColorRect" parent="Root" unique_id=914802364]
 visible = false
@@ -199,8 +182,8 @@ mouse_filter = 2
 color = Color(0.004, 0.004, 0.003, 0.78)
 
 [node name="DoorSickLight" type="ColorRect" parent="Root" unique_id=914802365]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.285
@@ -225,21 +208,21 @@ color = Color(0.38, 0.35, 0.26, 0.12)
 visible = false
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.20
+anchor_left = 0.2
 anchor_top = 0.52
 anchor_right = 0.62
 anchor_bottom = 0.83
 mouse_filter = 2
-color = Color(0.20, 0.19, 0.16, 0.065)
+color = Color(0.2, 0.19, 0.16, 0.065)
 
 [node name="LeftLowFog" type="ColorRect" parent="Root" unique_id=914802376]
 visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = -0.06
-anchor_top = 0.60
+anchor_top = 0.6
 anchor_right = 0.48
-anchor_bottom = 0.90
+anchor_bottom = 0.9
 mouse_filter = 2
 color = Color(0.12, 0.12, 0.105, 0.07)
 
@@ -248,15 +231,15 @@ visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.72
-anchor_top = 0.30
+anchor_top = 0.3
 anchor_right = 1.03
 anchor_bottom = 0.92
 mouse_filter = 2
 color = Color(0.09, 0.006, 0.004, 0.12)
 
 [node name="EmergencyRedGlow" type="ColorRect" parent="Root" unique_id=914802367]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.72
@@ -270,7 +253,6 @@ color = Color(0.34, 0.025, 0.018, 0.16)
 visible = false
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 0.16
 grow_horizontal = 2
@@ -300,8 +282,8 @@ mouse_filter = 2
 color = Color(0.34, 0.33, 0.28, 0.09)
 
 [node name="FloorRedReflection" type="ColorRect" parent="Root" unique_id=914802371]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.64
@@ -320,7 +302,7 @@ anchor_top = 0.12
 anchor_right = 0.42
 anchor_bottom = 0.132
 mouse_filter = 2
-color = Color(0.5, 0.48, 0.39, 0.0)
+color = Color(0.5, 0.48, 0.39, 0)
 
 [node name="BrokenBlindB" type="ColorRect" parent="Root" unique_id=914802373]
 visible = false
@@ -331,10 +313,11 @@ anchor_top = 0.175
 anchor_right = 0.39
 anchor_bottom = 0.184
 mouse_filter = 2
-color = Color(0.5, 0.48, 0.39, 0.0)
+color = Color(0.5, 0.48, 0.39, 0)
 
 [node name="GrimeVignette" type="ColorRect" parent="Root" unique_id=914802374]
 visible = false
+material = SubResource("ShaderMaterial_horror_grime")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -342,12 +325,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-material = SubResource("ShaderMaterial_horror_grime")
-color = Color(1, 1, 1, 1)
 
 [node name="ClassicStaticOverlay" type="ColorRect" parent="Root" unique_id=914802378]
-visible = false
 unique_name_in_owner = true
+visible = false
+material = SubResource("ShaderMaterial_classic_static")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -355,8 +337,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-material = SubResource("ShaderMaterial_classic_static")
-color = Color(1, 1, 1, 1)
 
 [node name="Scrim" type="ColorRect" parent="Root" unique_id=1698786640]
 layout_mode = 1
@@ -380,8 +360,8 @@ mouse_filter = 2
 color = Color(0.92, 0.32, 0.56, 0.055)
 
 [node name="WindowFrame" type="ColorRect" parent="Root" unique_id=1142656171]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.1
@@ -389,7 +369,7 @@ anchor_top = 0.06
 anchor_right = 0.42
 anchor_bottom = 0.44
 mouse_filter = 2
-color = Color(0.36, 0.34, 0.26, 0.0)
+color = Color(0.36, 0.34, 0.26, 0)
 
 [node name="WindowDark" type="ColorRect" parent="Root/WindowFrame" unique_id=113070074]
 layout_mode = 1
@@ -403,22 +383,22 @@ offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.006, 0.006, 0.005, 0.0)
+color = Color(0.006, 0.006, 0.005, 0)
 
 [node name="HangingSilhouette" type="ColorRect" parent="Root" unique_id=2062036505]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.18
 anchor_right = 0.23
 anchor_bottom = 0.38
 mouse_filter = 2
-color = Color(0, 0, 0, 0.0)
+color = Color(0, 0, 0, 0)
 
 [node name="FloorShadow" type="ColorRect" parent="Root" unique_id=750210546]
-visible = false
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_top = 0.74
@@ -429,8 +409,8 @@ mouse_filter = 2
 color = Color(0, 0, 0, 0.58)
 
 [node name="ScanLine" type="ColorRect" parent="Root" unique_id=275547550]
-visible = false
 unique_name_in_owner = true
+visible = false
 custom_minimum_size = Vector2(0, 1)
 layout_mode = 1
 anchors_preset = 10
@@ -470,14 +450,16 @@ theme_override_font_sizes/font_size = 142
 text = "Mirdo"
 
 [node name="SubtitleLabel" type="Label" parent="Root/MainPage/TitleGroup" unique_id=1929631345]
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.78, 0.74, 0.86)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 26
-text = "避难所日志 · 小空"
+text = "避难所日志 · Mirdo"
 
 [node name="InfoRow" type="HBoxContainer" parent="Root/MainPage" unique_id=990064551]
 unique_name_in_owner = true
+visible = false
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.08
@@ -514,9 +496,9 @@ layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.61
 anchor_top = 0.24
-anchor_right = 0.90
+anchor_right = 0.9
 anchor_bottom = 0.29
-theme_override_colors/font_color = Color(0.62, 0.60, 0.54, 0.54)
+theme_override_colors/font_color = Color(0.62, 0.6, 0.54, 0.54)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 16
 text = "选择行动"
@@ -539,7 +521,7 @@ unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.57
-anchor_top = 0.30
+anchor_top = 0.3
 anchor_right = 0.91
 anchor_bottom = 0.76
 grow_horizontal = 2
@@ -549,10 +531,10 @@ theme_override_constants/separation = 10
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-focus_mode = 0
+focus_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
-theme_override_colors/font_disabled_color = Color(0.78, 0.70, 0.74, 0.56)
+theme_override_colors/font_disabled_color = Color(0.78, 0.7, 0.74, 0.56)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 27
 theme_override_styles/normal = SubResource("StyleBox_button_normal")
@@ -566,7 +548,7 @@ alignment = 0
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-focus_mode = 0
+focus_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
@@ -581,7 +563,7 @@ alignment = 0
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-focus_mode = 0
+focus_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
@@ -596,7 +578,7 @@ alignment = 0
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-focus_mode = 0
+focus_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
@@ -611,7 +593,7 @@ alignment = 0
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
-focus_mode = 0
+focus_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
 theme_override_colors/font_hover_color = Color(0.96, 0.96, 0.9, 1)
 theme_override_fonts/font = ExtResource("4_smiley")
@@ -679,22 +661,27 @@ offset_top = 106.0
 offset_bottom = 107.0
 grow_horizontal = 2
 mouse_filter = 2
-color = Color(0.82, 0.82, 0.76, 0.0)
+color = Color(0.82, 0.82, 0.76, 0)
 
-[node name="SettingsMargin" type="MarginContainer" parent="Root/SettingsPage" unique_id=1366573218]
+[node name="SettingsMargin" type="ScrollContainer" parent="Root/SettingsPage" unique_id=1366573218]
 layout_mode = 1
 anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 420.0
-offset_top = 76.0
-offset_right = -360.0
-offset_bottom = -56.0
+anchor_left = 0.2
+anchor_top = 0.07
+anchor_right = 0.84
+anchor_bottom = 0.95
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
 
 [node name="Rows" type="VBoxContainer" parent="Root/SettingsPage/SettingsMargin" unique_id=1770324236]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 7
 
 [node name="SettingsTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1574871966]
@@ -702,15 +689,123 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.86, 0.86, 0.82, 1)
 theme_override_fonts/font = ExtResource("3_silver")
 theme_override_font_sizes/font_size = 44
-text = "AI SETTINGS"
+text = "设置"
 
 [node name="SettingsHint" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1166921640]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.74, 0.74, 0.7, 0.66)
 theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 16
-text = "配置大模型连接信息。修改后自动保存。"
+text = "音量、画面、操作与 AI 连接。全屏会保存偏好；编辑器嵌入运行需独立窗口才会生效。"
 autowrap_mode = 3
+
+
+[node name="AudioTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "音频 / 显示"
+
+[node name="MasterRow" type="HBoxContainer" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MasterLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows/MasterRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "主音量"
+
+[node name="MasterVolumeSlider" type="HSlider" parent="Root/SettingsPage/SettingsMargin/Rows/MasterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="MusicRow" type="HBoxContainer" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MusicLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows/MusicRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "音乐"
+
+[node name="MusicVolumeSlider" type="HSlider" parent="Root/SettingsPage/SettingsMargin/Rows/MusicRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="UiRow" type="HBoxContainer" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="UiLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows/UiRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "界面"
+
+[node name="UiVolumeSlider" type="HSlider" parent="Root/SettingsPage/SettingsMargin/Rows/UiRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.85
+
+[node name="SensitivityRow" type="HBoxContainer" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SensitivityLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows/SensitivityRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "视角灵敏度"
+
+[node name="MouseSensitivitySlider" type="HSlider" parent="Root/SettingsPage/SettingsMargin/Rows/SensitivityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.5
+max_value = 2.0
+step = 0.05
+value = 1.0
+tooltip_text = "调整鼠标视角转动速度"
+
+[node name="FullscreenCheck" type="CheckButton" parent="Root/SettingsPage/SettingsMargin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "全屏"
+
+[node name="AiTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "AI 连接"
 
 [node name="BaseUrlLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=854083204]
 layout_mode = 2
@@ -770,7 +865,6 @@ theme_override_styles/focus = SubResource("StyleBox_field_focus")
 placeholder_text = "sk-..."
 secret = true
 
-
 [node name="ProxyUrlLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1893305101]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
@@ -788,9 +882,50 @@ theme_override_fonts/font = ExtResource("4_smiley")
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBox_field")
 theme_override_styles/focus = SubResource("StyleBox_field_focus")
-placeholder_text = "http://127.0.0.1:7890"
 text = "http://127.0.0.1:7890"
+placeholder_text = "http://127.0.0.1:7890"
 
+[node name="TtsTitle" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "角色语音（VOICEVOX）"
+
+[node name="TtsEnabledCheck" type="CheckButton" parent="Root/SettingsPage/SettingsMargin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "启用 Mirdo 日语语音（TTS）"
+tooltip_text = "只对本次对话请求生成语音；关闭时只显示文字。"
+
+[node name="TtsVoiceLabel" type="Label" parent="Root/SettingsPage/SettingsMargin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.88)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "声线（Speaker ID）"
+
+[node name="TtsVoiceOption" type="OptionButton" parent="Root/SettingsPage/SettingsMargin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.86, 1)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 17
+tooltip_text = "选择 VOICEVOX 音色；对应的 speaker_id 会发送给后端。"
+
+[node name="TtsJapaneseCheck" type="CheckButton" parent="Root/SettingsPage/SettingsMargin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 0.9)
+theme_override_fonts/font = ExtResource("4_smiley")
+theme_override_font_sizes/font_size = 16
+text = "让 Agent 额外生成日语对白"
+tooltip_text = "启用后后端会返回 dialogue_ja，VOICEVOX 使用日语字段合成。"
 
 [node name="TestModelButton" type="Button" parent="Root/SettingsPage/SettingsMargin/Rows" unique_id=1893305103]
 unique_name_in_owner = true
@@ -845,5 +980,3 @@ visible = false
 [node name="UISoundPlayer" type="AudioStreamPlayer" parent="." unique_id=676416433]
 unique_name_in_owner = true
 process_mode = 3
-
-

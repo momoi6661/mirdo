@@ -991,10 +991,19 @@ func _update_status() -> void:
 	var changed: bool = connected != _last_connected or status_text != _last_status_text
 	if not changed:
 		return
+	var just_connected: bool = connected and not _last_connected
 	_last_connected = connected
 	_last_status_text = status_text
 	_status_icon.color = status_color
 	_status_label.text = status_text
+	if just_connected:
+		## #739: the server just came up. If the startup uv probe failed
+		## (the reporter's screenshot: green "Server connected" beside a
+		## red "uv: not found" row), the failure was transient — re-probe
+		## instead of pinning the red row for the whole session. Runs
+		## AFTER the label writes above and via the deferred queue, so the
+		## status-machine state is committed before the probe can block.
+		_schedule_uv_reprobe()
 
 	_update_dev_section_buttons()
 
@@ -1330,6 +1339,8 @@ func _on_dev_mode_toggled(enabled: bool) -> void:
 
 
 func _apply_dev_mode_visibility() -> void:
+	if _dev_mode_toggle == null:
+		return  ## dock UI not built yet (unit tests, teardown window)
 	var dev := _dev_mode_toggle.button_pressed
 	_dev_section.visible = dev
 	if _log_viewer != null:
@@ -1462,7 +1473,7 @@ func _on_restart_stale_server() -> void:
 	_last_rendered_server_text = ""
 	_refresh_server_version_label()
 	if not is_inside_tree():
-		_dispatch_stale_server_restart()
+		await _dispatch_stale_server_restart()
 		_server_restart_in_progress = false
 		_last_rendered_server_text = ""
 		_refresh_server_version_label()
@@ -1472,7 +1483,7 @@ func _on_restart_stale_server() -> void:
 
 func _restart_stale_server_after_feedback() -> void:
 	await get_tree().create_timer(0.15).timeout
-	if not _dispatch_stale_server_restart():
+	if not await _dispatch_stale_server_restart():
 		_server_restart_in_progress = false
 		_last_rendered_server_text = ""
 		_refresh_server_version_label()
@@ -1488,7 +1499,9 @@ func _dispatch_stale_server_restart() -> bool:
 	)
 	if int(status.get("state", ServerStateScript.UNINITIALIZED)) == ServerStateScript.INCOMPATIBLE:
 		if _plugin.has_method("recover_incompatible_server"):
-			return bool(_plugin.recover_incompatible_server())
+			## Coroutine in production (#678): recovery reports success only
+			## after the respawn walk completes and the connection unblocks.
+			return bool(await _plugin.recover_incompatible_server())
 	elif _plugin.has_method("force_restart_server"):
 		_plugin.force_restart_server()
 		return true
@@ -1496,6 +1509,38 @@ func _dispatch_stale_server_restart() -> bool:
 
 
 # --- Setup section ---
+
+## #739: a `uvx --version` probe that failed once at editor startup used
+## to pin "uv: not found" for the whole session — the Install-uv click
+## was the only invalidation path, so the fix users discovered was
+## re-clicking Install on every launch. Re-probe on events that suggest
+## the failure was transient (server-connect transition, manual Refresh).
+## No-op once uv has been found, so this costs nothing in the healthy
+## steady state; when uv is genuinely absent, the re-probe is a fast
+## negative (CliFinder's well-known-dir walk plus one bounded `where`).
+## Runs on the main thread like the initial probe — same wall-clock
+## bound, and the triggering events are rare (once per connect / click).
+##
+## Callers go through _schedule_uv_reprobe() rather than calling this
+## inline: the cache-miss probe shells out (bounded at 3s) on the
+## calling thread, and both call sites sit mid-flow in UI handlers —
+## the connect transition wants its status-label writes committed
+## first, and the Refresh click wants the client sweep dispatched
+## without waiting on the probe. Same deferred convention as
+## _on_install_uv. (The deferred queue still flushes on the main
+## thread, so a worst-case 3s probe delays that frame — acceptable for
+## a rare, bounded event; a worker thread would be the heavier cure.)
+func _schedule_uv_reprobe() -> void:
+	_reprobe_uv_if_negative.call_deferred()
+
+
+func _reprobe_uv_if_negative() -> void:
+	if not ClientConfigurator.uv_probe_negative():
+		return
+	ClientConfigurator.invalidate_uv_detection()
+	_refresh_setup_status()
+	_apply_dev_mode_visibility()
+
 
 func _refresh_setup_status() -> void:
 	if _setup_container == null:
@@ -1754,12 +1799,11 @@ func _on_install_uv() -> void:
 	## Drop the cached uvx path AND the cached `uvx --version` so the
 	## next `_refresh_setup_status` finds and reads the freshly-installed
 	## binary instead of returning the pre-install "not found" result.
-	## Routing through the configurator here matters on Windows, where
-	## the CLI-finder cache key is `uvx.exe` — invalidating just `"uvx"`
+	## Routing through the configurator matters on Windows, where the
+	## CLI-finder cache key is `uvx.exe` — invalidating just `"uvx"`
 	## would leave the cache stale and the dock would keep showing
 	## "uv: not found" for the rest of the session.
-	ClientConfigurator.invalidate_uvx_cli_cache()
-	ClientConfigurator.invalidate_uv_version_cache()
+	ClientConfigurator.invalidate_uv_detection()
 	_refresh_setup_status.call_deferred()
 
 
@@ -1809,6 +1853,10 @@ func _dispatch_client_action(client_id: String, action: String) -> void:
 	## `_perform_initial_client_status_refresh` and
 	## `_request_client_status_refresh`.
 	var server_url := ClientConfigurator.http_url()
+	## #691: refresh the env snapshot on main before this worker starts —
+	## configure/remove resolve CLI + config paths off-thread and must not
+	## race a concurrent spawn window's setenv/unsetenv.
+	ClientConfigurator.warm_env_snapshot()
 	var generation := int(_client_action_generations.get(client_id, 0)) + 1
 	_client_action_generations[client_id] = generation
 	var thread := Thread.new()
@@ -1940,6 +1988,9 @@ func _finalize_action_buttons(client_id: String) -> void:
 
 
 func _on_refresh_clients_pressed() -> void:
+	## Explicit user action — also give a failed uv probe another chance
+	## (#739), mirroring how the same click already re-sweeps client CLIs.
+	_schedule_uv_reprobe()
 	_request_client_status_refresh(true)
 
 
@@ -2070,10 +2121,13 @@ func _build_tools_tab(tabs: TabContainer) -> void:
 	core_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	core_row.add_child(core_label)
 	var core_count := Label.new()
-	core_count.text = "%d tools" % ToolCatalog.CORE_TOOLS.size()
+	core_count.text = "%d tools" % (ToolCatalog.CORE_TOOLS.size() + ToolCatalog.ALWAYS_ON_TOOLS.size())
 	core_count.add_theme_color_override("font_color", COLOR_MUTED)
 	core_row.add_child(core_count)
-	core_row.tooltip_text = ", ".join(ToolCatalog.CORE_TOOLS)
+	core_row.tooltip_text = "%s · always on: %s" % [
+		", ".join(ToolCatalog.CORE_TOOLS),
+		", ".join(ToolCatalog.ALWAYS_ON_TOOLS),
+	]
 	grid.add_child(core_row)
 
 	grid.add_child(HSeparator.new())
@@ -2166,8 +2220,11 @@ func _build_tools_domain_row(parent: VBoxContainer, entry: Dictionary) -> void:
 func _reset_tools_pending_from_setting() -> void:
 	## Read the saved setting → pending/saved arrays, then sync checkbox state.
 	## Unknown domain names in the setting (e.g. from an older plugin
-	## version) are silently dropped — matches the Python side's
-	## warn-and-continue behavior when it sees an unknown name.
+	## version) are dropped from the display here (only ids with a checkbox
+	## survive). The startup path is protected separately:
+	## `ClientConfigurator.excluded_domains()` filters unknown names before
+	## they reach `--exclude-domains`, whose `parse_exclude_list` hard-fails
+	## on them.
 	var saved_raw := ClientConfigurator.excluded_domains()
 	var saved := PackedStringArray()
 	if not saved_raw.is_empty():
@@ -2456,6 +2513,20 @@ func _show_manual_command_for(client_id: String) -> void:
 		return
 	row["manual_text"].text = cmd
 	row["manual_panel"].visible = true
+	## #680: for rows low in the list the panel materializes below the
+	## visible scroll area and the Configure click looks like a no-op.
+	## Deferred so the just-shown panel has a settled rect to scroll to.
+	_scroll_manual_panel_into_view.call_deferred(row["manual_panel"])
+
+
+func _scroll_manual_panel_into_view(panel: Control) -> void:
+	if panel == null or not panel.is_inside_tree():
+		return
+	var ancestor := panel.get_parent()
+	while ancestor != null and not (ancestor is ScrollContainer):
+		ancestor = ancestor.get_parent()
+	if ancestor != null:
+		(ancestor as ScrollContainer).ensure_control_visible(panel)
 
 
 func _on_copy_manual_command(client_id: String) -> void:
@@ -2601,7 +2672,7 @@ func _perform_initial_client_status_refresh() -> void:
 		return
 	if _client_rows.is_empty():
 		return
-	if _refresh_state == ClientRefreshStateScript.SHUTTING_DOWN:
+	if ClientRefreshStateScript.is_blocked_for_spawn(_refresh_state):
 		return
 	if _is_self_update_in_progress():
 		return
@@ -2660,6 +2731,10 @@ func _warm_strategy_bytecode() -> void:
 		JsonStrategy.verify_entry(any_client, {}, "")
 	TomlStrategy.format_body(PackedStringArray(), "")
 	CliStrategy.format_args(PackedStringArray(), "", "")
+	## #691: refresh the env snapshot on main before the worker starts, so
+	## its config-path expansions read the snapshot instead of racing a
+	## concurrent spawn window's setenv/unsetenv.
+	ClientConfigurator.warm_env_snapshot()
 
 
 func _begin_client_status_refresh_run() -> int:
@@ -2712,7 +2787,7 @@ func _request_client_status_refresh(force: bool = false) -> bool:
 			_client_status_refresh_pending_force = _client_status_refresh_pending_force or force
 			_refresh_clients_summary()
 			return false
-	if _refresh_state == ClientRefreshStateScript.SHUTTING_DOWN:
+	if ClientRefreshStateScript.is_blocked_for_spawn(_refresh_state):
 		return false
 	if not force and _is_client_status_refresh_in_cooldown():
 		return false

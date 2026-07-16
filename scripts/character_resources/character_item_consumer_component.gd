@@ -465,6 +465,13 @@ func _apply_mind_feedback(reaction: Dictionary) -> void:
 func _show_local_thanks(text: String) -> void:
 	if not speak_local_thanks or text.is_empty():
 		return
+	if _dialogue_component != null and _dialogue_component.has_method("present_local_dialogue"):
+		_dialogue_component.call("present_local_dialogue", text, {
+			"emotion": "开心",
+			"expression": "joy",
+			"action": "small_nod",
+		})
+		return
 	if _subtitle_component != null and _subtitle_component.has_method("show_once"):
 		_subtitle_component.call("show_once", text, "Mirdo")
 		return

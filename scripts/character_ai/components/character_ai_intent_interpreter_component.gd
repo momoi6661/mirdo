@@ -94,6 +94,7 @@ func interpret_payload(payload: Dictionary) -> Dictionary:
 		"target_ref": _extract_target_ref(payload),
 		"target_nav_point": _extract_target_nav_point(payload),
 		"marker_role": String(payload.get("marker_role", payload.get("role", ""))).strip_edges(),
+		"affordance": String(payload.get("affordance", payload.get("capability", ""))).strip_edges(),
 		"action": String(payload.get("action", "")).strip_edges(),
 		"item_id": _extract_item_id(payload),
 		"item_path": _extract_item_path(payload),

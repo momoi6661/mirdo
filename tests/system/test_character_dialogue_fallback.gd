@@ -10,6 +10,7 @@ func _run() -> void:
 	await _test_general_local_fallback_avoids_repeated_supply_prompt()
 	await _test_related_player_lines_are_formatted_for_backend()
 	await _test_queued_player_lines_are_merged_as_agent_ordered_messages()
+	await _test_realtime_steering_protocol_targets_active_request()
 	await _test_pending_flush_waits_while_player_is_typing()
 	await _test_pending_flush_resumes_after_draft_goes_idle()
 	await _test_manual_flush_sends_pending_player_dialogue_immediately()
@@ -95,6 +96,30 @@ func _test_queued_player_lines_are_merged_as_agent_ordered_messages() -> void:
 	_expect(merged_again.find("第1句：你先别去食物柜。") >= 0, "queued merge should keep original first line after repeated merges")
 	_expect(merged_again.find("继续：等等，先别开门。") >= 0, "queued merge should append later corrections as ordered messages")
 	_expect(merged_again.find("第1句：玩家连续输入") < 0, "queued merge should not nest the agent instruction header as a player line")
+	dialogue.queue_free()
+	await process_frame
+
+
+func _test_realtime_steering_protocol_targets_active_request() -> void:
+	var script := load("res://scripts/character_ai/components/character_ai_dialogue_component.gd") as Script
+	if script == null:
+		return
+	var dialogue := Node.new()
+	dialogue.set_script(script)
+	root.add_child(dialogue)
+	await process_frame
+	var envelope: Dictionary = dialogue.call(
+		"_build_steering_protocol",
+		"presentation",
+		"request-17",
+		17,
+		"老师，我正准备去门口看看。",
+	)
+	var steering: Dictionary = envelope.get("steering", {}) as Dictionary
+	_expect(String(steering.get("mode", "")) == "interrupt", "steering should interrupt the active output")
+	_expect(String(steering.get("phase", "")) == "presentation", "steering should identify the interrupted presentation phase")
+	_expect(String(steering.get("target_request_id", "")) == "request-17", "steering should target the active request id")
+	_expect(int(steering.get("target_client_sequence", 0)) == 17, "steering should target the active sequence")
 	dialogue.queue_free()
 	await process_frame
 
@@ -287,6 +312,8 @@ func _test_autonomous_chat_payload_compacts_behavior_context() -> void:
 	var npc: Dictionary = context.get("npc", {}) as Dictionary
 	_expect(npc.has("preferred_social_actions"), "compact npc contract should keep preferred action hints")
 	_expect(not npc.has("available_body_actions"), "compact npc contract should not send full action list")
+	_expect(not context.has("blackboard"), "compact payload should not duplicate the full runtime blackboard")
+	_expect(not context.has("known_nav_points"), "compact payload should not duplicate navigation_catalog")
 	host.queue_free()
 	await process_frame
 
@@ -453,26 +480,7 @@ class _FakeAIManagerAccept:
 	extends AIManager
 	var request_count := 0
 	var last_payload: Dictionary = {}
-	func build_chat_request(
-		player_text: String,
-		session_id: String = "default_session",
-		day: int = 1,
-		time_min: int = 0,
-		npc_stats: Dictionary = {},
-		given_item: String = "",
-		context: Dictionary = {},
-		_max_context_turns: int = -1
-	) -> Dictionary:
-		return {
-			"player_text": player_text,
-			"session_id": session_id,
-			"day": day,
-			"time_min": time_min,
-			"npc_stats": npc_stats,
-			"given_item": given_item,
-			"context": context,
-		}
-	func request_chat_once(payload: Dictionary, _context: Dictionary = {}) -> bool:
+	func request_chat_once(request_payload: Dictionary, context: Dictionary = {}) -> bool:
 		request_count += 1
-		last_payload = payload.duplicate(true)
+		last_payload = request_payload.duplicate(true)
 		return true

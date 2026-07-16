@@ -949,9 +949,13 @@ func _make_caret_material() -> StandardMaterial3D:
 	return material
 
 func _update_follow_transform(delta: float) -> void:
+	# 动态创建/销毁面板时，锚点可能已经有效但尚未进入 SceneTree；
+	# 此时读取 global_position/global_basis 会触发 Node3D 的 is_inside_tree 警告。
+	if not is_inside_tree():
+		return
 	if not follow_anchor_mark:
 		return
-	if _anchor_mark == null:
+	if _anchor_mark == null or not is_instance_valid(_anchor_mark) or not _anchor_mark.is_inside_tree():
 		return
 	var target_pos: Vector3 = _anchor_mark.global_position + _anchor_mark.global_basis.y * ((1.0 - _panel_alpha) * fade_offset_y)
 	var target_basis: Basis = _anchor_mark.global_basis if use_anchor_mark_basis else global_basis

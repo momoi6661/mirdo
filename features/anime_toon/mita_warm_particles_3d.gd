@@ -43,9 +43,14 @@ func _ensure_particle_node(node_name: String, amount: int, color: Color, size: f
 	particles.visibility_aabb = AABB(-emission_box * 0.65 + Vector3(0, 0, forward_offset), emission_box * 1.3)
 	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	particles.layers = 1
-	particles.emitting = true
+	# This effect intentionally has one mesh pass. Stop the emitter while the
+	# pass is rebuilt so an editor/tool refresh cannot render against a stale
+	# draw_pass_3/4 entry left by a previous particle edit.
+	particles.emitting = false
+	particles.draw_passes = 1
 	particles.draw_pass_1 = _make_quad_mesh(size, color, sparkle)
 	particles.process_material = _make_process_material(color, sparkle)
+	particles.emitting = true
 	return particles
 
 func _make_quad_mesh(size: float, color: Color, sparkle: bool) -> QuadMesh:

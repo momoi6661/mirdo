@@ -25,7 +25,7 @@ func build_ai_area_summary(observer: Node3D = null) -> Dictionary:
 		"path": String(get_path()) if is_inside_tree() else "",
 		"object_paths": _resolve_manual_object_paths(),
 	}
-	if observer != null and observer is Node3D:
+	if observer != null and observer is Node3D and observer.is_inside_tree() and is_inside_tree():
 		summary["distance"] = observer.global_position.distance_to(global_position)
 	else:
 		summary["distance"] = 0.0

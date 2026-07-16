@@ -42,7 +42,8 @@ func build_ai_pickable_summary(observer: Node3D = null) -> Dictionary:
 		"pickup_marker_path": _marker_path_string(),
 		"consumed": _consumed,
 	}
-	if observer != null and root is Node3D:
+	# 只有节点已经进入场景树时才读取 global_position，避免编辑器/加载阶段报 is_inside_tree 警告。
+	if observer != null and observer.is_inside_tree() and root is Node3D and (root as Node3D).is_inside_tree():
 		summary["distance"] = observer.global_position.distance_to((root as Node3D).global_position)
 	else:
 		summary["distance"] = 0.0

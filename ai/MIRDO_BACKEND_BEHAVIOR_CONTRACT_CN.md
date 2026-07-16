@@ -1,6 +1,6 @@
 # Mirdo 后端行为对齐契约（Godot 端最新）
 
-本文档用于后端/大模型服务对齐 Mirdo 的最新 AI NPC 架构。目标不是把 Godot 内所有调试数据都塞给模型，而是用 **compact context** 给后端足够判断：Mirdo 正在做什么、能做什么、周围有什么、玩家是否在互动、是否需要恢复刚才任务。
+本文档用于后端/大模型服务对齐 Mirdo 的最新 AI NPC 架构。目标不是把 Godot 内所有调试数据都塞给模型，而是用 **compact context** 给后端足够判断：Mirdo 正在做什么、能做什么、周围有什么、玩家是否在互动、是否需要恢复刚才任务。导航采用 `navigation_catalog` 的实体/能力模型；坐标、朝向和 Marker 路径永远留在 Godot。
 
 ## 1. 总体架构
 
@@ -12,7 +12,7 @@ Mirdo 的行为分成两层：
 
 2. **后端/大模型对话与意图层**
    - 负责低频、有语言价值的行为：回答玩家、主动报告、提出需求、解释正在做什么、根据玩家自然语言选择目标。
-   - Godot 会把 compact context 发给后端，后端只需要返回结构化 JSON。
+   - Godot 会把 compact context 和少量 `navigation_catalog` 发给后端，后端只需要返回结构化 JSON。
 
 原则：**本地负责动作执行，后端负责语义选择和说话。**
 
@@ -51,6 +51,36 @@ Godot 端会把玩家短时间内连续输入的多句话聚合成一次 `reques
 - 如果后续句子只是补充上下文，应综合前后句子回答。
 - 如果出现“先别/等等/不是/改成/别去”等修正或打断信号，应优先停止或切换原意图。
 
+### 实时引导（Codex-style steering）
+
+如果玩家在模型生成或 Mirdo 播放语音时再次提交输入，Godot 不再把它排到
+旧输出后面，而是取消当前客户端请求/语音，并立即提交一个更高
+`client_sequence` 的新请求：
+
+```json
+{
+  "player_text": "等等，先别过去",
+  "client_request_id": "godot:mirdo:...:18",
+  "client_sequence": 18,
+  "supersedes_request_id": "godot:mirdo:...:17",
+  "steering": {
+    "mode": "interrupt",
+    "phase": "generation|presentation",
+    "target_request_id": "godot:mirdo:...:17",
+    "target_client_sequence": 17,
+    "interrupted_dialogue": "老师，我正准备去看看……",
+    "reason": "player_guidance"
+  }
+}
+```
+
+- `player_text` 始终保留玩家原话，不拼接系统提示。
+- 后端按 `session_id + client_sequence + client_request_id` 判断新旧；旧响应标记
+  `superseded`，禁止保存助手对白、记忆、TTS 和动作任务。
+- 新回合返回 `response_kind="steered"` 和 `steering_ack`。
+- Agent 自然回应最新意图，并用 `task_control` 决定继续、暂停、替换或取消旧任务。
+- 已提交的上游模型调用不能原地修改；实际实现是让旧调用失效并用最新上下文重新运行。
+
 ## 3. 请求结构（核心字段）
 
 典型请求：
@@ -69,6 +99,10 @@ Godot 端会把玩家短时间内连续输入的多句话聚合成一次 `reques
   },
   "player_text": "老师问/或 Mirdo 自主提示词",
   "given_item": "",
+  "client_request_id": "godot:mirdo:...:18",
+  "client_sequence": 18,
+  "supersedes_request_id": "godot:mirdo:...:17",
+  "steering": {"mode": "none"},
   "context": {
     "request_source": "player|autonomous",
     "npc": {},
@@ -314,7 +348,7 @@ Godot 现在会给后端发送 compact 行为状态，例如：
   "expression": "fun",
   "action": "work_check_lower",
   "command": "go_to_nav_point",
-  "command_payload": {"target_nav_point": "wash_sink_point"},
+      "command_payload": {"target_ref": "sink", "affordance": "inspect", "marker_role": "approach"},
   "visemes": "aa、ih、ou"
 }
 ```
@@ -324,7 +358,7 @@ Godot 现在会给后端发送 compact 行为状态，例如：
 Godot 默认开启 `compact_backend_context=true`：
 
 - 不发送完整动作表，只发送优先动作和压缩后的 `action_contract`。
-- `ai_nav_points` 限制数量，按距离排序。
+- `navigation_catalog` 只保留相关实体和少量无实体归属的 waypoint；不包含坐标、朝向或 Marker 路径。
 - `current_behavior` 只保留任务核心字段，不带大型 debug blob。
 - `perception` 只保留附近对象/区域摘要，不发送所有节点。
 

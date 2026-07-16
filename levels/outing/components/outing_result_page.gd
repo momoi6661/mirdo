@@ -68,7 +68,7 @@ func play_story_then_summary(title: String, subtitle: String, story_body: String
 	_current_button_text = button_text
 	_current_button_disabled = button_disabled
 	if _current_story_text.is_empty():
-		_current_story_text = "[color=#f0e0bb]这次外出没有留下完整故事，只能从零散记录中复盘。[/color]"
+		_current_story_text = "[color=#e6e1d6]这次外出没有留下完整故事，只能从零散记录中复盘。[/color]"
 	if _title_label != null:
 		_title_label.text = title
 	if _subtitle_label != null:

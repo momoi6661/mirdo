@@ -23,6 +23,8 @@ var _visible_chars_float: float = 0.0
 var _last_visible_chars: int = -1
 var _streaming: bool = false
 var _hold_left: float = 0.0
+## TTS 播放期间锁住淡出；由对话组件在 playback_finished 后释放。
+var _external_hold: bool = false
 
 var _open_tween: Tween
 var _close_tween: Tween
@@ -87,10 +89,29 @@ func show_once(text: String, speaker: String = "") -> void:
 	_apply_visible_characters(0)
 	_show_overlay()
 
+func show_once_immediate(text: String, speaker: String = "") -> void:
+	"""立即显示完整句子，避免 TTS 已经起播而字幕还在逐字追赶。"""
+	show_once(text, speaker)
+	if _target_text.strip_edges().is_empty():
+		return
+	_apply_visible_characters(_target_text.length())
+
 func cancel_now() -> void:
+	_external_hold = false
 	_streaming = false
 	_target_text = ""
 	_hide_immediately()
+
+func set_external_hold(held: bool) -> void:
+	"""让语音播放决定字幕何时结束，而不是由 hold_seconds 抢先淡出。"""
+	_external_hold = held
+	if held:
+		_hold_left = maxf(_hold_left, hold_seconds)
+	else:
+		_hold_left = hold_seconds
+
+func is_external_hold_active() -> bool:
+	return _external_hold
 
 func is_showing_text() -> bool:
 	return visible and not _target_text.strip_edges().is_empty()
@@ -106,7 +127,7 @@ func _process(delta: float) -> void:
 			_apply_visible_characters(now_visible)
 			_play_pop()
 		return
-	if not _streaming:
+	if not _streaming and not _external_hold:
 		_hold_left = maxf(_hold_left - delta, 0.0)
 		if _hold_left <= 0.0:
 			_fade_out()

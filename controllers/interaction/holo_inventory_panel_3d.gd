@@ -1109,10 +1109,12 @@ func _on_inventory_changed() -> void:
 
 
 func _update_panel_transform(delta: float = 0.0) -> void:
+	if not is_inside_tree():
+		return
 	_refresh_anchor_mark_ref()
 	var use_mark_mode: bool = panel_anchor_mode != PanelAnchorMode.CAMERA_ONLY
 	var allow_camera_fallback: bool = panel_anchor_mode == PanelAnchorMode.MARK_THEN_CAMERA
-	var has_anchor_mark: bool = _anchor_mark != null and is_instance_valid(_anchor_mark)
+	var has_anchor_mark: bool = _anchor_mark != null and is_instance_valid(_anchor_mark) and _anchor_mark.is_inside_tree()
 	if use_mark_mode and not has_anchor_mark:
 		if not _missing_anchor_warned:
 			push_warning("HoloInventoryPanel3D: 未找到 Anchor Mark，当前模式是 MARK_ONLY。请在 Inspector 里设置 anchor_mark_path。")

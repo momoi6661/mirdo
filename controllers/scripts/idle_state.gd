@@ -16,9 +16,7 @@ func update(delta: float):
 	if not player:
 		return
 	if player.has_method("is_gameplay_input_blocked") and bool(player.call("is_gameplay_input_blocked")):
-		player._update_camera(delta)
 		return
-	player._update_camera(delta)
 	
 	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (player.transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()

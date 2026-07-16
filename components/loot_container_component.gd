@@ -94,6 +94,24 @@ func take_item_for_ai(item_ref: String, amount: int = 1) -> Dictionary:
 	return {"ok": false, "error": "container_item_not_found", "item_ref": item_ref}
 
 
+## 给 AI 的只读库存摘要；不暴露 Item 资源路径，也不修改库存。
+## 真正取物仍必须调用 take_item_for_ai()，成功后数量才会减少。
+func build_ai_inventory_snapshot() -> Dictionary:
+	_ensure_runtime_storage()
+	_rebuild_runtime_slots_from_storage()
+	var items: Array = []
+	for slot in runtime_slots:
+		if slot == null or slot.item == null or slot.amount <= 0:
+			continue
+		items.append({
+			"id": String(slot.item.ItemName).strip_edges(),
+			"name": String(slot.item.ItemName).strip_edges(),
+			"amount": int(slot.amount),
+			"category": String(slot.item.outing_category).strip_edges(),
+		})
+	return {"items": items, "item_count": items.size()}
+
+
 func _item_matches_ai_ref(item: ItemData, wanted: String) -> bool:
 	var text := "%s %s %s" % [String(item.ItemName), String(item.resource_path), String(item.ItemModelScenePath)]
 	text = text.to_lower()

@@ -11,7 +11,7 @@ const DEFAULT_SLOT_NAMES := ["slot_01", "slot_02", "slot_03"]
 @export var slot_names: PackedStringArray = PackedStringArray()
 @export var default_mode: String = MODE_PROGRESS
 @export var use_staggered_tweens: bool = true
-@export_range(420.0, 1200.0, 1.0) var drawer_width: float = 720.0
+@export_range(360.0, 1200.0, 1.0) var drawer_width: float = 560.0
 
 @onready var root_control: Control = get_node_or_null("Root") as Control
 @onready var dim_rect: ColorRect = get_node_or_null("Root/Dim") as ColorRect
@@ -42,6 +42,7 @@ var _sound_library: Dictionary = {
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_apply_visual_theme()
 	if slot_names.is_empty():
 		slot_names = PackedStringArray(DEFAULT_SLOT_NAMES)
 	if panel != null:
@@ -49,6 +50,9 @@ func _ready() -> void:
 		_panel_rest_position = Vector2(-drawer_width, 0.0)
 		_panel_rest_scale = panel.scale
 		_reset_drawer_closed_position()
+	if get_viewport() != null and not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
+	_on_viewport_size_changed()
 	hide()
 	if back_button != null and not back_button.pressed.is_connected(_on_back_pressed):
 		back_button.pressed.connect(_on_back_pressed)
@@ -61,6 +65,29 @@ func _ready() -> void:
 		confirm_delete_dialog.confirmed.connect(_confirm_delete_slot)
 	if dim_rect != null and not dim_rect.gui_input.is_connected(_on_dim_gui_input):
 		dim_rect.gui_input.connect(_on_dim_gui_input)
+
+
+func _apply_visual_theme() -> void:
+	MenuUIStyle.apply_drawer_panel(panel, false)
+	MenuUIStyle.apply_display_label(title_label, 44, MenuUIStyle.TEXT_PRIMARY)
+	MenuUIStyle.apply_body_label(subtitle_label, 16, MenuUIStyle.TEXT_SECONDARY)
+	MenuUIStyle.apply_body_label(current_slot_label, 16, MenuUIStyle.TEXT_MUTED)
+	MenuUIStyle.apply_body_label(status_label, 15, MenuUIStyle.TEXT_MUTED)
+	for button in [refresh_button, back_button]:
+		MenuUIStyle.apply_toolbar_button(button)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	if confirm_delete_dialog != null:
+		MenuUIStyle.apply_confirmation_dialog(confirm_delete_dialog)
+
+
+func _on_viewport_size_changed() -> void:
+	if panel == null or get_viewport() == null:
+		return
+	var viewport_width: float = get_viewport().get_visible_rect().size.x
+	drawer_width = minf(420.0, viewport_width) if viewport_width < 760.0 else minf(640.0, maxf(420.0, viewport_width * 0.46))
+	panel.custom_minimum_size.x = drawer_width
+	if not visible:
+		_reset_drawer_closed_position()
 
 
 func open_panel(mode: String = "") -> void:
@@ -134,18 +161,18 @@ func _update_header() -> void:
 	if subtitle_label != null:
 		match current_mode:
 			MODE_SAVE:
-				subtitle_label.text = "选择 1 个槽位写入当前进度"
+				subtitle_label.text = "选一个小窝，收好现在的进度"
 			MODE_LOAD:
-				subtitle_label.text = "选择 1 个槽位读取已有进度"
+				subtitle_label.text = "选一个小窝，回到那段时光"
 			_:
-				subtitle_label.text = "保存与读取避难所进度"
+				subtitle_label.text = "给每一次冒险留一颗小小的锚点"
 	var save_manager := _get_save_manager()
 	if current_slot_label != null:
 		var current_slot := "slot_01"
 		if save_manager != null and save_manager.has_method("get_current_slot"):
 			current_slot = String(save_manager.call("get_current_slot"))
 		var summary := save_manager.call("get_save_summary", current_slot) as Dictionary if save_manager != null and save_manager.has_method("get_save_summary") else {}
-		current_slot_label.text = "当前游玩槽：%s    最近保存：%s" % [_slot_display_name(current_slot), _format_slot_time(summary)]
+		current_slot_label.text = "正在陪伴：%s    最近收好：%s" % [_slot_display_name(current_slot), _format_slot_time(summary)]
 	_set_status("自动保存会写入当前游玩槽；手动保存会覆盖目标槽位。")
 
 
@@ -208,6 +235,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	var name_label := Label.new()
 	name_label.name = "NameLabel"
 	name_label.text = _slot_display_name(slot_name)
+	name_label.add_theme_font_override("font", MenuUIStyle.body_font())
 	name_label.add_theme_font_size_override("font_size", 22)
 	name_label.add_theme_color_override("font_color", MenuUIStyle.TEXT_PRIMARY)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -216,6 +244,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	var badge := Label.new()
 	badge.name = "Badge"
 	badge.text = _slot_badge(summary)
+	badge.add_theme_font_override("font", MenuUIStyle.body_font())
 	badge.add_theme_font_size_override("font_size", 13)
 	badge.add_theme_color_override("font_color", MenuUIStyle.ACCENT_SOFT if bool(summary.get("exists", false)) else MenuUIStyle.TEXT_MUTED)
 	top.add_child(badge)
@@ -224,6 +253,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	detail.name = "DetailLabel"
 	detail.text = _slot_detail_text(summary)
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_theme_font_override("font", MenuUIStyle.body_font())
 	detail.add_theme_font_size_override("font_size", 14)
 	detail.add_theme_color_override("font_color", MenuUIStyle.TEXT_SECONDARY)
 	rows.add_child(detail)
@@ -241,7 +271,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	var save_button := Button.new()
 	save_button.name = "SaveButton"
 	save_button.custom_minimum_size = Vector2(116, 40)
-	save_button.text = "保存"
+	save_button.text = "收好"
 	save_button.disabled = _busy or current_mode == MODE_LOAD
 	_apply_button_style(save_button, true)
 	save_button.pressed.connect(_on_slot_save_pressed.bind(slot_name))
@@ -250,7 +280,7 @@ func _build_slot_card(slot_name: String, summary: Dictionary) -> Control:
 	var load_button := Button.new()
 	load_button.name = "LoadButton"
 	load_button.custom_minimum_size = Vector2(116, 40)
-	load_button.text = "读取"
+	load_button.text = "带回"
 	load_button.disabled = _busy or current_mode == MODE_SAVE or not bool(summary.get("valid", false))
 	_apply_button_style(load_button, false)
 	load_button.pressed.connect(_on_slot_load_pressed.bind(slot_name))
@@ -282,28 +312,28 @@ func _apply_button_style(button: Button, primary: bool) -> void:
 
 func _slot_display_name(slot_name: String) -> String:
 	if slot_name.begins_with("slot_"):
-		return "进度槽 %s" % slot_name.trim_prefix("slot_").replace("_", "-")
+		return "小窝 %s" % slot_name.trim_prefix("slot_").replace("_", "-")
 	if slot_name == "manual_save":
-		return "兼容槽 / 旧快速存档"
+		return "旧时光 / 快速存档"
 	return slot_name
 
 
 func _slot_badge(summary: Dictionary) -> String:
 	if not bool(summary.get("exists", false)):
-		return "空槽"
+		return "空空的"
 	if not bool(summary.get("valid", false)):
-		return "损坏 / 不兼容"
-	return "已有进度"
+		return "暂时打不开"
+	return "有进度"
 
 
 func _slot_detail_text(summary: Dictionary) -> String:
 	if not bool(summary.get("exists", false)):
-		return "空进度槽。保存后会记录场景、时间、库存与探索进度。"
+		return "这里还没有记忆。收好一次冒险后，会记录场景、时间和库存。"
 	if not bool(summary.get("valid", false)):
-		return "这个槽位存在文件，但 SafeResourceLoader 拒绝读取或类型不正确。"
+		return "这个记忆还没法打开，可以先保留它，避免误删。"
 	var scene_name := String(summary.get("scene_name", "未知场景"))
 	var saved_time := _format_slot_time(summary)
-	return "场景：%s\n保存时间：%s" % [scene_name, saved_time]
+	return "去过：%s\n收好时间：%s" % [scene_name, saved_time]
 
 
 func _format_slot_time(summary: Dictionary) -> String:

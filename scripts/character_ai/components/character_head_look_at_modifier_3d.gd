@@ -21,18 +21,22 @@ extends SkeletonModifier3D
 @export_range(0.0, 80.0, 0.1) var max_pitch_down_degrees: float = 35.0
 @export var head_forward_axis: Vector3 = Vector3(0.0, 0.0, 1.0)
 @export var head_up_axis: Vector3 = Vector3(0.0, 1.0, 0.0)
+@export_range(15.0, 720.0, 1.0) var max_head_turn_speed_degrees: float = 180.0
 @export var debug_log: bool = false
 
 var _head_bone_idx: int = -1
 var _cached_skeleton: Skeleton3D
 var _target_node: Node3D
 var _actor_node: Node3D
+var _smoothed_target_direction: Vector3 = Vector3.ZERO
+var _smoothed_target_valid: bool = false
 
 func _ready() -> void:
 	_refresh_refs()
 
 func _process_modification_with_delta(_delta: float) -> void:
 	if not enabled or target_weight <= 0.001:
+		_smoothed_target_valid = false
 		return
 	_refresh_refs_if_needed()
 	var skeleton := get_skeleton()
@@ -53,7 +57,22 @@ func _process_modification_with_delta(_delta: float) -> void:
 	var current_axis := (current_world_basis * head_forward_axis).normalized()
 	if current_axis.length_squared() <= 0.0001:
 		current_axis = current_world_basis.z.normalized()
-	var rotation_to_target := Quaternion(current_axis, desired_dir.normalized())
+
+	# A target crossing the actor's rear hemisphere changes atan2 from +PI to
+	# -PI.  Without a rate limit that discontinuity becomes a visible head snap.
+	# Start from the current pose, then cap the angular change every physics tick.
+	if not _smoothed_target_valid:
+		_smoothed_target_direction = current_axis
+		_smoothed_target_valid = true
+	var dt := clampf(_delta, 0.0, 0.1)
+	var max_step := deg_to_rad(max_head_turn_speed_degrees) * dt
+	var target_angle := _smoothed_target_direction.angle_to(desired_dir)
+	if target_angle <= max_step or max_step <= 0.0:
+		_smoothed_target_direction = desired_dir
+	else:
+		_smoothed_target_direction = _smoothed_target_direction.slerp(desired_dir, clampf(max_step / target_angle, 0.0, 1.0)).normalized()
+
+	var rotation_to_target := Quaternion(current_axis, _smoothed_target_direction.normalized())
 	var target_world_basis := (Basis(rotation_to_target) * current_world_basis).orthonormalized()
 	var skeleton_basis_inverse := skeleton.global_basis.orthonormalized().inverse()
 	var target_pose_basis := (skeleton_basis_inverse * target_world_basis).orthonormalized()

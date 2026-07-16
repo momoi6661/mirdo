@@ -20,13 +20,18 @@ signal on_model_probe_error(error_msg: String)
 @export_range(1, 65535, 1) var server_port: int = 5678
 @export var chat_stream_endpoint_path: String = "/chat_stream"
 @export var chat_endpoint_path: String = "/chat"
+## Godot 完成一个 Agent 工具步骤后，按需把结果回传到这个一次性接口。
+@export var godot_action_result_endpoint_path: String = "/godot/action-result"
 @export var debug_subtitle_endpoint_path: String = "/debug/subtitle_test_stream"
 @export var debug_subtitle_once_endpoint_path: String = "/debug/subtitle_test"
 @export var model_probe_endpoint_path: String = "/model/probe"
 @export var session_event_stream_endpoint_template: String = "/session/{session_id}/events/stream"
 @export var endpoint_path: String = "/chat_stream" # deprecated: kept for old scenes
 @export var use_https: bool = false
-@export var request_timeout_sec: float = 45.0
+## /chat 会等待模型、动作规划以及可选 TTS 合成；首轮冷启动时可能超过 45 秒。
+## 如果 Godot 先超时，后端终端仍会继续打印“已生成”，但游戏端已经收到
+## network_error_2 并走本地兜底，所以这里给同步聊天链路更宽的等待窗口。
+@export var request_timeout_sec: float = 120.0
 @export_range(10.0, 600.0, 1.0) var stream_idle_timeout_sec: float = 120.0
 @export var enable_true_sse_stream: bool = false
 @export var session_event_stream_enabled: bool = false
@@ -37,6 +42,16 @@ signal on_model_probe_error(error_msg: String)
 @export var always_log: bool = true
 @export var use_ai_settings_service: bool = true
 
+@export_category("TTS 请求默认值")
+## TTS 默认关闭；只有对话组件或单次请求明确打开时，后端才会生成语音。
+@export var tts_enabled: bool = false
+## 与 Server/data/tts/characters 中的配置文件对应，默认使用麻糬子声线。
+@export var tts_voice_profile: String = "mirdo_ja"
+## -1 表示使用 voice profile 中的 speaker_id；非负值表示本次请求覆盖它。
+@export var tts_speaker_id: int = -1
+## 是否让 Agent 同时生成日语对白；不打开时仍只生成中文主对白。
+@export var tts_generate_japanese: bool = false
+
 var is_requesting: bool = false
 
 var _http_request: HTTPRequest
@@ -45,6 +60,8 @@ var _events_pull_request: HTTPRequest
 var _probe_request: HTTPRequest
 var _last_request_payload: Dictionary = {}
 var _last_request_context: Dictionary = {}
+var _active_client_request_id: String = ""
+var _active_client_sequence: int = 0
 var _settings_service: Node = null
 var _history_requesting: bool = false
 var _history_request_session_id: String = ""
@@ -145,7 +162,8 @@ func build_chat_request(
 		npc_stats: Dictionary = {},
 		given_item: String = "",
 		context: Dictionary = {},
-		max_context_turns: int = -1
+		max_context_turns: int = -1,
+		tts_options: Dictionary = {}
 	) -> Dictionary:
 	var clean_text := text.strip_edges()
 
@@ -166,7 +184,36 @@ func build_chat_request(
 	}
 	if max_context_turns > 0:
 		payload["max_context_turns"] = int(max_context_turns)
+	_apply_tts_options(payload, tts_options)
 	return payload
+
+# 把 TTS 作为请求能力附加到 payload，不把语音逻辑塞进模型提示词。
+# 这样同一个 Agent 仍然只负责对白和情绪，呈现层按请求决定是否合成。
+func _apply_tts_options(payload: Dictionary, options: Dictionary = {}) -> void:
+	var defaults := _tts_defaults()
+	var use_tts_value := bool(options.get("use_tts", defaults.get("enabled", tts_enabled)))
+	var profile_value := String(options.get("tts_voice_profile", defaults.get("voice_profile", tts_voice_profile))).strip_edges()
+	if profile_value.is_empty():
+		profile_value = "mirdo_ja"
+	payload["use_tts"] = use_tts_value
+	payload["tts_voice_profile"] = profile_value
+	payload["generate_japanese"] = bool(options.get("generate_japanese", defaults.get("generate_japanese", tts_generate_japanese)))
+	var speaker_value := int(options.get("tts_speaker_id", defaults.get("speaker_id", tts_speaker_id)))
+	if speaker_value >= 0:
+		payload["tts_speaker_id"] = speaker_value
+	else:
+		payload.erase("tts_speaker_id")
+
+# 将后端返回的相对音频路径转换成 Godot 可请求的完整 URL。
+func resolve_asset_url(path: String) -> String:
+	var clean := path.strip_edges()
+	if clean.is_empty():
+		return ""
+	if clean.begins_with("http://") or clean.begins_with("https://"):
+		return clean
+	if not clean.begins_with("/"):
+		clean = "/" + clean
+	return _build_url(clean)
 
 # 标准入口：流式对话，对应后端 POST /chat_stream
 func request_chat_stream(request_payload: Dictionary, context: Dictionary = {}) -> bool:
@@ -179,6 +226,32 @@ func request_chat_stream(request_payload: Dictionary, context: Dictionary = {}) 
 func request_chat_once(request_payload: Dictionary, context: Dictionary = {}) -> bool:
 	var normalized := _normalize_chat_request(request_payload)
 	return _send_json_request(normalized, context, _resolve_chat_endpoint())
+
+# Agent 工具结果入口：只保留一次动作完成后的真实结果，不把它伪装成玩家发言。
+# Server 会在同一个 HTTP 响应中返回 Mirdo 的下一句对白和下一步 action_line。
+func request_godot_action_result(result_payload: Dictionary, context: Dictionary = {}) -> bool:
+	var payload := result_payload.duplicate(true)
+	var session_id_value := String(payload.get("session_id", "default_session")).strip_edges()
+	if session_id_value.is_empty():
+		session_id_value = "default_session"
+	payload["session_id"] = session_id_value
+	payload["request_source"] = "godot_tool_result"
+	var context_value: Dictionary = {}
+	var raw_context: Variant = payload.get("context", {})
+	if raw_context is Dictionary:
+		context_value = (raw_context as Dictionary).duplicate(true)
+	context_value["request_source"] = "godot_tool_result"
+	payload["context"] = context_value
+	if String(payload.get("player_text", "")).strip_edges().is_empty():
+		payload["player_text"] = "（Godot 工具结果，请依据真实结果继续规划。）"
+	if not payload.has("provider"):
+		var provider := _build_provider_from_settings()
+		if not provider.is_empty():
+			payload["provider"] = provider
+	var endpoint := godot_action_result_endpoint_path.strip_edges()
+	if endpoint.is_empty():
+		endpoint = "/godot/action-result"
+	return _send_json_request(payload, context, endpoint)
 
 # 标准入口：调试字幕流，对应后端 POST /debug/subtitle_test_stream
 func request_subtitle_test_stream(request_payload: Dictionary, context: Dictionary = {}) -> bool:
@@ -424,6 +497,8 @@ func _send_json_request(payload: Dictionary, context: Dictionary = {}, endpoint_
 		return false
 
 	is_requesting = true
+	_active_client_request_id = String(payload.get("client_request_id", "")).strip_edges()
+	_active_client_sequence = maxi(0, int(payload.get("client_sequence", 0)))
 	_last_request_payload = payload.duplicate(true)
 	_last_request_context = context.duplicate(true)
 	return true
@@ -496,6 +571,8 @@ func _send_stream_request(payload: Dictionary, context: Dictionary = {}, endpoin
 	_stream_elapsed_sec = 0.0
 	_stream_last_io_sec = 0.0
 	_stream_poll_elapsed = 0.0
+	_active_client_request_id = String(payload.get("client_request_id", "")).strip_edges()
+	_active_client_sequence = maxi(0, int(payload.get("client_sequence", 0)))
 	is_requesting = true
 	_last_request_payload = payload.duplicate(true)
 	_last_request_context = context.duplicate(true)
@@ -861,6 +938,9 @@ func _finalize_stream_request() -> void:
 		_log("parse_error reason=empty_or_invalid_ai_response raw_len=%d" % raw_body.length())
 		_emit_error("empty_or_invalid_ai_response")
 		return
+	if _is_stale_client_response(final_data):
+		_log("stream_response_ignored reason=stale_client_sequence response=%d active=%d" % [int(final_data.get("client_sequence", 0)), _active_client_sequence])
+		return
 
 	var backend_error := _extract_backend_error(final_data)
 	if not backend_error.is_empty():
@@ -995,6 +1075,9 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 	if final_data.is_empty():
 		_log("parse_error reason=empty_or_invalid_ai_response raw_len=%d" % body_text.length())
 		_emit_error("empty_or_invalid_ai_response")
+		return
+	if _is_stale_client_response(final_data):
+		_log("response_ignored reason=stale_client_sequence response=%d active=%d" % [int(final_data.get("client_sequence", 0)), _active_client_sequence])
 		return
 
 	var backend_error := _extract_backend_error(final_data)
@@ -1227,6 +1310,21 @@ func _normalize_chat_request(raw_payload: Dictionary) -> Dictionary:
 		"given_item": item_value,
 		"context": context_value,
 	}
+	# 这些字段只负责客户端回合排序，不进入模型提示词；服务端用它们丢弃
+	# 已被玩家改口替代的旧响应，避免旧对白晚到时覆盖新对白。
+	if payload.has("client_request_id"):
+		normalized["client_request_id"] = String(payload.get("client_request_id", "")).strip_edges()
+	if payload.has("client_sequence"):
+		normalized["client_sequence"] = maxi(0, int(payload.get("client_sequence", 0)))
+	if payload.has("supersedes_request_id"):
+		normalized["supersedes_request_id"] = String(payload.get("supersedes_request_id", "")).strip_edges()
+	# steering 是“修改正在进行回合”的结构化元数据。它必须原样送到后端，
+	# 不能混入 player_text，否则模型会把协议说明误认为玩家说过的话。
+	var steering_value: Variant = payload.get("steering", {})
+	if steering_value is Dictionary:
+		var steering: Dictionary = steering_value.duplicate(true)
+		if String(steering.get("mode", "none")).strip_edges() != "none":
+			normalized["steering"] = steering
 	var provider := _build_provider_from_settings()
 	if not provider.is_empty():
 		normalized["provider"] = provider
@@ -1236,12 +1334,28 @@ func _normalize_chat_request(raw_payload: Dictionary) -> Dictionary:
 		var max_context_turns_value := int(payload.get("max_context_turns", 0))
 		if max_context_turns_value > 0:
 			normalized["max_context_turns"] = max_context_turns_value
+	# 保留前端按请求传入的 TTS 能力，避免标准化过程把字段静默丢掉。
+	var tts_defaults := _tts_defaults()
+	normalized["use_tts"] = bool(payload.get("use_tts", tts_defaults.get("enabled", tts_enabled)))
+	normalized["tts_voice_profile"] = String(payload.get("tts_voice_profile", tts_defaults.get("voice_profile", tts_voice_profile))).strip_edges()
+	if String(normalized["tts_voice_profile"]).is_empty():
+		normalized["tts_voice_profile"] = "mirdo_ja"
+	normalized["generate_japanese"] = bool(payload.get("generate_japanese", tts_defaults.get("generate_japanese", tts_generate_japanese)))
+	var tts_speaker_id_value := int(payload.get("tts_speaker_id", tts_defaults.get("speaker_id", tts_speaker_id)))
+	if tts_speaker_id_value >= 0:
+		normalized["tts_speaker_id"] = tts_speaker_id_value
 	return normalized
 
 func _emit_error(msg: String) -> void:
 	is_requesting = false
 	_log("request_error %s" % msg)
 	on_ai_request_error.emit(msg)
+
+func _is_stale_client_response(response: Dictionary) -> bool:
+	var response_sequence := int(response.get("client_sequence", 0))
+	if _active_client_sequence <= 0 or response_sequence <= 0:
+		return false
+	return response_sequence != _active_client_sequence
 
 func _log(message: String) -> void:
 	if always_log or debug_log:
@@ -1256,6 +1370,21 @@ func _resolve_settings_service() -> void:
 	if _settings_service != null and is_instance_valid(_settings_service):
 		return
 	_settings_service = get_node_or_null("/root/AISettings")
+
+
+## 读取全局 TTS 选择；请求显式传入的选项仍然拥有更高优先级。
+func _tts_defaults() -> Dictionary:
+	_resolve_settings_service()
+	if _settings_service != null and _settings_service.has_method("get_tts_settings"):
+		var values: Variant = _settings_service.call("get_tts_settings")
+		if values is Dictionary:
+			return values as Dictionary
+	return {
+		"enabled": tts_enabled,
+		"voice_profile": tts_voice_profile,
+		"speaker_id": tts_speaker_id,
+		"generate_japanese": tts_generate_japanese,
+	}
 
 func _build_provider_from_settings() -> Dictionary:
 	_resolve_settings_service()

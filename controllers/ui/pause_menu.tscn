@@ -1,17 +1,20 @@
 [gd_scene format=3 uid="uid://csgpjgy6o5cv7"]
 
 [ext_resource type="Script" uid="uid://bkt2b3xik1gda" path="res://controllers/scripts/pause_menu.gd" id="1_script"]
-[ext_resource type="Shader" uid="uid://1nay0wyo4yvl" path="res://controllers/ui/shaders/cyber_glitch_transition.gdshader" id="2_rmx5d"]
+[ext_resource type="Shader" uid="uid://yn5xrx2feeu7" path="res://shaders/ui_pause_breath.gdshader" id="2_rmx5d"]
 [ext_resource type="PackedScene" path="res://controllers/ui/AISettingsPanel.tscn" id="3_ai_settings_panel"]
 [ext_resource type="PackedScene" path="res://controllers/ui/SaveSlotMenu.tscn" id="4_save_slot_menu"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8747e"]
 shader = ExtResource("2_rmx5d")
+shader_parameter/tint = Color(0.60, 0.55, 0.72, 1)
+shader_parameter/strength = 0.12
+shader_parameter/scan_strength = 0.008
+shader_parameter/motion_speed = 0.18
 shader_parameter/progress = 0.0
-shader_parameter/bg_color = Color(0.02, 0.02, 0.02, 0.85)
 
 [sub_resource type="Gradient" id="Gradient_solid"]
-colors = PackedColorArray(0, 0, 0, 0.78431374, 0, 0, 0, 0.8627451)
+colors = PackedColorArray(0.04, 0.03, 0.07, 0.32, 0.16, 0.08, 0.16, 0.38)
 metadata/_snap_count = 99
 
 [sub_resource type="GradientTexture2D" id="GradientTexture2D_solid"]
@@ -21,17 +24,16 @@ fill = 1
 fill_from = Vector2(0.5, 0.5)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.014, 0.012, 0.016, 0.985)
-border_width_right = 3
-border_color = Color(1, 0.48, 0.72, 0.82)
+bg_color = Color(0.20, 0.16, 0.25, 0.97)
 corner_radius_top_right = 28
-corner_radius_bottom_right = 8
+corner_radius_bottom_right = 28
 corner_detail = 4
-shadow_color = Color(0, 0, 0, 0.48)
-shadow_size = 18
+shadow_color = Color(0.04, 0.02, 0.08, 0.34)
+shadow_size = 24
+shadow_offset = Vector2(5, 0)
 
 [sub_resource type="StyleBoxLine" id="StyleBoxLine_separator"]
-color = Color(1, 0.78, 0.88, 0.18)
+color = Color(0.53, 0.42, 0.70, 0.20)
 grow_begin = -20.0
 grow_end = -20.0
 thickness = 2
@@ -41,33 +43,37 @@ content_margin_left = 28.0
 content_margin_top = 12.0
 content_margin_right = 20.0
 content_margin_bottom = 12.0
-bg_color = Color(0.95, 0.52, 0.72, 0.055)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+bg_color = Color(0.29, 0.23, 0.35, 0.92)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_pressed"]
 content_margin_left = 32.0
 content_margin_top = 12.0
 content_margin_right = 20.0
 content_margin_bottom = 12.0
-bg_color = Color(1, 0.48, 0.68, 0.25)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+bg_color = Color(0.88, 0.34, 0.50, 0.98)
+border_width_left = 4
+border_color = Color(0.86, 0.34, 0.42, 0.50)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_hover"]
 content_margin_left = 36.0
 content_margin_top = 12.0
 content_margin_right = 20.0
 content_margin_bottom = 12.0
-bg_color = Color(1, 0.62, 0.78, 0.2)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+bg_color = Color(0.55, 0.32, 0.43, 0.94)
+border_width_left = 4
+border_color = Color(0.98, 0.49, 0.55, 0.72)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [sub_resource type="Animation" id="Animation_RESET"]
 resource_name = "RESET"
@@ -264,7 +270,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.02, 0.02, 0.85)
+color = Color(1, 1, 1, 1)
 
 [node name="BackgroundOverlay" type="TextureRect" parent="Control" unique_id=1585795494]
 layout_mode = 1
@@ -273,13 +279,14 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = SubResource("GradientTexture2D_solid")
 
 [node name="SidePanel" type="Panel" parent="Control" unique_id=272109569]
 layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
-offset_right = 420.0
+offset_right = 460.0
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
 
@@ -288,20 +295,20 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 40.0
-offset_top = 100.0
-offset_right = -20.0
-offset_bottom = -40.0
+offset_left = 34.0
+offset_top = 82.0
+offset_right = -26.0
+offset_bottom = -38.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 15
+theme_override_constants/separation = 14
 
 [node name="HeaderBox" type="HBoxContainer" parent="Control/SidePanel/VBoxContainer" unique_id=806691892]
 layout_mode = 2
 theme_override_constants/separation = 15
 
 [node name="DecorBar" type="ColorRect" parent="Control/SidePanel/VBoxContainer/HeaderBox" unique_id=195805764]
-custom_minimum_size = Vector2(8, 55)
+custom_minimum_size = Vector2(12, 62)
 layout_mode = 2
 size_flags_vertical = 4
 color = Color(1, 0.48, 0.72, 1)
@@ -313,14 +320,14 @@ layout_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
 theme_override_font_sizes/font_size = 34
-text = "暂停"
+text = "暂停一下"
 uppercase = false
 
 [node name="SubtitleLabel" type="Label" parent="Control/SidePanel/VBoxContainer/HeaderBox/TitleGroup" unique_id=895234452]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.72)
 theme_override_font_sizes/font_size = 14
-text = "避难所静默 · 时间仍在流逝"
+text = "慢慢来，Mirdo 还在等你"
 
 [node name="HSeparator" type="HSeparator" parent="Control/SidePanel/VBoxContainer" unique_id=778357946]
 layout_mode = 2
@@ -339,7 +346,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "  继续"
+text = "  继续冒险"
 alignment = 0
 
 [node name="DebugLoadButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1096618873]
@@ -370,7 +377,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "  记录"
+text = "  保存进度"
 alignment = 0
 
 [node name="OptionsButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1816499980]
@@ -385,7 +392,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "  设置"
+text = "  游戏设置"
 alignment = 0
 
 [node name="MainMenuButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=789355765]
@@ -400,7 +407,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "  标题"
+text = "  回到标题"
 alignment = 0
 
 [node name="ExitGameButton" type="Button" parent="Control/SidePanel/VBoxContainer" unique_id=1335890699]
@@ -415,7 +422,7 @@ theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxEmpty_btn_normal")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_btn_pressed")
 theme_override_styles/hover = SubResource("StyleBoxFlat_btn_hover")
-text = "  退出"
+text = "  退出游戏"
 alignment = 0
 
 [node name="Spacer" type="Control" parent="Control/SidePanel/VBoxContainer" unique_id=811939930]
@@ -436,14 +443,14 @@ color = Color(1, 0.48, 0.72, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.62, 0.58, 0.56, 0.72)
 theme_override_font_sizes/font_size = 14
-text = "记录会自动写入当前槽"
+text = "进度已自动收好"
 
 [node name="EscHint" type="Label" parent="Control/SidePanel/VBoxContainer/FooterBox" unique_id=1349493874]
 layout_mode = 2
 size_flags_horizontal = 10
 theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.7)
 theme_override_font_sizes/font_size = 14
-text = "[ESC] 继续"
+text = "ESC · 继续"
 
 
 [node name="AISettingsPanel" parent="." instance=ExtResource("3_ai_settings_panel")]
@@ -456,6 +463,7 @@ visible = false
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1518216197]
 unique_name_in_owner = true
+process_mode = 3
 libraries/ = SubResource("AnimationLibrary_anim")
 
 [node name="UISoundPlayer" type="AudioStreamPlayer" parent="." unique_id=574126554]

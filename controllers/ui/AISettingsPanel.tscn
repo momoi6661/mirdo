@@ -3,21 +3,21 @@
 [ext_resource type="Script" path="res://controllers/scripts/ai_settings_panel.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.014, 0.012, 0.016, 0.985)
+bg_color = Color(0.20, 0.16, 0.25, 0.97)
 border_width_left = 3
-border_color = Color(1, 0.48, 0.72, 0.82)
-corner_radius_top_left = 28
-corner_radius_bottom_left = 8
+border_color = Color(0.91, 0.37, 0.51, 0.82)
+corner_radius_top_left = 22
+corner_radius_bottom_left = 10
 corner_detail = 4
-shadow_size = 24
+shadow_size = 20
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_field"]
-bg_color = Color(0.58, 0.08, 0.33, 0.34)
+bg_color = Color(0.14, 0.11, 0.19, 0.94)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(1, 0.78, 0.88, 0.24)
+border_color = Color(0.72, 0.60, 0.84, 0.34)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
@@ -28,12 +28,12 @@ content_margin_top = 8.0
 content_margin_bottom = 8.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_field_focus"]
-bg_color = Color(0.66, 0.1, 0.38, 0.42)
+bg_color = Color(0.20, 0.12, 0.23, 0.98)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(1, 0.86, 0.94, 0.78)
+border_color = Color(0.98, 0.52, 0.64, 0.82)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
@@ -44,9 +44,9 @@ content_margin_top = 8.0
 content_margin_bottom = 8.0
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button"]
-bg_color = Color(1, 0.48, 0.72, 0.14)
+bg_color = Color(0.32, 0.26, 0.40, 0.96)
 border_width_left = 4
-border_color = Color(1, 0.48, 0.72, 0.92)
+border_color = Color(0.91, 0.37, 0.51, 0.92)
 content_margin_left = 16.0
 content_margin_right = 16.0
 content_margin_top = 8.0
@@ -57,9 +57,9 @@ corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
-bg_color = Color(1, 0.48, 0.72, 0.28)
+bg_color = Color(0.55, 0.32, 0.43, 0.94)
 border_width_left = 4
-border_color = Color(1, 0.62, 0.8, 1)
+border_color = Color(0.98, 0.60, 0.62, 1)
 content_margin_left = 16.0
 content_margin_right = 16.0
 content_margin_top = 8.0
@@ -92,11 +92,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
-color = Color(0, 0, 0, 0.18)
+color = Color(0, 0, 0, 0.35)
 
 [node name="DrawerPanel" type="Panel" parent="PanelRoot"]
 unique_name_in_owner = true
-layout_mode = 1
 custom_minimum_size = Vector2(760, 0)
 layout_mode = 1
 anchors_preset = 11
@@ -112,125 +111,258 @@ grow_horizontal = 0
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
 
-[node name="MarginContainer" type="MarginContainer" parent="PanelRoot/DrawerPanel"]
+[node name="MarginContainer" type="ScrollContainer" parent="PanelRoot/DrawerPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 64.0
-offset_top = 52.0
-offset_right = -56.0
-offset_bottom = -40.0
+offset_left = 48.0
+offset_top = 40.0
+offset_right = -40.0
+offset_bottom = -28.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
 
 [node name="VBoxContainer" type="VBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
 [node name="TitleLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 42
-text = "AI 对话设置"
+theme_override_colors/font_color = Color(0.92, 0.9, 0.86, 1)
+theme_override_font_sizes/font_size = 34
+text = "设置"
 
 [node name="HintLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.55)
-theme_override_font_sizes/font_size = 16
-text = "连接对话模型。Base URL / API Key / Model 会在输入后自动保存。"
+theme_override_colors/font_color = Color(0.78, 0.76, 0.72, 0.78)
+theme_override_font_sizes/font_size = 15
+text = "音量、画面和视角灵敏度会自动保存；全屏会保存偏好，独立窗口生效。AI 连接在下方。"
 autowrap_mode = 3
+
+[node name="AudioTitle" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_font_sizes/font_size = 16
+text = "音频 / 显示"
+
+[node name="MasterRow" type="HBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MasterLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/MasterRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "主音量"
+
+[node name="MasterSlider" type="HSlider" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/MasterRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="MusicRow" type="HBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MusicLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/MusicRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "音乐"
+
+[node name="MusicSlider" type="HSlider" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/MusicRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="UiRow" type="HBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="UiLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/UiRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "界面"
+
+[node name="UiSlider" type="HSlider" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/UiRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 1.0
+step = 0.01
+value = 0.85
+
+[node name="SensitivityRow" type="HBoxContainer" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SensitivityLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/SensitivityRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "视角灵敏度"
+
+[node name="MouseSensitivitySlider" type="HSlider" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer/SensitivityRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.5
+max_value = 2.0
+step = 0.05
+value = 1.0
+tooltip_text = "调整鼠标视角转动速度"
+
+[node name="FullscreenCheck" type="CheckButton" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "全屏"
+
+[node name="AiTitle" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_font_sizes/font_size = 16
+text = "AI 连接"
 
 [node name="BaseUrlLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.78)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.82, 0.8, 0.76, 0.9)
+theme_override_font_sizes/font_size = 15
 text = "Base URL"
 
 [node name="BaseUrlLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_field")
 theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
-placeholder_text = "http://127.0.0.1:18080 或 https://api.example.com/v1"
+placeholder_text = "http://127.0.0.1:18080"
 
 [node name="ApiKeyLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.78)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.82, 0.8, 0.76, 0.9)
+theme_override_font_sizes/font_size = 15
 text = "API Key"
 
 [node name="ApiKeyLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 secret = true
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_field")
 theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
 placeholder_text = "sk-..."
 
 [node name="ModelLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.78)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.82, 0.8, 0.76, 0.9)
+theme_override_font_sizes/font_size = 15
 text = "Model"
 
 [node name="ModelLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_field")
 theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
-placeholder_text = "例如 gpt-4.1-mini / qwen3 / local-model"
+placeholder_text = "模型名"
 
 [node name="ProxyUrlLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.78)
-theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.82, 0.8, 0.76, 0.9)
+theme_override_font_sizes/font_size = 15
 text = "Proxy URL"
 
 [node name="ProxyUrlLineEdit" type="LineEdit" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_colors/caret_color = Color(1, 0.42, 0.12, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_field")
 theme_override_styles/focus = SubResource("StyleBoxFlat_field_focus")
 placeholder_text = "http://127.0.0.1:7890"
 text = "http://127.0.0.1:7890"
 
+[node name="TtsTitle" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.62, 0.78, 0.95)
+theme_override_font_sizes/font_size = 16
+text = "角色语音（VOICEVOX）"
+
+[node name="TtsEnabledCheck" type="CheckButton" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "启用 Mirdo 日语语音（TTS）"
+tooltip_text = "只对本次对话请求生成语音；关闭时只显示文字。"
+
+[node name="TtsVoiceLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.8, 0.76, 0.9)
+theme_override_font_sizes/font_size = 15
+text = "声线（Speaker ID）"
+
+[node name="TtsVoiceOption" type="OptionButton" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
+theme_override_font_sizes/font_size = 17
+tooltip_text = "选择 VOICEVOX 音色；请求会把对应 speaker_id 发送给后端。"
+
+[node name="TtsJapaneseCheck" type="CheckButton" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.88, 0.84, 1)
+theme_override_font_sizes/font_size = 16
+text = "让 Agent 额外生成日语对白"
+tooltip_text = "启用后后端会返回 dialogue_ja，VOICEVOX 使用日语字段合成。"
 
 [node name="TestModelButton" type="Button" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 50)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-focus_mode = 0
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_hover")
 text = "测试连接"
-alignment = 0
 
 [node name="StatusLabel" type="Label" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.5)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.72, 0.68, 0.66, 0.8)
+theme_override_font_sizes/font_size = 15
 text = "设置会自动保存"
+autowrap_mode = 3
 
 [node name="Spacer" type="Control" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -238,19 +370,16 @@ size_flags_vertical = 3
 
 [node name="BackButton" type="Button" parent="PanelRoot/DrawerPanel/MarginContainer/VBoxContainer"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
-focus_mode = 0
 theme_override_colors/font_color = Color(0.95, 0.95, 0.95, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button_hover")
-text = "返回暂停菜单"
-alignment = 0
+text = "返回"
 
 [node name="AutoSaveTimer" type="Timer" parent="."]
 unique_name_in_owner = true
 wait_time = 0.35
 one_shot = true
-

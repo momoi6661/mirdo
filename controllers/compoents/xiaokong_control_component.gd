@@ -41,6 +41,7 @@ var _world_subtitle_component: Node
 var _subtitle_overlay: XiaokongSubtitleOverlay
 var _dialogue_stream_text: String = ""
 var _subtitle_stream_finished_early: bool = false
+var _subtitle_started_for_current_dialogue: bool = false
 var _local_stream_token: int = 0
 var _last_request_payload: Dictionary = {}
 var _last_response_payload: Dictionary = {}
@@ -226,6 +227,12 @@ func send_dialogue_text(text: String) -> bool:
 
 	var result = _dialogue_component.send_player_text(trimmed)
 	if bool(result.get("ok", false)):
+		# aggregate/queued 只表示已经接收输入，不代表本句可以覆盖当前字幕。
+		# 之前这里无论 queued 与否都显示“思考中”，会清掉正在播放的句子，
+		# 造成字幕与 TTS 错位；只有真正发出新请求才开始新的呈现状态。
+		if bool(result.get("queued", false)):
+			_set_status("Dialogue revision queued (latest input kept).")
+			return true
 		_last_request_payload = result.get("payload", {}).duplicate(true) if result.get("payload", {}) is Dictionary else {}
 		if _panel != null and _panel.has_method("set_request_payload"):
 			_panel.call("set_request_payload", _last_request_payload)
@@ -783,6 +790,14 @@ func _dialogue_uses_local_fallback_on_error() -> bool:
 		return text == "true" or text == "1" or text == "yes"
 	return false
 
+func _dialogue_waits_for_tts() -> bool:
+	if _dialogue_component == null:
+		return false
+	if _dialogue_component.has_method("waits_for_tts_presentation"):
+		return bool(_dialogue_component.call("waits_for_tts_presentation"))
+	var value: Variant = _dialogue_component.get("tts_enabled")
+	return bool(value) if value is bool else false
+
 func _connect_dialogue_component_signals(component: Node) -> void:
 	# 控制器负责流式字幕的唯一呈现；关闭组件自己的最终句直出，避免同一句在
 	# stream_finished 与 dialogue_completed 两条路径各显示一次。
@@ -790,6 +805,8 @@ func _connect_dialogue_component_signals(component: Node) -> void:
 		component.set("direct_subtitle_enabled", false)
 	_connect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
 	_connect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
+	_connect_dialogue_signal(component, &"dialogue_presenting", Callable(self, "_on_dialogue_presenting"))
+	_connect_dialogue_signal(component, &"dialogue_interrupted", Callable(self, "_on_dialogue_interrupted"))
 	_connect_dialogue_signal(component, &"dialogue_completed", Callable(self, "_on_dialogue_completed"))
 	_connect_dialogue_signal(component, &"dialogue_failed", Callable(self, "_on_dialogue_failed"))
 	_connect_dialogue_signal(component, &"model_probe_completed", Callable(self, "_on_model_probe_completed"))
@@ -807,6 +824,8 @@ func _has_property(object: Object, property_name: StringName) -> bool:
 func _disconnect_dialogue_component_signals(component: Node) -> void:
 	_disconnect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
 	_disconnect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
+	_disconnect_dialogue_signal(component, &"dialogue_presenting", Callable(self, "_on_dialogue_presenting"))
+	_disconnect_dialogue_signal(component, &"dialogue_interrupted", Callable(self, "_on_dialogue_interrupted"))
 	_disconnect_dialogue_signal(component, &"dialogue_completed", Callable(self, "_on_dialogue_completed"))
 	_disconnect_dialogue_signal(component, &"dialogue_failed", Callable(self, "_on_dialogue_failed"))
 	_disconnect_dialogue_signal(component, &"model_probe_completed", Callable(self, "_on_model_probe_completed"))
@@ -827,26 +846,54 @@ func _disconnect_dialogue_signal(component: Node, signal_name: StringName, callb
 func _on_dialogue_chunk(chunk: String) -> void:
 	_cancel_local_stream()
 	_dialogue_stream_text += chunk
-	_push_subtitle_chunk(chunk)
+	# 字幕按“完整对白”呈现，不把模型传输 chunk 当成字幕队列。
+	# 这样网络分片不会变成逐字打字机，也不会在 TTS 起播前显示半句话。
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
 		_panel.call("set_dialogue_reply", _dialogue_stream_text)
 	_set_status("Dialogue streaming...")
 
 func _on_dialogue_stream_finished(dialogue_text: String) -> void:
-	if _subtitle_stream_finished_early:
+	# 这里只记录“模型文字已经收齐”；真正显示统一等
+	# dialogue_completed，保证最终字段、TTS 和字幕使用同一条对白。
+	if not dialogue_text.strip_edges().is_empty():
+		_dialogue_stream_text = dialogue_text.strip_edges()
+	_set_status("Dialogue text completed, waiting presentation...")
+
+
+func _on_dialogue_presenting(report: Dictionary) -> void:
+	# TTS 音频开始下载/播放前，先把同一条对白交给字幕；完成信号仍由
+	# AIDialogueComponent 在 playback_finished 后发出，因此下一句不会抢播。
+	var reply := String(report.get("dialogue", "")).strip_edges()
+	if reply.is_empty():
 		return
-	if _dialogue_stream_text.strip_edges().is_empty():
-		return
-	var final_text := dialogue_text.strip_edges()
-	if final_text.is_empty():
-		final_text = _dialogue_stream_text.strip_edges()
-	if final_text.is_empty():
-		return
-	_subtitle_stream_finished_early = true
-	_finish_subtitle_stream(final_text)
-	_set_status("Dialogue text completed, waiting action...")
+	_subtitle_started_for_current_dialogue = true
+	_cancel_local_stream()
+	# TTS 回合不再走逐字模拟流：完整字幕在语音下载完成并起播前就准备好，
+	# 避免 Godot 端还在逐字生成时玩家已经听到后半句。
+	_show_subtitle_immediate(reply, subtitle_speaker_name)
+	# show_once_immediate 内部会先清理旧字幕，因此锁定必须放在新句建立之后。
+	_set_subtitle_external_hold(true)
+	if _panel != null and _panel.has_method("set_dialogue_reply"):
+		_panel.call("set_dialogue_reply", reply)
+
+
+func _on_dialogue_interrupted(report: Dictionary) -> void:
+	"""撤下已失效的字幕；新的引导回合会用自己的 sequence 再次呈现。"""
+	_set_subtitle_external_hold(false)
+	_cancel_local_stream()
+	_dialogue_stream_text = ""
+	_subtitle_stream_finished_early = false
+	_subtitle_started_for_current_dialogue = false
+	_clear_subtitle_immediately()
+	if _panel != null and _panel.has_method("set_dialogue_reply"):
+		_panel.call("set_dialogue_reply", "正在根据最新引导调整……")
+	_set_status("Dialogue steered (%s)." % String(report.get("phase", "unknown")))
 
 func _on_dialogue_completed(report: Dictionary) -> void:
+	if bool(report.get("superseded", false)) or String(report.get("response_kind", "")) == "superseded":
+		# 旧请求被改口替代时，绝不能把空/旧对白再推到字幕层。
+		_set_subtitle_external_hold(false)
+		return
 	var had_stream_chunk := not _dialogue_stream_text.is_empty()
 	var reply := String(report.get("dialogue", "")).strip_edges()
 	if reply.is_empty():
@@ -864,22 +911,28 @@ func _on_dialogue_completed(report: Dictionary) -> void:
 	if _panel != null and _panel.has_method("set_response_payload"):
 		_panel.call("set_response_payload", _last_response_payload)
 
-	if had_stream_chunk:
+	if _subtitle_started_for_current_dialogue:
+		# 字幕已经在 TTS 开始时显示，本次完成只负责释放队列和下一步行为。
 		_dialogue_stream_text = ""
-		if not _subtitle_stream_finished_early:
-			_finish_subtitle_stream(reply)
+		_subtitle_started_for_current_dialogue = false
+	elif had_stream_chunk:
+		_dialogue_stream_text = ""
+		_show_subtitle_immediate(reply, subtitle_speaker_name)
 		_subtitle_stream_finished_early = false
 	else:
-		_start_local_stream_from_full_text(reply)
+		_show_subtitle_immediate(reply, subtitle_speaker_name)
 
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
 		_panel.call("set_dialogue_reply", reply)
 	_set_status("Dialogue completed.")
+	_set_subtitle_external_hold(false)
 
 func _on_dialogue_failed(error_text: String) -> void:
+	_set_subtitle_external_hold(false)
 	_cancel_local_stream()
 	_dialogue_stream_text = ""
 	_subtitle_stream_finished_early = false
+	_subtitle_started_for_current_dialogue = false
 	_clear_subtitle_immediately()
 	var safe_error_text := error_subtitle_text.strip_edges()
 	if safe_error_text.is_empty():
@@ -943,6 +996,22 @@ func _run_local_stream_async(text: String, token: int) -> void:
 		return
 	_dialogue_stream_text = ""
 	_finish_subtitle_stream(safe_text)
+
+func _set_subtitle_external_hold(held: bool) -> void:
+	var target := _resolve_subtitle_target()
+	if target == null:
+		return
+	if target.has_method("set_external_hold"):
+		target.call("set_external_hold", held)
+
+func _show_subtitle_immediate(text: String, speaker: String) -> void:
+	var target := _resolve_subtitle_target()
+	if target == null:
+		return
+	if target.has_method("show_once_immediate"):
+		target.call("show_once_immediate", text, speaker)
+	elif target.has_method("show_once"):
+		target.call("show_once", text, speaker)
 
 func _cancel_local_stream() -> void:
 	_local_stream_token += 1

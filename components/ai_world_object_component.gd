@@ -13,6 +13,10 @@ class_name AIWorldObjectComponent
 @export var priority: int = 0
 @export var enabled: bool = true
 
+## 语义能力的额外描述，不暴露给后端的 NodePath。
+## 例如：{"take_item": {"requires": ["open"], "result": "item_in_hand"}}。
+@export var affordance_metadata: Dictionary = {}
+
 func _ready() -> void:
 	if enabled and not is_in_group("ai_world_object"):
 		add_to_group("ai_world_object")
@@ -25,11 +29,12 @@ func build_ai_object_summary(observer: Node3D = null) -> Dictionary:
 		"description": ai_description.strip_edges(),
 		"tags": _packed_to_array(tags),
 		"actions": _packed_to_array(supported_actions),
+		"affordances": get_ai_affordances(),
 		"priority": priority,
 		"path": String(get_path()) if is_inside_tree() else "",
 		"marker_roles": _build_marker_role_paths(),
 	}
-	if observer != null and observer is Node3D:
+	if observer != null and observer is Node3D and observer.is_inside_tree() and is_inside_tree():
 		summary["distance"] = observer.global_position.distance_to(global_position)
 	else:
 		summary["distance"] = 0.0
@@ -40,6 +45,102 @@ func build_ai_object_summary(observer: Node3D = null) -> Dictionary:
 	if look_marker != null:
 		summary["look_marker_path"] = String(look_marker.get_path())
 	return summary
+
+## 构造给 Agent 的实体摘要。
+##
+## 导航点是 Godot 的实现细节；Agent 只需要知道“这个实体能做什么”。
+## 具体的 approach/sit/stand Marker 仍由 get_marker_for_role() 在本地解析。
+func build_ai_entity_summary(observer: Node3D = null) -> Dictionary:
+	var summary := {
+		"id": _resolve_object_id(),
+		"name": _resolve_display_name(),
+		"kind": object_type,
+		"description": ai_description.strip_edges(),
+		"tags": _packed_to_array(tags),
+		"affordances": get_ai_affordances(),
+		"availability": _build_availability_snapshot(),
+		"priority": priority,
+		"relation": "known",
+	}
+	if observer != null and observer is Node3D and observer.is_inside_tree() and is_inside_tree():
+		summary["distance"] = observer.global_position.distance_to(global_position)
+	else:
+		summary["distance"] = 0.0
+	return summary
+
+## 返回稳定的语义能力名称，并把坐下/打开等角色映射转换为能力。
+func get_ai_affordances() -> Array[String]:
+	var result: Array[String] = []
+	for raw_action in supported_actions:
+		var action := String(raw_action).strip_edges()
+		if not action.is_empty() and not result.has(action):
+			result.append(action)
+	for raw_role in marker_roles.keys():
+		var role := String(raw_role).strip_edges().to_lower()
+		if role in ["approach", "look"] or role.is_empty():
+			continue
+		if not result.has(role):
+			result.append(role)
+	return result
+
+## 查询一个能力的执行契约；返回的是语义信息，不包含场景路径。
+func resolve_ai_affordance(affordance: String) -> Dictionary:
+	var affordance_name := affordance.strip_edges().to_lower()
+	if affordance_name.is_empty() or not get_ai_affordances().has(affordance_name):
+		return {}
+	var metadata: Dictionary = {}
+	var raw_metadata: Variant = affordance_metadata.get(affordance_name, {})
+	if raw_metadata is Dictionary:
+		metadata = (raw_metadata as Dictionary).duplicate(true)
+	var result := {
+		"name": affordance_name,
+		"requires_navigation": affordance_name not in ["look_at_player", "listen"],
+		"marker_role": _preferred_marker_role_for_affordance(affordance_name),
+		"metadata": metadata,
+	}
+	for key in ["requires", "result", "post_action", "preconditions"]:
+		if metadata.has(key):
+			result[key] = metadata[key]
+	return result
+
+func _preferred_marker_role_for_affordance(affordance: String) -> String:
+	if affordance in ["sit", "sit_down", "seated_idle"] and marker_roles.has("sit"):
+		return "sit"
+	if marker_roles.has(affordance):
+		return affordance
+	if affordance in ["open", "inspect", "take_item", "take_from_container"] and marker_roles.has("approach"):
+		return "approach"
+	return "approach" if marker_roles.has("approach") else ""
+
+func _build_availability_snapshot() -> Dictionary:
+	# 容器/物品组件可以通过方法提供动态库存；没有库存接口时保持空对象。
+	for method_name in [&"build_ai_inventory_snapshot", &"get_ai_inventory_snapshot", &"get_inventory_snapshot"]:
+		if has_method(method_name):
+			var value: Variant = call(method_name)
+			if value is Dictionary:
+				return (value as Dictionary).duplicate(true)
+	var child_snapshot := _find_child_inventory_snapshot(self)
+	if not child_snapshot.is_empty():
+		return child_snapshot
+	return {}
+
+func _find_child_inventory_snapshot(root: Node) -> Dictionary:
+	if root == null:
+		return {}
+	for child in root.get_children():
+		var node := child as Node
+		if node == null:
+			continue
+		for method_name in [&"build_ai_inventory_snapshot", &"get_ai_inventory_snapshot", &"get_inventory_snapshot"]:
+			if not node.has_method(method_name):
+				continue
+			var value: Variant = node.call(method_name)
+			if value is Dictionary:
+				return (value as Dictionary).duplicate(true)
+		var nested := _find_child_inventory_snapshot(node)
+		if not nested.is_empty():
+			return nested
+	return {}
 
 func get_nav_marker() -> Marker3D:
 	if nav_marker_path != NodePath():

@@ -14,6 +14,7 @@ const HELD_GIFT_INTERACTABLE_SCRIPT := preload("res://scripts/character_ai/compo
 @export var face_component_path: NodePath
 @export var navigation_motor_path: NodePath
 @export var autonomous_life_path: NodePath
+@export var dialogue_component_path: NodePath = NodePath("../AIDialogueComponent")
 @export var subtitle_component_path: NodePath
 @export var state_component_path: NodePath
 @export var hand_attachment_path: NodePath = NodePath("VisualRoot/Model/Armature/GeneralSkeleton/RightHandItemAttachment/HeldItemRoot")
@@ -39,6 +40,7 @@ var _animation_behavior: Node
 var _face_component: Node
 var _navigation_motor: Node
 var _autonomous_life: Node
+var _dialogue_component: Node
 var _subtitle_component: Node
 var _state_component: Node
 var _active_item: ItemData
@@ -340,7 +342,16 @@ func _notify_external_control() -> void:
 
 func _show_line(text: String) -> void:
 	var clean := text.strip_edges()
-	if clean.is_empty() or _subtitle_component == null:
+	if clean.is_empty():
+		return
+	if _dialogue_component != null and _dialogue_component.has_method("present_local_dialogue"):
+		_dialogue_component.call("present_local_dialogue", clean, {
+			"emotion": "开心",
+			"expression": "joy",
+			"action": "work_reach",
+		})
+		return
+	if _subtitle_component == null:
 		return
 	if _subtitle_component.has_method("show_once"):
 		_subtitle_component.call("show_once", clean, "Mirdo")
@@ -352,6 +363,7 @@ func _refresh_refs() -> void:
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
 	_navigation_motor = get_node_or_null(navigation_motor_path) if navigation_motor_path != NodePath() else null
 	_autonomous_life = get_node_or_null(autonomous_life_path) if autonomous_life_path != NodePath() else null
+	_dialogue_component = get_node_or_null(dialogue_component_path) if dialogue_component_path != NodePath() else null
 	_subtitle_component = get_node_or_null(subtitle_component_path) if subtitle_component_path != NodePath() else null
 	_state_component = get_node_or_null(state_component_path) if state_component_path != NodePath() else null
 	if _character_root == null:
@@ -364,6 +376,8 @@ func _refresh_refs() -> void:
 		_navigation_motor = _character_root
 	if _autonomous_life == null:
 		_autonomous_life = _find_sibling_with_method(&"notify_external_control_for")
+	if _dialogue_component == null:
+		_dialogue_component = _find_sibling_with_method(&"present_local_dialogue")
 	if _subtitle_component == null:
 		_subtitle_component = _find_sibling_with_method(&"show_once")
 	if _state_component == null:
