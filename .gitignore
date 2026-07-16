@@ -1,23 +1,26 @@
-# Godot generated/editor cache
+# Godot editor/cache
 .godot/
 .import/
+*.import.tmp
 export.cfg
-export_presets.cfg
 
-# Godot devtool local state/logs
+# Godot local plugin/runtime state
 .godot-devtool/
 .godot-devtool/*.log
 .godot-devtool/*-state.json
 .godot-devtool/audit.jsonl
 .godot-devtool/editor-state.json
 .godot-devtool/runtime-state.json
+addons/godot_ai/export/
 
-# Local automation/agent/worktree state
+# Local automation / agent / design scratch
 .worktrees/
 .superpowers/
 .codex_tmp/
 .learnings/
 .bytro
+.omd/
+IDEA.md
 
 # Dependencies / package managers
 node_modules/
@@ -26,7 +29,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS/editor junk
+# OS / editor junk
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -54,7 +57,7 @@ nul
 *.blend@*
 *.blend~
 
-# Task documents folder
+# Local documents / generated reports
 /docs/
 
 # Large local export/build outputs
@@ -73,7 +76,9 @@ exports/
 # Python caches/tools
 __pycache__/
 *.py[cod]
+.pytest_cache/
 .venv/
 venv/
 .env
 .env.*
+!.env.example
