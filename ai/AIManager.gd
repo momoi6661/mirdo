@@ -51,6 +51,8 @@ signal on_model_probe_error(error_msg: String)
 @export var tts_speaker_id: int = -1
 ## 是否让 Agent 同时生成日语对白；不打开时仍只生成中文主对白。
 @export var tts_generate_japanese: bool = false
+## 音频传输协议：inline 最快；url 只返回音频链接；auto 由后端按体积选择。
+@export_enum("inline", "url", "auto") var tts_audio_delivery: String = "inline"
 
 var is_requesting: bool = false
 
@@ -198,6 +200,7 @@ func _apply_tts_options(payload: Dictionary, options: Dictionary = {}) -> void:
 	payload["use_tts"] = use_tts_value
 	payload["tts_voice_profile"] = profile_value
 	payload["generate_japanese"] = bool(options.get("generate_japanese", defaults.get("generate_japanese", tts_generate_japanese)))
+	payload["tts_audio_delivery"] = _normalize_tts_audio_delivery(String(options.get("tts_audio_delivery", defaults.get("audio_delivery", tts_audio_delivery))))
 	var speaker_value := int(options.get("tts_speaker_id", defaults.get("speaker_id", tts_speaker_id)))
 	if speaker_value >= 0:
 		payload["tts_speaker_id"] = speaker_value
@@ -1341,6 +1344,7 @@ func _normalize_chat_request(raw_payload: Dictionary) -> Dictionary:
 	if String(normalized["tts_voice_profile"]).is_empty():
 		normalized["tts_voice_profile"] = "mirdo_ja"
 	normalized["generate_japanese"] = bool(payload.get("generate_japanese", tts_defaults.get("generate_japanese", tts_generate_japanese)))
+	normalized["tts_audio_delivery"] = _normalize_tts_audio_delivery(String(payload.get("tts_audio_delivery", tts_defaults.get("audio_delivery", tts_audio_delivery))))
 	var tts_speaker_id_value := int(payload.get("tts_speaker_id", tts_defaults.get("speaker_id", tts_speaker_id)))
 	if tts_speaker_id_value >= 0:
 		normalized["tts_speaker_id"] = tts_speaker_id_value
@@ -1384,7 +1388,13 @@ func _tts_defaults() -> Dictionary:
 		"voice_profile": tts_voice_profile,
 		"speaker_id": tts_speaker_id,
 		"generate_japanese": tts_generate_japanese,
+		"audio_delivery": _normalize_tts_audio_delivery(tts_audio_delivery),
 	}
+
+
+func _normalize_tts_audio_delivery(value: String) -> String:
+	var clean := value.strip_edges().to_lower()
+	return clean if (clean in ["inline", "url", "auto"]) else "inline"
 
 func _build_provider_from_settings() -> Dictionary:
 	_resolve_settings_service()

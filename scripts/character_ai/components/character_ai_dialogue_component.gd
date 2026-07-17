@@ -84,6 +84,8 @@ signal dialogue_failed(error_text: String)
 @export var tts_speaker_id: int = -1
 ## 开启后 Agent 会额外返回 dialogue_ja，VOICEVOX 使用日语字段合成。
 @export var tts_generate_japanese: bool = false
+## 音频传输协议：inline=随 /chat 返回音频；url=只返回链接；auto=后端按大小选择。
+@export_enum("inline", "url", "auto") var tts_audio_delivery: String = "inline"
 
 @export_category("Dialogue Continuation")
 @export var auto_continue_dialogue_enabled: bool = true
@@ -110,6 +112,8 @@ var _pending_voice_report: Dictionary = {}
 var _pending_voice_dialogue: String = ""
 var _pending_voice_ai_data: Dictionary = {}
 var _pending_voice_route_summary: Dictionary = {}
+## 只有播放器真正起播后才显示字幕；TTS 失败时由完成路径补显示。
+var _pending_voice_presented: bool = false
 var _queued_local_dialogues: Array[Dictionary] = []
 var _request_in_flight: bool = false
 var _last_payload: Dictionary = {}
@@ -195,12 +199,11 @@ func present_local_dialogue(text: String, ai_data: Dictionary = {}) -> bool:
 	}
 	if _has_playable_tts(data):
 		_speech_gate_active = true
+		_pending_voice_presented = false
 		_pending_voice_report = report
 		_pending_voice_dialogue = dialogue_text
 		_pending_voice_ai_data = data.duplicate(true)
 		_pending_voice_route_summary = {}
-		# 本地台词也遵循同一时序：先显示字幕，再请求/播放语音。
-		dialogue_presenting.emit(report.duplicate(true))
 		if _play_tts_response(data):
 			return true
 		_clear_pending_voice_state()
@@ -757,6 +760,7 @@ func _build_chat_payload(player_text: String, given_item: String, request_source
 		"use_tts": tts_enabled,
 		"tts_voice_profile": _effective_tts_voice_profile(),
 		"generate_japanese": tts_enabled and tts_generate_japanese,
+		"tts_audio_delivery": _effective_tts_audio_delivery(),
 	}
 	if tts_speaker_id >= 0:
 		fallback_payload["tts_speaker_id"] = tts_speaker_id
@@ -767,6 +771,7 @@ func _build_tts_options() -> Dictionary:
 		"use_tts": tts_enabled,
 		"tts_voice_profile": _effective_tts_voice_profile(),
 		"generate_japanese": tts_enabled and tts_generate_japanese,
+		"tts_audio_delivery": _effective_tts_audio_delivery(),
 	}
 	if tts_speaker_id >= 0:
 		options["tts_speaker_id"] = tts_speaker_id
@@ -775,6 +780,11 @@ func _build_tts_options() -> Dictionary:
 func _effective_tts_voice_profile() -> String:
 	var profile := tts_voice_profile.strip_edges()
 	return profile if not profile.is_empty() else "mirdo_ja"
+
+
+func _effective_tts_audio_delivery() -> String:
+	var delivery := tts_audio_delivery.strip_edges().to_lower()
+	return delivery if (delivery in ["inline", "url", "auto"]) else "inline"
 
 
 ## 从全局设置读取玩家在设置面板选择的声线，避免只改 UI 却仍使用场景默认值。
@@ -789,6 +799,7 @@ func _load_global_tts_settings() -> void:
 			tts_voice_profile = String(values.get("voice_profile", tts_voice_profile)).strip_edges()
 			tts_speaker_id = int(values.get("speaker_id", tts_speaker_id))
 			tts_generate_japanese = bool(values.get("generate_japanese", tts_generate_japanese))
+			tts_audio_delivery = String(values.get("audio_delivery", tts_audio_delivery)).strip_edges()
 	if settings.has_signal("settings_changed") and not settings.settings_changed.is_connected(_on_global_tts_settings_changed):
 		settings.settings_changed.connect(_on_global_tts_settings_changed)
 
@@ -1300,14 +1311,19 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 	}
 	# 先建立等待状态，再启动下载，避免缓存命中时同步播放造成竞态。
 	if _has_playable_tts(final_data):
+		var tts_debug: Dictionary = final_data.get("tts", {}) as Dictionary
+		_log("tts_gate_enter cache=%s hit=%s audio=%s dialogue=%s" % [
+			String(tts_debug.get("cache_key", "")),
+			str(bool(tts_debug.get("cache_hit", false))),
+			String(tts_debug.get("audio_url", "")),
+			_preview_text(dialogue_text),
+		])
 		_speech_gate_active = true
+		_pending_voice_presented = false
 		_pending_voice_report = report
 		_pending_voice_dialogue = dialogue_text
 		_pending_voice_ai_data = final_data.duplicate(true)
 		_pending_voice_route_summary = route_summary.duplicate(true)
-		# 先通知字幕层，再启动音频请求。这样即使命中 Godot 的内存缓存，
-		# 也不会出现“声音先响、字幕后出现”；下一句仍等 playback_finished。
-		dialogue_presenting.emit(report.duplicate(true))
 		if _play_tts_response(final_data):
 			return
 		_clear_pending_voice_state()
@@ -1680,30 +1696,23 @@ func _show_subtitle(text: String) -> void:
 	var subtitle := _resolve_subtitle_target()
 	if subtitle == null:
 		return
-	# Agent 的完整响应已经收齐；不要把网络 chunk 再模拟成逐字打字机。
-	# TTS 回合由 dialogue_presenting 提前显示，这个方法只作为无 TTS/回退路径。
-	if subtitle.has_method("show_once_immediate"):
-		subtitle.call("show_once_immediate", text, npc_display_name.strip_edges())
-	elif subtitle.has_method("show_once"):
+	# 使用项目原有字幕组件的逐字动画；网络 chunk 只更新面板，不直接绘制。
+	if subtitle.has_method("show_once"):
 		subtitle.call("show_once", text, npc_display_name.strip_edges())
+	elif subtitle.has_method("show_once_immediate"):
+		subtitle.call("show_once_immediate", text, npc_display_name.strip_edges())
 
 func _finish_dialogue_presentation(
 	report: Dictionary,
 	dialogue_text: String,
 	ai_data: Dictionary,
 	route_summary: Dictionary,
+	tts_presented: bool = false,
 ) -> void:
 	_speech_gate_active = false
 	_tts_expected_for_request = false
-	# TTS 回合在 dialogue_presenting 时已经把整句字幕立即渲染并锁住；
-	# 播放完成这里只释放队列，不能再次 show_once，否则会把同一句重新变成
-	# 打字机动画，表现为“最后一句重复/音频结束后又慢慢显示一次”。
-	var tts_value: Variant = ai_data.get("tts", {})
-	var subtitle_already_presented := false
-	if tts_value is Dictionary:
-		var tts := tts_value as Dictionary
-		subtitle_already_presented = bool(tts.get("generated", false)) and not String(tts.get("audio_url", "")).strip_edges().is_empty()
-	if direct_subtitle_enabled and not subtitle_already_presented:
+	# 只有播放器已起播才算字幕已经显示；下载/解码失败时仍要显示无声字幕。
+	if direct_subtitle_enabled and not tts_presented:
 		_show_subtitle(dialogue_text)
 	dialogue_completed.emit(report)
 	_schedule_dialogue_continuation_if_needed(ai_data, dialogue_text, route_summary)
@@ -1728,6 +1737,7 @@ func _clear_pending_voice_state() -> void:
 	_pending_voice_dialogue = ""
 	_pending_voice_ai_data = {}
 	_pending_voice_route_summary = {}
+	_pending_voice_presented = false
 
 func _ensure_voice_player() -> void:
 	if _voice_player != null and is_instance_valid(_voice_player):
@@ -1735,8 +1745,27 @@ func _ensure_voice_player() -> void:
 	_voice_player = AIVoicePlayer.new()
 	_voice_player.name = "AIVoicePlayer"
 	add_child(_voice_player)
+	_voice_player.playback_started.connect(_on_tts_playback_started)
 	_voice_player.playback_finished.connect(_on_tts_playback_finished)
 	_voice_player.playback_failed.connect(_on_tts_playback_failed)
+
+func _on_tts_playback_started(_metadata: Dictionary) -> void:
+	"""播放器真正开始发声时才通知字幕层，保证两者起点一致。"""
+	if not _speech_gate_active or _pending_voice_report.is_empty() or _pending_voice_presented:
+		return
+	_pending_voice_presented = true
+	_present_subtitle_at_playback(_pending_voice_report)
+
+
+func _present_subtitle_at_playback(report: Dictionary) -> void:
+	"""在音频真正起播的瞬间通知字幕组件；控制器负责调用既有字幕组件。"""
+	var payload := report.duplicate(true)
+	if dialogue_presenting.get_connections().size() > 0:
+		# 不在对话组件里重复绘制，避免绕过角色已有的 WorldSubtitleComponent。
+		dialogue_presenting.emit(payload)
+	elif direct_subtitle_enabled:
+		# 没有外部编排器时才使用组件自身配置的字幕目标作为最后回退。
+		_show_subtitle(String(payload.get("dialogue", "")).strip_edges())
 
 
 func _has_playable_tts(ai_data: Dictionary) -> bool:
@@ -1746,7 +1775,17 @@ func _has_playable_tts(ai_data: Dictionary) -> bool:
 	if not value is Dictionary:
 		return false
 	var tts := value as Dictionary
-	return bool(tts.get("generated", false)) and not String(tts.get("audio_url", "")).strip_edges().is_empty()
+	if not bool(tts.get("generated", false)):
+		return false
+	var delivery := String(tts.get("audio_delivery", "")).strip_edges().to_lower()
+	var has_inline := not String(tts.get("audio_base64", "")).strip_edges().is_empty()
+	var has_url := not String(tts.get("audio_url", "")).strip_edges().is_empty()
+	if delivery == "inline":
+		return has_inline
+	if delivery == "url":
+		return has_url
+	# 兼容旧后端：没有明确协议时只看是否存在任一可播放载荷。
+	return has_inline or has_url
 
 func _play_tts_response(ai_data: Dictionary) -> bool:
 	if not tts_enabled:
@@ -1762,12 +1801,29 @@ func _play_tts_response(ai_data: Dictionary) -> bool:
 	if not bool(tts.get("generated", false)):
 		return false
 	var audio_path := String(tts.get("audio_url", "")).strip_edges()
-	if audio_path.is_empty():
+	var inline_audio := String(tts.get("audio_base64", "")).strip_edges()
+	var delivery := String(tts.get("audio_delivery", "")).strip_edges().to_lower()
+	if delivery.is_empty() or not (delivery in ["inline", "url", "auto"]):
+		delivery = "inline" if not inline_audio.is_empty() else "url"
+	elif delivery == "auto":
+		delivery = "inline" if not inline_audio.is_empty() else "url"
+	if delivery == "inline" and inline_audio.is_empty():
 		return false
-	if _ai_manager.has_method("resolve_asset_url"):
+	if delivery == "url" and audio_path.is_empty():
+		return false
+	tts["audio_delivery"] = delivery
+	if delivery == "url" and _ai_manager.has_method("resolve_asset_url"):
 		tts["audio_url"] = _ai_manager.call("resolve_asset_url", audio_path)
-		response["tts"] = tts
-	return _voice_player.play_response(response)
+	response["tts"] = tts
+	var started := _voice_player.play_response(response)
+	_log("tts_play_request started=%s delivery=%s cache=%s inline_bytes=%d url=%s" % [
+		str(started),
+		delivery,
+		String(tts.get("cache_key", "")),
+		int(tts.get("audio_bytes", 0)),
+		String(tts.get("audio_url", "")),
+	])
+	return started
 
 func _on_tts_playback_finished(_cache_key: String) -> void:
 	if not _speech_gate_active or _pending_voice_report.is_empty():
@@ -1776,8 +1832,9 @@ func _on_tts_playback_finished(_cache_key: String) -> void:
 	var dialogue_text := _pending_voice_dialogue
 	var ai_data := _pending_voice_ai_data.duplicate(true)
 	var route_summary := _pending_voice_route_summary.duplicate(true)
+	var tts_presented := _pending_voice_presented
 	_clear_pending_voice_state()
-	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary)
+	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary, tts_presented)
 
 func _on_tts_playback_failed(reason: String, _metadata: Dictionary) -> void:
 	_log("tts_playback_failed reason=%s" % reason)
@@ -1787,8 +1844,9 @@ func _on_tts_playback_failed(reason: String, _metadata: Dictionary) -> void:
 	var dialogue_text := _pending_voice_dialogue
 	var ai_data := _pending_voice_ai_data.duplicate(true)
 	var route_summary := _pending_voice_route_summary.duplicate(true)
+	var tts_presented := _pending_voice_presented
 	_clear_pending_voice_state()
-	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary)
+	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary, tts_presented)
 
 func _extract_dialogue(data: Dictionary) -> String:
 	for key in ["dialogue", "reply", "text", "message", "summary"]:

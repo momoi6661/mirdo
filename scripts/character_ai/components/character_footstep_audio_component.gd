@@ -3,7 +3,9 @@ class_name CharacterFootstepAudioComponent
 
 @export var actor_path: NodePath = NodePath("../..")
 @export var audio_player_path: NodePath = NodePath("../../FootstepAudio3D")
-@export var use_2d_audible_fallback: bool = true
+## 默认只使用角色身上的 AudioStreamPlayer3D。
+## 旧的 2D fallback 会像 UI 音频一样从耳机里直接响，而且会和 3D 播放器叠声。
+@export var use_2d_audible_fallback: bool = false
 @export var animation_behavior_path: NodePath = NodePath("../AnimationBehaviorTreeComponent")
 @export_dir var footstep_folder_path: String = "res://Audio/footsteps/sneakers_soft"
 @export_file("*.mp3", "*.ogg", "*.wav") var footstep_loop_stream_path: String = "res://Audio/footsteps/sneakers_soft/tennis_tile_medium_pace_170500.mp3"
@@ -18,6 +20,8 @@ class_name CharacterFootstepAudioComponent
 @export_range(0.0, 6.0, 0.1) var volume_jitter_db: float = 0.8
 @export_range(0.5, 20.0, 0.1) var max_distance: float = 14.0
 @export_range(0.1, 10.0, 0.1) var unit_size: float = 2.0
+@export_range(0.0, 1.0, 0.05) var panning_strength: float = 0.85
+@export_range(-24.0, 6.0, 0.5) var max_db: float = -4.0
 @export var use_continuous_loop: bool = true
 @export_range(0.0, 12.0, 0.1) var stop_fade_db_per_sec: float = 7.5
 
@@ -136,7 +140,7 @@ func _on_navigation_stopped(_arg: Variant = null) -> void:
 func _start_navigation_footstep_loop() -> void:
 	_ensure_audible_player()
 	_configure_audio_player()
-	var target := _get_primary_player()
+	var target = _get_primary_player()
 	if target == null:
 		return
 	if target.stream == null and not footstep_clips.is_empty():
@@ -148,7 +152,7 @@ func _start_navigation_footstep_loop() -> void:
 	target.pitch_scale = 1.0
 	if not target.playing:
 		target.play()
-	print("[MirdoFootstep] NAV START audible=%s stream=%s vol=%.1f bus=%s loop=%s pos=%.3f" % [str(target == _audible_player), target.stream.resource_path if target.stream != null else "", target.volume_db, target.bus, _stream_loop_debug(target.stream), target.get_playback_position()])
+	print("[MirdoFootstep] NAV START spatial=%s stream=%s vol=%.1f bus=%s loop=%s pos=%.3f" % [str(target is AudioStreamPlayer3D), target.stream.resource_path if target.stream != null else "", target.volume_db, target.bus, _stream_loop_debug(target.stream), target.get_playback_position()])
 	_sync_secondary_player(target, true)
 
 func _is_navigation_motion_active() -> bool:
@@ -193,6 +197,9 @@ func _is_running() -> bool:
 	return false
 
 func _play_step(horizontal_speed: float) -> void:
+	var target = _get_primary_player()
+	if target == null:
+		return
 	if not footstep_clips.is_empty():
 		var clip_index := randi() % footstep_clips.size()
 		if footstep_clips.size() > 1:
@@ -203,21 +210,23 @@ func _play_step(horizontal_speed: float) -> void:
 		_last_clip_index = clip_index
 		var clip := footstep_clips[clip_index]
 		if clip != null:
-			_audio_player.stream = clip
-			_configure_footstep_stream(_audio_player.stream)
-	if _audio_player.stream == null:
+			target.stream = clip
+			if _audio_player != null:
+				_audio_player.stream = clip
+			_configure_footstep_stream(target.stream)
+	if target.stream == null:
 		return
 	var speed_gain := lerpf(-1.8, 1.0, clampf(horizontal_speed / 3.6, 0.0, 1.0))
-	_audio_player.stop()
-	_audio_player.volume_db = base_volume_db + speed_gain + randf_range(-volume_jitter_db, volume_jitter_db)
-	_audio_player.pitch_scale = randf_range(pitch_min, pitch_max)
-	_audio_player.max_distance = max_distance
-	_audio_player.unit_size = unit_size
-	_audio_player.play()
-	print("[MirdoFootstep] play stream=%s vol=%.1f pitch=%.2f bus=%s" % [_audio_player.stream.resource_path if _audio_player.stream != null else "", _audio_player.volume_db, _audio_player.pitch_scale, _audio_player.bus])
+	target.stop()
+	target.volume_db = base_volume_db + speed_gain + randf_range(-volume_jitter_db, volume_jitter_db)
+	target.pitch_scale = randf_range(pitch_min, pitch_max)
+	if target is AudioStreamPlayer3D:
+		_configure_3d_footstep_player(target as AudioStreamPlayer3D, _resolve_footstep_bus_name(), target.volume_db)
+	target.play()
+	print("[MirdoFootstep] play spatial=%s stream=%s vol=%.1f pitch=%.2f bus=%s" % [str(target is AudioStreamPlayer3D), target.stream.resource_path if target.stream != null else "", target.volume_db, target.pitch_scale, target.bus])
 
 func _update_continuous_loop(delta: float, should_play_step: bool, horizontal_speed: float) -> void:
-	var target := _get_primary_player()
+	var target = _get_primary_player()
 	if target == null:
 		return
 	if should_play_step:
@@ -229,10 +238,12 @@ func _update_continuous_loop(delta: float, should_play_step: bool, horizontal_sp
 		var speed_gain := lerpf(-0.6, 1.0, clampf(horizontal_speed / 3.6, 0.0, 1.0))
 		var target_volume := base_volume_db + speed_gain
 		target.pitch_scale = clampf(remap(maxf(horizontal_speed, min_speed), min_speed, 3.6, pitch_min, pitch_max), pitch_min, pitch_max)
+		if target is AudioStreamPlayer3D:
+			_configure_3d_footstep_player(target as AudioStreamPlayer3D, _resolve_footstep_bus_name(), target.volume_db)
 		if not target.playing:
 			target.volume_db = target_volume
 			target.play()
-			print("[MirdoFootstep] START audible=%s stream=%s vol=%.1f bus=%s" % [str(target == _audible_player), target.stream.resource_path if target.stream != null else "", target.volume_db, target.bus])
+			print("[MirdoFootstep] START spatial=%s stream=%s vol=%.1f bus=%s" % [str(target is AudioStreamPlayer3D), target.stream.resource_path if target.stream != null else "", target.volume_db, target.bus])
 		else:
 			target.volume_db = lerpf(target.volume_db, target_volume, clampf(delta * 10.0, 0.0, 1.0))
 		_sync_secondary_player(target, true)
@@ -269,7 +280,7 @@ func _autoload_footstep_clips() -> void:
 
 func _ensure_audible_player() -> void:
 	if not use_2d_audible_fallback:
-		use_2d_audible_fallback = true
+		return
 	if _audible_player != null and is_instance_valid(_audible_player):
 		return
 	_audible_player = get_node_or_null("MirdoFootstepAudiblePlayer") as AudioStreamPlayer
@@ -280,11 +291,14 @@ func _ensure_audible_player() -> void:
 	if _audible_player.stream == null and not footstep_clips.is_empty():
 		_audible_player.stream = footstep_clips[0]
 
-func _get_primary_player() -> AudioStreamPlayer:
-	_ensure_audible_player()
-	return _audible_player
+func _get_primary_player():
+	if use_2d_audible_fallback:
+		_ensure_audible_player()
+		if _audible_player != null:
+			return _audible_player
+	return _audio_player
 
-func _sync_secondary_player(primary: AudioStreamPlayer, should_play: bool) -> void:
+func _sync_secondary_player(primary, should_play: bool) -> void:
 	if _audio_player == null or primary == _audio_player:
 		return
 	if not should_play:
@@ -306,7 +320,7 @@ func _stop_all_players() -> void:
 		_audio_player.stop()
 
 func _get_current_stream_path() -> String:
-	var target := _get_primary_player()
+	var target = _get_primary_player()
 	if target != null and target.stream != null:
 		return target.stream.resource_path
 	if _audio_player != null and _audio_player.stream != null:
@@ -314,27 +328,42 @@ func _get_current_stream_path() -> String:
 	return ""
 
 func _get_current_volume_db() -> float:
-	var target := _get_primary_player()
+	var target = _get_primary_player()
 	if target != null:
 		return target.volume_db
 	if _audio_player != null:
 		return _audio_player.volume_db
 	return -80.0
 
-func _configure_audio_player() -> void:
+func _resolve_footstep_bus_name() -> String:
 	var bus_name := String(footstep_bus_name)
 	if bus_name.is_empty() or AudioServer.get_bus_index(bus_name) == -1:
-		bus_name = "Master"
+		return "Master"
+	return bus_name
+
+func _configure_audio_player() -> void:
+	var bus_name := _resolve_footstep_bus_name()
 	if _audio_player != null:
-		_audio_player.bus = bus_name
-		_audio_player.max_distance = max_distance
-		_audio_player.unit_size = unit_size
-		_audio_player.volume_db = base_volume_db
+		_configure_3d_footstep_player(_audio_player, bus_name, base_volume_db)
 		_configure_footstep_stream(_audio_player.stream)
 	if _audible_player != null:
 		_audible_player.bus = bus_name
 		_audible_player.volume_db = base_volume_db
 		_configure_footstep_stream(_audible_player.stream)
+
+func _configure_3d_footstep_player(player: AudioStreamPlayer3D, bus_name: String, volume_db: float) -> void:
+	"""统一配置 3D 脚步声，避免 Mirdo 脚步声退化成全局音频。"""
+	if player == null:
+		return
+	player.bus = bus_name
+	player.volume_db = volume_db
+	player.max_distance = max_distance
+	player.unit_size = unit_size
+	player.max_db = max_db
+	player.panning_strength = panning_strength
+	player.max_polyphony = 1
+	player.area_mask = 1
+	player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
 
 func _configure_footstep_clips() -> void:
 	for clip in footstep_clips:

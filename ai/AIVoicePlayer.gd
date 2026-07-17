@@ -10,16 +10,38 @@ signal playback_started(metadata: Dictionary)
 signal playback_finished(cache_key: String)
 signal playback_failed(reason: String, metadata: Dictionary)
 
-@export var audio_bus: StringName = &"Master"
+## Mirdo 的语音按角色声源处理，默认走单独 Voice 总线，再发送到 SFX。
+## 这样可以给人声加一点房间感，不会像 UI 音效一样直接贴在耳机里。
+@export var audio_bus: StringName = &"Voice"
 @export var debug_log: bool = true
-@export_range(0.0, 1.0, 0.01) var volume_linear: float = 1.0
+@export_range(0.0, 1.0, 0.01) var volume_linear: float = 0.78
 @export_range(0.1, 30.0, 0.1) var request_timeout_sec: float = 15.0
 ## 默认把语音挂到 Mirdo 的 Node3D 身上，声音会随距离和方向衰减。
 @export var spatial_audio_enabled: bool = true
-@export_range(0.1, 10.0, 0.1) var spatial_unit_size: float = 2.0
-@export_range(1.0, 50.0, 0.5) var spatial_max_distance: float = 18.0
+## 找不到 3D 角色父节点时是否退回 2D/全局播放。默认关闭，避免“耳机里旁白”的错觉。
+@export var allow_global_audio_fallback: bool = false
+## 确保当前玩家相机有 AudioListener3D，否则 3D 声音不会产生左右声像。
+@export var ensure_spatial_listener: bool = true
+## 耳机里过强的左右声像会显得“贴耳”，所以默认稍微收窄一点。
+@export_range(0.0, 1.0, 0.05) var spatial_panning_strength: float = 0.65
+## 1 米左右保持自然音量；距离拉开后更快衰减，更像角色在房间里说话。
+@export_range(0.1, 10.0, 0.1) var spatial_unit_size: float = 1.15
+@export_range(1.0, 50.0, 0.5) var spatial_max_distance: float = 12.0
+@export_range(-24.0, 6.0, 0.5) var spatial_max_db: float = -3.0
 ## 相对角色根节点的发声位置，默认接近胸口/头部高度。
 @export var spatial_offset: Vector3 = Vector3(0.0, 1.35, 0.0)
+## 角色背对玩家说话时略微变暗，增强“从 Mirdo 身上发声”的方向感。
+@export var directional_voice_enabled: bool = true
+@export_range(30.0, 90.0, 1.0) var voice_emission_angle_degrees: float = 80.0
+@export_range(-24.0, 0.0, 0.5) var voice_emission_filter_attenuation_db: float = -5.0
+@export_range(1000.0, 20000.0, 100.0) var attenuation_filter_cutoff_hz: float = 7200.0
+@export_range(-24.0, 0.0, 0.5) var attenuation_filter_db: float = -6.0
+## 运行时确保 Voice bus 存在，并给它一点很轻的房间混响。
+@export var ensure_voice_bus_enabled: bool = true
+@export var voice_room_reverb_enabled: bool = true
+@export_range(0.0, 1.0, 0.01) var voice_room_wet: float = 0.075
+@export_range(0.0, 1.0, 0.01) var voice_room_size: float = 0.22
+@export_range(0.0, 1.0, 0.01) var voice_room_damping: float = 0.72
 ## 在同一局游戏里重复播放同一句时，直接复用已经解码的 WAV。
 @export var memory_cache_enabled: bool = true
 @export_range(0, 16, 1) var max_memory_cache_entries: int = 8
@@ -28,6 +50,8 @@ var _request: HTTPRequest
 var _player: Node
 var _spatial_player: AudioStreamPlayer3D
 var _global_player: AudioStreamPlayer
+var _listener: AudioListener3D
+var _listener_created_by_us: bool = false
 var _request_serial: int = 0
 var _active_serial: int = 0
 var _active_cache_key: String = ""
@@ -39,6 +63,7 @@ var _player_attach_deferred: bool = false
 ## 用于区分“后端生成慢、下载慢、还是 Godot 解码/挂载慢”。
 var _request_started_msec: int = 0
 var _download_finished_msec: int = 0
+var _voice_bus_prepared: bool = false
 
 func _ready() -> void:
 	_ensure_nodes()
@@ -50,8 +75,10 @@ func _exit_tree() -> void:
 		_spatial_player.queue_free()
 	if _global_player != null and is_instance_valid(_global_player):
 		_global_player.queue_free()
+	if _listener_created_by_us and _listener != null and is_instance_valid(_listener):
+		_listener.queue_free()
 
-# 播放一次后端响应中的 tts.audio_url；返回 false 表示没有可播放内容或已去重。
+# 播放一次后端响应中的 TTS 音频；由 tts.audio_delivery 决定使用 inline 还是 url。
 func play_response(response: Dictionary, server_url: String = "") -> bool:
 	_ensure_nodes()
 	var tts_value: Variant = response.get("tts", {})
@@ -61,8 +88,15 @@ func play_response(response: Dictionary, server_url: String = "") -> bool:
 	if not bool(tts.get("generated", false)):
 		return false
 	var audio_path := String(tts.get("audio_url", "")).strip_edges()
-	if audio_path.is_empty():
-		return false
+	var inline_audio := String(tts.get("audio_base64", "")).strip_edges()
+	var delivery := String(tts.get("audio_delivery", "")).strip_edges().to_lower()
+	if delivery.is_empty() or not (delivery in ["inline", "url", "auto"]):
+		delivery = "inline" if not inline_audio.is_empty() else "url"
+	elif delivery == "auto":
+		# auto 是请求侧的策略；真正到播放层时要落成一个确定通道。
+		# 旧响应若没有落成 inline/url，就按实际字段选择，仍然不做失败后切换。
+		delivery = "inline" if not inline_audio.is_empty() else "url"
+	tts["audio_delivery"] = delivery
 
 	var cache_key := String(tts.get("cache_key", "")).strip_edges()
 	# 只阻止“同一段音频正在播放/下载时”的重复请求。
@@ -80,22 +114,35 @@ func play_response(response: Dictionary, server_url: String = "") -> bool:
 		_request.cancel_request()
 	_stop_player()
 
-	var url := _resolve_url(audio_path, server_url)
-	if url.is_empty():
-		_emit_failure("tts_url_empty")
-		return false
 	# 后端已经按 cache_key 做了生成缓存；这里再保留少量已解码资源，
 	# 让同一局内的重复对白不必重新发 HTTP 请求或解码 WAV。
 	if memory_cache_enabled and not cache_key.is_empty() and _stream_cache.has(cache_key):
 		var cached_stream := _stream_cache[cache_key] as AudioStreamWAV
 		if cached_stream != null:
 			_request_started_msec = Time.get_ticks_msec()
-			_log("tts_memory_cache_hit cache=%s" % cache_key)
+			_log("tts_memory_cache_hit cache=%s delivery=%s" % [cache_key, delivery])
 			_play_stream(cached_stream)
 			return true
+	if delivery == "inline":
+		if inline_audio.is_empty():
+			_emit_failure("tts_inline_missing")
+			return false
+		_request_started_msec = Time.get_ticks_msec()
+		_download_finished_msec = _request_started_msec
+		if _try_play_inline_audio(inline_audio, cache_key, int(tts.get("audio_bytes", 0))):
+			return true
+		_emit_failure("tts_inline_invalid")
+		return false
+	if audio_path.is_empty():
+		_emit_failure("tts_url_empty")
+		return false
+	var url := _resolve_url(audio_path, server_url)
+	if url.is_empty():
+		_emit_failure("tts_url_empty")
+		return false
 	_request_started_msec = Time.get_ticks_msec()
 	_download_finished_msec = 0
-	_log("tts_request cache=%s url=%s" % [cache_key, url])
+	_log("tts_request cache=%s delivery=%s url=%s" % [cache_key, delivery, url])
 	_request.timeout = request_timeout_sec
 	var err := _request.request(url, PackedStringArray(["Accept: audio/wav"]), HTTPClient.METHOD_GET, "")
 	if err != OK:
@@ -125,6 +172,8 @@ func is_playing() -> bool:
 	return _is_player_playing()
 
 func _ensure_nodes() -> void:
+	_ensure_voice_audio_bus()
+	_ensure_audio_listener()
 	if _request == null or not is_instance_valid(_request):
 		_request = HTTPRequest.new()
 		_request.name = "TTSRequest"
@@ -142,10 +191,7 @@ func _ensure_nodes() -> void:
 	if spatial_audio_enabled and spatial_parent != null:
 		_spatial_player = AudioStreamPlayer3D.new()
 		_spatial_player.name = "MirdoVoicePlayer3D"
-		_spatial_player.bus = audio_bus
-		_spatial_player.unit_size = spatial_unit_size
-		_spatial_player.max_distance = spatial_max_distance
-		_spatial_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+		_apply_spatial_player_settings()
 		_spatial_player.finished.connect(_on_player_finished)
 		_spatial_player.position = spatial_offset
 		_player = _spatial_player
@@ -156,12 +202,109 @@ func _ensure_nodes() -> void:
 		_player_attach_deferred = true
 		call_deferred("_attach_spatial_player_deferred", spatial_parent)
 		return
+	if spatial_audio_enabled and not allow_global_audio_fallback:
+		_log("tts_spatial_parent_missing no_global_fallback")
+		return
 	_global_player = AudioStreamPlayer.new()
 	_global_player.name = "VoicePlayer"
 	_global_player.bus = audio_bus
 	_global_player.finished.connect(_on_player_finished)
 	add_child(_global_player)
 	_player = _global_player
+
+
+func _ensure_voice_audio_bus() -> void:
+	"""为角色语音准备单独 bus。
+
+	项目原本只有 Master/Music/UI/SFX。TTS 人声如果直接走 Master/SFX，会非常
+	干、非常贴耳；这里运行时创建 Voice bus，并加很轻的 Reverb，让声音像从
+	房间里的 Mirdo 身上发出。若工程以后在 Audio 面板里手动添加 Voice，本函数
+	会复用已有配置，不重复创建。
+	"""
+	if not ensure_voice_bus_enabled or _voice_bus_prepared:
+		return
+	var voice_bus := String(audio_bus).strip_edges()
+	if voice_bus.is_empty() or voice_bus == "Master":
+		_voice_bus_prepared = true
+		return
+	var index := AudioServer.get_bus_index(voice_bus)
+	if index < 0:
+		index = AudioServer.get_bus_count()
+		AudioServer.add_bus(index)
+		AudioServer.set_bus_name(index, voice_bus)
+		var send_bus := "SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master"
+		AudioServer.set_bus_send(index, send_bus)
+		AudioServer.set_bus_volume_db(index, 0.0)
+		_log("voice_bus_created name=%s send=%s" % [voice_bus, send_bus])
+	if voice_room_reverb_enabled and not _bus_has_effect(index, "MirdoVoiceRoom"):
+		var reverb := AudioEffectReverb.new()
+		reverb.resource_name = "MirdoVoiceRoom"
+		reverb.room_size = voice_room_size
+		reverb.damping = voice_room_damping
+		reverb.spread = 0.35
+		reverb.hipass = 0.42
+		reverb.dry = 1.0
+		reverb.wet = voice_room_wet
+		AudioServer.add_bus_effect(index, reverb)
+		_log("voice_reverb_added bus=%s wet=%.3f room=%.2f" % [voice_bus, voice_room_wet, voice_room_size])
+	_voice_bus_prepared = true
+
+
+func _bus_has_effect(bus_index: int, effect_name: String) -> bool:
+	if bus_index < 0:
+		return false
+	for i in range(AudioServer.get_bus_effect_count(bus_index)):
+		var effect := AudioServer.get_bus_effect(bus_index, i)
+		if effect != null and effect.resource_name == effect_name:
+			return true
+	return false
+
+
+func _apply_spatial_player_settings() -> void:
+	"""把空间音频参数集中在这里，创建和播放前都可以刷新。"""
+	if _spatial_player == null or not is_instance_valid(_spatial_player):
+		return
+	_spatial_player.bus = audio_bus
+	_spatial_player.unit_size = spatial_unit_size
+	_spatial_player.max_db = spatial_max_db
+	_spatial_player.max_distance = spatial_max_distance
+	_spatial_player.max_polyphony = 1
+	_spatial_player.panning_strength = spatial_panning_strength
+	_spatial_player.area_mask = 1
+	_spatial_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	_spatial_player.emission_angle_enabled = directional_voice_enabled
+	_spatial_player.emission_angle_degrees = voice_emission_angle_degrees
+	_spatial_player.emission_angle_filter_attenuation_db = voice_emission_filter_attenuation_db
+	_spatial_player.attenuation_filter_cutoff_hz = attenuation_filter_cutoff_hz
+	_spatial_player.attenuation_filter_db = attenuation_filter_db
+
+
+func _ensure_audio_listener() -> void:
+	"""将空间音频监听器挂到当前相机，让左右声像跟随玩家视角。"""
+	if not ensure_spatial_listener or not is_inside_tree():
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	if _listener != null and is_instance_valid(_listener):
+		if _listener.get_parent() == camera:
+			if not _listener.is_current():
+				_listener.make_current()
+			return
+		if _listener_created_by_us:
+			_listener.queue_free()
+		_listener = null
+		_listener_created_by_us = false
+	var existing := camera.get_node_or_null("MirdoAudioListener") as AudioListener3D
+	if existing != null:
+		_listener = existing
+		_listener_created_by_us = false
+	else:
+		_listener = AudioListener3D.new()
+		_listener.name = "MirdoAudioListener"
+		camera.add_child(_listener)
+		_listener_created_by_us = true
+	_listener.make_current()
 
 
 func _is_player_ready() -> bool:
@@ -223,14 +366,43 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 	var download_elapsed := _download_finished_msec - _request_started_msec if _request_started_msec > 0 else 0
 	_log("tts_response result=%d code=%d bytes=%d download_ms=%d" % [result, response_code, body.size(), download_elapsed])
 
+	var decode_started_msec := Time.get_ticks_msec()
 	var stream := AudioStreamWAV.load_from_buffer(body)
 	if stream == null:
 		_emit_failure("tts_wav_decode_failed")
 		return
+	var decode_elapsed := Time.get_ticks_msec() - decode_started_msec
+	_log("tts_decode bytes=%d decode_ms=%d audio_sec=%.2f" % [body.size(), decode_elapsed, stream.get_length()])
 	_set_player_stream(stream)
 	if memory_cache_enabled and not _active_cache_key.is_empty():
 		_store_stream(_active_cache_key, stream)
 	_play_stream(stream)
+
+
+func _try_play_inline_audio(audio_base64: String, cache_key: String, declared_bytes: int = 0) -> bool:
+	"""直接播放 /chat JSON 中携带的短 WAV，跳过第二次 HTTP GET。"""
+	var raw := Marshalls.base64_to_raw(audio_base64)
+	if raw.is_empty():
+		_log("tts_inline_empty cache=%s declared_bytes=%d" % [cache_key, declared_bytes])
+		return false
+	var decode_started_msec := Time.get_ticks_msec()
+	var stream := AudioStreamWAV.load_from_buffer(raw)
+	if stream == null:
+		_log("tts_inline_decode_failed cache=%s bytes=%d" % [cache_key, raw.size()])
+		return false
+	var decode_elapsed := Time.get_ticks_msec() - decode_started_msec
+	_log("tts_inline_ready cache=%s bytes=%d declared_bytes=%d decode_ms=%d audio_sec=%.2f" % [
+		cache_key,
+		raw.size(),
+		declared_bytes,
+		decode_elapsed,
+		stream.get_length(),
+	])
+	_set_player_stream(stream)
+	if memory_cache_enabled and not cache_key.is_empty():
+		_store_stream(cache_key, stream)
+	_play_stream(stream)
+	return true
 
 func _play_stream(stream: AudioStreamWAV) -> void:
 	if _player_attach_deferred:
@@ -242,13 +414,21 @@ func _play_stream(stream: AudioStreamWAV) -> void:
 	if _player == null or not is_instance_valid(_player) or not _is_player_ready() or stream == null:
 		_emit_failure("tts_stream_missing")
 		return
+	_apply_spatial_player_settings()
 	_set_player_stream(stream)
 	# AudioStreamPlayer3D 同样使用分贝；把设置里的线性音量转换后再赋值。
 	_set_player_volume(linear_to_db(maxf(volume_linear, 0.0001)))
 	_play_player()
 	_last_played_cache_key = _active_cache_key
 	var total_elapsed := Time.get_ticks_msec() - _request_started_msec if _request_started_msec > 0 else 0
-	_log("tts_play_started cache=%s spatial=%s total_ms=%d audio_sec=%.2f" % [_active_cache_key, str(_spatial_player != null and is_instance_valid(_spatial_player)), total_elapsed, stream.get_length()])
+	_log("tts_play_started cache=%s spatial=%s bus=%s dist=%.2f total_ms=%d audio_sec=%.2f" % [
+		_active_cache_key,
+		str(_spatial_player != null and is_instance_valid(_spatial_player)),
+		String(audio_bus),
+		_listener_distance(),
+		total_elapsed,
+		stream.get_length(),
+	])
 	playback_started.emit(_active_metadata.duplicate(true))
 
 func _on_player_finished() -> void:
@@ -312,6 +492,15 @@ func _play_player() -> void:
 		_spatial_player.play()
 	elif _global_player != null and is_instance_valid(_global_player):
 		_global_player.play()
+
+
+func _listener_distance() -> float:
+	if _spatial_player == null or not is_instance_valid(_spatial_player) or not _spatial_player.is_inside_tree():
+		return -1.0
+	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if camera == null:
+		return -1.0
+	return _spatial_player.global_position.distance_to(camera.global_position)
 
 func _log(message: String) -> void:
 	if debug_log:

@@ -320,6 +320,9 @@ func _spawn_character(char_text: String, animate: bool = true) -> void:
 		letter_node.call("set_character", char_text)
 	if animate and letter_node.has_method("start_animation"):
 		letter_node.call("start_animation")
+	elif not animate and letter_node.has_method("reveal_immediate"):
+		# TTS 字幕要求和音频同一帧可见；不能只创建节点，否则 Label3D 仍是透明的。
+		letter_node.call("reveal_immediate")
 	elif animate and letter_node.has_method("play_start"):
 		letter_node.call("play_start")
 	_active_letters.append({

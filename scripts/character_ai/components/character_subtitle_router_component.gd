@@ -61,6 +61,21 @@ func show_once(text: String, speaker: String = "") -> void:
 		_world_subtitle.call("show_once", text, speaker)
 	_update_overlay_visibility(true)
 
+
+func show_once_immediate(text: String, speaker: String = "") -> void:
+	"""立即显示完整句子，供 TTS 起播时使用，避免字幕还在追赶音频。"""
+	var clean_text := text.strip_edges()
+	var clean_speaker := speaker.strip_edges()
+	# show_once 会做去重；这里提前判断，避免去重后仍继续调用底层
+	# WorldSubtitleComponent.show_once_immediate，导致最后一句被重置一次。
+	if _should_suppress_duplicate_line(clean_text, clean_speaker):
+		return
+	show_once(clean_text, clean_speaker)
+	if _world_subtitle != null and _world_subtitle.has_method("show_once_immediate"):
+		_world_subtitle.call("show_once_immediate", clean_text, clean_speaker)
+	if _player_overlay != null and _player_overlay.has_method("show_once_immediate"):
+		_player_overlay.call("show_once_immediate", clean_text, clean_speaker)
+
 func begin_stream(speaker: String = "") -> void:
 	_refresh_refs()
 	_active_text = ""
@@ -109,6 +124,22 @@ func cancel_now() -> void:
 		_world_subtitle.call("cancel_now")
 	if _player_overlay != null and _player_overlay.has_method("cancel_now"):
 		_player_overlay.call("cancel_now")
+
+
+func set_external_hold(held: bool) -> void:
+	"""把 TTS 的生命周期同时传给头顶字幕和屏幕 UI，避免 UI 提前淡出。"""
+	_refresh_refs()
+	if _world_subtitle != null and _world_subtitle.has_method("set_external_hold"):
+		_world_subtitle.call("set_external_hold", held)
+	if _player_overlay != null and _player_overlay.has_method("set_external_hold"):
+		_player_overlay.call("set_external_hold", held)
+
+
+func is_external_hold_active() -> bool:
+	_refresh_refs_light()
+	if _world_subtitle != null and _world_subtitle.has_method("is_external_hold_active"):
+		return bool(_world_subtitle.call("is_external_hold_active"))
+	return false
 
 func play_text(text: String, speaker: String = "") -> void:
 	show_once(text, speaker)

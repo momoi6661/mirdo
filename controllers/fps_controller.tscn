@@ -31,7 +31,6 @@
 [ext_resource type="Script" uid="uid://beiixda73gl0f" path="res://scripts/character_resources/character_resource_time_decay_component.gd" id="30_resource_decay"]
 [ext_resource type="Script" uid="uid://m14ciefq6ug2" path="res://features/anime_toon/mita_warm_particles_3d.gd" id="32_warm_particles"]
 [ext_resource type="Script" uid="uid://cjf10xmapsoo" path="res://controllers/scripts/character_subtitle_overlay.gd" id="33_subtitle_overlay"]
-[ext_resource type="AudioStream" path="res://Audio/footsteps/sneakers_soft/tennis_tile_scuffs_170499.mp3" id="34_landing_sfx"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_5w0k0"]
 radius = 6.5739846
@@ -265,16 +264,6 @@ stream = ExtResource("22_step_sfx")
 volume_db = -15.0
 unit_size = 1.0
 max_distance = 10.0
-bus = &"SFX"
-
-[node name="PlayerFootstepAudiblePlayer" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("22_step_sfx")
-volume_db = -15.0
-bus = &"SFX"
-
-[node name="PlayerFootstepLandingAudiblePlayer" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("34_landing_sfx")
-volume_db = -16.0
 bus = &"SFX"
 
 [node name="Area3D" type="Area3D" parent="." unique_id=210373777]

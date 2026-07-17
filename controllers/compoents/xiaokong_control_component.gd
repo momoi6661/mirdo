@@ -635,6 +635,12 @@ func _clear_subtitle_immediately() -> void:
 		target.call("finish_stream", "")
 
 func _resolve_subtitle_target() -> Node:
+	var router := _find_subtitle_router_component(_target)
+	if router != null:
+		# 统一走角色字幕路由：它会根据视线在头顶字幕和屏幕 UI 之间切换，
+		# 并把 TTS hold 同时转发给两个呈现层。
+		_rebind_subtitle_signal_target(router)
+		return router
 	_bind_world_subtitle_component_from_target()
 	var resolved: Node = null
 	if prefer_world_subtitle and _world_subtitle_component != null and is_instance_valid(_world_subtitle_component):
@@ -760,6 +766,21 @@ func _find_world_subtitle_component_recursive(root_node: Node) -> Node:
 			return nested
 	return null
 
+
+func _find_subtitle_router_component(root_node: Node) -> Node:
+	if root_node == null:
+		return null
+	if root_node.has_method("is_overlay_needed_now") and root_node.has_method("set_external_hold") and root_node.has_method("show_once"):
+		return root_node
+	for child in root_node.get_children():
+		var child_node := child as Node
+		if child_node == null:
+			continue
+		var nested := _find_subtitle_router_component(child_node)
+		if nested != null:
+			return nested
+	return null
+
 func _find_dialogue_component_recursive(root_node: Node) -> Node:
 	if root_node == null:
 		return null
@@ -799,10 +820,8 @@ func _dialogue_waits_for_tts() -> bool:
 	return bool(value) if value is bool else false
 
 func _connect_dialogue_component_signals(component: Node) -> void:
-	# 控制器负责流式字幕的唯一呈现；关闭组件自己的最终句直出，避免同一句在
-	# stream_finished 与 dialogue_completed 两条路径各显示一次。
-	if _has_property(component, &"direct_subtitle_enabled"):
-		component.set("direct_subtitle_enabled", false)
+	# 由对话组件自己在 TTS 起播时渲染完整句；控制器只接收呈现事件并负责
+	# 面板、表情和语音门控。保留属性原值，避免绑定时把 Mirdo 的字幕关闭。
 	_connect_dialogue_signal(component, &"dialogue_chunk_received", Callable(self, "_on_dialogue_chunk"))
 	_connect_dialogue_signal(component, &"dialogue_stream_finished", Callable(self, "_on_dialogue_stream_finished"))
 	_connect_dialogue_signal(component, &"dialogue_presenting", Callable(self, "_on_dialogue_presenting"))
@@ -861,17 +880,19 @@ func _on_dialogue_stream_finished(dialogue_text: String) -> void:
 
 
 func _on_dialogue_presenting(report: Dictionary) -> void:
-	# TTS 音频开始下载/播放前，先把同一条对白交给字幕；完成信号仍由
-	# AIDialogueComponent 在 playback_finished 后发出，因此下一句不会抢播。
+	# AIVoicePlayer 已经真正起播后才发出 presenting；字幕和声音使用同一个
+	# 起播时钟，完成信号仍由 AIDialogueComponent 在 playback_finished 后发出。
 	var reply := String(report.get("dialogue", "")).strip_edges()
 	if reply.is_empty():
 		return
 	_subtitle_started_for_current_dialogue = true
 	_cancel_local_stream()
-	# TTS 回合不再走逐字模拟流：完整字幕在语音下载完成并起播前就准备好，
-	# 避免 Godot 端还在逐字生成时玩家已经听到后半句。
-	_show_subtitle_immediate(reply, subtitle_speaker_name)
-	# show_once_immediate 内部会先清理旧字幕，因此锁定必须放在新句建立之后。
+	# CharacterAIDialogueComponent 会在同一个 playback_started 时钟直接渲染；
+	# 旧版对话组件没有 direct_subtitle_enabled 时，仍由控制器兜底。
+	var component_renders_subtitle := _has_property(_dialogue_component, &"direct_subtitle_enabled") and bool(_dialogue_component.get("direct_subtitle_enabled"))
+	if not component_renders_subtitle:
+		_show_subtitle_immediate(reply, subtitle_speaker_name)
+	# show_once 会先清理旧字幕，因此锁定必须放在新句建立之后。
 	_set_subtitle_external_hold(true)
 	if _panel != null and _panel.has_method("set_dialogue_reply"):
 		_panel.call("set_dialogue_reply", reply)
@@ -1008,10 +1029,12 @@ func _show_subtitle_immediate(text: String, speaker: String) -> void:
 	var target := _resolve_subtitle_target()
 	if target == null:
 		return
-	if target.has_method("show_once_immediate"):
-		target.call("show_once_immediate", text, speaker)
-	elif target.has_method("show_once"):
+	# 角色字幕组件本来就是逐字显示；这里不要调用 immediate，否则会绕过
+	# WorldSubtitleComponent 的字母生成、音效和排版流程。
+	if target.has_method("show_once"):
 		target.call("show_once", text, speaker)
+	elif target.has_method("show_once_immediate"):
+		target.call("show_once_immediate", text, speaker)
 
 func _cancel_local_stream() -> void:
 	_local_stream_token += 1

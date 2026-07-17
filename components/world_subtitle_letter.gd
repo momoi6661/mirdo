@@ -23,6 +23,20 @@ func start_animation() -> void:
 	if animation_player != null:
 		animation_player.play("letter/start")
 
+
+func reveal_immediate() -> void:
+	"""跳过入场动画直接显示，供 TTS 起播时的整句字幕使用。"""
+	for candidate in [label_3d, label_3d_2]:
+		var label := candidate as Label3D
+		if label == null:
+			continue
+		# 场景初始透明度为 0；不补这一层时，直接渲染的字幕会“有节点但看不见”。
+		label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		label.outline_modulate = Color(1.0, 1.0, 1.0, 1.0)
+		label.scale = Vector3.ONE
+		label.position = Vector3(0.0, 0.0, label.position.z)
+		label.rotation = Vector3.ZERO
+
 func queue_animation() -> void:
 	if animation_player != null:
 		animation_player.play("letter/queue")

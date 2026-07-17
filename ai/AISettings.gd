@@ -27,6 +27,8 @@ var tts_enabled: bool = false
 var tts_voice_profile: String = "mirdo_ja"
 var tts_speaker_id: int = -1
 var tts_generate_japanese: bool = false
+## TTS 音频传输方式：inline 默认最快；url 便于调试缓存；auto 留给后端策略。
+var tts_audio_delivery: String = "inline"
 
 var _config_path: String = DEFAULT_CONFIG_PATH
 var _test_request: HTTPRequest
@@ -62,7 +64,7 @@ func load_settings() -> bool:
 	var err := config.load(_config_path)
 	if err != OK:
 		_set_values(DEFAULT_BASE_URL, DEFAULT_API_KEY, DEFAULT_MODEL, DEFAULT_PROXY_URL, false)
-		_set_tts_values(false, "mirdo_ja", -1, false, false)
+		_set_tts_values(false, "mirdo_ja", -1, false, "inline", false)
 		return false
 
 	var loaded_base_url := String(config.get_value(CONFIG_SECTION, "base_url", DEFAULT_BASE_URL))
@@ -75,6 +77,7 @@ func load_settings() -> bool:
 		String(config.get_value(TTS_CONFIG_SECTION, "voice_profile", "mirdo_ja")),
 		int(config.get_value(TTS_CONFIG_SECTION, "speaker_id", -1)),
 		bool(config.get_value(TTS_CONFIG_SECTION, "generate_japanese", false)),
+		String(config.get_value(TTS_CONFIG_SECTION, "audio_delivery", "inline")),
 		false
 	)
 	return true
@@ -90,6 +93,7 @@ func save_settings() -> bool:
 	config.set_value(TTS_CONFIG_SECTION, "voice_profile", tts_voice_profile)
 	config.set_value(TTS_CONFIG_SECTION, "speaker_id", tts_speaker_id)
 	config.set_value(TTS_CONFIG_SECTION, "generate_japanese", tts_generate_japanese)
+	config.set_value(TTS_CONFIG_SECTION, "audio_delivery", tts_audio_delivery)
 	var err := config.save(_config_path)
 	if err != OK:
 		var message := "save_failed_%d" % err
@@ -131,7 +135,15 @@ func update_proxy_url(value: String, auto_save: bool = true) -> bool:
 
 ## 更新 TTS 选择；speaker_id 为 -1 时由声线 profile 决定。
 func set_tts_settings(enabled: bool, voice_profile: String, speaker_id: int = -1, generate_japanese: bool = false, auto_save: bool = true) -> bool:
-	var changed := _set_tts_values(enabled, voice_profile, speaker_id, generate_japanese, true)
+	var changed := _set_tts_values(enabled, voice_profile, speaker_id, generate_japanese, tts_audio_delivery, true)
+	if auto_save:
+		return save_settings()
+	return changed
+
+
+## 单独切换音频传输方式，避免 UI 只改声线时误改播放协议。
+func set_tts_audio_delivery(audio_delivery: String, auto_save: bool = true) -> bool:
+	var changed := _set_tts_values(tts_enabled, tts_voice_profile, tts_speaker_id, tts_generate_japanese, audio_delivery, true)
 	if auto_save:
 		return save_settings()
 	return changed
@@ -143,6 +155,7 @@ func get_tts_settings() -> Dictionary:
 		"voice_profile": tts_voice_profile,
 		"speaker_id": tts_speaker_id,
 		"generate_japanese": tts_generate_japanese,
+		"audio_delivery": tts_audio_delivery,
 	}
 
 
@@ -433,19 +446,26 @@ func _set_values(new_base_url: String, new_api_key: String, new_model: String, n
 	return changed
 
 
-func _set_tts_values(new_enabled: bool, new_profile: String, new_speaker_id: int, new_generate_japanese: bool, emit_change: bool) -> bool:
+func _set_tts_values(new_enabled: bool, new_profile: String, new_speaker_id: int, new_generate_japanese: bool, new_audio_delivery: String, emit_change: bool) -> bool:
 	var normalized_profile := new_profile.strip_edges()
 	if normalized_profile.is_empty():
 		normalized_profile = "mirdo_ja"
 	var normalized_speaker_id := new_speaker_id if new_speaker_id >= 0 else -1
-	var changed := tts_enabled != new_enabled or tts_voice_profile != normalized_profile or tts_speaker_id != normalized_speaker_id or tts_generate_japanese != new_generate_japanese
+	var normalized_audio_delivery := _normalize_tts_audio_delivery(new_audio_delivery)
+	var changed := tts_enabled != new_enabled or tts_voice_profile != normalized_profile or tts_speaker_id != normalized_speaker_id or tts_generate_japanese != new_generate_japanese or tts_audio_delivery != normalized_audio_delivery
 	tts_enabled = new_enabled
 	tts_voice_profile = normalized_profile
 	tts_speaker_id = normalized_speaker_id
 	tts_generate_japanese = new_generate_japanese
+	tts_audio_delivery = normalized_audio_delivery
 	if changed and emit_change:
 		settings_changed.emit(get_provider_settings())
 	return changed
+
+
+func _normalize_tts_audio_delivery(value: String) -> String:
+	var clean := value.strip_edges().to_lower()
+	return clean if (clean in ["inline", "url", "auto"]) else "inline"
 
 
 func _normalize_base_url(value: String) -> String:
