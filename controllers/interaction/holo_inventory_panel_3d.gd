@@ -1615,14 +1615,29 @@ func _get_mouse_local_hit_info(screen_pos_override: Variant = null) -> Dictionar
 		mouse_pos = screen_pos_override as Vector2
 	else:
 		mouse_pos = viewport.get_mouse_position()
+	# 优先使用真实 HitArea 射线，避免面板平面在鼠标位于面板后方时
+	# 仍然返回一个“命中”，从而把拖拽释放判定到错误的格子。
 	var ray_origin: Vector3 = _camera.project_ray_origin(mouse_pos)
 	var ray_dir: Vector3 = _camera.project_ray_normal(mouse_pos)
+	var ray_end := ray_origin + ray_dir * ray_pick_distance
+	var world := viewport.get_world_3d()
+	if world != null and _hit_area != null and is_instance_valid(_hit_area):
+		var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end, panel_collision_layer)
+		query.collide_with_areas = true
+		query.collide_with_bodies = false
+		var ray_hit := world.direct_space_state.intersect_ray(query)
+		if not ray_hit.is_empty() and ray_hit.get("collider", null) == _hit_area:
+			var ray_hit_pos: Vector3 = ray_hit.get("position", global_position) as Vector3
+			return {"hit": true, "local": to_local(ray_hit_pos), "world": ray_hit_pos}
 	var plane_normal: Vector3 = global_basis.z.normalized()
 	var panel_plane := Plane(plane_normal, plane_normal.dot(global_position))
 	var hit_pos_variant: Variant = panel_plane.intersects_ray(ray_origin, ray_dir)
 	if hit_pos_variant == null:
 		return {"hit": false}
 	var hit_pos: Vector3 = hit_pos_variant as Vector3
+	var hit_distance := ray_origin.distance_to(hit_pos)
+	if ray_dir.dot(hit_pos - ray_origin) <= 0.0 or hit_distance > ray_pick_distance:
+		return {"hit": false}
 	return {
 		"hit": true,
 		"local": to_local(hit_pos),

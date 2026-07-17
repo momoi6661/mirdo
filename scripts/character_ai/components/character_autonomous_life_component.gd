@@ -1574,6 +1574,7 @@ func _build_external_goal_follow_up_prompt(goal_report: Dictionary) -> String:
 	var previous_reason := String(payload.get("task_reason", "")).strip_edges()
 	var next_hint := String(payload.get("next_decision_hint", "")).strip_edges()
 	var action_result: Dictionary = goal_report.get("action_result", {}) as Dictionary if goal_report.get("action_result", {}) is Dictionary else {}
+	var execution: Dictionary = goal_report.get("execution", {}) as Dictionary if goal_report.get("execution", {}) is Dictionary else {}
 	var parts: Array[String] = []
 	if not target.is_empty():
 		parts.append("目标=%s" % target)
@@ -1705,6 +1706,7 @@ func _build_external_event_context(
 		"intent": _compact_event_value(intent),
 		"intent_report": _compact_event_value(intent_report),
 		"action_result": _compact_event_value(action_result),
+		"execution": _compact_event_value(execution),
 		"target_object": String(goal_report.get("target_object", payload.get("target_object", ""))).strip_edges(),
 		"target_nav_point": String(goal_report.get("target_nav_point", payload.get("target_nav_point", ""))).strip_edges(),
 		"target_name": String(goal_report.get("target_name", "")).strip_edges(),

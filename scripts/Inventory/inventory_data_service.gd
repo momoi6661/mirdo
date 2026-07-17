@@ -7,6 +7,7 @@ signal item_used(item: ItemData, amount: int, effect: Dictionary)
 
 const SAVE_VERSION := 3
 const INVENTORY_STORAGE_SCRIPT := preload("res://scripts/Inventory/inventory_storage_resource.gd")
+const INVENTORY_TRANSFER_SERVICE := preload("res://scripts/Inventory/inventory_transfer_service.gd")
 
 @export var inventory_storage: InventoryStorageResource
 @export var initial_slot_configs: Array[SlotConfig] = []
@@ -70,7 +71,7 @@ func pickup_item(item: ItemData, amount: int = 1) -> bool:
 		var slot = _get_slot(i)
 		if slot == null or slot.is_empty():
 			continue
-		if slot.item != item:
+		if not INVENTORY_TRANSFER_SERVICE.items_match(slot.item, item):
 			continue
 		var available: int = _available_stack_space(slot)
 		if available <= 0:
@@ -111,7 +112,7 @@ func can_pickup_item(item: ItemData, amount: int = 1) -> bool:
 			continue
 		if slot.is_empty():
 			available_space += _max_stack_size(item)
-		elif slot.item == item:
+		elif INVENTORY_TRANSFER_SERVICE.items_match(slot.item, item):
 			available_space += _available_stack_space(slot)
 	return available_space >= amount
 
@@ -133,7 +134,7 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 	if amount > 0:
 		move_amount = clampi(amount, 1, from_slot.amount)
 
-	if not to_slot.is_empty() and to_slot.item == from_slot.item:
+	if not to_slot.is_empty() and INVENTORY_TRANSFER_SERVICE.items_match(to_slot.item, from_slot.item):
 		var available: int = _available_stack_space(to_slot)
 		if available <= 0:
 			return 0

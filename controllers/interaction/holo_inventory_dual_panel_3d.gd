@@ -438,6 +438,12 @@ func _resolve_external_transfer(
 
 
 func _resolve_release_target(screen_pos: Vector2, source_panel: HoloInventoryPanel3D = null) -> Dictionary:
+	# 先按两个面板当前的屏幕投影判断目标。拖拽期间面板会跟随相机
+	# 做平滑变换，直接依赖物理 HitArea 可能命中旧位置，导致“拖到另一个
+	# 面板但没有转移”。平面命中成功后再使用物理射线作为遮挡/深度兜底。
+	var plane_target := _resolve_release_target_by_panel_plane(screen_pos, source_panel)
+	if plane_target.get("panel", null) != null:
+		return plane_target
 	var camera: Camera3D = _resolve_release_camera()
 	if camera == null:
 		return {"panel": null, "slot": -1}
@@ -473,7 +479,7 @@ func _resolve_release_target(screen_pos: Vector2, source_panel: HoloInventoryPan
 				"panel": _right_panel,
 				"slot": _right_panel.get_slot_index_from_world_hit(hit_position),
 			}
-	return _resolve_release_target_by_panel_plane(screen_pos, source_panel)
+	return plane_target
 
 
 func _resolve_release_target_by_panel_plane(screen_pos: Vector2, source_panel: HoloInventoryPanel3D = null) -> Dictionary:

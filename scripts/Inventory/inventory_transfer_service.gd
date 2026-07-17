@@ -53,7 +53,7 @@ static func transfer_between_storages(
 			return 0
 		source_after = _make_slot_dict(source_item, source_amount - moved)
 		target_after = _make_slot_dict(source_item, moved)
-	elif target_item == source_item:
+	elif items_match(target_item, source_item):
 		var available: int = maxi(0, get_storage_max_stack_for_item(target_storage, source_item) - target_amount)
 		moved = mini(move_amount, available)
 		if moved <= 0:
@@ -128,7 +128,7 @@ static func transfer_to_first_available(
 		var target_data: Dictionary = _read_slot_data(target_storage, i)
 		var target_item: ItemData = target_data.get("item", null) as ItemData
 		var target_amount: int = int(target_data.get("amount", 0))
-		if target_item != source_item or target_amount <= 0:
+		if not items_match(target_item, source_item) or target_amount <= 0:
 			continue
 		var moved_stack: int = transfer_between_storages(source_storage, source_slot, target_storage, i, remaining)
 		if moved_stack <= 0:
@@ -207,6 +207,23 @@ static func storage_can_accept_item(storage: Object, item: ItemData) -> bool:
 	return true
 
 
+## 判断两个库存物品是否代表同一种物品。
+## 不要只用 `==`：存档、容器和玩家库存可能从同一个 `.tres` 各自
+## duplicate 出不同的 Resource 实例。比较资源路径，才能保证堆叠和转移一致。
+static func items_match(left: ItemData, right: ItemData) -> bool:
+	if left == right:
+		return true
+	if left == null or right == null:
+		return false
+	var left_path := String(left.resource_path).strip_edges()
+	var right_path := String(right.resource_path).strip_edges()
+	if not left_path.is_empty() and not right_path.is_empty():
+		return left_path == right_path
+	var left_name := String(left.ItemName).strip_edges().to_lower()
+	var right_name := String(right.ItemName).strip_edges().to_lower()
+	return not left_name.is_empty() and left_name == right_name
+
+
 static func _supports_slot_access(storage: Object) -> bool:
 	return (
 		storage != null
@@ -254,7 +271,7 @@ static func _slot_equals(actual: Dictionary, expected: Dictionary) -> bool:
 	var expected_item: ItemData = expected.get("item", null) as ItemData
 	var actual_amount: int = int(actual.get("amount", 0))
 	var expected_amount: int = int(expected.get("amount", 0))
-	return actual_item == expected_item and actual_amount == expected_amount
+	return items_match(actual_item, expected_item) and actual_amount == expected_amount
 
 
 static func _commit_pair(

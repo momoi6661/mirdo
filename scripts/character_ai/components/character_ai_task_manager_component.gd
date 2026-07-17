@@ -165,7 +165,19 @@ func _on_gift_started(item: ItemData, amount: int) -> void:
 func _on_gift_accepted(item: ItemData, amount: int, player: Node) -> void:
 	if _active_task.is_empty() or String(_active_task.get("command", "")) != "give_item_to_player":
 		return
-	_resolve(true, "gift_offer_accepted", {"item_id": String(item.ItemName) if item != null else "", "amount": amount, "player": String(player.name) if player != null else ""})
+	var item_id := String(item.ItemName) if item != null else ""
+	_resolve(true, "gift_offer_accepted", {
+		"item_id": item_id,
+		"amount": amount,
+		"player": String(player.name) if player != null else "",
+		"action_result": {
+			"ok": true,
+			"interaction": "give_item_to_player",
+			"item_id": item_id,
+			"amount": amount,
+			"accepted_by": String(player.name) if player != null else "player",
+		},
+	})
 
 
 func _on_gift_withdrawn(item: ItemData, amount: int, reason: String) -> void:
@@ -218,9 +230,24 @@ func _resolve(ok: bool, event: String, details: Dictionary = {}) -> Dictionary:
 		"item_id": String(task.get("item_id", "")),
 		"status": "succeeded" if ok else "failed",
 		"task": task,
+		# 统一的执行回执。后端只需要读取 execution，而不必猜测
+		# 当前事件来自导航、容器取物还是玩家接收礼物。
+		"execution": {
+			"phase": "completed" if ok else "failed",
+			"task_id": String(task.get("task_id", "")),
+			"step_id": String(task.get("step_id", "")),
+			"command": String(task.get("command", "")),
+			"target_object": String(task.get("target_object", "")),
+			"target_nav_point": String(task.get("target_nav_point", "")),
+			"observed_at_msec": Time.get_ticks_msec(),
+		},
 	}
 	for key in details.keys():
 		report[String(key)] = details[key]
+	var action_result_value: Variant = report.get("action_result", {})
+	if action_result_value is Dictionary:
+		var execution_payload := report["execution"] as Dictionary
+		execution_payload["result"] = (action_result_value as Dictionary).duplicate(true)
 	task_resolved.emit(report.duplicate(true))
 	if ok:
 		task_succeeded.emit(report.duplicate(true))

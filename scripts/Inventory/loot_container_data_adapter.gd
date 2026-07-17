@@ -3,6 +3,7 @@ class_name LootContainerDataAdapter
 
 @export var container_path: NodePath
 const ADAPTER_DEBUG := true
+const INVENTORY_TRANSFER_SERVICE := preload("res://scripts/Inventory/inventory_transfer_service.gd")
 
 var _container: LootContainerComponent
 var _pending_container_sync: bool = false
@@ -109,7 +110,7 @@ func insert_item(item: ItemData, amount: int = 1) -> int:
 		if remaining <= 0:
 			break
 		var slot := _get_storage_slot(i)
-		if slot == null or slot.item != item or slot.amount <= 0:
+		if slot == null or not INVENTORY_TRANSFER_SERVICE.items_match(slot.item, item) or slot.amount <= 0:
 			continue
 		var space: int = _available_stack_space(slot)
 		if space <= 0:
@@ -156,7 +157,7 @@ func move_item_between_slots(from_slot_index: int, to_slot_index: int, amount: i
 		move_amount = clampi(amount, 1, from_slot.amount)
 
 	var changed := {}
-	if to_slot.item != null and to_slot.item == from_slot.item:
+	if to_slot.item != null and INVENTORY_TRANSFER_SERVICE.items_match(to_slot.item, from_slot.item):
 		var available: int = _available_stack_space(to_slot)
 		if available <= 0:
 			return 0
@@ -322,7 +323,7 @@ func _compute_available_space(item: ItemData) -> int:
 			continue
 		if slot.item == null or slot.amount <= 0:
 			total += _max_stack_size(item)
-		elif slot.item == item:
+		elif INVENTORY_TRANSFER_SERVICE.items_match(slot.item, item):
 			total += _available_stack_space(slot)
 	return total
 

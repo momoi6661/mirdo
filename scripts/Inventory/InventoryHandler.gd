@@ -1,6 +1,8 @@
 extends Control
 class_name InventoryHandler
 
+const INVENTORY_TRANSFER_SERVICE := preload("res://scripts/Inventory/inventory_transfer_service.gd")
+
 @export_range(1,25) var ItemSlotsCount:int=20
 @export var DisplayRows:int=4
 @export var InventoryGrid:GridContainer
@@ -337,7 +339,7 @@ func PickupItem(item:ItemData, amount:int=1) -> bool:
 	if not CanPickupItem(item, amount): return false
 	var remaining = amount
 	for slot in InventorySlots:
-		if slot.SlotFilled and slot.SlotData == item:
+		if slot.SlotFilled and INVENTORY_TRANSFER_SERVICE.items_match(slot.SlotData, item):
 			var available = slot.GetAvailableSpace()
 			if available > 0:
 				var add_amount = min(available, remaining)
@@ -357,7 +359,7 @@ func CanPickupItem(item:ItemData, amount:int=1) -> bool:
 	var available_space = 0
 	for slot in InventorySlots:
 		if not slot or not slot.is_inside_tree(): continue
-		if slot.SlotFilled and slot.SlotData == item: available_space += slot.GetAvailableSpace()
+		if slot.SlotFilled and INVENTORY_TRANSFER_SERVICE.items_match(slot.SlotData, item): available_space += slot.GetAvailableSpace()
 		elif not slot.SlotFilled: available_space += item.MaxStackSize
 	return available_space >= amount
 
@@ -410,7 +412,7 @@ func transfer_item_from_loot(source_loot_slot: InventorySlot, target_player_slot
 		if source_loot_slot.StackCount <= 0:
 			source_loot_slot.ClearSlot()
 	else:
-		if target_player_slot.SlotData == item:
+		if INVENTORY_TRANSFER_SERVICE.items_match(target_player_slot.SlotData, item):
 			# 物品相同，尝试堆叠
 			var available = target_player_slot.GetAvailableSpace()
 			var actual_add = min(move_amount, available)
@@ -433,3 +435,36 @@ func transfer_item_from_loot(source_loot_slot: InventorySlot, target_player_slot
 	var loot_panel = get_node_or_null("LootPanel")
 	if loot_panel and loot_panel.has_method("_sync_loot_data"):
 		loot_panel._sync_loot_data()
+
+
+## 处理玩家背包拖回箱子。旧版只实现了“箱子 -> 玩家”，
+## 导致拖动方向相反时 UI 看似接受了鼠标事件，但数据没有改变。
+func transfer_item_from_player(source_player_slot: InventorySlot, target_loot_slot: InventorySlot, amount: int) -> void:
+	if source_player_slot == null or target_loot_slot == null or not source_player_slot.SlotFilled:
+		return
+	var item := source_player_slot.SlotData
+	var move_amount := clampi(amount if amount > 0 else source_player_slot.StackCount, 1, source_player_slot.StackCount)
+	if target_loot_slot.SlotFilled and not INVENTORY_TRANSFER_SERVICE.items_match(target_loot_slot.SlotData, item):
+		# 部分数量不能交换，避免源数据被错误覆盖。
+		if move_amount < source_player_slot.StackCount:
+			return
+		var old_item := target_loot_slot.SlotData
+		var old_amount := target_loot_slot.StackCount
+		target_loot_slot.FillSlot(item, source_player_slot.StackCount)
+		source_player_slot.FillSlot(old_item, old_amount)
+	else:
+		if target_loot_slot.SlotFilled:
+			var available := target_loot_slot.GetAvailableSpace()
+			var moved := mini(move_amount, available)
+			if moved <= 0:
+				return
+			target_loot_slot.AddStack(moved)
+			source_player_slot.RemoveStack(moved)
+		else:
+			target_loot_slot.FillSlot(item, move_amount)
+			source_player_slot.RemoveStack(move_amount)
+	if source_player_slot.StackCount <= 0:
+		source_player_slot.ClearSlot()
+	var loot_panel := get_node_or_null("LootPanel")
+	if loot_panel != null and loot_panel.has_method("_sync_loot_data"):
+		loot_panel.call("_sync_loot_data")

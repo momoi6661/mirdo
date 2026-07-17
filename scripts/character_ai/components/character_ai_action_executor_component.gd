@@ -20,6 +20,8 @@ signal sit_down_finished()
 @export var give_item_component_path: NodePath
 @export var actor_path: NodePath
 @export var navigation_agent_path: NodePath
+@export_range(0.8, 4.0, 0.05) var give_item_approach_distance: float = 1.8
+@export var give_item_approach_run: bool = false
 @export var world_object_group: StringName = &"ai_world_object"
 @export var ai_nav_point_group: StringName = &"ai_nav_point"
 @export var default_idle_action: StringName = &"idle_normal"
@@ -83,6 +85,7 @@ var _active_sit_marker_path: NodePath
 var _active_stand_marker_path: NodePath
 var _pending_seat_marker_after_approach_path: NodePath
 var _pending_seat_action_after_approach: StringName = &""
+var _pending_give_after_navigation: Dictionary = {}
 var _seat_exact_navigation_active: bool = false
 var _seat_alignment_active: bool = false
 var _stand_transition_active: bool = false
@@ -204,6 +207,7 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 				"give_item_to_player":
 					var give_report := _start_give_item_to_player(intent, payload)
 					report["action_applied"] = bool(give_report.get("ok", false))
+					report["navigation_started"] = bool(give_report.get("navigation_started", false))
 					report["action"] = String(intent_report.get("chosen_action", "work_reach"))
 					report["intent_report"] = give_report
 					ai_response_application_finished.emit(report.duplicate(true))
@@ -581,6 +585,16 @@ func _finish_navigation() -> void:
 		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
+	if not _pending_give_after_navigation.is_empty():
+		var pending_give := _pending_give_after_navigation.duplicate(true)
+		_pending_give_after_navigation.clear()
+		_face_player()
+		_start_give_item_to_player(
+			pending_give.get("intent", {}) as Dictionary,
+			pending_give.get("payload", {}) as Dictionary,
+			true,
+		)
+		return
 	_face_arrival_target(goal_context)
 	if finished_action != &"":
 		_request_body_action(finished_action)
@@ -622,6 +636,16 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 		_navigation_goal_context = goal_context
 		_start_seat_exact_navigation_after_approach()
 		return
+	if not _pending_give_after_navigation.is_empty():
+		var pending_give := _pending_give_after_navigation.duplicate(true)
+		_pending_give_after_navigation.clear()
+		_face_player()
+		_start_give_item_to_player(
+			pending_give.get("intent", {}) as Dictionary,
+			pending_give.get("payload", {}) as Dictionary,
+			true,
+		)
+		return
 	_face_arrival_target(goal_context)
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_complete_pickable_interaction(goal_context)
@@ -630,6 +654,7 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 
 func _on_motor_navigation_cancelled() -> void:
 	var goal_context := _navigation_goal_context.duplicate(true)
+	_pending_give_after_navigation.clear()
 	_navigation_active = false
 	_follow_active = false
 	_navigation_goal_context = {}
@@ -928,7 +953,7 @@ func _interpret_payload(payload: Dictionary) -> Dictionary:
 		"raw": payload.duplicate(true),
 	}
 
-func _start_give_item_to_player(intent: Dictionary, payload: Dictionary) -> Dictionary:
+func _start_give_item_to_player(intent: Dictionary, payload: Dictionary, skip_approach: bool = false) -> Dictionary:
 	_refresh_refs()
 	if _give_item_component == null or not _give_item_component.has_method("offer_item_to_player"):
 		return {"ok": false, "error": "give_item_component_missing"}
@@ -946,6 +971,48 @@ func _start_give_item_to_player(intent: Dictionary, payload: Dictionary) -> Dict
 	if payload.has("timeout_sec"):
 		options["timeout_sec"] = float(payload.get("timeout_sec", 10.0))
 	var player := _find_player()
+	if player == null:
+		return {"ok": false, "error": "player_missing"}
+	if not skip_approach and _actor is Node3D and _navigation_motor != null and _navigation_motor.has_method("move_to_position"):
+		var distance := (_actor as Node3D).global_position.distance_to(player.global_position)
+		if distance > give_item_approach_distance:
+			_pending_give_after_navigation = {
+				"intent": intent.duplicate(true),
+				"payload": payload.duplicate(true),
+			}
+			_navigation_active = true
+			_follow_active = false
+			_navigation_target_position = player.global_position
+			_navigation_target_marker_path = NodePath()
+			_navigation_goal_result_sent = false
+			_pending_arrival_action = &"give_item_to_player"
+			_navigation_goal_context = {
+				"task_id": String(payload.get("task_id", "")).strip_edges(),
+				"current_step_id": String(payload.get("current_step_id", "")).strip_edges(),
+				"intent": intent.duplicate(true),
+				"payload": payload.duplicate(true),
+				"target_object": "player",
+				"target_name": "老师",
+				"arrival_action": "give_item_to_player",
+			}
+			var started := bool(_navigation_motor.call(
+				"move_to_position",
+				player.global_position,
+				&"give_item_to_player",
+				NodePath(),
+				give_item_approach_run,
+			))
+			if not started:
+				_pending_give_after_navigation.clear()
+				_navigation_active = false
+				return {"ok": false, "error": "give_navigation_start_failed"}
+			return {
+				"ok": true,
+				"navigation_started": true,
+				"awaiting": "give_item_to_player",
+				"target": "player",
+				"distance": distance,
+			}
 	var result: Dictionary = _give_item_component.call("offer_item_to_player", item, player, options)
 	if bool(result.get("ok", false)) and item == _carried_item:
 		_carried_item = null

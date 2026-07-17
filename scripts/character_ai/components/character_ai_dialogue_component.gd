@@ -269,6 +269,7 @@ func send_action_result(goal_report: Dictionary, source_decision: Dictionary = {
 		"status": "succeeded" if bool(goal_report.get("ok", decision.get("ok", false))) else "failed",
 		"ok": bool(goal_report.get("ok", decision.get("ok", false))),
 		"action_result": action_result,
+		"execution": event_context.get("execution", goal_report.get("execution", {})),
 		"observation": observation,
 	}
 	var prompt := "（Godot 工具结果：%s；请依据真实结果决定下一步。）" % event
