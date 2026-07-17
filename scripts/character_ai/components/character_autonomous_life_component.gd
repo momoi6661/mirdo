@@ -1689,7 +1689,9 @@ func _build_external_event_context(
 		event_id = "%s:%s:%d:%d" % [event_scope, event, Time.get_ticks_msec(), _event_context_serial]
 	var next_hint := String(payload.get("next_decision_hint", "")).strip_edges()
 	var previous_dialogue := String(payload.get("dialogue", "")).strip_edges()
-	var current_step_id := String(goal_report.get("current_step_id", payload.get("current_step_id", ""))).strip_edges()
+	# TaskManager 的统一回执使用 step_id；导航执行器旧回执使用
+	# current_step_id。两者都要接受，否则递物品/取物回执会丢掉步骤关联。
+	var current_step_id := String(goal_report.get("current_step_id", goal_report.get("step_id", payload.get("current_step_id", "")))).strip_edges()
 	var action_step_value: Variant = goal_report.get("action_step", payload.get("action_step", {}))
 	var action_line_value: Variant = goal_report.get("action_line", payload.get("action_line", []))
 	# execution 是跨 Godot/Server 的稳定协议字段。旧场景可能还没有显式

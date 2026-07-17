@@ -254,17 +254,27 @@ func send_action_result(goal_report: Dictionary, source_decision: Dictionary = {
 	if tool_call_id.is_empty():
 		tool_call_id = String(goal_report.get("event_id", decision.get("event_id", event_context.get("event_id", "")))).strip_edges()
 	if tool_call_id.is_empty():
-		tool_call_id = "%s:%s:%s" % [String(decision.get("task_id", "")), String(decision.get("current_step_id", "")), event]
+		tool_call_id = "%s:%s:%s" % [
+			String(decision.get("task_id", goal_report.get("task_id", ""))),
+			String(decision.get("current_step_id", goal_report.get("current_step_id", goal_report.get("step_id", "")))),
+			event,
+		]
 	var action_result: Dictionary = event_context.get("action_result", {}) as Dictionary if event_context.get("action_result", {}) is Dictionary else {}
 	if action_result.is_empty():
 		action_result = goal_report.get("action_result", {}) as Dictionary if goal_report.get("action_result", {}) is Dictionary else {}
 	var command := String(goal_report.get("command", raw_payload.get("command", ""))).strip_edges()
 	var observation := event_context.duplicate(true)
+	var result_task_id := String(decision.get("task_id", "")).strip_edges()
+	if result_task_id.is_empty():
+		result_task_id = String(goal_report.get("task_id", "")).strip_edges()
+	var result_step_id := String(decision.get("current_step_id", "")).strip_edges()
+	if result_step_id.is_empty():
+		result_step_id = String(goal_report.get("current_step_id", goal_report.get("step_id", ""))).strip_edges()
 	var protocol_fields := {
 		"tool_call_id": tool_call_id,
-		"task_id": String(decision.get("task_id", goal_report.get("task_id", ""))).strip_edges(),
+		"task_id": result_task_id,
 		"chain_id": String(decision.get("chain_id", goal_report.get("chain_id", ""))).strip_edges(),
-		"step_id": String(decision.get("current_step_id", goal_report.get("current_step_id", ""))).strip_edges(),
+		"step_id": result_step_id,
 		"command": command if not command.is_empty() else String(decision.get("command", "")).strip_edges(),
 		"target_ref": String(goal_report.get("target_object", goal_report.get("target_nav_point", ""))).strip_edges(),
 		"event": event,
