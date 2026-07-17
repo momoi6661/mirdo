@@ -3,7 +3,6 @@ class_name LootContainerDataAdapter
 
 @export var container_path: NodePath
 const ADAPTER_DEBUG := true
-const INVENTORY_TRANSFER_SERVICE := preload("res://scripts/Inventory/inventory_transfer_service.gd")
 
 var _container: LootContainerComponent
 var _pending_container_sync: bool = false
