@@ -71,9 +71,15 @@ signal dialogue_failed(error_text: String)
 @export var always_log: bool = true
 
 @export_category("实时引导")
-## 玩家在 Mirdo 说话时补充或改口，立即停止旧语音并重新进入 Agent；
-## 自主事件仍排队，不能用这个入口抢断玩家对白。
-@export var interrupt_presentation_on_player_guidance: bool = true
+## 玩家在 Mirdo 正在说话时提交新输入的处理策略。
+## after_current_segment：默认像自然对话一样，先让当前这一小句说完，再用玩家新输入重新进入 Agent。
+## immediate_interrupt：明确抢断，立即停止语音和字幕。
+## queue_after_response：不改写当前回应，等整段回应结束后再按普通排队消息处理。
+@export_enum("after_current_segment", "immediate_interrupt", "queue_after_response") var presentation_guidance_policy: String = "after_current_segment"
+## 兼容旧场景的开关；新项目建议使用 presentation_guidance_policy。
+@export var interrupt_presentation_on_player_guidance: bool = false
+## 命中这些词时，即使默认策略是 after_current_segment，也会立刻打断。
+@export var immediate_interrupt_keywords: PackedStringArray = PackedStringArray(["停下", "别说", "闭嘴", "回来", "取消", "不要", "等一下", "stop", "cancel", "interrupt"])
 
 @export_category("TTS 呈现")
 ## 默认关闭；勾选后，本组件会在每次 Agent 完成对白时请求语音。
@@ -112,6 +118,15 @@ var _pending_voice_report: Dictionary = {}
 var _pending_voice_dialogue: String = ""
 var _pending_voice_ai_data: Dictionary = {}
 var _pending_voice_route_summary: Dictionary = {}
+var _pending_voice_segments: Array[Dictionary] = []
+var _pending_voice_segment_index: int = 0
+var _pending_voice_final_report: Dictionary = {}
+var _pending_voice_final_dialogue: String = ""
+var _pending_voice_final_ai_data: Dictionary = {}
+var _pending_voice_final_route_summary: Dictionary = {}
+var _pending_voice_any_presented: bool = false
+## 正在说话时玩家提交的新输入。默认不立刻截断当前句，而是在 segment 边界消费它。
+var _deferred_presentation_guidance: Dictionary = {}
 ## 只有播放器真正起播后才显示字幕；TTS 失败时由完成路径补显示。
 var _pending_voice_presented: bool = false
 var _queued_local_dialogues: Array[Dictionary] = []
@@ -157,7 +172,7 @@ func send_player_text(player_text: String, given_item: String = "") -> Dictionar
 		_queued_local_dialogues.clear()
 		_log("autonomous_dialogue_queue_cleared_by_player_guidance")
 	# 空闲时仍保留很短的输入聚合窗口；已有生成或语音输出时，Enter 提交
-	# 就是明确的 steer 边界，应立即打断，不能再等待 0.45 秒聚合计时器。
+	# 是明确的 steer 边界，但语音播放阶段默认等当前 segment 说完再介入。
 	var steer_now := _request_in_flight or _speech_gate_active
 	return _send_dialogue_text(player_text, given_item, "player", {}, steer_now)
 
@@ -284,8 +299,8 @@ func _send_dialogue_text(
 	if _request_in_flight and request_source.strip_edges() == "player" and not _sending_request:
 		return _replace_inflight_player_request(text, given_item, source_decision)
 	if _speech_gate_active:
-		if request_source.strip_edges() == "player" and interrupt_presentation_on_player_guidance:
-			return _replace_presented_player_response(text, given_item, source_decision)
+		if request_source.strip_edges() == "player":
+			return _handle_player_guidance_during_presentation(text, given_item, source_decision)
 		if _can_queue_dialogue_request(request_source):
 			return _enqueue_dialogue_text(text, given_item, request_source, source_decision)
 		return {"ok": false, "error": "speech_in_progress"}
@@ -377,6 +392,56 @@ func _replace_inflight_player_request(text: String, given_item: String, source_d
 	return result
 
 
+
+func _handle_player_guidance_during_presentation(text: String, given_item: String, source_decision: Dictionary) -> Dictionary:
+	"""Mirdo 正在说话时处理玩家新输入；默认等当前语音段结束再介入。"""
+	if _should_interrupt_presentation_immediately(text):
+		return _replace_presented_player_response(text, given_item, source_decision)
+	var policy := presentation_guidance_policy.strip_edges().to_lower()
+	if policy == "queue_after_response":
+		return _enqueue_dialogue_text(text, given_item, "player", source_decision)
+	return _defer_presented_player_response(text, given_item, source_decision)
+
+
+func _should_interrupt_presentation_immediately(text: String) -> bool:
+	"""判断玩家输入是不是明确抢断；普通补充不打断当前句。"""
+	if interrupt_presentation_on_player_guidance:
+		return true
+	var policy := presentation_guidance_policy.strip_edges().to_lower()
+	if policy == "immediate_interrupt":
+		return true
+	if policy == "queue_after_response":
+		return false
+	var lowered := text.strip_edges().to_lower()
+	if lowered.is_empty():
+		return false
+	for keyword in immediate_interrupt_keywords:
+		var needle := String(keyword).strip_edges().to_lower()
+		if not needle.is_empty() and lowered.find(needle) >= 0:
+			return true
+	return false
+
+
+func _defer_presented_player_response(text: String, given_item: String, source_decision: Dictionary) -> Dictionary:
+	"""保存玩家最新引导，等当前 segment 播完后再发给后端。"""
+	_deferred_presentation_guidance = {
+		"player_text": text.strip_edges(),
+		"given_item": given_item.strip_edges(),
+		"source_decision": source_decision.duplicate(true),
+		"target_request_id": _active_client_request_id,
+		"target_client_sequence": _client_sequence,
+		"heard_dialogue": _pending_voice_dialogue.strip_edges(),
+		"created_msec": Time.get_ticks_msec(),
+	}
+	# 玩家引导优先级高于尚未发出的自主闲聊；保留当前正在说的这一小句。
+	for index in range(_queued_dialogue_requests.size() - 1, -1, -1):
+		var queued_source := String((_queued_dialogue_requests[index] as Dictionary).get("request_source", "player"))
+		if queued_source != "player":
+			_queued_dialogue_requests.remove_at(index)
+	_log("dialogue_guidance_deferred phase=presentation_boundary text=%s" % _preview_text(text))
+	return {"ok": true, "deferred": true, "phase": "presentation_boundary"}
+
+
 func _replace_presented_player_response(text: String, given_item: String, source_decision: Dictionary) -> Dictionary:
 	"""停止正在播放的旧对白，并把玩家最新输入作为实时引导重新提交。"""
 	var previous_id := _active_client_request_id
@@ -417,18 +482,21 @@ func _build_steering_protocol(
 	target_request_id: String,
 	target_sequence: int,
 	interrupted_dialogue: String,
+	heard_dialogue: String = "",
+	boundary_reason: String = "",
 ) -> Dictionary:
 	"""构造与后端 ChatRequest.steering 对应的稳定协议字段。"""
-	return {
-		"steering": {
-			"mode": "interrupt",
-			"phase": phase,
-			"target_request_id": target_request_id,
-			"target_client_sequence": maxi(0, target_sequence),
-			"interrupted_dialogue": interrupted_dialogue.left(500),
-			"reason": "player_guidance",
-		},
+	var steering := {
+		"mode": "interrupt",
+		"phase": phase,
+		"target_request_id": target_request_id,
+		"target_client_sequence": maxi(0, target_sequence),
+		"interrupted_dialogue": interrupted_dialogue.left(500),
+		"heard_dialogue": heard_dialogue.left(500),
+		"boundary_reason": boundary_reason.left(80),
+		"reason": "player_guidance",
 	}
+	return {"steering": steering}
 
 func get_queued_dialogue_count() -> int:
 	return _queued_dialogue_requests.size()
@@ -1310,21 +1378,18 @@ func _on_ai_completed(final_data: Dictionary) -> void:
 		"request_payload": _last_payload.duplicate(true),
 	}
 	# 先建立等待状态，再启动下载，避免缓存命中时同步播放造成竞态。
+	# 新协议优先使用 dialogue_segments：每个 segment 单独字幕 + 单独 TTS。
 	if _has_playable_tts(final_data):
 		var tts_debug: Dictionary = final_data.get("tts", {}) as Dictionary
-		_log("tts_gate_enter cache=%s hit=%s audio=%s dialogue=%s" % [
+		var segments := _extract_dialogue_segments(final_data, dialogue_text)
+		_log("tts_gate_enter segments=%d cache=%s hit=%s audio=%s dialogue=%s" % [
+			segments.size(),
 			String(tts_debug.get("cache_key", "")),
 			str(bool(tts_debug.get("cache_hit", false))),
 			String(tts_debug.get("audio_url", "")),
 			_preview_text(dialogue_text),
 		])
-		_speech_gate_active = true
-		_pending_voice_presented = false
-		_pending_voice_report = report
-		_pending_voice_dialogue = dialogue_text
-		_pending_voice_ai_data = final_data.duplicate(true)
-		_pending_voice_route_summary = route_summary.duplicate(true)
-		if _play_tts_response(final_data):
+		if _start_segmented_tts_presentation(report, dialogue_text, final_data, route_summary, segments):
 			return
 		_clear_pending_voice_state()
 	_finish_dialogue_presentation(report, dialogue_text, final_data, route_summary)
@@ -1419,12 +1484,12 @@ func _should_speak_local_fallback_for_error(error_text: String) -> bool:
 	return true
 
 func _drain_queued_dialogue_deferred() -> void:
-	if _queued_dialogue_requests.is_empty() or _request_in_flight:
+	if _queued_dialogue_requests.is_empty() or _request_in_flight or _speech_gate_active:
 		return
 	call_deferred("_drain_queued_dialogue")
 
 func _drain_queued_dialogue() -> void:
-	if _request_in_flight or _queued_dialogue_requests.is_empty():
+	if _request_in_flight or _speech_gate_active or _queued_dialogue_requests.is_empty():
 		return
 	var entry: Dictionary = _queued_dialogue_requests.pop_front()
 	var result := _send_dialogue_text(
@@ -1446,7 +1511,7 @@ func _schedule_queued_dialogue_retry(delay_sec: float) -> void:
 
 func _on_queue_retry_timer_timeout() -> void:
 	_queue_retry_scheduled = false
-	if not _request_in_flight:
+	if not _request_in_flight and not _speech_gate_active:
 		_drain_queued_dialogue_deferred()
 	elif not _queued_dialogue_requests.is_empty():
 		_schedule_queued_dialogue_retry(queued_dialogue_retry_delay_sec)
@@ -1737,10 +1802,20 @@ func _clear_pending_voice_state() -> void:
 	_pending_voice_dialogue = ""
 	_pending_voice_ai_data = {}
 	_pending_voice_route_summary = {}
+	_pending_voice_segments.clear()
+	_pending_voice_segment_index = 0
+	_pending_voice_final_report = {}
+	_pending_voice_final_dialogue = ""
+	_pending_voice_final_ai_data = {}
+	_pending_voice_final_route_summary = {}
+	_pending_voice_any_presented = false
+	_deferred_presentation_guidance = {}
 	_pending_voice_presented = false
 
 func _ensure_voice_player() -> void:
 	if _voice_player != null and is_instance_valid(_voice_player):
+		if _voice_player.has_method("prepare"):
+			_voice_player.call("prepare")
 		return
 	_voice_player = AIVoicePlayer.new()
 	_voice_player.name = "AIVoicePlayer"
@@ -1748,6 +1823,10 @@ func _ensure_voice_player() -> void:
 	_voice_player.playback_started.connect(_on_tts_playback_started)
 	_voice_player.playback_finished.connect(_on_tts_playback_finished)
 	_voice_player.playback_failed.connect(_on_tts_playback_failed)
+	# 预先创建 HTTPRequest、3D 声源和 AudioListener；真正说话时就不用再临时挂节点。
+	if _voice_player.has_method("prepare"):
+		_voice_player.call("prepare")
+		_voice_player.call_deferred("prepare")
 
 func _on_tts_playback_started(_metadata: Dictionary) -> void:
 	"""播放器真正开始发声时才通知字幕层，保证两者起点一致。"""
@@ -1758,20 +1837,61 @@ func _on_tts_playback_started(_metadata: Dictionary) -> void:
 
 
 func _present_subtitle_at_playback(report: Dictionary) -> void:
-	"""在音频真正起播的瞬间通知字幕组件；控制器负责调用既有字幕组件。"""
+	"""在音频真正起播的同一帧显示 3D 字幕，并通知外部 UI 锁住字幕。"""
 	var payload := report.duplicate(true)
+	var text := String(payload.get("dialogue", "")).strip_edges()
+	if direct_subtitle_enabled and not text.is_empty():
+		# 这里必须直接调用角色现有的 3D 字幕组件，否则控制器认为
+		# direct_subtitle_enabled=true 而不兜底显示，就会出现“有声音没头顶字幕”。
+		_show_subtitle(text)
 	if dialogue_presenting.get_connections().size() > 0:
-		# 不在对话组件里重复绘制，避免绕过角色已有的 WorldSubtitleComponent。
 		dialogue_presenting.emit(payload)
-	elif direct_subtitle_enabled:
-		# 没有外部编排器时才使用组件自身配置的字幕目标作为最后回退。
-		_show_subtitle(String(payload.get("dialogue", "")).strip_edges())
 
 
 func _has_playable_tts(ai_data: Dictionary) -> bool:
 	if not tts_enabled:
 		return false
-	var value: Variant = ai_data.get("tts", {})
+	for segment in _extract_dialogue_segments(ai_data, String(ai_data.get("dialogue", ""))):
+		if _segment_has_playable_tts(segment):
+			return true
+	return _tts_payload_is_playable(ai_data.get("tts", {}))
+
+func _extract_dialogue_segments(ai_data: Dictionary, fallback_dialogue: String = "") -> Array[Dictionary]:
+	"""读取后端 dialogue_segments 协议；没有新字段时退回旧的 dialogue+tts。"""
+	var out: Array[Dictionary] = []
+	var segments_value: Variant = ai_data.get("dialogue_segments", [])
+	if segments_value is Array:
+		for raw_segment in segments_value as Array:
+			if not raw_segment is Dictionary:
+				continue
+			var source := raw_segment as Dictionary
+			var text := String(source.get("text", source.get("dialogue", ""))).strip_edges()
+			if text.is_empty():
+				continue
+			var segment: Dictionary = source.duplicate(true)
+			segment["text"] = text
+			if not segment.has("tts"):
+				segment["tts"] = {}
+			out.append(segment)
+	if out.is_empty():
+		var text := fallback_dialogue.strip_edges()
+		if text.is_empty():
+			text = _extract_dialogue(ai_data)
+		if not text.is_empty():
+			out.append({
+				"text": text,
+				"text_ja": String(ai_data.get("dialogue_ja", "")).strip_edges(),
+				"emotion": String(ai_data.get("emotion", "")),
+				"expression": String(ai_data.get("expression", "")),
+				"tts": ai_data.get("tts", {}) if ai_data.get("tts", {}) is Dictionary else {},
+			})
+	return out
+
+func _segment_has_playable_tts(segment: Dictionary) -> bool:
+	return _tts_payload_is_playable(segment.get("tts", {}))
+
+func _tts_payload_is_playable(value: Variant) -> bool:
+	"""判断一个 TTS 载荷是否能播放；只做协议检查，不触发任何回退下载。"""
 	if not value is Dictionary:
 		return false
 	var tts := value as Dictionary
@@ -1784,14 +1904,79 @@ func _has_playable_tts(ai_data: Dictionary) -> bool:
 		return has_inline
 	if delivery == "url":
 		return has_url
-	# 兼容旧后端：没有明确协议时只看是否存在任一可播放载荷。
+	# auto/旧协议：服务端没有落定时按实际字段判断。
 	return has_inline or has_url
+
+func _start_segmented_tts_presentation(
+	report: Dictionary,
+	dialogue_text: String,
+	ai_data: Dictionary,
+	route_summary: Dictionary,
+	segments: Array[Dictionary],
+) -> bool:
+	"""进入“每段字幕对应每段语音”的顺序播放模式。"""
+	if segments.is_empty():
+		return false
+	_speech_gate_active = true
+	_pending_voice_segments = segments.duplicate(true)
+	_pending_voice_segment_index = 0
+	_pending_voice_final_report = report.duplicate(true)
+	_pending_voice_final_dialogue = dialogue_text
+	_pending_voice_final_ai_data = ai_data.duplicate(true)
+	_pending_voice_final_route_summary = route_summary.duplicate(true)
+	_pending_voice_any_presented = false
+	_pending_voice_presented = false
+	if _play_pending_voice_segment():
+		return true
+	return false
+
+func _play_pending_voice_segment() -> bool:
+	"""播放当前待播段；无音频段只显示字幕，不阻塞下一段。"""
+	while _pending_voice_segment_index < _pending_voice_segments.size():
+		var index := _pending_voice_segment_index
+		var segment := _pending_voice_segments[index] as Dictionary
+		var segment_text := String(segment.get("text", "")).strip_edges()
+		if segment_text.is_empty():
+			_pending_voice_segment_index += 1
+			continue
+
+		if not _segment_has_playable_tts(segment):
+			if direct_subtitle_enabled:
+				_show_subtitle(segment_text)
+			_pending_voice_any_presented = true
+			_log("tts_segment_skip_no_audio index=%d text=%s" % [index, _preview_text(segment_text)])
+			_pending_voice_segment_index += 1
+			continue
+
+		var segment_report := _pending_voice_final_report.duplicate(true)
+		segment_report["dialogue"] = segment_text
+		segment_report["dialogue_segment_index"] = index
+		segment_report["dialogue_segment_count"] = _pending_voice_segments.size()
+
+		var segment_data := _pending_voice_final_ai_data.duplicate(true)
+		segment_data["dialogue"] = segment_text
+		segment_data["dialogue_ja"] = String(segment.get("text_ja", "")).strip_edges()
+		segment_data["emotion"] = String(segment.get("emotion", segment_data.get("emotion", "")))
+		segment_data["expression"] = String(segment.get("expression", segment_data.get("expression", "")))
+		segment_data["tts"] = segment.get("tts", {})
+
+		_pending_voice_report = segment_report
+		_pending_voice_dialogue = segment_text
+		_pending_voice_ai_data = segment_data
+		_pending_voice_route_summary = _pending_voice_final_route_summary.duplicate(true)
+		_pending_voice_presented = false
+		if _play_tts_response(segment_data):
+			return true
+		_log("tts_segment_start_failed index=%d text=%s" % [index, _preview_text(segment_text)])
+		_pending_voice_segment_index += 1
+
+	return false
 
 func _play_tts_response(ai_data: Dictionary) -> bool:
 	if not tts_enabled:
 		return false
 	_ensure_voice_player()
-	if _voice_player == null or _ai_manager == null:
+	if _voice_player == null:
 		return false
 	var response := ai_data.duplicate(true)
 	var tts_value: Variant = response.get("tts", {})
@@ -1812,7 +1997,7 @@ func _play_tts_response(ai_data: Dictionary) -> bool:
 	if delivery == "url" and audio_path.is_empty():
 		return false
 	tts["audio_delivery"] = delivery
-	if delivery == "url" and _ai_manager.has_method("resolve_asset_url"):
+	if delivery == "url" and _ai_manager != null and _ai_manager.has_method("resolve_asset_url"):
 		tts["audio_url"] = _ai_manager.call("resolve_asset_url", audio_path)
 	response["tts"] = tts
 	var started := _voice_player.play_response(response)
@@ -1825,8 +2010,88 @@ func _play_tts_response(ai_data: Dictionary) -> bool:
 	])
 	return started
 
+
+func _consume_deferred_presentation_guidance_after_segment(boundary_reason: String) -> bool:
+	"""当前语音段结束后消费玩家引导，并取消后续未播放的旧对白。"""
+	if _deferred_presentation_guidance.is_empty():
+		return false
+	var guidance := _deferred_presentation_guidance.duplicate(true)
+	var player_text := String(guidance.get("player_text", "")).strip_edges()
+	if player_text.is_empty():
+		_deferred_presentation_guidance = {}
+		return false
+	var previous_id := String(guidance.get("target_request_id", _active_client_request_id)).strip_edges()
+	if previous_id.is_empty():
+		previous_id = _active_client_request_id
+	var previous_sequence := int(guidance.get("target_client_sequence", _client_sequence))
+	var skipped_dialogue := _remaining_pending_dialogue_text()
+	var heard_dialogue := String(guidance.get("heard_dialogue", "")).strip_edges()
+	var interrupted_report := _pending_voice_final_report.duplicate(true) if not _pending_voice_final_report.is_empty() else _pending_voice_report.duplicate(true)
+	var source_decision: Dictionary = guidance.get("source_decision", {}) as Dictionary if guidance.get("source_decision", {}) is Dictionary else {}
+	var given_item := String(guidance.get("given_item", "")).strip_edges()
+
+	# 旧对白的当前句已经自然播完；这里撤掉剩余 segment 和字幕 hold，重新进入 Agent。
+	_clear_pending_voice_state()
+	_tts_expected_for_request = false
+	_dialogue_continue_serial += 1
+	_queued_dialogue_requests.clear()
+	dialogue_interrupted.emit({
+		"phase": "presentation_boundary",
+		"target_request_id": previous_id,
+		"target_client_sequence": previous_sequence,
+		"heard_dialogue": heard_dialogue,
+		"interrupted_dialogue": skipped_dialogue,
+		"previous_report": interrupted_report,
+		"reason": "player_guidance",
+		"boundary_reason": boundary_reason,
+	})
+	var result := _send_dialogue_text(
+		player_text,
+		given_item,
+		"player",
+		source_decision.duplicate(true),
+		true,
+		"chat",
+		_build_steering_protocol("presentation", previous_id, previous_sequence, skipped_dialogue, heard_dialogue, boundary_reason),
+	)
+	_log("dialogue_presentation_guidance_consumed boundary=%s previous=%s latest=%s ok=%s text=%s" % [
+		boundary_reason,
+		previous_id,
+		_active_client_request_id,
+		str(bool(result.get("ok", false))),
+		_preview_text(player_text),
+	])
+	# guidance 已经消费，无论后端请求是否成功，都不能继续播放旧的剩余 segment。
+	return true
+
+
+func _remaining_pending_dialogue_text() -> String:
+	"""返回尚未播放的 segment 文本，作为 steering 的 interrupted_dialogue。"""
+	if _pending_voice_segments.is_empty():
+		return ""
+	var parts: Array[String] = []
+	var start_index := clampi(_pending_voice_segment_index, 0, _pending_voice_segments.size())
+	for index in range(start_index, _pending_voice_segments.size()):
+		var segment := _pending_voice_segments[index] as Dictionary
+		var text := String(segment.get("text", "")).strip_edges()
+		if not text.is_empty():
+			parts.append(text)
+	return "".join(parts).left(500)
+
+
 func _on_tts_playback_finished(_cache_key: String) -> void:
 	if not _speech_gate_active or _pending_voice_report.is_empty():
+		return
+	_pending_voice_any_presented = _pending_voice_any_presented or _pending_voice_presented
+	if not _pending_voice_segments.is_empty():
+		_pending_voice_segment_index += 1
+		if _consume_deferred_presentation_guidance_after_segment("segment_finished"):
+			return
+		if _play_pending_voice_segment():
+			return
+		_finish_pending_segmented_dialogue()
+		return
+	if _consume_deferred_presentation_guidance_after_segment("speech_finished"):
 		return
 	var report := _pending_voice_report.duplicate(true)
 	var dialogue_text := _pending_voice_dialogue
@@ -1840,11 +2105,32 @@ func _on_tts_playback_failed(reason: String, _metadata: Dictionary) -> void:
 	_log("tts_playback_failed reason=%s" % reason)
 	if not _speech_gate_active or _pending_voice_report.is_empty():
 		return
+	_pending_voice_any_presented = _pending_voice_any_presented or _pending_voice_presented
+	if not _pending_voice_segments.is_empty():
+		_pending_voice_segment_index += 1
+		if _consume_deferred_presentation_guidance_after_segment("segment_failed"):
+			return
+		if _play_pending_voice_segment():
+			return
+		_finish_pending_segmented_dialogue()
+		return
+	if _consume_deferred_presentation_guidance_after_segment("speech_failed"):
+		return
 	var report := _pending_voice_report.duplicate(true)
 	var dialogue_text := _pending_voice_dialogue
 	var ai_data := _pending_voice_ai_data.duplicate(true)
 	var route_summary := _pending_voice_route_summary.duplicate(true)
 	var tts_presented := _pending_voice_presented
+	_clear_pending_voice_state()
+	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary, tts_presented)
+
+func _finish_pending_segmented_dialogue() -> void:
+	"""所有 segment 播完后，只发送一次完整 dialogue_completed。"""
+	var report := _pending_voice_final_report.duplicate(true)
+	var dialogue_text := _pending_voice_final_dialogue
+	var ai_data := _pending_voice_final_ai_data.duplicate(true)
+	var route_summary := _pending_voice_final_route_summary.duplicate(true)
+	var tts_presented := _pending_voice_any_presented
 	_clear_pending_voice_state()
 	_finish_dialogue_presentation(report, dialogue_text, ai_data, route_summary, tts_presented)
 

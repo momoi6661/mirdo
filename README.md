@@ -82,6 +82,10 @@ D:\AAgodot\release\Mirdo-windows-x64.zip
 - 导出产物：`exports/`、`*.exe`、`*.pck`、`*.zip`
 - 日志、临时文件、虚拟环境等
 
+## 架构文档
+
+- [可引导的事件驱动 Agent 循环](docs/steerable_event_driven_agent_loop.md)：解释 Mirdo 如何把玩家输入、Godot 工具结果、TTS 字幕和后端 Agent Loop 串成连续任务。
+
 ## 开发重点
 
 - 对话 → 行为 → Godot 回执 → 后续对话/行为的闭环。

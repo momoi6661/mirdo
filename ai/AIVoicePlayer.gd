@@ -68,6 +68,9 @@ var _voice_bus_prepared: bool = false
 func _ready() -> void:
 	_ensure_nodes()
 
+## 外部组件可在角色初始化完成后再次调用，用来提前完成 3D 播放器挂载。
+func prepare() -> void:
+	_ensure_nodes()
 
 func _exit_tree() -> void:
 	# 空间播放器挂在角色根节点上，组件销毁时要主动清理，避免角色重复生成声音节点。
