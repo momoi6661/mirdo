@@ -27,7 +27,7 @@ var _active_task: Dictionary = {}
 var _task_serial: int = 0
 var _timeout_serial: int = 0
 
-const NAVIGATION_COMMANDS := ["go_to_nav_point", "go_to_object", "sit_down", "pick_up_item", "take_from_container", "use_item", "eat_item"]
+const NAVIGATION_COMMANDS := ["go_to_marker", "go_to_nav_point", "go_to_object", "sit_down", "pick_up_item", "take_from_container", "use_item", "eat_item"]
 
 func _ready() -> void:
 	_refresh_refs()
@@ -94,7 +94,10 @@ func _on_executor_started(ai_data: Dictionary) -> void:
 	var step := _current_step(ai_data)
 	var payload: Dictionary = step.get("command_payload", {}) as Dictionary if step.get("command_payload", {}) is Dictionary else {}
 	var task_id := String(ai_data.get("task_id", payload.get("task_id", ""))).strip_edges()
-	if task_id.is_empty():
+	var command := String(step.get("command", "")).strip_edges()
+	# 没有首步就不是一个可等待的 Agent 任务。避免仅带 task_id 的对白
+	# 被误登记成“空动作”，从而让后端收到一条无法对齐的回执。
+	if task_id.is_empty() or command.is_empty():
 		return
 	if not _active_task.is_empty():
 		# 同一个 task_id 的重复响应是网络/重绘重入，保持原任务，不重新计时。
@@ -106,7 +109,7 @@ func _on_executor_started(ai_data: Dictionary) -> void:
 		"task_id": task_id,
 		"local_id": "godot-task-%d" % _task_serial,
 		"step_id": String(step.get("step_id", ai_data.get("current_step_id", ""))).strip_edges(),
-		"command": String(step.get("command", "")).strip_edges(),
+		"command": command,
 		"action": String(step.get("action", ai_data.get("action", ""))).strip_edges(),
 		"target_object": String(payload.get("target_object", payload.get("target_ref", ""))).strip_edges(),
 		"target_nav_point": String(payload.get("target_nav_point", "")).strip_edges(),

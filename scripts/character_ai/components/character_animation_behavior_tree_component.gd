@@ -408,6 +408,26 @@ func get_available_actions() -> PackedStringArray:
 	result.sort()
 	return result
 
+## 返回运行时真正挂到 AnimationTree 的动作能力，而不是仅返回配置文件里的
+## 名称。后端/调试面板可据此区分“模型知道的动作”和“本实例能执行的动作”。
+func get_action_capabilities() -> Dictionary:
+	var capabilities := {
+		"ready": is_ready(),
+		"modes": [],
+		"actions": [],
+		"current_mode": String(_current_mode),
+		"current_state": String(get_current_state()),
+	}
+	for mode in [MODE_LOCOMOTION, MODE_POSTURE, MODE_WORK, MODE_REACTION]:
+		if _playbacks.has(mode):
+			(capabilities["modes"] as Array).append(String(mode))
+	for action in ACTION_ROUTES.keys():
+		var route: Dictionary = ACTION_ROUTES[action]
+		if _playbacks.has(StringName(route.get("mode", &""))):
+			(capabilities["actions"] as Array).append(String(action))
+	(capabilities["actions"] as Array).sort()
+	return capabilities
+
 func get_available_states() -> PackedStringArray:
 	return PackedStringArray([
 		"idle_normal", "idle_relaxed", "idle_sleepy", "idle_alert", "idle_fidget", "listen", "happy_bounce",

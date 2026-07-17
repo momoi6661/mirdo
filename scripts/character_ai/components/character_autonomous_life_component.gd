@@ -1692,6 +1692,19 @@ func _build_external_event_context(
 	var current_step_id := String(goal_report.get("current_step_id", payload.get("current_step_id", ""))).strip_edges()
 	var action_step_value: Variant = goal_report.get("action_step", payload.get("action_step", {}))
 	var action_line_value: Variant = goal_report.get("action_line", payload.get("action_line", []))
+	# execution 是跨 Godot/Server 的稳定协议字段。旧场景可能还没有显式
+	# 填它，因此这里补一个最小回执，避免把未定义变量或散落字段送给 Agent。
+	var execution_value: Variant = goal_report.get("execution", payload.get("execution", {}))
+	var execution: Dictionary = execution_value as Dictionary if execution_value is Dictionary else {}
+	if execution.is_empty():
+		execution = {
+			"phase": "completed" if bool(goal_report.get("ok", false)) else "failed",
+			"task_id": task_id,
+			"step_id": current_step_id,
+			"command": String(goal_report.get("command", payload.get("command", ""))).strip_edges(),
+			"observed_at_msec": Time.get_ticks_msec(),
+			"result": action_result.duplicate(true),
+		}
 	return {
 		"event_id": event_id,
 		"event": event,

@@ -19,6 +19,7 @@ signal dialogue_failed(error_text: String)
 @export var autonomous_life_path: NodePath
 @export var blackboard_path: NodePath
 @export var action_semantics_path: NodePath
+@export var animation_behavior_path: NodePath
 @export var action_executor_path: NodePath
 @export var subtitle_target_path: NodePath
 @export var face_component_path: NodePath
@@ -108,6 +109,7 @@ var _player_awareness: Node
 var _autonomous_life: Node
 var _blackboard: Node
 var _action_semantics: Node
+var _animation_behavior: Node
 var _action_executor: Node
 var _subtitle_target: Node
 var _face_component: Node
@@ -1005,6 +1007,11 @@ func _build_npc_contract_context() -> Dictionary:
 		context["preferred_work_actions"] = ["work_inspect_cabinet", "work_check_shelf", "work_check_lower", "work_count_supplies", "work_take_item", "work_drink"]
 	else:
 		context["available_body_actions"] = _packed_to_clean_array(available_body_actions)
+	_refresh_refs()
+	if _animation_behavior != null and _animation_behavior.has_method("get_action_capabilities"):
+		var runtime_caps: Variant = _animation_behavior.call("get_action_capabilities")
+		if runtime_caps is Dictionary:
+			context["runtime_action_capabilities"] = (runtime_caps as Dictionary).duplicate(true)
 	return context
 
 func _build_blackboard_context() -> Dictionary:
@@ -2167,6 +2174,7 @@ func _refresh_refs() -> void:
 	_autonomous_life = get_node_or_null(autonomous_life_path) if autonomous_life_path != NodePath() else null
 	_blackboard = get_node_or_null(blackboard_path) if blackboard_path != NodePath() else null
 	_action_semantics = get_node_or_null(action_semantics_path) if action_semantics_path != NodePath() else null
+	_animation_behavior = get_node_or_null(animation_behavior_path) if animation_behavior_path != NodePath() else null
 	_action_executor = get_node_or_null(action_executor_path) if action_executor_path != NodePath() else null
 	_subtitle_target = get_node_or_null(subtitle_target_path) if subtitle_target_path != NodePath() else null
 	_face_component = get_node_or_null(face_component_path) if face_component_path != NodePath() else null
@@ -2186,6 +2194,8 @@ func _refresh_refs() -> void:
 		_blackboard = _find_sibling_with_method(&"build_blackboard_snapshot")
 	if _action_semantics == null:
 		_action_semantics = _find_sibling_with_method(&"get_action_semantics")
+	if _animation_behavior == null:
+		_animation_behavior = _find_sibling_with_method(&"get_action_capabilities")
 	if _action_executor == null:
 		_action_executor = _find_sibling_with_method(&"apply_ai_response")
 	if _subtitle_target == null:

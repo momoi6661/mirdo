@@ -2296,6 +2296,7 @@ script = ExtResource("55_ai_manager")
 
 [node name="AIDialogueComponent" type="Node" parent="Components" unique_id=1043631563]
 script = ExtResource("56_ai_dialogue")
+animation_behavior_path = NodePath("../AnimationBehaviorTreeComponent")
 ai_manager_path = NodePath("../AIManager")
 perception_component_path = NodePath("../CharacterPerception")
 mind_state_path = NodePath("../CharacterMindState")

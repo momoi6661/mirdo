@@ -117,6 +117,15 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 		report["errors"].append("intent_empty")
 		return report
 	match intent_name:
+		"go_to_marker":
+			# go_to_marker 是旧后端和编辑器工具仍会产生的兼容命令。
+			# 它的 target_ref 可能是 NodePath，也可能是语义导航点，按两级解析，
+			# 避免命令被识别成功但角色原地不动。
+			if _resolve_direct_marker_from_intent(intent, report):
+				if report.get("ok", false):
+					report["chosen_action"] = _choose_body_action_for_target(report, intent)
+				return report
+			_resolve_nav_point_marker(intent, report)
 		"go_to_nav_point":
 			_resolve_nav_point_marker(intent, report)
 		"go_to_object", "sit_down":
@@ -153,8 +162,17 @@ func execute_intent(intent: Dictionary) -> Dictionary:
 				report["chosen_action"] = &"work_reach"
 			else:
 				report["errors"].append("gift_item_missing")
-		_:
+		"play_action":
+			report["ok"] = not String(intent.get("action", "")).strip_edges().is_empty()
+			report["chosen_action"] = StringName(String(intent.get("action", "")).strip_edges())
+			if not report["ok"]:
+				report["errors"].append("action_empty")
+		"set_expression", "speak_hint":
+			# 表情/口播已经在 apply_ai_response 的呈现层处理；仍返回成功，
+			# 这样 TaskManager 不会把一个非移动步骤误报成 action_rejected。
 			report["ok"] = true
+		_:
+			report["errors"].append("unsupported_intent:%s" % intent_name)
 	return report
 
 func apply_ai_response(ai_data: Dictionary) -> Dictionary:
@@ -181,6 +199,7 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 		var intent_report := execute_intent(intent)
 		report["intent_report"] = intent_report
 		if bool(intent_report.get("ok", false)):
+			var intent_name := String(intent.get("intent", ""))
 			match String(intent.get("intent", "")):
 				"follow_player":
 					_clear_active_sit_marker()
@@ -210,6 +229,11 @@ func apply_ai_response(ai_data: Dictionary) -> Dictionary:
 					report["navigation_started"] = bool(give_report.get("navigation_started", false))
 					report["action"] = String(intent_report.get("chosen_action", "work_reach"))
 					report["intent_report"] = give_report
+					ai_response_application_finished.emit(report.duplicate(true))
+					return report
+				"set_expression", "speak_hint":
+					report["action_applied"] = true
+					report["action"] = intent_name
 					ai_response_application_finished.emit(report.duplicate(true))
 					return report
 			var chosen := StringName(String(intent_report.get("chosen_action", "")))
@@ -891,6 +915,14 @@ func _normalize_ai_payload(ai_data: Dictionary) -> Dictionary:
 			if current_step_id.is_empty() or String(candidate_dict.get("step_id", "")).strip_edges() == current_step_id:
 				step = candidate_dict.duplicate(true)
 				break
+		# 后端重试/恢复时可能带着已经完成的 current_step_id，但 action_line
+		# 已经只剩下一步。不要静默清空 command 让 Mirdo 只看着玩家；在没有
+		# 精确命中的情况下选择第一条可执行步骤，并把实际 step_id 回传出去。
+		if step.is_empty():
+			for candidate in action_line:
+				if candidate is Dictionary and not String((candidate as Dictionary).get("command", "")).strip_edges().is_empty():
+					step = (candidate as Dictionary).duplicate(true)
+					break
 		if not step.is_empty():
 			current_step_id = String(step.get("step_id", current_step_id)).strip_edges()
 			out["current_step_id"] = current_step_id

@@ -64,17 +64,29 @@ func show_once(text: String, speaker: String = "") -> void:
 
 func show_once_immediate(text: String, speaker: String = "") -> void:
 	"""立即显示完整句子，供 TTS 起播时使用，避免字幕还在追赶音频。"""
+	_refresh_refs()
 	var clean_text := text.strip_edges()
 	var clean_speaker := speaker.strip_edges()
-	# show_once 会做去重；这里提前判断，避免去重后仍继续调用底层
-	# WorldSubtitleComponent.show_once_immediate，导致最后一句被重置一次。
+	# 不要先调用 show_once 再调用 show_once_immediate：这会让底层组件
+	# 创建两次同一句对白，表现为最后一句闪烁/重复。这里直接更新路由器
+	# 状态，然后只调用一次“立即显示”接口。
 	if _should_suppress_duplicate_line(clean_text, clean_speaker):
 		return
-	show_once(clean_text, clean_speaker)
+	_remember_displayed_line(clean_text, clean_speaker)
+	_active_text = clean_text
+	_active_speaker = clean_speaker
+	_streaming = false
+	_line_active = not _active_text.is_empty()
+	_overlay_visible_for_current_line = false
+	_world_seen_for_current_line = false
+	_line_lifetime_left = _resolve_line_lifetime(_active_text)
 	if _world_subtitle != null and _world_subtitle.has_method("show_once_immediate"):
 		_world_subtitle.call("show_once_immediate", clean_text, clean_speaker)
+	elif _world_subtitle != null and _world_subtitle.has_method("show_once"):
+		_world_subtitle.call("show_once", clean_text, clean_speaker)
 	if _player_overlay != null and _player_overlay.has_method("show_once_immediate"):
 		_player_overlay.call("show_once_immediate", clean_text, clean_speaker)
+	_update_overlay_visibility(true)
 
 func begin_stream(speaker: String = "") -> void:
 	_refresh_refs()
