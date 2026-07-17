@@ -142,15 +142,28 @@ func _handle_mouse_look_event(event: InputEvent) -> bool:
 
 func _notification(what: int) -> void:
 	# 窗口失焦时释放鼠标和按键，避免点击到编辑器后角色继续移动或视角漂移。
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		_window_has_focus = false
 		_mouse_mode_before_focus_out = Input.mouse_mode
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_mouse_input = false
+		_rotation_input = 0.0
+		_tilt_input = 0.0
 		_release_ui_captured_movement_input()
-	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
 		_window_has_focus = true
-		if recapture_mouse_on_focus and _should_capture_mouse_after_focus():
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		_mouse_input = false
+		_rotation_input = 0.0
+		_tilt_input = 0.0
+		call_deferred("_recapture_mouse_after_focus")
+
+func _recapture_mouse_after_focus() -> void:
+	await get_tree().process_frame
+	var window := get_window()
+	if window != null and window.get_mode() == Window.MODE_MINIMIZED:
+		return
+	if recapture_mouse_on_focus and _should_capture_mouse_after_focus():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _should_capture_mouse_after_focus() -> bool:
 	if get_tree() == null or get_tree().paused:
