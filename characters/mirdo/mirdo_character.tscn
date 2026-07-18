@@ -2258,8 +2258,10 @@ navigation_agent_path = NodePath("../../NavigationAgent3D")
 self_talk_chance_on_arrival = 0.22
 self_talk_chance_on_ambient = 0.05
 self_talk_cooldown_sec = 42.0
-autonomous_backend_task_chance = 1.0
-autonomous_backend_task_cooldown_sec = 30.0
+# 自主 Agent 不是定时播报器：大多数思考回合先使用本地行为树，
+# 只有少量机会才请求后端生成一件有原因的小事，避免等待工具结果时刷屏。
+autonomous_backend_task_chance = 0.28
+autonomous_backend_task_cooldown_sec = 75.0
 autonomous_backend_task_prompt_prefix = "Mirdo 在避难所里主动思考下一件自然的小事。不要每次只汇报状态；优先提出一个具体观察、疑问或邀请老师参与的话题，也可以先行动再回来说明。"
 opening_dialogue_enabled = true
 opening_dialogue_delay_sec = 1.2
