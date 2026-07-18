@@ -119,6 +119,10 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export var player_social_seated_actions: PackedStringArray = PackedStringArray(["seated_idle"])
 @export var inspect_marker_role: String = "approach"
 @export var sit_marker_role: String = "sit"
+@export var use_arrival_action_sequences: bool = true
+## 到达设施后先伸手靠近，再执行对应的检查动作；这样行为树里的
+## work_reach / work_check_* 不会只停留在“能力列表”里，而会成为完整行为。
+@export_range(0, 50, 1) var arrival_sequence_priority: int = 8
 @export var debug_log: bool = false
 
 var _perception_component: Node
@@ -2191,7 +2195,7 @@ func _on_motor_navigation_finished(_finished_action: StringName = &"") -> void:
 	# arrives, so do not request sit_down here or the character will sit at the
 	# projected navmesh point instead of the actual seat marker.
 	if arrival != &"" and not _is_sit_action(arrival):
-		_request_body_action(arrival)
+		_play_arrival_action_sequence(arrival, finished)
 	_apply_decision_expression(finished)
 	_start_dwell(float(finished.get("dwell_time_sec", post_arrival_dwell_default_sec)))
 	_think_left = maxf(_think_left, post_arrival_think_delay_sec)
@@ -2200,6 +2204,32 @@ func _on_motor_navigation_finished(_finished_action: StringName = &"") -> void:
 	_apply_resource_delta_for_action(String(arrival), finished)
 	_try_request_self_talk(finished, self_talk_chance_on_arrival)
 	autonomous_navigation_finished.emit(finished)
+
+func _play_arrival_action_sequence(arrival_action: StringName, decision: Dictionary) -> void:
+	# 导航完成只是“到了目标”，不是“完成了观察”。用调度器串起
+	# 伸手 -> 检查/清点两个动作，避免后端只看到一个瞬间动作。
+	if not use_arrival_action_sequences or _action_scheduler == null:
+		_request_body_action(arrival_action)
+		return
+	if not _action_scheduler.has_method("request_sequence"):
+		_request_body_action(arrival_action)
+		return
+	var normalized := String(arrival_action).strip_edges().to_lower()
+	var work_actions := [
+		"work_inspect_cabinet", "work_check_shelf", "work_check_lower",
+		"work_count_supplies", "work_take_item", "work_place_item", "work_drink"
+	]
+	if not work_actions.has(normalized):
+		_request_body_action(arrival_action)
+		return
+	var sequence: Array = ["work_reach", normalized]
+	var source := "autonomous_arrival:%s" % String(decision.get("target_object", decision.get("target_nav_point", "")))
+	var accepted := bool(_action_scheduler.call(
+		"request_sequence", sequence, arrival_sequence_priority, source, StringName(default_return_action)
+	))
+	if not accepted:
+		# 调度器拒绝时保留单动作回退，避免行为树因为一个队列冲突完全没有反应。
+		_request_body_action(arrival_action)
 
 func _on_motor_navigation_cancelled() -> void:
 	_navigation_active = false
