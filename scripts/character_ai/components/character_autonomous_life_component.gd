@@ -37,6 +37,8 @@ signal autonomous_navigation_finished(decision: Dictionary)
 @export_range(5.0, 300.0, 1.0) var self_talk_cooldown_sec: float = 38.0
 @export_range(8, 80, 1) var self_talk_max_chars: int = 24
 @export var self_talk_prompt_prefix: String = "用Mirdo的口吻自言自语一句很短的话，称呼玩家为老师，不要超过24个中文字符。"
+@export var proactive_idle_talk_enabled: bool = true
+@export_range(15.0, 300.0, 1.0) var proactive_idle_interval_sec: float = 42.0
 @export var external_goal_follow_up_enabled: bool = true
 @export_range(0.0, 10.0, 0.1) var external_goal_follow_up_delay_sec: float = 0.7
 @export_range(20, 180, 1) var external_goal_follow_up_max_chars: int = 56
@@ -161,6 +163,7 @@ var _locomotion_velocity_gate_active: bool = false
 var _dwell_left: float = 0.0
 var _self_talk_cooldown_left: float = 0.0
 var _autonomous_backend_task_cooldown_left: float = 0.0
+var _proactive_idle_talk_left: float = 18.0
 var _last_decision_kind: String = ""
 var _last_decision_target: String = ""
 var _recent_decision_kinds: Array[String] = []
@@ -209,6 +212,10 @@ func _process(delta: float) -> void:
 	if _startup_movement_grace_left > 0.0:
 		return
 	if _try_resume_saved_task():
+		return
+	# 长时间没有玩家输入或外部任务时，主动发起一小段有上下文的对话。
+	# 这条路径仍由 DialogueComponent/Agent 生成，不在 Godot 中硬编码台词。
+	if _try_request_proactive_idle_talk():
 		return
 	_think_left -= delta
 	if _think_left > 0.0:
@@ -1506,6 +1513,31 @@ func _try_request_self_talk(decision: Dictionary, chance: float) -> bool:
 			notify_dialogue_started()
 	return ok
 
+func _try_request_proactive_idle_talk() -> bool:
+	if not proactive_idle_talk_enabled or _proactive_idle_talk_left > 0.0:
+		return false
+	if _is_external_action_busy() or is_navigating() or not _get_block_reason().is_empty():
+		return false
+	_refresh_refs()
+	if _dialogue_component == null or not _dialogue_component.has_method("send_autonomous_text"):
+		return false
+	var snapshot := _build_snapshot()
+	var prompt := "Mirdo 已经有一段时间没有和老师交流。请根据当前环境、最近记忆和人格，主动说一句自然的日语对话；不要虚构不存在的事件，不超过%d字。若发现值得做的小事，可附带一个简短的后续行动。" % self_talk_max_chars
+	var decision := {
+		"kind": "ambient_dialogue",
+		"event": "proactive_idle_dialogue",
+		"request_source": "autonomous_idle",
+		"perception": snapshot.get("perception", {}),
+		"recent_context": snapshot.get("recent_context", {}),
+	}
+	var result: Variant = _dialogue_component.call("send_autonomous_text", prompt, decision)
+	var ok := bool(result.get("ok", false)) if result is Dictionary else bool(result)
+	if ok:
+		_proactive_idle_talk_left = proactive_idle_interval_sec
+		_self_talk_cooldown_left = maxf(_self_talk_cooldown_left, 8.0)
+		notify_dialogue_started()
+	return ok
+
 func _schedule_external_goal_follow_up(goal_report: Dictionary) -> void:
 	if not external_goal_follow_up_enabled:
 		return
@@ -2267,6 +2299,7 @@ func _tick_timers(delta: float) -> void:
 	_player_social_approach_cooldown_left = maxf(0.0, _player_social_approach_cooldown_left - delta)
 	_sit_cooldown_left = maxf(0.0, _sit_cooldown_left - delta)
 	_self_talk_cooldown_left = maxf(0.0, _self_talk_cooldown_left - delta)
+	_proactive_idle_talk_left = maxf(0.0, _proactive_idle_talk_left - delta)
 	_autonomous_backend_task_cooldown_left = maxf(0.0, _autonomous_backend_task_cooldown_left - delta)
 	var expired: Array = []
 	for key in _target_cooldowns.keys():
