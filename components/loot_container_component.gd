@@ -131,14 +131,21 @@ func can_accept_item(item: ItemData) -> bool:
 func _is_item_allowed_by_filters(item: ItemData) -> bool:
 	if item == null:
 		return false
-	if not allowed_item_categories.is_empty() and not allowed_item_categories.has(item.outing_category):
-		return false
-	if not allowed_item_tags.is_empty():
+	# 类别和标签是两种互补的语义过滤器，而不是必须同时满足的 AND。
+	# 例如食品柜配置了 category=food、tag=食品柜，但旧物品资源没有额外
+	# inventory_tags；若强制 AND，玩家就只能从柜子取出，无法把食物放回柜子。
+	var category_allowed := allowed_item_categories.is_empty() or allowed_item_categories.has(item.outing_category)
+	var tag_allowed := allowed_item_tags.is_empty()
+	if not tag_allowed:
 		for tag in item.inventory_tags:
 			if allowed_item_tags.has(tag):
-				return true
-		return false
-	return true
+				tag_allowed = true
+				break
+	if allowed_item_categories.is_empty():
+		return tag_allowed
+	if allowed_item_tags.is_empty():
+		return category_allowed
+	return category_allowed or tag_allowed
 
 # ==========================================
 # 存档系统接口
