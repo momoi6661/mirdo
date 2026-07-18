@@ -57,6 +57,39 @@ func _ready() -> void:
 func is_offering_item() -> bool:
 	return _offer_active
 
+## 把已经从柜子取出的物品留在 Mirdo 手上。
+## 取物和递物是两个不同阶段：这里不创建“等待玩家接受”的交互区，
+## 只负责可视化持有状态；后续 give_item_to_player 再转为递出状态。
+func hold_item_in_hand(item: ItemData, amount: int = 1) -> Dictionary:
+	if not enabled or item == null:
+		return {"ok": false, "error": "item_missing"}
+	_refresh_refs()
+	var attachment := _resolve_attachment()
+	if attachment == null:
+		return {"ok": false, "error": "hand_attachment_missing"}
+	_withdraw_active_offer("replaced_by_new_hold", false)
+	var visual := _create_item_visual(item)
+	if visual == null:
+		return {"ok": false, "error": "item_visual_missing"}
+	_active_item = item
+	_active_amount = maxi(1, amount)
+	_offer_active = false
+	_clear_named_child(attachment, offered_visual_name)
+	_clear_named_child(attachment, "HeldItemVisual")
+	var holder := Node3D.new()
+	holder.name = "HeldItemVisual"
+	attachment.add_child(holder)
+	var pose := _resolve_offer_pose_options({})
+	holder.position = pose.get("position", Vector3.ZERO)
+	holder.rotation_degrees = pose.get("rotation_degrees", Vector3.ZERO)
+	holder.scale = pose.get("scale", Vector3.ONE)
+	_clear_owner_recursive(visual)
+	visual.name = "ItemModel"
+	holder.add_child(visual)
+	_active_visual = holder
+	_log("hold %s amount=%d" % [_item_name(item), _active_amount])
+	return {"ok": true, "item": item, "amount": _active_amount, "held": true}
+
 func offer_item_by_path(item_path: String, player: Node = null, options: Dictionary = {}) -> Dictionary:
 	var item := load(item_path) as ItemData
 	return offer_item_to_player(item, player, options)

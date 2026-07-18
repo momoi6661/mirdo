@@ -1089,6 +1089,11 @@ func _complete_container_take(intent: Dictionary, goal_context: Dictionary) -> v
 	if bool(result.get("ok", false)):
 		_carried_item = result.get("item", null) as ItemData
 		_carried_amount = int(result.get("amount", 1))
+		# 取物成功后立即把同一个 ItemData 显示在手上；不能等到递给老师
+		# 时才创建模型，否则玩家会看到“库存减少但手里是空的”。
+		if _give_item_component != null and _give_item_component.has_method("hold_item_in_hand"):
+			var hold_report: Variant = _give_item_component.call("hold_item_in_hand", _carried_item, _carried_amount)
+			goal_context["hold_report"] = hold_report if hold_report is Dictionary else {}
 	goal_context["action_result"] = result
 
 

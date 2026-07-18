@@ -1420,9 +1420,11 @@ func _schedule_dialogue_continuation_if_needed(ai_data: Dictionary, dialogue_tex
 	if _action_line_size(ai_data) > 0:
 		return false
 	var status := String(ai_data.get("task_status", ai_data.get("dialogue_status", ""))).strip_edges().to_lower()
-	var wants_continue := status in ["continue", "wait"]
+	# wait 表示正在等待 Godot/玩家的工具结果，不是让 Mirdo 自己继续刷屏。
+	# 只有模型明确返回 continue 且给出后续提示时，才自动发起下一轮。
+	var wants_continue := status == "continue"
 	var hint := String(ai_data.get("next_decision_hint", ai_data.get("continue_hint", ""))).strip_edges()
-	if not wants_continue and hint.is_empty():
+	if not wants_continue or hint.is_empty():
 		return false
 	var source: Dictionary = ai_data.get("source_decision", {}) as Dictionary if ai_data.get("source_decision", {}) is Dictionary else {}
 	var chain_id := String(ai_data.get("chain_id", source.get("chain_id", ""))).strip_edges()
