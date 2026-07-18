@@ -96,6 +96,7 @@ func _on_inventory_changed() -> void:
 		return
 	if _slots.size() != _inventory_data.get_slot_count():
 		_rebuild_slots()
+	# 数量/物品变化通常不会改变槽位总数，仍然要刷新每个槽位。
 	_refresh_all_slots()
 
 

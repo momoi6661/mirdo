@@ -1103,6 +1103,9 @@ func _calculate_grid_size(slot_count: int) -> Vector2:
 func _on_inventory_changed() -> void:
 	if _inventory_data == null:
 		return
+	# 物品数量变化并不一定改变槽位总数：拿走一瓶水、交换两个物品时，
+	# 槽位数量保持不变，但图标和数量必须立即重绘。旧代码把刷新缩进在
+	# “槽位总数变化”分支里，导致 3D 悬浮面板一直显示旧的背包内容。
 	if _slot_visuals.size() != _inventory_data.get_slot_count():
 		_rebuild_slot_visuals()
 	_refresh_all_slot_visuals()
