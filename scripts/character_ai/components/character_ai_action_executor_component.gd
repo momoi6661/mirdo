@@ -625,6 +625,7 @@ func _finish_navigation() -> void:
 	else:
 		_request_body_action(stop_action)
 	_complete_pickable_interaction(goal_context)
+	_capture_arrival_observation(goal_context)
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_pending_arrival_action = &""
 	navigation_finished.emit(finished_action)
@@ -673,6 +674,7 @@ func _on_motor_navigation_finished(finished_action: StringName = &"") -> void:
 	_face_arrival_target(goal_context)
 	_update_seat_state_after_arrival(finished_action, finished_marker_path)
 	_complete_pickable_interaction(goal_context)
+	_capture_arrival_observation(goal_context)
 	navigation_finished.emit(finished_action)
 	_emit_navigation_goal_finished(finished_action, finished_marker_path, goal_context)
 
@@ -721,6 +723,52 @@ func _complete_pickable_interaction(goal_context: Dictionary) -> void:
 	}
 	if intent_name != "pick_up_item" and bool(pick_report.get("ok", true)):
 		_consume_pickable_after_arrival(target, intent_name, target_ref)
+
+## 抵达普通语义物体也要生成一次“看到什么”的工具结果。
+## 以前只有取物/喝水会写 action_result；检查柜子只是到了目标就结束，
+## 后端因此收不到库存快照，看起来像“知道了但没有下一步”。
+func _capture_arrival_observation(goal_context: Dictionary) -> void:
+	# 取物/喝水已经有更具体的结果（数量、剩余库存、消耗结果），不能覆盖。
+	var existing_result: Variant = goal_context.get("action_result", {})
+	if existing_result is Dictionary and not (existing_result as Dictionary).is_empty():
+		return
+	var target_ref := String(goal_context.get("target_object", "")).strip_edges()
+	if target_ref.is_empty():
+		return
+	var target := _find_world_object(target_ref)
+	if target == null:
+		return
+	var summary := _build_world_object_summary(target)
+	var entity_summary: Dictionary = {}
+	if target.has_method("build_ai_entity_summary"):
+		var entity_value: Variant = target.call("build_ai_entity_summary", _actor)
+		if entity_value is Dictionary:
+			entity_summary = (entity_value as Dictionary).duplicate(true)
+	var inventory: Dictionary = {}
+	for method_name in [&"build_ai_inventory_snapshot", &"get_ai_inventory_snapshot", &"get_inventory_snapshot"]:
+		if target.has_method(method_name):
+			var value: Variant = target.call(method_name)
+			if value is Dictionary:
+				inventory = (value as Dictionary).duplicate(true)
+				break
+	if inventory.is_empty() and target.has_method("build_ai_object_summary"):
+		var object_value: Variant = target.call("build_ai_object_summary", _actor)
+		if object_value is Dictionary:
+			var object_summary := object_value as Dictionary
+			var availability: Variant = object_summary.get("availability", {})
+			if availability is Dictionary:
+				inventory = (availability as Dictionary).duplicate(true)
+	if summary.is_empty() and entity_summary.is_empty() and inventory.is_empty():
+		return
+	goal_context["action_result"] = {
+		"ok": true,
+		"interaction": "inspect",
+		"target_ref": target_ref,
+		"object": summary,
+		"entity": entity_summary,
+		"inventory": inventory,
+		"observed_at_msec": Time.get_ticks_msec(),
+	}
 
 func _consume_pickable_after_arrival(target: Node, intent_name: String, target_ref: String) -> void:
 	# 等拿起动画/手部模型稍微就位后再消耗，让玩家能看到“拿水→喝水”的因果。
