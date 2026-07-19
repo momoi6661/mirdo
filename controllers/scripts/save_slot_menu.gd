@@ -29,6 +29,7 @@ const DEFAULT_SLOT_NAMES := ["slot_01", "slot_02", "slot_03"]
 var current_mode: String = MODE_PROGRESS
 var _pending_delete_slot: String = ""
 var _busy: bool = false
+var _backend_delete_dialog: ConfirmationDialog
 var _is_closing: bool = false
 var _panel_rest_position: Vector2 = Vector2.ZERO
 var _panel_rest_scale: Vector2 = Vector2.ONE
@@ -42,6 +43,15 @@ var _sound_library: Dictionary = {
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_backend_delete_dialog = ConfirmationDialog.new()
+	_backend_delete_dialog.title = "需要重启后端"
+	_backend_delete_dialog.ok_button_text = "确定"
+	_backend_delete_dialog.dialog_text = "存档已删除，但后端会话清理失败。请重启后端后再开始游戏。"
+	_backend_delete_dialog.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_backend_delete_dialog)
+	var ai_manager := get_node_or_null("/root/AIManager")
+	if ai_manager != null and ai_manager.has_signal("on_session_deleted"):
+		ai_manager.on_session_deleted.connect(_on_backend_session_deleted)
 	_apply_visual_theme()
 	if slot_names.is_empty():
 		slot_names = PackedStringArray(DEFAULT_SLOT_NAMES)
@@ -420,8 +430,32 @@ func _confirm_delete_slot() -> void:
 		_set_status("找不到 SaveManager，无法删除。", true)
 		return
 	var success := bool(save_manager.call("delete_save", slot_name))
+	if success:
+		var ai_manager := get_node_or_null("/root/AIManager")
+		var session_id := _backend_session_id(slot_name)
+		if ai_manager != null and ai_manager.has_method("request_delete_session"):
+			if not bool(ai_manager.call("request_delete_session", session_id)):
+				_show_backend_delete_error()
+		else:
+			_show_backend_delete_error()
 	_set_status("已清理：%s" % _slot_display_name(slot_name) if success else "清理失败。", not success)
 	_refresh_slots()
+
+func _on_backend_session_deleted(_session_id: String, ok: bool, _error_msg: String) -> void:
+	if not ok:
+		_show_backend_delete_error()
+
+func _show_backend_delete_error() -> void:
+	if _backend_delete_dialog != null and is_instance_valid(_backend_delete_dialog):
+		_backend_delete_dialog.popup_centered()
+
+func _backend_session_id(slot_name: String) -> String:
+	var save_manager := _get_save_manager()
+	if save_manager != null and save_manager.has_method("get_current_ai_timeline_id"):
+		var timeline := String(save_manager.call("get_current_ai_timeline_id")).strip_edges()
+		if not timeline.is_empty():
+			return timeline
+	return "mirdo:%s" % slot_name.strip_edges().replace(" ", "_")
 
 
 func _reset_drawer_closed_position() -> void:

@@ -13,6 +13,7 @@ signal on_session_events_pull_error(session_id: String, error_msg: String)
 signal on_session_event_received(session_id: String, event: Dictionary)
 signal on_session_event_error(session_id: String, error_msg: String)
 signal on_session_event_stream_state_changed(session_id: String, connected: bool)
+signal on_session_deleted(session_id: String, ok: bool, error_msg: String)
 signal on_model_probe_received(response: Dictionary)
 signal on_model_probe_error(error_msg: String)
 
@@ -66,6 +67,8 @@ var _active_client_request_id: String = ""
 var _active_client_sequence: int = 0
 var _settings_service: Node = null
 var _history_requesting: bool = false
+var _delete_session_request: HTTPRequest
+var _delete_session_id: String = ""
 var _history_request_session_id: String = ""
 var _events_pull_requesting: bool = false
 var _events_pull_session_id: String = ""
@@ -290,6 +293,44 @@ func request_session_history(session_id: String, limit: int = 20) -> bool:
 	_history_request_session_id = clean_session_id
 	_log("history_request_start session_id=%s limit=%d" % [clean_session_id, safe_limit])
 	return true
+
+## 删除一个存档对应的后端会话；存档菜单会等待这个结果再提示玩家。
+func request_delete_session(session_id: String) -> bool:
+	if _delete_session_request != null and is_instance_valid(_delete_session_request):
+		return false
+	var clean := session_id.strip_edges()
+	if clean.is_empty():
+		clean = "default_session"
+	_delete_session_id = clean
+	_delete_session_request = HTTPRequest.new()
+	add_child(_delete_session_request)
+	_delete_session_request.request_completed.connect(_on_delete_session_completed)
+	var url := _build_url("/session/%s" % clean.uri_encode())
+	var err := _delete_session_request.request(url, PackedStringArray(["Accept: application/json"]), HTTPClient.METHOD_DELETE)
+	if err != OK:
+		_delete_session_request.queue_free()
+		_delete_session_request = null
+		on_session_deleted.emit(clean, false, "request_failed_%d" % err)
+		return false
+	return true
+
+func _on_delete_session_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	var sid := _delete_session_id
+	var ok := result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300
+	var error_msg := ""
+	if not ok:
+		error_msg = "http_%d" % response_code if response_code > 0 else "network_error_%d" % result
+	else:
+		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if parsed is Dictionary and parsed.has("ok"):
+			ok = bool((parsed as Dictionary).get("ok", false))
+			if not ok:
+				error_msg = String((parsed as Dictionary).get("error", "delete_failed"))
+	if _delete_session_request != null:
+		_delete_session_request.queue_free()
+	_delete_session_request = null
+	_delete_session_id = ""
+	on_session_deleted.emit(sid, ok, error_msg)
 
 # 标准入口：仅拉取新事件，对应后端 GET /session/{session_id}/events/pull
 func request_session_events_pull(session_id: String, after_turn_id: int = 0, limit: int = 20) -> bool:
